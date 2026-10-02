@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Skate Ski Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed snowfield canvas, fixed skier at center, slim HUD top-left, tuning drawer bottom-right, touch pads on phones */
+:root{
+  --snow:#dfe7ee; --grid:#c4d1dd; --grid-major:#a9bccd; --ink:#1d2a36; --muted:#5d7083;
+  --skier:#d2462e; --track:#8fa6ba; --shade:#5b7a96; --contour:#9a8466; --groomed:#fbfdff; --trail-edge:#b9c8d6; --d-green:#2f8a4f; --d-blue:#2563b8; --d-black:#1d2a36; --map-bg:rgba(255,255,255,.88); --up:#b5532a; --down:#2f7a5a; --panel:rgba(255,255,255,.86); --line:#d3dde6;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --snow:#0b1218; --grid:#1d2a37; --grid-major:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4;
+  --skier:#ff6a4d; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --snow:#0b1218; --grid:#1d2a37; --grid-major:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4;
+  --skier:#ff6a4d; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--snow);color:var(--ink);font-family:var(--mono);overflow:hidden;user-select:none;-webkit-user-select:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+.hud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);left:16px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:grid;gap:8px;min-width:200px;backdrop-filter:blur(6px)}
+.hud h1{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.04em;text-transform:uppercase;margin:0;line-height:1}
+.row{display:flex;justify-content:space-between;gap:16px;font-size:12px;font-variant-numeric:tabular-nums}
+.row span:first-child{color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:10.5px;align-self:center}
+.legs{display:flex;gap:6px;margin-top:2px}
+.leg{flex:1;text-align:center;font-size:11px;padding:4px 0;border:1px solid var(--line);border-radius:4px;color:var(--muted);transition:background .12s,color .12s}
+.leg.on{background:var(--skier);color:#fff;border-color:var(--skier)}
+.glide{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.gbar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.gbar i{display:block;height:100%;width:0;background:var(--muted);opacity:.5}
+.gbar i[data-on="1"]{background:var(--down);opacity:1}
+.help{font-size:11px;color:var(--muted);line-height:1.5;max-width:220px}
+.help b{color:var(--ink);font-weight:500}
+details{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 14px;width:min(260px,calc(100vw - 32px));backdrop-filter:blur(6px);font-size:11px}
+summary{cursor:pointer;font-family:var(--display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:14px}
+summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--skier);outline-offset:2px}
+.tune{display:grid;gap:8px;margin-top:10px}
+.tune label{display:grid;grid-template-columns:1fr auto;gap:2px 8px;color:var(--muted)}
+.tune input{grid-column:1/-1;width:100%;accent-color:var(--skier)}
+.tune output{color:var(--ink);font-variant-numeric:tabular-nums}
+.btns{display:flex;gap:6px}
+.sl{grid-column:1/-1;position:relative;display:block}
+.ghost{position:absolute;top:50%;width:4px;height:16px;margin-top:-8px;border-radius:2px;background:var(--ink);opacity:.55;pointer-events:none;transition:left .15s}
+.note{margin:0;color:var(--muted);font-size:10.5px}
+.srf{display:inline-flex;align-items:center;gap:2px;text-align:right}.srf[data-off="1"]{color:var(--up)}
+.dm{display:inline-block;width:9px;height:9px;flex:none}.dm.green{background:var(--d-green);border-radius:50%}.dm.blue{background:var(--d-blue)}.dm.black{background:var(--d-black);transform:rotate(45deg) scale(.85)}
+.grd[data-dir="up"]{color:var(--up)}.grd[data-dir="down"]{color:var(--down)}
+.btns button{flex:1;font:inherit;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px;cursor:pointer}
+.pads{position:fixed;inset:auto 0 0 0;display:none;height:38%;}
+.pad{position:absolute;bottom:0;top:0;width:50%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 20px);font-family:var(--display);font-size:18px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;touch-action:manipulation}
+.pad.l{left:0}.pad.r{right:0;border-left:1px dashed var(--line)}
+@media (pointer:coarse){.pads{display:block}details{bottom:calc(38% + 12px)}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud">
+  <h1>Skate Ski</h1>
+  <div class="row"><span>Speed</span><span id="spd">0.0 km/h</span></div>
+  <div class="row"><span>Heading</span><span id="hdg">000°</span></div>
+  <div class="row"><span>Last kick</span><span id="rot">—</span></div>
+  <div class="row"><span>Surface</span><span id="srf" class="srf">Groomed</span></div>
+  <div class="row"><span>Grade</span><span id="grd" class="grd">flat</span></div>
+  <div class="row"><span>Distance</span><span id="dst">0 m</span></div>
+  <div class="row"><span>Cadence</span><span id="cad">0 kicks/min</span></div>
+  <div class="legs"><div class="leg" id="legL">L kick</div><div class="leg" id="legR">R kick</div></div>
+  <div class="glide"><span>Glide</span><div class="gbar"><i id="gfill"></i></div></div>
+  <div class="help"><b>A / ←</b> left kick &nbsp; <b>D / →</b> right kick<br>Hold the key after each kick to ride the glide, and let go before you kick again. Alternate to go straight. Each kick turns you one step: left kicks step right, right kicks step left. Repeating a leg makes the step grow; alternate and the steps cancel.</div>
+</div>
+
+<details id="tuneBox">
+  <summary>Tuning</summary>
+  <div class="tune">
+    <label for="tPush">Push per kick (m/s)<output id="oPush"></output><input id="tPush" type="range" min="0.2" max="2.5" step="0.05" value="1.1"></label>
+    <label for="tTurn">Turn per kick (°)<output id="oTurn"></output><input id="tTurn" type="range" min="0" max="30" step="0.5" value="7"></label>
+    <label for="tBuild">Same-leg build (% per kick)<output id="oBuild"></output><input id="tBuild" type="range" min="0" max="50" step="1" value="15"></label>
+    <label for="tSplay">Skate angle (°)<output id="oSplay"></output><span class="sl"><input id="tSplay" type="range" min="0" max="60" step="1" value="18"><i class="ghost" id="tSplayG"></i></span></label>
+    <label for="tGwin">Glide window (ms)<output id="oGwin"></output><input id="tGwin" type="range" min="0" max="2000" step="50" value="900"></label>
+    <label for="tGcut">Glide friction cut (%)<output id="oGcut"></output><input id="tGcut" type="range" min="0" max="100" step="5" value="85"></label>
+    <label for="tFric">Snow friction (m/s²)<output id="oFric"></output><span class="sl"><input id="tFric" type="range" min="0" max="2" step="0.05" value="0.6"><i class="ghost" id="tFricG"></i></span></label>
+    <label for="tGlide">Speed drag<output id="oGlide"></output><input id="tGlide" type="range" min="0.01" max="1" step="0.01" value="0.25"></label>
+    <label for="tOff">Ungroomed snow (× friction)<output id="oOff"></output><input id="tOff" type="range" min="1" max="12" step="0.5" value="6"></label>
+    <label for="tGrip">Edge grip<output id="oGrip"></output><input id="tGrip" type="range" min="0.5" max="12" step="0.1" value="4"></label>
+    <label for="tSnap">Ski set time (ms)<output id="oSnap"></output><input id="tSnap" type="range" min="0" max="400" step="10" value="160"></label>
+    <label for="tCam">Camera smoothing (s)<output id="oCam"></output><input id="tCam" type="range" min="0.1" max="1.5" step="0.05" value="0.6"></label>
+    <label for="tMax">Top speed (km/h)<output id="oMax"></output><span class="sl"><input id="tMax" type="range" min="10" max="60" step="1" value="32"><i class="ghost" id="tMaxG"></i></span></label>
+    <p class="note">Markers show the live value after speed and hill adjust it.</p>
+    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button></div>
+  </div>
+</details>
+
+<div class="pads"><div class="pad l" id="padL">Left kick</div><div class="pad r" id="padR">Right kick</div></div>
+
+<script>
+(() => {
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const PX_PER_M = 28;        // world scale: 1 grid cell = 1 m, major line every 5 m
+let W = 0, H = 0, dpr = 1;
+function resize(){ dpr = Math.min(devicePixelRatio||1, 2); W = innerWidth; H = innerHeight; cv.width = W*dpr; cv.height = H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); }
+addEventListener('resize', resize); resize();
+
+const $ = id => document.getElementById(id);
+const P = {};
+const tune = [['tPush','oPush','push',v=>v.toFixed(2)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tBuild','oBuild','build',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
+  ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tMax','oMax','max',v=>v.toFixed(0)]];
+tune.forEach(([i,o,k,f]) => { const el=$(i); const upd=()=>{P[k]=+el.value; $(o).textContent=f(+el.value);}; el.addEventListener('input',upd); upd(); });
+
+// state: position (m), velocity (m/s), heading (rad, 0 = north, clockwise +), target heading set by the last kick
+const S = { x:0, y:0, vx:0, vy:0, th:0, thv:0, tgt:0, dist:0, grade:0, off:0, trail:null };
+let lastTurn = null, lastTurnDeg = 0, streak = 0;
+const MAX_BUILD = 2.5;    // same-leg turn step can grow to at most 2.5x the base
+const PUSH_LEN = 0.7;     // push-off adds this much to the end of a ski's line
+const SKI_MAX = 4;        // longest a single ski mark can run before the next kick
+const G = 9.81;
+let skis = [];            // every ski mark: { x, y, dx, dy, bx, by, len, live }
+let showTracks = true, kicks = [], lastLeg = null, lastSki = { L:null, R:null };
+const legFlash = { L:0, R:0 };
+
+// ---- terrain: gentle rolling hills, heights in metres (about ±3 m over 20–60 m wavelengths)
+function height(x, y){
+  const roll = 1.5*Math.sin(x/23 + .7)*Math.cos(y/31)
+             + 1.1*Math.sin((x + y)/41)
+             + 0.6*Math.cos((x - 2*y)/19)
+             + 0.9*Math.sin(y/57 - 1.3);
+  const ridge  =  8 * Math.exp(-((x-58)**2 + (y+92)**2) / (2*32*32));   // the ridge in the north-east
+  const valley = -6 * Math.exp(-((x+68)**2 + (y+68)**2) / (2*28*28));   // the valley in the west
+  const flat = 1 - 0.8*Math.exp(-(x*x + (y-5)**2) / (2*18*18));          // stadium is nearly level
+  return roll*flat + ridge + valley;
+}
+
+// ---- groomed trail network. control points in metres; north is up (negative y).
+// difficulty uses the usual trail-map marks: easiest green circle, more difficult blue square, most difficult black diamond
+const TRAIL_W = 5;        // groomed width (m)
+const TRAILS = [
+  { name:'Stadium Straight', diff:'green', pts:[[0,0],[2,-20],[0,-40]] },
+  { name:'Ridge Climb',      diff:'black', pts:[[0,-40],[25,-55],[50,-62],[68,-85],[62,-110],[35,-128],[5,-135]] },
+  { name:'Center Line',      diff:'blue',  pts:[[0,-40],[-8,-70],[8,-100],[5,-135]] },
+  { name:'Valley Run',       diff:'blue',  pts:[[5,-135],[-30,-125],[-62,-95],[-80,-62],[-78,-30]] },
+  { name:'Cutoff',           diff:'green', pts:[[0,-40],[-35,-45],[-78,-30]] },
+  { name:'Home Stretch',     diff:'green', pts:[[-78,-30],[-60,0],[-30,18],[0,0]] },
+];
+const JUNCTIONS = [
+  { name:'Stadium', x:0, y:0 }, { name:'North Jct', x:0, y:-40 }, { name:'Summit Jct', x:5, y:-135 }, { name:'Valley Jct', x:-78, y:-30 },
+];
+// smooth each trail through its control points (Catmull-Rom), sampled about every metre
+for (const t of TRAILS){
+  const c = t.pts, out = [];
+  for (let i = 0; i < c.length - 1; i++){
+    const p0 = c[Math.max(0,i-1)], p1 = c[i], p2 = c[i+1], p3 = c[Math.min(c.length-1,i+2)];
+    const n = Math.max(2, Math.ceil(Math.hypot(p2[0]-p1[0], p2[1]-p1[1])));
+    for (let k = 0; k < n; k++){
+      const u = k/n, u2 = u*u, u3 = u2*u;
+      out.push(0.5*((2*p1[0]) + (-p0[0]+p2[0])*u + (2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*u2 + (-p0[0]+3*p1[0]-3*p2[0]+p3[0])*u3),
+               0.5*((2*p1[1]) + (-p0[1]+p2[1])*u + (2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*u2 + (-p0[1]+3*p1[1]-3*p2[1]+p3[1])*u3));
+    }
+  }
+  const e = c[c.length-1]; out.push(e[0], e[1]);
+  t.s = out;
+  let len = 0, climb = 0;
+  for (let i = 2; i < out.length; i += 2){
+    len += Math.hypot(out[i]-out[i-2], out[i+1]-out[i-1]);
+    const dh = height(out[i],out[i+1]) - height(out[i-2],out[i-1]); if (dh > 0) climb += dh;
+  }
+  t.len = len; t.climb = climb;
+  const m = (out.length/4|0)*2; t.mid = [out[m], out[m+1]];
+}
+// distance from a point to the nearest groomed centre line
+function nearestTrail(x, y){
+  let best = Infinity, bt = null;
+  for (const t of TRAILS){
+    const p = t.s;
+    for (let i = 0; i < p.length - 2; i += 2){
+      const ax = p[i], ay = p[i+1], bx = p[i+2], by = p[i+3];
+      const dx = bx-ax, dy = by-ay, L2 = dx*dx + dy*dy;
+      const u = L2 ? Math.max(0, Math.min(1, ((x-ax)*dx + (y-ay)*dy)/L2)) : 0;
+      const d = Math.hypot(x - ax - u*dx, y - ay - u*dy);
+      if (d < best){ best = d; bt = t; }
+    }
+  }
+  return { d: best, t: bt };
+}
+// 0 on the groomed surface, 1 in the ungroomed snow, blending over the last half metre of the edge
+function offTrail(d){ const e = d - TRAIL_W/2; return e <= -0.5 ? 0 : e >= 0 ? 1 : (e + 0.5) / 0.5; }
+function grad(x, y){
+  const e = 0.05;
+  return [(height(x+e,y) - height(x-e,y))/(2*e), (height(x,y+e) - height(x,y-e))/(2*e)];
+}
+// how the sliders bend with the hill: positive grade = climbing
+function slopeFactors(grade){
+  return {
+    fric: Math.min(2.5, Math.max(0.4, 1 + 4*grade)),   // climbing feels draggier, descending slicker
+    max:  Math.min(1.8, Math.max(0.35, 1 - 4*grade)),  // kicks stop adding speed sooner uphill
+  };
+}
+
+// skate angle: how far each ski is splayed from the direction of travel. it opens up when you're slow
+// or climbing and closes when you're fast or descending, the way it does on real snow:
+//  - your leg can only drive the ski outward so fast. at low speed that sideways motion is a big share of
+//    the ski's motion, so the V is wide; at high speed it's a small share, so the V narrows.
+//  - on a climb gravity pulls you back down the hill. a wider V puts the ski edge more across the slope so
+//    it can hold, and points more of the push sideways-uphill instead of along a ski that would slip back.
+function splayNow(){
+  const v = Math.hypot(S.vx, S.vy);
+  const speedF = Math.min(1.6, Math.max(0.55, Math.sqrt(4 / Math.max(v, 1.2))));   // 1.0 at about 14 km/h
+  const gradeF = Math.min(2.2, Math.max(0.45, 1 + 4*S.grade));
+  return Math.min(60, P.splay * speedF * gradeF);
+}
+
+const REACH = 0.25;   // furthest a gliding ski sits from the body's centre line (m)
+const COAST_MS = 700; // after this long without a kick, the lifted ski comes down and both glide
+let lastKickAt = 0;
+function newSki(side, splayDeg, along = 0){
+  // a ski is set down with its tail at the centre of the body. it is attached to the skier: it moves with
+  // the body and drifts out to its side at the skate angle until it reaches leg reach, then runs parallel.
+  // so its track always bends with the skier's path and always ends under the skier.
+  const s = { pts:[], hx:S.x, hy:S.y, tan: Math.tan(Math.min(60, splayDeg)*Math.PI/180), along, live:true, side };
+  placeHead(s); s.pts.push(s.hx, s.hy);
+  skis.push(s); if (skis.length > 1200) skis.shift();
+  return s;
+}
+function placeHead(s){
+  const [mx, my] = moveDir();
+  const lat = Math.min(REACH, s.along * s.tan);
+  s.hx = S.x + (-my) * s.side * lat; s.hy = S.y + mx * s.side * lat;
+}
+function extendStraight(s, d, dirX, dirY){
+  let ex = dirX, ey = dirY;
+  if (ex === undefined){
+    // carry on along the ski's own last direction: from the nearest earlier point that isn't the head
+    const p = s.pts; let i = p.length - 2;
+    while (i >= 0 && Math.hypot(s.hx - p[i], s.hy - p[i+1]) < 0.05) i -= 2;
+    if (i < 0) return;
+    ex = s.hx - p[i]; ey = s.hy - p[i+1];
+    const L = Math.hypot(ex, ey); ex /= L; ey /= L;
+  }
+  s.pts.push(s.hx, s.hy);
+  s.hx += ex*d; s.hy += ey*d; s.pts.push(s.hx, s.hy);
+}
+
+function kick(leg){
+  // leg 'L' pushes off the left ski: heading steps right (+). leg 'R' pushes off the right ski: steps left (-).
+  // the step grows a little with each consecutive kick on the same leg; switching legs resets it.
+  const side = leg === 'L' ? 1 : -1;            // turn direction, and also the side of the ski that takes the weight
+  const out  = -side;                           // side of the kicking ski (+1 = right)
+  streak = (leg === lastLeg) ? streak + 1 : 1;
+  const thPre = S.tgt;
+
+  // 1. print the push before any rotation: the kicking ski's own line carries straight on, same direction
+  const sp = splayNow();
+  const mine = lastSki[leg];
+  if (mine && mine.live){ extendStraight(mine, PUSH_LEN); mine.live = false; }
+  else {
+    // this ski was already lifted (kick turn): it is set down from the centre along the old heading and pushes off
+    const a = thPre + out * sp*Math.PI/180;
+    const s = newSki(out, sp); extendStraight(s, PUSH_LEN, Math.sin(a), -Math.cos(a)); s.live = false;
+  }
+
+  // 2. rotate
+  const mult = Math.min(MAX_BUILD, 1 + (P.build/100) * (streak - 1));
+  lastTurnDeg = P.turn * mult;
+  S.tgt += side * lastTurnDeg * Math.PI/180;
+  lastTurn = side;
+
+  // 3. impulse, limited by the hill-adjusted top speed
+  const ang = S.tgt + side * sp * Math.PI/180;
+  const speed = Math.hypot(S.vx, S.vy), vmax = P.max * slopeFactors(S.grade).max / 3.6;
+  const eff = Math.max(0.08, 1 - speed/vmax) * (1 - 0.5*S.off);   // half the push sinks into loose snow
+  S.vx += Math.sin(ang) * P.push * eff;
+  S.vy += -Math.cos(ang) * P.push * eff;
+
+  // 4. the other ski takes the weight. in a kick turn it is lifted and re-set along the new heading too.
+  const other = leg === 'L' ? 'R' : 'L';
+  const o = lastSki[other];
+  if (!o || !o.live || streak > 1){
+    if (o) o.live = false;
+    lastSki[other] = newSki(side, sp);   // tip splayed out, tail at centre
+  }
+  // the kicking ski is now in the air
+  lastSki[leg] = null;
+
+  const now = performance.now();
+  kicks.push(now); kicks = kicks.filter(t => now - t < 4000);
+  legFlash[leg] = 1; lastLeg = leg; lastKickAt = now;
+}
+
+// glide: keep holding the key you kicked with to ride the glide. for a short window after the kick the
+// snow barely slows you, then normal deceleration fades back in. let go early and you lose the glide.
+const held = { L:false, R:false };
+let glideLeg = null, glideStart = 0;
+function press(leg){ held[leg] = true; kick(leg); glideLeg = leg; glideStart = performance.now(); }
+function release(leg){ held[leg] = false; }
+function glideMult(){
+  // 1 = normal friction. while the kicking key is held, friction is cut early in the window and eases back in at the end
+  if (!glideLeg || !held[glideLeg]) return 1;
+  const t = (performance.now() - glideStart) / Math.max(1, P.gwin);
+  if (t >= 1) return 1;
+  const fade = t < 0.6 ? 0 : (t - 0.6) / 0.4, ease = fade*fade*(3 - 2*fade);
+  return 1 - (P.gcut/100) * (1 - ease);
+}
+const keyLeg = k => (k === 'a' || k === 'arrowleft') ? 'L' : (k === 'd' || k === 'arrowright') ? 'R' : null;
+addEventListener('keydown', e => {
+  const leg = keyLeg(e.key.toLowerCase()); if (!leg) return;
+  e.preventDefault();
+  if (e.repeat) return;                                  // holding doesn't kick again; you have to press
+  press(leg);
+});
+addEventListener('keyup', e => { const leg = keyLeg(e.key.toLowerCase()); if (leg) release(leg); });
+addEventListener('blur', () => { held.L = held.R = false; });
+for (const [id, leg] of [['padL','L'],['padR','R']]){
+  const el = $(id);
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture?.(e.pointerId); press(leg); });
+  for (const ev of ['pointerup','pointercancel']) el.addEventListener(ev, () => release(leg));
+}
+$('reset').addEventListener('click', () => { glideLeg=null; Object.assign(S,{x:0,y:0,vx:0,vy:0,th:0,thv:0,tgt:0,dist:0,grade:0,off:0,trail:null}); camTh=0; camVel=0; skis=[]; kicks=[]; lastTurn=null; lastLeg=null; streak=0; lastSki={L:null,R:null}; lastKickAt=0; });
+$('tracks').addEventListener('click', e => { showTracks = !showTracks; e.target.textContent = 'Tracks: ' + (showTracks?'on':'off'); });
+
+function moveDir(){
+  const sp = Math.hypot(S.vx, S.vy);
+  return sp > 0.05 ? [S.vx/sp, S.vy/sp] : [Math.sin(S.th), -Math.cos(S.th)];
+}
+
+function step(dt){
+  // ease toward the kick's heading over the ski-set time; the total turn is exactly the step
+  // the skier's own heading also follows a critically damped spring, so each kick's turn starts gently,
+  // peaks mid-way and settles softly instead of jumping at full rate on the keypress
+  if (P.snap <= 0){ S.th = S.tgt; S.thv = 0; }
+  else {
+    const w = 5000 / P.snap, sub = 4, h = dt / sub;      // settles in about the ski-set time
+    for (let i = 0; i < sub; i++){ S.thv += (w*w*(S.tgt - S.th) - 2*w*S.thv) * h; S.th += S.thv * h; }
+  }
+
+  // hill: gravity pulls down the slope; grade is measured along the way you're travelling
+  const [hx, hy] = grad(S.x, S.y);
+  const [mx, my] = moveDir();
+  S.grade = hx*mx + hy*my;
+  const f = slopeFactors(S.grade);
+  const nt = nearestTrail(S.x, S.y);
+  S.off = offTrail(nt.d); S.trail = nt.t;
+  // ungroomed snow multiplies both friction and drag; a held glide only pays off on the groomed surface
+  S.gm = glideMult();
+  const surf = (1 + (P.off - 1) * S.off) * (S.gm + (1 - S.gm) * S.off);
+
+  // split velocity into along-ski and sideways; edges kill sideways slip, wax lets you glide forward
+  const fx = Math.sin(S.th), fy = -Math.cos(S.th);
+  let fwd = S.vx*fx + S.vy*fy;
+  let lat = S.vx*(-fy) + S.vy*fx;
+  // gravity only acts along the skis: the edges hold you against the sideways pull of the slope,
+  // so you run down the hill the way your skis point instead of slipping sideways
+  fwd -= G * (hx*fx + hy*fy) * dt;
+  fwd *= Math.exp(-P.glide * surf * dt);
+  const dec = P.fric * f.fric * surf * dt;
+  fwd = Math.abs(fwd) <= dec ? 0 : fwd - Math.sign(fwd) * dec;
+  lat *= Math.exp(-P.grip * dt);
+  S.vx = fx*fwd + (-fy)*lat; S.vy = fy*fwd + fx*lat;
+  const mvx = S.vx*dt, mvy = S.vy*dt;
+  S.x += mvx; S.y += mvy;
+  S.dist += Math.hypot(mvx, mvy);
+
+  // a planted ski follows the body's movement turned out by its skate angle, so it curves with the skier
+  const moved = Math.hypot(mvx, mvy);
+  for (const k of ['L','R']){
+    const sk = lastSki[k]; if (!sk || !sk.live) continue;
+    sk.along += moved; placeHead(sk);
+    const n = sk.pts.length;
+    if (Math.hypot(sk.hx - sk.pts[n-2], sk.hy - sk.pts[n-1]) > 0.25) sk.pts.push(sk.hx, sk.hy);
+  }
+  // coasting: if you stop kicking, the lifted ski is set down alongside and both leave parallel lines
+  if (performance.now() - lastKickAt > COAST_MS && moved > 0){
+    for (const k of ['L','R']){
+      if (lastSki[k] && lastSki[k].live) continue;
+      lastSki[k] = newSki(k === 'L' ? -1 : 1, 0, 1e3);
+      lastSki[k].tan = 1;   // already at stance width
+      placeHead(lastSki[k]); lastSki[k].pts = [lastSki[k].hx, lastSki[k].hy];
+    }
+  }
+  legFlash.L = Math.max(0, legFlash.L - dt*5); legFlash.R = Math.max(0, legFlash.R - dt*5);
+}
+
+function css(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+let C = {}; function readColors(){ C = { snow:css('--snow'), grid:css('--grid'), major:css('--grid-major'), skier:css('--skier'), track:css('--track'), contour:css('--contour'), groomed:css('--groomed'), edge:css('--trail-edge'), green:css('--d-green'), blue:css('--d-blue'), black:css('--d-black'), mapbg:css('--map-bg'), muted:css('--muted'), line:css('--line'), ink:css('--ink'), shade:css('--shade') }; }
+readColors(); matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+new MutationObserver(readColors).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+let camTh = 0;     // camera heading, eases after the skier's heading
+const Z_PX = 10;   // screen pixels of upward shift per metre of height, relative to the skier
+function draw(){
+  const cx = W/2, cy = H/2, h0 = height(S.x, S.y);
+  // the camera turns with the skier so the skier always faces up the screen. it follows the heading
+  // smoothly, so the side-to-side sway of alternating kicks shows on the skier, not as a swaying world.
+  const cc = Math.cos(camTh), cs = Math.sin(camTh);
+  const PX = (x, y) => cx + ((x - S.x)*cc + (y - S.y)*cs) * PX_PER_M;
+  const PY = (x, y) => cy + (-(x - S.x)*cs + (y - S.y)*cc) * PX_PER_M - (height(x, y) - h0)*Z_PX;
+  ctx.fillStyle = C.snow; ctx.fillRect(0,0,W,H);
+  const VR = Math.hypot(W, H)/2/PX_PER_M + 4;   // world radius that covers the screen at any rotation
+  const x0 = Math.floor(S.x - VR), x1 = Math.ceil(S.x + VR);
+  const y0 = Math.floor(S.y - VR), y1 = Math.ceil(S.y + VR);
+
+  // hill shading: slopes facing away from a north-west light get a soft shadow, 1 m cells
+  ctx.fillStyle = C.shade;
+  for (let gx = x0; gx < x1; gx++) for (let gy = y0; gy < y1; gy++){
+    const [hx, hy] = grad(gx + .5, gy + .5);
+    const a = Math.min(.5, Math.max(0, -(hx + hy) * 0.9));
+    if (a < .02) continue;
+    ctx.globalAlpha = a;
+    ctx.beginPath();
+    ctx.moveTo(PX(gx,gy), PY(gx,gy)); ctx.lineTo(PX(gx+1,gy), PY(gx+1,gy));
+    ctx.lineTo(PX(gx+1,gy+1), PY(gx+1,gy+1)); ctx.lineTo(PX(gx,gy+1), PY(gx,gy+1)); ctx.closePath(); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // groomed trails: an edge line, the packed surface, and a faint centre seam
+  const strokeTrail = t => {
+    const p = t.s; ctx.moveTo(PX(p[0],p[1]), PY(p[0],p[1]));
+    for (let i = 2; i < p.length; i += 2) ctx.lineTo(PX(p[i],p[i+1]), PY(p[i],p[i+1]));
+  };
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = C.edge; ctx.lineWidth = TRAIL_W*PX_PER_M + 4; ctx.beginPath(); TRAILS.forEach(strokeTrail); ctx.stroke();
+  ctx.strokeStyle = C.groomed; ctx.lineWidth = TRAIL_W*PX_PER_M; ctx.globalAlpha = .9; ctx.beginPath(); TRAILS.forEach(strokeTrail); ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = C.edge; ctx.lineWidth = 1; ctx.setLineDash([2, 10]); ctx.beginPath(); TRAILS.forEach(strokeTrail); ctx.stroke(); ctx.setLineDash([]);
+
+  // grid draped over the terrain
+  ctx.lineWidth = 1; const STEP = 0.5;
+  for (let pass = 0; pass < 2; pass++){
+    ctx.strokeStyle = pass ? C.major : C.grid; ctx.beginPath();
+    for (let gx = x0; gx <= x1; gx++){
+      if ((gx%5===0) !== !!pass) continue;
+      ctx.moveTo(PX(gx,y0), PY(gx,y0));
+      for (let y = y0 + STEP; y <= y1; y += STEP) ctx.lineTo(PX(gx,y), PY(gx,y));
+    }
+    for (let gy = y0; gy <= y1; gy++){
+      if ((gy%5===0) !== !!pass) continue;
+      ctx.moveTo(PX(x0,gy), PY(x0,gy));
+      for (let x = x0 + STEP; x <= x1; x += STEP) ctx.lineTo(PX(x,gy), PY(x,gy));
+    }
+    ctx.stroke();
+  }
+
+  // contour lines every 0.5 m of height, a stronger line every 2 m
+  {
+    const R = 0.5, nx = Math.ceil((x1 - x0)/R), ny = Math.ceil((y1 - y0)/R);
+    const hs = new Float32Array((nx+1)*(ny+1));
+    let lo = Infinity, hi = -Infinity;
+    for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++){
+      const h = height(x0 + i*R, y0 + j*R); hs[j*(nx+1)+i] = h; if (h < lo) lo = h; if (h > hi) hi = h;
+    }
+    const INT = 0.5;
+    for (let pass = 0; pass < 2; pass++){
+      ctx.strokeStyle = C.contour; ctx.lineWidth = pass ? 1.4 : 0.8; ctx.globalAlpha = pass ? .75 : .5;
+      ctx.beginPath();
+      for (let lv = Math.ceil(lo/INT)*INT; lv <= hi; lv += INT){
+        const major = Math.abs(lv/2 - Math.round(lv/2)) < 1e-6;
+        if (major !== !!pass) continue;
+        for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++){
+          const a = hs[j*(nx+1)+i], b = hs[j*(nx+1)+i+1], c = hs[(j+1)*(nx+1)+i+1], d = hs[(j+1)*(nx+1)+i];
+          const pts = [];
+          const X = x0 + i*R, Y = y0 + j*R;
+          if ((a < lv) !== (b < lv)) pts.push(X + R*(lv-a)/(b-a), Y);
+          if ((b < lv) !== (c < lv)) pts.push(X + R, Y + R*(lv-b)/(c-b));
+          if ((d < lv) !== (c < lv)) pts.push(X + R*(lv-d)/(c-d), Y + R);
+          if ((a < lv) !== (d < lv)) pts.push(X, Y + R*(lv-a)/(d-a));
+          for (let k = 0; k + 3 < pts.length; k += 4){
+            ctx.moveTo(PX(pts[k],pts[k+1]), PY(pts[k],pts[k+1]));
+            ctx.lineTo(PX(pts[k+2],pts[k+3]), PY(pts[k+2],pts[k+3]));
+          }
+        }
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ski marks: straight lines from the centre of the body, tails together, tips splayed: herringbone
+  if (showTracks){
+    ctx.strokeStyle = C.track; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.beginPath();
+    for (const k of skis){
+      const p = k.pts; if (p.length < 2) continue;
+      ctx.moveTo(PX(p[0],p[1]), PY(p[0],p[1]));
+      for (let i = 2; i < p.length; i += 2) ctx.lineTo(PX(p[i],p[i+1]), PY(p[i],p[i+1]));
+      if (p[p.length-2] !== k.hx || p[p.length-1] !== k.hy) ctx.lineTo(PX(k.hx,k.hy), PY(k.hx,k.hy));
+    }
+    ctx.stroke();
+  }
+
+  // skier: dot + heading tick + leg flash
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(S.th - camTh);
+  ctx.strokeStyle = C.skier; ctx.lineWidth = 2.5; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(0,-30); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-5,-25); ctx.lineTo(0,-31); ctx.lineTo(5,-25); ctx.stroke();
+  for (const [leg, sx] of [['L',-1],['R',1]]){
+    const f = legFlash[leg]; if (!f) continue;
+    ctx.globalAlpha = f; ctx.beginPath(); ctx.arc(sx*14, 4, 4 + (1-f)*6, 0, Math.PI*2); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = C.skier; ctx.beginPath(); ctx.arc(0,0,9,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // trail and junction signs
+  ctx.font = '500 11px "IBM Plex Mono", ui-monospace, monospace'; ctx.textBaseline = 'middle';
+  for (const t of TRAILS){
+    const sx = PX(t.mid[0], t.mid[1]), sy = PY(t.mid[0], t.mid[1]);
+    if (sx < -100 || sx > W + 100 || sy < -20 || sy > H + 20) continue;
+    const label = t.name + '  ' + Math.round(t.len) + ' m  ↑' + Math.round(t.climb) + ' m';
+    const w = ctx.measureText(label).width + 26;
+    ctx.fillStyle = C.mapbg; ctx.fillRect(sx - w/2, sy - 10, w, 20);
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.strokeRect(sx - w/2 + .5, sy - 9.5, w - 1, 19);
+    drawDiff(t.diff, sx - w/2 + 10, sy, 4.5);
+    ctx.fillStyle = C.ink; ctx.textAlign = 'left'; ctx.fillText(label, sx - w/2 + 19, sy + 1);
+  }
+  ctx.textAlign = 'center';
+  for (const j of JUNCTIONS){
+    const sx = PX(j.x, j.y), sy = PY(j.x, j.y);
+    if (sx < -60 || sx > W + 60 || sy < -20 || sy > H + 20) continue;
+    ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(sx, sy, 3, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = C.muted; ctx.fillText(j.name.toUpperCase(), sx, sy - 12);
+  }
+
+  drawMinimap();
+}
+
+function drawDiff(d, x, y, r){
+  ctx.fillStyle = C[d];
+  ctx.beginPath();
+  if (d === 'green') ctx.arc(x, y, r, 0, Math.PI*2);
+  else if (d === 'blue') ctx.rect(x - r, y - r, 2*r, 2*r);
+  else { ctx.moveTo(x, y - r*1.25); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r*1.25); ctx.lineTo(x - r, y); ctx.closePath(); }
+  ctx.fill();
+}
+
+// overview map of the whole network, top-right
+const MAP = (() => {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const t of TRAILS) for (let i = 0; i < t.s.length; i += 2){ x0 = Math.min(x0, t.s[i]); x1 = Math.max(x1, t.s[i]); y0 = Math.min(y0, t.s[i+1]); y1 = Math.max(y1, t.s[i+1]); }
+  return { x0: x0 - 8, x1: x1 + 8, y0: y0 - 8, y1: y1 + 8 };
+})();
+function drawMinimap(){
+  const size = W < 520 ? 104 : 150, pad = 16;
+  const sc = size / Math.max(MAP.x1 - MAP.x0, MAP.y1 - MAP.y0);
+  const mw = (MAP.x1 - MAP.x0)*sc, mh = (MAP.y1 - MAP.y0)*sc;
+  const mx = W - pad - mw, my = pad + (parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0);
+  ctx.fillStyle = C.mapbg; ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(mx - 6, my - 6, mw + 12, mh + 12, 6) : ctx.rect(mx - 6, my - 6, mw + 12, mh + 12); ctx.fill(); ctx.stroke();
+  const mX = x => mx + (x - MAP.x0)*sc, mY = y => my + (y - MAP.y0)*sc;
+  ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const t of TRAILS){
+    ctx.strokeStyle = C[t.diff]; ctx.beginPath();
+    ctx.moveTo(mX(t.s[0]), mY(t.s[1]));
+    for (let i = 2; i < t.s.length; i += 2) ctx.lineTo(mX(t.s[i]), mY(t.s[i+1]));
+    ctx.stroke();
+  }
+  const px = Math.min(mx + mw, Math.max(mx, mX(S.x))), py = Math.min(my + mh, Math.max(my, mY(S.y)));
+  ctx.fillStyle = C.skier; ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = C.skier; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.sin(S.th)*9, py - Math.cos(S.th)*9); ctx.stroke();
+}
+
+function hud(){
+  const sp = Math.hypot(S.vx,S.vy)*3.6;
+  $('spd').textContent = sp.toFixed(1) + ' km/h';
+  const deg = ((S.th*180/Math.PI)%360+360)%360;
+  $('hdg').textContent = String(Math.round(deg)%360).padStart(3,'0') + '°';
+  $('rot').textContent = lastTurn === null ? '—' : (lastTurn>0?'R ':'L ') + lastTurnDeg.toFixed(1) + '°' + (streak>1 ? ' ×' + streak : '');
+  const gp = S.grade*100;
+  $('grd').textContent = Math.abs(gp) < 0.5 ? 'flat' : (gp > 0 ? '▲ ' : '▼ ') + Math.abs(gp).toFixed(1) + '%';
+  $('grd').dataset.dir = Math.abs(gp) < 0.5 ? '' : gp > 0 ? 'up' : 'down';
+  $('dst').textContent = Math.round(S.dist) + ' m';
+  const now = performance.now(); const recent = kicks.filter(t => now-t < 4000);
+  $('cad').textContent = Math.round(recent.length * 15) + ' kicks/min';
+  // glide meter: how much of the glide window is left, lit while you're holding it
+  const gw = glideLeg ? Math.max(0, 1 - (performance.now() - glideStart) / Math.max(1, P.gwin)) : 0;
+  const gf = $('gfill'); gf.style.width = (gw*100) + '%'; gf.dataset.on = (glideLeg && held[glideLeg] && gw > 0) ? '1' : '';
+  $('legL').classList.toggle('on', legFlash.L > 0.3 || held.L);
+  $('legR').classList.toggle('on', legFlash.R > 0.3 || held.R);
+  // live hill-adjusted values beside the base slider values
+  const srf = $('srf');
+  if (S.off >= 0.99){ srf.textContent = 'Ungroomed'; srf.dataset.off = '1'; }
+  else { srf.innerHTML = ''; srf.append(diffMark(S.trail.diff), ' ' + S.trail.name); srf.dataset.off = ''; }
+  const f = slopeFactors(S.grade);
+  const gm = S.gm ?? 1, surf = (1 + (P.off - 1) * S.off) * (gm + (1 - gm) * S.off);
+  $('oFric').textContent = P.fric.toFixed(2) + ' → ' + (P.fric*f.fric*surf).toFixed(2);
+  $('oMax').textContent = P.max.toFixed(0) + ' → ' + (P.max*f.max).toFixed(0);
+  const spn = splayNow();
+  $('oSplay').textContent = P.splay.toFixed(0) + ' → ' + spn.toFixed(0);
+  setGhost('tFric', P.fric*f.fric*surf); setGhost('tMax', P.max*f.max); setGhost('tSplay', spn);
+}
+function diffMark(d){ const i = document.createElement('i'); i.className = 'dm ' + d; return i; }
+function setGhost(id, v){
+  const el = $(id), g = $(id + 'G');
+  const t = Math.min(1, Math.max(0, (v - +el.min) / (+el.max - +el.min)));
+  g.style.left = 'calc(' + (t*100) + '% - 2px)';
+}
+
+let last = performance.now();
+let camVel = 0;
+function loop(t){
+  const dt = Math.min(0.05, (t-last)/1000); last = t; step(dt);
+  // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
+  // and quick left-right kick sway is filtered out while sustained turns come through
+  const w = 3 / Math.max(0.05, P.cam);
+  const sub = 4, h = dt / sub;
+  for (let i = 0; i < sub; i++){
+    camVel += (w*w*(S.th - camTh) - 2*w*camVel) * h;
+    camTh += camVel * h;
+  }
+  draw(); hud(); requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

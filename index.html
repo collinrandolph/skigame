@@ -91,7 +91,7 @@ summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid
   <div class="row"><span>Controller</span><span id="pad">none</span></div>
   <div class="legs"><div class="leg" id="legL">L kick</div><div class="leg" id="legR">R kick</div></div>
   <div class="glide"><span>Glide</span><div class="gbar"><i id="gfill"></i></div></div>
-  <div class="help"><b>A / ←</b> left kick &nbsp; <b>D / →</b> right kick<br><b>LT / RT</b> on a controller do the same. <b>S / ↓</b>: snow plow, <b>W / ↑</b>: double pole.<br>Twin-stick: hold both sticks down = snow plow; both down then quickly up = double pole; both up = tuck (tilt both sticks to lean). LT/RT kick as in the trigger scheme. RB switches between skating and classic. Classic: one stick up and one down, then swap; left stick left/right steers; both sticks up = double pole; hold both down = snow plow.<br>Hold each kick to push it all the way out (a quick tap only gives part of the power) and to ride the glide, and let go before you kick again. Alternate to go straight. Each kick turns you one step: left kicks step right, right kicks step left. Repeating a leg makes the step grow; alternate and the steps cancel.</div>
+  <div class="help"><b>← / →</b> (A / D) or <b>LT / RT</b>: kick. Hold each skating kick to push it all the way out and ride the glide.<br><b>↓</b> (S), left stick down, or both sticks down: hold to snow plow.<br><b>C</b> or <b>A button</b>: switch between skating and classic.<br><b>Space</b> or <b>LB / RB</b>: double pole.<br>Classic: kicks alternate; <b>↑</b> (W), left stick up, or both sticks up: hold to tuck; <b>Q / E</b> or left stick left/right steers.<br>Twin-stick skating: load a stick down-and-in, throw it up-and-out; flick a stick to the edge for a step or kick turn.</div>
 </div>
 
 <details id="tuneBox">
@@ -101,6 +101,8 @@ summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid
     <label for="tRest">Load hold at centre (ms)<output id="oRest"></output><input id="tRest" type="range" min="0" max="800" step="20" value="250"></label>
     <div class="btns"><button id="dbgToggle" type="button">Stick debug: off</button></div>
     <label for="tTmin">Shortest throw (stick units)<output id="oTmin"></output><input id="tTmin" type="range" min="0.3" max="1.4" step="0.05" value="0.7"></label>
+    <label for="tV1side">V1 hang side (triggers)<output id="oV1side"></output><input id="tV1side" type="range" min="0" max="1" step="1" value="1"></label>
+    <label for="tSboost">Stick stroke boost (×)<output id="oSboost"></output><input id="tSboost" type="range" min="1" max="3" step="0.05" value="1.5"></label>
     <label for="tFedge">Flick needs (share of stick range)<output id="oFedge"></output><input id="tFedge" type="range" min="0.6" max="1" step="0.01" value="0.92"></label>
     <label for="tVstep">Skate V step (°)<output id="oVstep"></output><input id="tVstep" type="range" min="0" max="20" step="1" value="10"></label>
     <label for="tVslow">Wider V below (km/h)<output id="oVslow"></output><input id="tVslow" type="range" min="0" max="30" step="1" value="10"></label>
@@ -170,7 +172,7 @@ addEventListener('resize', resize);
 
 const $ = id => document.getElementById(id);
 const P = {};
-const tune = [['tScheme','oScheme','scheme',v=>v ? 'Twin-stick (experimental)' : 'Triggers'],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tVstep','oVstep','vstep',v=>v.toFixed(0)],['tVslow','oVslow','vslow',v=>v.toFixed(0)],['tVfast','oVfast','vfast',v=>v.toFixed(0)],['tVhill','oVhill','vhill',v=>v.toFixed(1)],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tSa0','oSa0','sa0',v=>v.toFixed(0)],['tSa45','oSa45','sa45',v=>v.toFixed(0)],['tSa90','oSa90','sa90',v=>v.toFixed(0)],['tSlen','oSlen','slen',v=>v.toFixed(2)],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tBuild','oBuild','build',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
+const tune = [['tScheme','oScheme','scheme',v=>v ? 'Twin-stick (experimental)' : 'Triggers'],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tSboost','oSboost','sboost',v=>v.toFixed(2)+'×'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tVstep','oVstep','vstep',v=>v.toFixed(0)],['tVslow','oVslow','vslow',v=>v.toFixed(0)],['tVfast','oVfast','vfast',v=>v.toFixed(0)],['tVhill','oVhill','vhill',v=>v.toFixed(1)],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tSa0','oSa0','sa0',v=>v.toFixed(0)],['tSa45','oSa45','sa45',v=>v.toFixed(0)],['tSa90','oSa90','sa90',v=>v.toFixed(0)],['tSlen','oSlen','slen',v=>v.toFixed(2)],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tBuild','oBuild','build',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
   ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tCexit','oCexit','cexit',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -354,7 +356,7 @@ function trailAssist(dt){
   if (P.assist <= 0){ assistTrail = null; return; }
   // hands off while you lean and for a moment after, and forget which trail you were on: you're steering yourself
   const now = performance.now();
-  if (lean){ assistQuietUntil = now + 800; assistTrail = null; return; }
+  if (lean || keySteer.q || keySteer.e){ assistQuietUntil = now + 800; assistTrail = null; return; }
   if (now < assistQuietUntil){ assistTrail = null; return; }
   const v = Math.hypot(S.vx, S.vy); if (v < 0.5) return;
   const twinSkate = P.scheme === 1 && !mode;
@@ -436,6 +438,10 @@ const MODES_ENABLED = true;
 function enterMode(m, push = true){
   if (!MODES_ENABLED) return;
   const fresh = mode !== m;
+  // twin-stick skating keeps its heading on the ski you're riding, with the stride's centre line held separately
+  // (camPending). a mode runs straight along one heading, so it has to start from that centre line, not from the
+  // last ski, or you'd set off 20-30° to one side of where you were going.
+  if (P.scheme === 1 && !mode) S.tgt -= camPending;
   mode = m; weightLeg = null; camPending = 0;
   if (fresh){
     // both skis come down together in the new stance
@@ -444,24 +450,87 @@ function enterMode(m, push = true){
   if (m === 'tuck' && push) polePush();
   legFlash.L = legFlash.R = 0.6;
 }
-function exitMode(){ mode = null; }
+function exitMode(){ mode = null; }   // both skis stay down until your next stroke
+// ---- the same actions for every input (keyboard, triggers scheme, twin-stick)
+// snow plow is held: it starts when the input goes down and ends when it's let go, returning you to classic if
+// that's where you plowed from, otherwise to skating
+// (src says which input is holding the plow, so letting go of one input doesn't cancel a plow another is holding)
+let plowSrc = null;
+function setPlow(on, src){
+  if (on && mode !== 'plow'){ plowReturn = mode === 'classic' ? 'classic' : null; plowSrc = src; enterMode('plow'); }
+  else if (!on && mode === 'plow' && plowSrc === src){
+    plowSrc = null;
+    if (plowReturn === 'classic'){ enterMode('classic', false); classic.pos = null; classic.trigLast = null; }
+    else exitMode();
+    plowReturn = null;
+  }
+}
+function toggleClassic(){
+  if (mode === 'classic'){ exitMode(); classic.pos = null; }
+  else { if (mode === 'plow') plowReturn = null; enterMode('classic', false); classic.pos = null; classic.trigLast = null; classic.dp = false; }
+}
+// tuck (classic only): held like the plow; letting go returns you to classic
+let tuckSrc = null;
+function setTuck(on, src){
+  if (on && mode === 'classic'){ tuckSrc = src; enterMode('tuck', false); }
+  else if (!on && mode === 'tuck' && tuckSrc === src){ tuckSrc = null; enterMode('classic', false); classic.pos = null; classic.trigLast = null; }
+}
+const inClassic = () => mode === 'classic' || (mode === 'tuck' && tuckSrc) || (mode === 'plow' && plowReturn === 'classic');
+// a kick on either leg: a skating kick, or in classic a diagonal-stride kick
+function kickInput(leg){
+  if (!inClassic()){ press(leg); return; }
+  // classic kicks go through straight away (double pole has its own buttons now, so there's nothing to wait for)
+  if (mode === 'tuck' && tuckSrc) setTuck(false, tuckSrc);          // a kick stands you up out of the tuck
+  if (mode === 'classic') classicTrigger(leg);
+}
+// LB (4) or RB (5): one double pole per press
+const bumperDown = { 4: false, 5: false };
+function bumperPole(trig){
+  for (const i of [4, 5]){
+    const v = trig(i);
+    if (v > 0.5 && !bumperDown[i]){ bumperDown[i] = true; doublePoleInput(); }
+    else if (v < 0.3) bumperDown[i] = false;
+  }
+}
+function doublePoleInput(){
+  if (!mode){
+    // skating: a double pole straight down the stride's centre line (twin-stick) or the heading (triggers/keys)
+    const dir = P.scheme === 1 ? S.tgt - camPending : S.tgt;
+    polePush(dir); legFlash.L = legFlash.R = 0.6; lastKickAt = performance.now(); return;
+  }
+  if (!inClassic()) return;
+  if (mode === 'tuck' && tuckSrc) setTuck(false, tuckSrc);
+  if (mode !== 'classic') return;
+  classic.pos = null; polePush(); legFlash.L = legFlash.R = 0.6;
+}
+// keyboard steering: Q leans/steers left, E right (classic and tuck)
+const keySteer = { q: 0, e: 0 };
 const classic = { pos: null, rest: 0, dp: false, downSince: 0, trigLast: null };
-function classicPush(){
+// a trigger in classic is a diagonal-stride kick off that leg: the other foot slides forward and takes the weight,
+// the same stance the sticks give (LT kicks off the left leg -> right foot forward). triggers must alternate.
+function classicTrigger(leg){
+  if (classic.trigLast === leg) return;
+  classic.trigLast = leg;
+  classic.pos = leg === 'L' ? 'B' : 'A';
+  classicPush(); dbgNote(leg, 'CLASSIC KICK (trigger)');
+}
+function classicPush(mult = 1){
   // diagonal stride kick: straight ahead along the tracks, limited by top speed like any push
   const speed = Math.hypot(S.vx, S.vy), vmax = P.max * slopeFactors(S.grade).max / 3.6;
   // classic is unaffected by ungroomed snow: the kick keeps its full power off the trail
   const eff = Math.max(0.08, 1 - speed/vmax);
-  S.vx += Math.sin(S.th) * P.classic * eff; S.vy += -Math.cos(S.th) * P.classic * eff;
+  S.vx += Math.sin(S.th) * P.classic * eff * mult; S.vy += -Math.cos(S.th) * P.classic * eff * mult;
   const now = performance.now(); kicks.push(now); kicks = kicks.filter(t => now - t < 4000); lastKickAt = now;
   legFlash[classic.pos === 'A' ? 'R' : 'L'] = 1;
   rumble(classic.pos === 'A' ? 'R' : 'L');
 }   // both skis stay down until your next stroke
-function polePush(){
+function polePush(dir = S.th){
   poleT = 1;
   // double pole: both poles plant and drive you straight ahead, limited by the hill-adjusted top speed
   const speed = Math.hypot(S.vx, S.vy), vmax = P.max * slopeFactors(S.grade).max / 3.6;
-  const eff = Math.max(0.08, 1 - speed/vmax) * (1 - 0.5*S.off);
-  S.vx += Math.sin(S.th) * P.pole * eff; S.vy += -Math.cos(S.th) * P.pole * eff;
+  // the poles plant through loose snow just as well, so a double pole keeps its full push off the trail
+  const eff = Math.max(0.08, 1 - speed/vmax);
+  S.vx += Math.sin(dir) * P.pole * eff; S.vy += -Math.cos(dir) * P.pole * eff;
   const now = performance.now(); kicks.push(now); kicks = kicks.filter(t => now - t < 4000);
 }
 
@@ -506,16 +575,19 @@ function kick(leg, opt = {}){
     d = S.tgt - prev;
     lastTurnDeg = Math.abs(opt.turnDeg);
   } else {
-    // classic: a fixed step that builds on repeated same-leg kicks
+    // trigger / key kicks: a fixed step that builds on repeated same-leg kicks, using the same two references as the
+    // stick strokes. a kick on the same leg as the last one turns from your current heading (a kick turn: steps add
+    // up and the camera follows one step behind). a kick on the other leg is measured from the camera heading, so it
+    // swings back across and undoes the last kick's rotation instead of stacking on top of it.
     const mult = Math.min(MAX_BUILD, 1 + (P.build/100) * (streak - 1));
     lastTurnDeg = P.turn * mult;
-    d = side * lastTurnDeg * Math.PI/180;
-    S.tgt += d;
-    // camera is one kick behind. a kick's turn is held back until the next kick shows whether it was a real
-    // turn (same direction: the held turn is passed to the camera) or part of the stride (opposite: the two
-    // cancel and the camera never moves). keep kicking one way and the camera follows, one step behind.
-    if (camPending === 0 || Math.sign(d) === Math.sign(camPending)){ camPending = d; }
-    else { camPending += d; if (Math.abs(camPending) < 1e-6) camPending = 0; }
+    const a = side * lastTurnDeg * Math.PI/180;
+    let camRef = S.tgt - camPending;
+    const prev = S.tgt;
+    if (sameSide){ S.tgt = prev + a; camRef = prev; assistQuietUntil = performance.now() + 800; }
+    else S.tgt = camRef + a;
+    camPending = S.tgt - camRef;
+    d = S.tgt - prev;
   }
   lastTurn = opt.turnDeg !== undefined ? side : (Math.abs(d) < 1e-6 ? 0 : Math.sign(d));
 
@@ -565,13 +637,15 @@ function kick(leg, opt = {}){
 // snow barely slows you, then normal deceleration fades back in. let go early and you lose the glide.
 const held = { L:false, R:false };
 let glideLeg = null, glideStart = 0;
-function press(leg){ mode = null; held[leg] = true; kick(leg); glideLeg = leg; glideStart = performance.now(); rumble(leg); }
+// which arm animation the last skating kick uses: trigger/key kicks are V1, stick strokes are V2
+let strideStyle = 'v2';
+function press(leg){ strideStyle = 'v1'; mode = null; held[leg] = true; kick(leg); glideLeg = leg; glideStart = performance.now(); rumble(leg); }
 
 // ---- Xbox-style controller (standard mapping): LT = left kick, RT = right kick.
 // pulling a trigger past halfway kicks; keep it pulled to hold the glide; it releases below 30%.
 const PAD_ON = 0.5, PAD_OFF = 0.3;
 const padDown = { L:false, R:false };
-let padIndex = null, padStatus = '', padStick = null;
+let padIndex = null, padStatus = '', padStick = null, padRB = false;
 addEventListener('gamepadconnected', e => { padIndex = e.gamepad.index; });
 addEventListener('gamepaddisconnected', e => { if (e.gamepad.index === padIndex){ padIndex = null; release('L'); release('R'); padDown.L = padDown.R = false; } });
 function pollPad(){
@@ -584,14 +658,21 @@ function pollPad(){
   padStatus = gp.mapping === 'standard' ? 'connected' : 'connected (non-standard)';
   const trig = i => { const b = gp.buttons[i]; return b ? (typeof b === 'object' ? (b.value || (b.pressed ? 1 : 0)) : b) : 0; };
   if (P.scheme === 1){ pollTwin(gp); return; }
-  // triggers scheme, left stick: push down for snow plow, flick up for a double-pole push (each flick is one push)
-  const ay = gp.axes && gp.axes.length > 1 ? gp.axes[1] : 0;
-  if (!padStick && ay >= 0.6){ padStick = 'down'; enterMode('plow'); }
-  else if (!padStick && ay <= -0.6){ padStick = 'up'; enterMode('tuck'); }
-  else if (padStick && Math.abs(ay) <= 0.3) padStick = null;
+  // triggers scheme: A switches between skating and classic, LB or RB double poles (classic)
+  bumperPole(trig);
+  const rb = trig(0);
+  if (rb > 0.5 && !padRB){ padRB = true; toggleClassic(); }
+  else if (rb < 0.3) padRB = false;
+  const ax0 = gp.axes && gp.axes.length > 0 ? gp.axes[0] : 0, ay = gp.axes && gp.axes.length > 1 ? gp.axes[1] : 0;
+  // left stick: hold down for snow plow (both modes); in classic, flick up to double pole and tilt left/right to steer
+  if (mode === 'classic' || mode === 'tuck') lean = Math.abs(ax0) < 0.15 ? 0 : Math.max(-1, Math.min(1, ax0 / 0.6));
+  if (ay >= 0.6) setPlow(true, 'pad');
+  else if (ay < 0.3) setPlow(false, 'pad');
+  if (ay <= -0.6) setTuck(true, 'pad');                                   // classic only: hold the left stick up to tuck
+  else if (ay > -0.35) setTuck(false, 'pad');
   for (const [leg, i] of [['L', 6], ['R', 7]]){
     const v = trig(i);
-    if (!padDown[leg] && v >= PAD_ON){ padDown[leg] = true; press(leg); }
+    if (!padDown[leg] && v >= PAD_ON){ padDown[leg] = true; kickInput(leg); }
     else if (padDown[leg] && v <= PAD_OFF){ padDown[leg] = false; release(leg); }
   }
 }
@@ -646,6 +727,7 @@ function strokeThrow(leg, t, from, x, y, power, how, passive = false){
 //  - double pole: pull both sticks down together (load), then push both straight forward (throw); you're then tucked
 //  - tuck lasts until your next stroke or flick; one trigger leans you through it, both triggers plow
 const both = { dpLoaded: false, load: null, fwdSince: 0, rest: 0, downSince: 0, rtDown: false };
+function globalLean(){ return lean; }
 let lean = 0;   // -1..1 while tucked or in classic: stick tilt leans or steers you that way
 let plowReturn = null;   // where letting go of a snow plow takes you ('classic' if you plowed from classic)
 const isDown = (x, y) => Math.hypot(x, y) > 0.5 && y > 0.4;
@@ -657,12 +739,12 @@ function pollTwin(gp){
   const trig = i => { const b = gp.buttons[i]; return b ? (b.value || (b.pressed ? 1 : 0)) : 0; };
   const [lx, ly] = sticks.L, [rx, ry] = sticks.R;
   const setPhase = p => { for (const k of ['L','R']){ twin[k].phase = p; twin[k].load = null; twin[k].pending = 0; twin[k].armed = false; } };
-  // ---- RB (right bumper) toggles between skating and classic. the triggers are left for kicking.
-  const rbv = trig(5);
+  // ---- A toggles between skating and classic; LB or RB double poles (classic). the triggers are for kicking.
+  bumperPole(trig);
+  const rbv = trig(0);
   if (rbv > 0.5 && !both.rtDown){
     both.rtDown = true;
-    if (mode === 'classic'){ exitMode(); classic.pos = null; setPhase('idle'); dbgNote('L', 'RB: skating'); }
-    else { both.dpLoaded = false; enterMode('classic', false); classic.pos = null; classic.dp = false; setPhase('both'); dbgNote('L', 'RB: classic'); }
+    both.dpLoaded = false; toggleClassic(); setPhase(mode === 'classic' ? 'both' : 'idle'); dbgNote('L', 'A: ' + (mode || 'skating'));
   } else if (rbv < 0.3) both.rtDown = false;
   lean = 0;
   const dz = v => Math.abs(v) < 0.15 ? 0 : v;
@@ -672,8 +754,7 @@ function pollTwin(gp){
     const v = trig(i);
     if (!padDown[leg] && v >= PAD_ON){
       padDown[leg] = true;
-      if (mode === 'classic'){ if (classic.trigLast !== leg){ classic.trigLast = leg; classicPush(); dbgNote(leg, 'CLASSIC KICK (trigger)'); } }
-      else { press(leg); dbgNote(leg, 'TRIGGER KICK'); }
+      kickInput(leg); dbgNote(leg, 'TRIGGER KICK');
     } else if (padDown[leg] && v <= PAD_OFF){ padDown[leg] = false; release(leg); }
   }
 
@@ -684,67 +765,41 @@ function pollTwin(gp){
     const posNow = (vert(lx) && vert(rx)) ? ((ly < -0.6 && ry > 0.6) ? 'A' : (ly > 0.6 && ry < -0.6) ? 'B' : null) : null;
     lean = Math.max(-1, Math.min(1, dz(lx) / 0.6));
     for (const leg of ['L','R']){ const [x, y] = sticks[leg]; twin[leg].x = x; twin[leg].y = y; dbgSample(leg, x, y, 'classic'); }
-    // double pole in the tracks: push both sticks forward, no load needed. bring them back before the next one.
-    const bothFwd = isFwd(lx, ly) && isFwd(rx, ry);
-    if (bothFwd && !classic.dp){ classic.dp = true; classic.pos = null; polePush(); legFlash.L = legFlash.R = 0.6; dbgNote('L', 'CLASSIC DOUBLE POLE'); dbgNote('R', 'CLASSIC DOUBLE POLE'); }
-    else if (!bothFwd && ly > -0.4 && ry > -0.4) classic.dp = false;
+    // tuck: hold both sticks up; tilt them to lean. letting go returns you to classic.
+    if (isFwd(lx, ly) && isFwd(rx, ry)){ setTuck(true, 'twin'); dbgNote('L', 'TUCK'); return; }
     // snow plow in classic: hold both sticks down. letting go puts you back in classic.
     if (isDown(lx, ly) && isDown(rx, ry)){
       classic.downSince = classic.downSince || performance.now();
-      if (performance.now() - classic.downSince > P.plowhold){ classic.downSince = 0; plowReturn = 'classic'; enterMode('plow'); dbgNote('L', 'SNOW PLOW (classic)'); return; }
+      if (performance.now() - classic.downSince > P.plowhold){ classic.downSince = 0; setPlow(true, 'twin'); dbgNote('L', 'SNOW PLOW (classic)'); return; }
     } else classic.downSince = 0;
     if (posNow){
-      if (classic.pos && posNow !== classic.pos){ classicPush(); dbgNote('L', 'CLASSIC KICK'); }
+      if (classic.pos && posNow !== classic.pos){ classicPush(P.sboost); dbgNote('L', 'CLASSIC KICK'); }
       classic.pos = posNow;
     }
     return;
   }
 
-  // ---- skating, two-stick moves:
-  //  both sticks down and held          -> snow plow (after a moment, so a quick double pole doesn't plow)
-  //  both down, then quickly both up    -> double pole, into a tuck
-  //  both sticks up from rest           -> tuck, no push
-  //  in a tuck, tilting the sticks left or right leans you that way; letting go of a plow drops you into a tuck
-  const bothDown = isDown(lx, ly) && isDown(rx, ry), bothUp = isFwd(lx, ly) && isFwd(rx, ry);
-  if (mode === 'tuck') lean = Math.max(-1, Math.min(1, dz((lx + rx) / 2) / 0.6));
+  if (mode === 'tuck' && tuckSrc === 'twin'){
+    for (const leg of ['L','R']){ const [x, y] = sticks[leg]; twin[leg].x = x; twin[leg].y = y; dbgSample(leg, x, y, 'tuck'); }
+    lean = Math.max(-1, Math.min(1, dz((lx + rx) / 2) / 0.6));
+    if (ly > -0.35 || ry > -0.35){ setTuck(false, 'twin'); setPhase('both'); dbgNote('L', 'tuck released'); }
+    return;
+  }
+  // ---- skating, two-stick moves: hold both sticks down for a snow plow; letting go puts you back to skating.
+  // (tuck and double pole live in classic now, so nothing else here needs both sticks)
+  const bothDown = isDown(lx, ly) && isDown(rx, ry);
   if (mode === 'plow'){
     for (const leg of ['L','R']){ const [x, y] = sticks[leg]; twin[leg].x = x; twin[leg].y = y; dbgSample(leg, x, y, 'plow'); }
-    if (!bothDown){
-      if (plowReturn === 'classic'){ plowReturn = null; enterMode('classic', false); classic.pos = null; setPhase('both'); dbgNote('L', 'plow released: classic'); }
-      else { enterMode('tuck', false); setPhase('idle'); dbgNote('L', 'plow released: tuck'); }
-    }
+    if (plowSrc === 'twin' && !bothDown){ setPlow(false, 'twin'); setPhase(mode === 'classic' ? 'both' : 'idle'); dbgNote('L', 'plow released'); }
+    if (plowSrc === 'twin') return;
+  }
+  if (bothDown){
+    if (!both.dpLoaded){ both.dpLoaded = true; both.downSince = performance.now(); setPhase('both'); }
+    for (const leg of ['L','R']){ const [x, y] = sticks[leg]; twin[leg].x = x; twin[leg].y = y; dbgSample(leg, x, y, 'both'); }
+    if (performance.now() - both.downSince > P.plowhold){ both.dpLoaded = false; setPlow(true, 'twin'); dbgNote('L', 'SNOW PLOW'); }
     return;
   }
-  if (bothDown && !both.dpLoaded){
-    both.dpLoaded = true; both.downSince = performance.now(); both.load = { L: [lx, ly], R: [rx, ry] }; both.fwdSince = 0; setPhase('both');
-    dbgNote('L', 'both down'); dbgNote('R', 'both down');
-  }
-  if (both.dpLoaded){
-    for (const leg of ['L','R']){ const [x, y] = sticks[leg]; twin[leg].x = x; twin[leg].y = y; dbgSample(leg, x, y, 'both');
-      if (isDown(x, y) && Math.hypot(x, y) > Math.hypot(...both.load[leg])) both.load[leg] = [x, y]; }
-    if (bothDown && performance.now() - both.downSince > P.plowhold){
-      both.dpLoaded = false; enterMode('plow'); dbgNote('L', 'SNOW PLOW'); return;
-    }
-    const lf = isFwd(lx, ly), rf = isFwd(rx, ry);
-    if (lf && rf){
-      both.dpLoaded = false; setPhase('idle'); enterMode('tuck', true);
-      dbgNote('L', 'DOUBLE POLE'); dbgNote('R', 'DOUBLE POLE');
-    } else if (lf || rf){
-      both.fwdSince = both.fwdSince || performance.now();
-      if (performance.now() - both.fwdSince > FLICK_WAIT){
-        const leg = lf ? 'L' : 'R', [x, y] = sticks[leg];
-        both.dpLoaded = false; setPhase('idle');
-        strokeThrow(leg, twin[leg], both.load[leg], x, y, Math.min(1, Math.hypot(x - both.load[leg][0], y - both.load[leg][1]) / P.slen), 'THROW');
-      }
-    } else if (Math.hypot(lx, ly) < 0.25 && Math.hypot(rx, ry) < 0.25){
-      both.rest = both.rest || performance.now();
-      if (performance.now() - both.rest > P.rest){ both.dpLoaded = false; both.rest = 0; setPhase('idle'); }
-    } else both.rest = 0;
-    return;
-  }
-  if (bothUp && mode !== 'tuck' && twin.L.phase !== 'loading' && twin.R.phase !== 'loading'){
-    enterMode('tuck', false); setPhase('idle'); dbgNote('L', 'TUCK'); dbgNote('R', 'TUCK');
-  }
+  if (both.dpLoaded){ both.dpLoaded = false; setPhase('idle'); }   // came back up before the plow kicked in
   for (const leg of ['L','R']){
     const t = twin[leg], [x, y] = sticks[leg];
     const inSign = leg === 'L' ? 1 : -1;            // inward is toward the other leg
@@ -829,9 +884,11 @@ function dbgExport(){
 // a stick's throw steps that foot's ski out and puts your weight on it, so the push comes off the other leg
 const pushLeg = stickLeg => stickLeg === 'L' ? 'R' : 'L';
 function throwStroke(stickLeg, turnDeg, power, passive = false){
+  if (!passive) strideStyle = 'v2';
   const leg = pushLeg(stickLeg);
   mode = null; held[leg] = true;
-  kick(leg, { turnDeg, power: passive ? 0 : power, splay: 0, passive });
+  // stick strokes take longer to make than a trigger pull, so each one carries a bigger push (Stick stroke boost)
+  kick(leg, { turnDeg, power: passive ? 0 : power * P.sboost, splay: 0, passive });
   glideLeg = leg; glideStart = performance.now();      // hold the stick up and out to ride the glide
   rumble(stickLeg);
 }
@@ -856,20 +913,31 @@ function glideMult(){
   return 1 - (P.gcut/100) * (1 - ease);
 }
 const keyLeg = k => (k === 'a' || k === 'arrowleft') ? 'L' : (k === 'd' || k === 'arrowright') ? 'R' : null;
-const keyMode = k => (k === 's' || k === 'arrowdown') ? 'plow' : (k === 'w' || k === 'arrowup') ? 'tuck' : null;
+// keyboard, matching the controller: ←/→ (A/D) kick, ↓ (S) held = snow plow, ↑ (W) = double pole in classic,
+// C switches between skating and classic
 addEventListener('keydown', e => {
-  const k = e.key.toLowerCase(), m = keyMode(k);
-  if (m){ e.preventDefault(); if (!e.repeat) enterMode(m); return; }   // each tap of up is one double-pole push
+  const k = e.key.toLowerCase();
+  if (k === 's' || k === 'arrowdown'){ e.preventDefault(); if (!e.repeat) setPlow(true, 'key'); return; }
+  if (k === 'w' || k === 'arrowup'){ e.preventDefault(); if (!e.repeat) setTuck(true, 'key'); return; }
+  if (k === 'q' || k === 'e'){ e.preventDefault(); keySteer[k] = 1; return; }
+  if (k === 'c'){ e.preventDefault(); if (!e.repeat) toggleClassic(); return; }
+  if (k === ' '){ e.preventDefault(); if (!e.repeat) doublePoleInput(); return; }
   const leg = keyLeg(k); if (!leg) return;
   e.preventDefault();
   if (e.repeat) return;                                  // holding doesn't kick again; you have to press
-  press(leg);
+  kickInput(leg);
 });
-addEventListener('keyup', e => { const leg = keyLeg(e.key.toLowerCase()); if (leg) release(leg); });
+addEventListener('keyup', e => {
+  const k = e.key.toLowerCase();
+  if (k === 's' || k === 'arrowdown'){ setPlow(false, 'key'); return; }
+  if (k === 'w' || k === 'arrowup'){ setTuck(false, 'key'); return; }
+  if (k === 'q' || k === 'e'){ keySteer[k] = 0; return; }
+  const leg = keyLeg(k); if (leg) release(leg);
+});
 addEventListener('blur', () => { held.L = held.R = false; });
 for (const [id, leg] of [['padL','L'],['padR','R']]){
   const el = $(id);
-  el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture?.(e.pointerId); press(leg); });
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture?.(e.pointerId); kickInput(leg); });
   for (const ev of ['pointerup','pointercancel']) el.addEventListener(ev, () => release(leg));
 }
 $('reset').addEventListener('click', () => { glideLeg=null; Object.assign(S,{x:0,y:0,vx:0,vy:0,th:0,thv:0,tgt:0,vis:0,visv:0,travel:0,dist:0,grade:0,off:0,trail:null}); camTh=0; camVel=0; camH=null; clearTracks(); skis=[]; kicks=[]; lastTurn=null; lastLeg=null; streak=0; lastSki={L:null,R:null}; lastKickAt=0; kickDrive=null; vState=0; vChangedAt=-99; strokeNo=0; weightLeg=null; camPending=0; mode=null; focus=null; });
@@ -896,7 +964,8 @@ function step(dt){
   trailAssist(dt);
   // leaning in a tuck carves you round steadily
   // (a lean carves on moving skis, so it fades out below about 10 km/h and does nothing standing still)
-  if ((mode === 'tuck' || mode === 'classic') && lean) S.tgt += lean * P.lean * Math.PI/180 * dt * Math.min(1, Math.hypot(S.vx, S.vy) / 3);
+  const ks = keySteer.e - keySteer.q, steer = ks || lean;   // Q/E on the keyboard, or the stick
+  if ((mode === 'tuck' || mode === 'classic') && steer) S.tgt += steer * P.lean * Math.PI/180 * dt * Math.min(1, Math.hypot(S.vx, S.vy) / 3);
   if (mode !== 'tuck' && mode !== 'classic') lean = 0;
   // ease toward the kick's heading over the ski-set time; the total turn is exactly the step
   // the skier's own heading also follows a critically damped spring, so each kick's turn starts gently,
@@ -1327,6 +1396,27 @@ function poseSkier(h0, arrowTh){
       const p = 1 - poleT;                                            // double pole: reach forward, then drive down and back
       hand = [s0[0], s0[1] - 0.15 - 0.45*p, s0[2] - 0.45 + 0.85*p];
       tip = [hand[0] + sd*0.05, 0.02, hand[2] + 0.2 + 0.6*p];
+    } else if (!mode && strideStyle === 'v1'){
+      // V1 (offset), for trigger and key kicks in either scheme: one staggered double pole every second skate, made as you step onto the hang-side
+      // ski, with the two poles and that ski landing together. the hang-side hand is high, just ahead of the head,
+      // its pole near vertical; the other hand is lower with its pole angled back. follow-through stops just past the
+      // hips. on the off-side skate the arms just come back up to the ready position.
+      const hang = P.v1side ? 'R' : 'L', mine = k === hang;
+      const onto = lastLeg === 'L' ? 'R' : 'L';               // the ski just stepped onto
+      const poling = onto === hang;
+      const READY = mine
+        ? { h: [s0[0] - sd*0.02, s0[1] + 0.28, s0[2] - 0.32], t: [s0[0] + sd*0.06, 0.03, s0[2] - 0.12] }   // high, pole near vertical by the foot
+        : { h: [s0[0] - sd*0.06, s0[1] + 0.06, s0[2] - 0.42], t: [s0[0] + sd*0.22, 0.03, s0[2] + 0.3] };   // lower, pole angled back
+      const BACK = { h: [s0[0] + sd*0.05, hip[1] + 0.05, hip[2] + 0.22], t: [s0[0] + sd*0.12, hip[1] + 0.25, hip[2] + 1.05] };  // short follow-through
+      const mix = (a, b, f) => a.map((v, i) => v + (b[i] - v) * f);
+      let A = READY, B = READY, f = 0;
+      if (poling){
+        if (v2 === 'push'){ A = READY; B = BACK; f = ease(vp); }
+        else if (v2 === 'recover'){ A = BACK; B = READY; f = ease(vp); }
+      }
+      hand = mix(A.h, B.h, f); tip = mix(A.t, B.t, f);
+      if (poling && v2 === 'push' && vp < 0.5) tip[1] = 0.02;              // planted with the ski
+      if (!poling || v2 === 'glide'){ tip[1] = 0.25; }                       // carried just off the snow, ready
     } else if (!mode){
       // V2 arms: both together. key poses, blended by phase
       // from the footage: hands come right up to chin height with elbows bent before the plant, and at the end of the
@@ -1503,6 +1593,7 @@ function drawMinimap(){
 }
 
 function hud(){
+  const lean = (keySteer.e - keySteer.q) || globalLean();
   $('arow').textContent = Math.abs(assistOff) < 0.3 ? '—' : (assistOff > 0 ? 'pulling right ' : 'pulling left ') + Math.abs(assistOff).toFixed(0) + '°';
   $('vrow').textContent = (vState > 0 ? 'wide' : vState < 0 ? 'narrow' : 'normal') + ' · ' + skateV45().toFixed(0) + '°';
   { const ld = loadState(); if (!mode && (ld.leg || ld.both)){ $('mode').textContent = ld.both ? 'Loading double pole' : 'Loading ' + (ld.leg === 'L' ? 'left' : 'right') + ' leg'; } else

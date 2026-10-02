@@ -6,46 +6,26 @@ Open `index.html` in a browser. It loads three.js from cdnjs, so it needs an int
 
 ## Controls
 
-There are two controller schemes. Switch between them under **Controller scheme** in the Tuning panel.
+The keyboard and both controller schemes share one layout. Choose the controller scheme under **Controller scheme** in the Tuning panel.
 
-### Triggers scheme (also keyboard and touch)
+| Action | Keyboard | Controller |
+|---|---|---|
+| Kick (left / right) | ← / → or A / D | LT / RT |
+| Snow plow (hold) | ↓ or S | Left stick down (triggers scheme) / both sticks down (twin-stick) |
+| Double pole | Space | LB or RB |
+| Switch skating / classic | C | A button |
+| Tuck (hold, classic) | ↑ or W | Left stick up / both sticks up |
+| Steer (classic and tuck) | Q / E | Left stick left / right |
 
-| Action | Keyboard | Controller | Touch |
-|---|---|---|---|
-| Left kick | A / ← | LT | Left half of screen |
-| Right kick | D / → | RT | Right half of screen |
-| Snow plow | S / ↓ | Left stick down | — |
-| Double pole | W / ↑ | Left stick up | — |
-
-- **Kicks:** hold a kick to push it all the way out and ride the glide.
-- **Turning:** each kick turns you a step away from the kicking leg. Alternating kicks cancel out, and repeated same-side kicks build into a kick turn.
-
-### Twin-stick scheme (experimental)
-
-Each stick is one foot.
-
-**Skating**
-
-| Action | Input |
-|---|---|
-| Stroke | Pull a stick down and inward to load, then throw it up and outward to step onto that foot's ski. The stroke's angle sets the ski angle, and its length sets the power. |
-| Passive step / kick turn | Flick a stick from centre out to the edge without loading. On the other stick it's a passive step with no push; on the same stick it's a kick turn. |
-| Double pole | Both sticks down, then quickly both up. Ends in a tuck. |
-| Snow plow | Hold both sticks down. Letting go puts you in a tuck. |
-| Tuck | Both sticks up from rest. Tilt both sticks to lean. |
-| Kicks | LT / RT, exactly as in the triggers scheme. |
-| Switch to classic | RB |
-
-**Classic**
-
-| Action | Input |
-|---|---|
-| Diagonal stride | One stick up and one down, then swap them. The kick comes once both have switched. |
-| Kick with triggers | Alternate LT / RT. |
-| Steer | Left stick left / right. |
-| Double pole | Push both sticks forward. |
-| Snow plow | Hold both sticks down. Letting go returns you to classic. |
-| Switch to skating | RB |
+- **Skating kicks:** hold a skating kick to push it all the way out and ride the glide. Each kick turns you a step away from the kicking leg.
+  - Same-leg kicks build into a kick turn, measured from your current heading.
+  - An opposite-leg kick is measured from the camera heading, so alternating kicks swing evenly around a steady line.
+- **Classic kicks:** these must alternate legs. Letting go of a snow plow returns you to the mode you started it from.
+- **Twin-stick strokes:** each stick is one foot.
+  - Pull a stick down and inward to load, then throw it up and outward to step onto that foot's ski. The stroke's angle sets the ski angle, and stick strokes carry a bigger push to make up for being slower to perform.
+  - Flick a stick from centre to the edge for a passive step (other foot) or a kick turn (same foot).
+  - In classic, swap one stick up and one down to kick.
+- **Animation:** trigger and key kicks animate as V1 (offset), and stick strokes as V2.
 
 ## Mechanics
 
@@ -55,9 +35,9 @@ Each stick is one foot.
 - **Terrain and trails:**
   - Rolling terrain with a ridge and a valley, and gravity acts along the skis.
   - Six groomed trails with green, blue and black ratings, plus scattered trees.
-  - Ungroomed snow is slower, except in classic.
+  - Ungroomed snow is slower, except in classic. Double poles keep their full push off the trail.
 - **Trail assist:** gently steers your stride toward the trail ahead. It lets go when you lean, kick-turn or steer away.
-- **Skier:** animated through a V2 cycle (load tall, push and compress, recover), with tuck, snow plow and classic poses.
+- **Skier:** V2 for stick strokes (load tall, push and compress, recover) and V1 offset poling for trigger and key kicks, with tuck, snow plow and classic poses.
 - **Tuning:** every setting is a slider in the Tuning panel and is remembered in your browser. The stick debug recorder logs your stick input so you can tune the input thresholds.
 
 ## Files

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Skate Ski Prototype</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -19,7 +19,8 @@
 :root[data-theme="dark"]{
   --snow:#0b1218; --grid:#1d2a37; --grid-major:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4;
   --skier:#ff6a4d; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; color-scheme:dark}
-html,body{height:100%}
+html,body{height:100%;touch-action:manipulation;-webkit-text-size-adjust:100%}
+*{-webkit-tap-highlight-color:transparent}
 body{background:var(--snow);color:var(--ink);font-family:var(--mono);overflow:hidden;user-select:none;-webkit-user-select:none}
 canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 #c{pointer-events:none}
@@ -85,22 +86,18 @@ body.dev .play-only { display:none !important }
 @media (max-width:560px){.stat.big b{font-size:34px}.stat b{font-size:20px}.stats-right{gap:12px}.modebadge{bottom:calc(env(safe-area-inset-bottom,0px) + 128px)}}
 
 
-/* ---- phones and tablets: everything hidden except the skate / classic toggle (the touch pads stay, unlabelled) ---- */
-.touchToggle{display:none}
-@media (hover:none) and (pointer:coarse){
-  .topbar,.padpanel,.stats-left,.stats-right,.modebadge,.hud,#tuneBox,.gradebig,.dbg{display:none !important}
-  .pad{color:transparent !important;border:0 !important}
-  .touchToggle{display:flex;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 22px);z-index:6;width:68px;height:68px;border-radius:50%;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.12);touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-  .touchToggle svg{width:34px;height:34px}
-  .touchToggle:active{transform:translateX(-50%) scale(.94)}
-}
-
-
 /* ---- phones and tablets (touch): no HUD at all, just the kick pads and one skate/classic toggle ---- */
 .mtoggle{display:none}
 @media (pointer:coarse){
   #c,.topbar,.padpanel,.stats-left,.stats-right,.modebadge,.hud,#tuneBox,.gradebig,.dbg{display:none !important}
-  .pad{color:transparent}.pad.r{border-left:0}
+  /* the two kick zones: each half of the lower screen, drawn as a soft panel with its label; lit while pressed */
+  .pads .pad{box-sizing:border-box;color:var(--ink);padding:0 10px calc(env(safe-area-inset-bottom,0px) + 14px)}
+  .pad::before{content:"";position:absolute;inset:8px 8px calc(env(safe-area-inset-bottom,0px) + 8px);border:1px solid var(--line);border-radius:14px;background:var(--panel);opacity:.55;transition:opacity .08s,background .08s}
+  .pad.l::before{right:44px}.pad.r::before{left:44px}
+  .pads .pad.r{border-left:0}
+  .pad span{position:relative;font:700 16px/1 var(--display);letter-spacing:.14em;text-transform:uppercase}
+  .pad.l span{margin-right:36px}.pad.r span{margin-left:36px}
+  .pad.on::before{background:var(--skier);opacity:.35}
   .mtoggle{display:flex;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 24px);z-index:6;
     width:64px;height:64px;border-radius:50%;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);
     border:1px solid var(--line);backdrop-filter:blur(6px);touch-action:manipulation;box-sizing:border-box}
@@ -233,12 +230,11 @@ summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid
   <div class="btns"><button id="dbgCopy" type="button">Copy log</button><button id="dbgClear" type="button">Clear</button></div>
   <textarea id="dbgOut" hidden readonly></textarea>
 </div>
-<button class="touchToggle" id="touchToggle" type="button" aria-label="Switch between skate and classic"><svg id="ttIcon" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"></svg></button>
 <button class="mtoggle" id="mToggle" type="button" data-mode="skate" aria-label="Switch between skate and classic">
   <svg class="ic-skate" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 5l9 20 9-20"/></svg>
   <svg class="ic-classic" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M10 5v20M20 5v20"/></svg>
 </button>
-<div class="pads"><div class="pad l" id="padL">Left kick</div><div class="pad r" id="padR">Right kick</div></div>
+<div class="pads"><div class="pad l" id="padL"><span>Left kick</span></div><div class="pad r" id="padR"><span>Right kick</span></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -1031,8 +1027,15 @@ addEventListener('keyup', e => {
 addEventListener('blur', () => { held.L = held.R = false; });
 for (const [id, leg] of [['padL','L'],['padR','R']]){
   const el = $(id);
-  el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture?.(e.pointerId); kickInput(leg); });
-  for (const ev of ['pointerup','pointercancel']) el.addEventListener(ev, () => release(leg));
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture?.(e.pointerId); el.classList.add('on'); kickInput(leg); });
+  for (const ev of ['pointerup','pointercancel']) el.addEventListener(ev, () => { el.classList.remove('on'); release(leg); });
+}
+// iOS Safari: no double-tap zoom or pinch zoom while playing (fast kicks would otherwise zoom the page)
+{
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', e => { const n = Date.now(); if (n - lastTouchEnd < 350) e.preventDefault(); lastTouchEnd = n; }, { passive: false });
+  for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
+  document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
 }
 $('mToggle').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleClassic(); });
 $('reset').addEventListener('click', () => { glideLeg=null; Object.assign(S,{x:0,y:0,vx:0,vy:0,th:0,thv:0,tgt:0,vis:0,visv:0,travel:0,dist:0,grade:0,off:0,trail:null}); camTh=0; camVel=0; camH=null; clearTracks(); skis=[]; kicks=[]; lastTurn=null; lastLeg=null; streak=0; lastSki={L:null,R:null}; lastKickAt=0; kickDrive=null; vState=0; vChangedAt=-99; strokeNo=0; weightLeg=null; camPending=0; mode=null; focus=null; });
@@ -1960,16 +1963,9 @@ addEventListener('mousemove', e => {
 
 // ---- touch: one toggle button, its icon showing the current technique (\/ skate, || classic)
 const isTouchUI = matchMedia('(hover: none) and (pointer: coarse)').matches;
-$('touchToggle').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleClassic(); });
-let ttShown = null;
-function updateTouchToggle(){
-  const cl = inClassic(); if (cl === ttShown) return; ttShown = cl;
-  $('ttIcon').innerHTML = cl ? '<path d="M12 6v22M22 6v22"/>' : '<path d="M7 7l10 20 10-20"/>';
-}
 
 function hud(){
   $('mToggle').dataset.mode = inClassic() ? 'classic' : 'skate';
-  updateTouchToggle();
   if (!devView){
     const gp = S.grade*100, flat = Math.abs(gp) < 0.5;
     const g = $('pGrade'); g.textContent = (flat ? '' : gp > 0 ? '+' : '−') + Math.abs(gp).toFixed(1) + '%'; g.dataset.dir = flat ? '' : gp > 0 ? 'up' : 'down';

@@ -26,7 +26,7 @@ The keyboard and both controller schemes share one layout. Choose the controller
   - Flick a stick from centre to the edge for a passive step (other foot) or a kick turn (same foot).
   - In classic, swap one stick up and one down to kick.
 - **Animation:** trigger and key kicks animate as V1 (offset), and stick strokes as V2.
-- **Touch screens:** tap the left or right half of the screen to kick. The only on-screen control is a toggle at the bottom: **\/** means skate and **||** means classic.
+- **Touch screens:** tap the labelled **Left kick** / **Right kick** pads at the bottom of the screen. Between them sits the only other control, a toggle: **\/** means skate and **||** means classic. Double-tap and pinch zoom are disabled so fast kicking doesn't zoom the page on iOS.
 
 ## Interface
 

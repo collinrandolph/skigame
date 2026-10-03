@@ -132,12 +132,23 @@ summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid
 .pad{position:absolute;bottom:0;top:0;width:50%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 20px);font-family:var(--display);font-size:18px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;touch-action:manipulation}
 .pad.l{left:0}.pad.r{right:0;border-left:1px dashed var(--line)}
 @media (pointer:coarse){.pads{display:block}details{bottom:calc(38% + 12px)}}
+
+/* ---- music toggle: top left, every view and device ---- */
+.musicbtn{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);left:16px;z-index:7;width:40px;height:40px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(6px);cursor:pointer;box-sizing:border-box;touch-action:manipulation}
+.musicbtn svg{width:22px;height:22px}
+.musicbtn .ic-off{display:none}
+.musicbtn[aria-pressed="false"] .ic-on{display:none}
+.musicbtn[aria-pressed="false"] .ic-off{display:block}
+.musicbtn[aria-pressed="false"]{color:var(--muted)}
+.musicbtn:focus-visible{outline:2px solid var(--skier);outline-offset:2px}
+body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 </style>
 </head>
 <body>
 <canvas id="gl"></canvas>
 <canvas id="c"></canvas>
 
+<button class="musicbtn" id="musicBtn" type="button" aria-pressed="true" aria-label="Music on/off" title="Music (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" fill-opacity=".15"/><g class="ic-on"><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/></g><g class="ic-off"><path d="M16 9.5l5 5M21 9.5l-5 5"/></g></svg></button>
 <div class="topbar">
   <button id="padBtn" class="iconbtn" type="button" aria-expanded="false" aria-controls="padPanel" title="Controller layout"><svg viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h14c4 0 6.5 3 7 8l.6 5.5c.3 3-2.6 4.6-4.7 2.6L22.5 17h-13L6.1 20.1C4 22.1 1.1 20.5 1.4 17.5L2 12c.5-5 3-8 7-8z"/><path d="M8.5 9.5v5M6 12h5"/><circle cx="21.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="24.5" cy="13.5" r="1.1" fill="currentColor" stroke="none"/></svg></button>
   <button id="devBtn" class="iconbtn" type="button" aria-pressed="false" title="Dev mode: full HUD, tuning and debug tools (`)">Dev</button>
@@ -1045,6 +1056,40 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
   for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
   document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
 }
+
+// ---- background music: gapless Web Audio loop, starts on the first key / tap / controller press (browsers block autoplay)
+const music = (() => {
+  let on = true; try { on = localStorage.getItem('skate-music') !== 'off'; } catch(e){}
+  let ctx = null, gain = null, src = null, buf = null, loading = null;
+  const btn = $('musicBtn');
+  const show = () => btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  const load = () => loading || (loading = fetch('winter.wav').then(r => { if (!r.ok) throw 0; return r.arrayBuffer(); })
+    .then(a => new Promise((res, rej) => ctx.decodeAudioData(a, res, rej))).then(b => { buf = b; play(); }).catch(() => { loading = null; }));
+  function play(){
+    if (!buf || src || !on) return;
+    src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(gain); src.start();
+  }
+  function start(){
+    if (!on) return;
+    if (!ctx){ const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; ctx = new AC(); gain = ctx.createGain(); gain.gain.value = 0.55; gain.connect(ctx.destination); }
+    if (ctx.state !== 'running') ctx.resume();
+    if (buf) play(); else load();
+  }
+  function set(v){
+    on = v; show(); try { localStorage.setItem('skate-music', on ? 'on' : 'off'); } catch(e){}
+    if (on) { start(); if (gain) gain.gain.setTargetAtTime(0.55, ctx.currentTime, 0.08); }
+    else if (gain) gain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+  }
+  show();
+  btn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); set(!on); });
+  btn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); e.stopPropagation(); set(!on); } });
+  const kick = () => { if (on && (!ctx || ctx.state !== 'running' || !src)) start(); };
+  for (const ev of ['pointerdown','keydown','touchend']) addEventListener(ev, kick, { capture: true });
+  addEventListener('keydown', e => { if ((e.key === 'm' || e.key === 'M') && !e.repeat && !e.target.closest?.('input,textarea,select')) set(!on); });
+  setInterval(() => { if (!on || (ctx && ctx.state === 'running' && src)) return;
+    for (const g of (navigator.getGamepads ? navigator.getGamepads() : [])) if (g && g.buttons.some(b => b.pressed)) { start(); break; } }, 300);
+  return { set, get on(){ return on; } };
+})();
 $('mToggle').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleClassic(); });
 $('reset').addEventListener('click', () => { glideLeg=null; Object.assign(S,{x:0,y:0,vx:0,vy:0,th:0,thv:0,tgt:0,vis:0,visv:0,travel:0,dist:0,grade:0,off:0,trail:null}); camTh=0; camVel=0; camH=null; clearTracks(); skis=[]; kicks=[]; lastTurn=null; lastLeg=null; streak=0; lastSki={L:null,R:null}; lastKickAt=0; kickDrive=null; vState=0; vChangedAt=-99; strokeNo=0; weightLeg=null; camPending=0; mode=null; focus=null; });
 $('tracks').addEventListener('click', e => { showTracks = !showTracks; e.target.textContent = 'Tracks: ' + (showTracks?'on':'off'); });

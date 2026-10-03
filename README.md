@@ -14,6 +14,7 @@ The keyboard and both controller schemes share one layout. Choose the controller
 | Snow plow (hold) | ↓ or S | Left stick down (triggers scheme) / both sticks down (twin-stick) |
 | Double pole | Space | LB or RB |
 | Switch skating / classic | C | A button |
+| Music on / off | M | — |
 | Tuck (hold, classic) | ↑ or W | Left stick up / both sticks up |
 | Steer (classic and tuck) | Q / E | Left stick left / right |
 
@@ -26,7 +27,7 @@ The keyboard and both controller schemes share one layout. Choose the controller
   - Flick a stick from centre to the edge for a passive step (other foot) or a kick turn (same foot).
   - In classic, swap one stick up and one down to kick.
 - **Animation:** trigger and key kicks animate as V1 (offset), and stick strokes as V2.
-- **Touch screens:** tap the labelled **Left kick** / **Right kick** pads at the bottom of the screen. Between them sits the only other control, a toggle: **\/** means skate and **||** means classic. Double-tap and pinch zoom, text selection and the long-press Copy/Share menu are all disabled so fast kicking doesn't disturb the page on iOS.
+- **Touch screens:** tap the labelled **Left kick** / **Right kick** pads at the bottom of the screen. Between them sits the only other control, a toggle: **\/** means skate and **||** means classic. A speaker button in the top-left corner mutes the music on any device. Double-tap and pinch zoom, text selection and the long-press Copy/Share menu are all disabled so fast kicking doesn't disturb the page on iOS.
 
 ## Interface
 

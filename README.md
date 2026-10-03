@@ -26,6 +26,16 @@ The keyboard and both controller schemes share one layout. Choose the controller
   - Flick a stick from centre to the edge for a passive step (other foot) or a kick turn (same foot).
   - In classic, swap one stick up and one down to kick.
 - **Animation:** trigger and key kicks animate as V1 (offset), and stick strokes as V2.
+- **Touch screens:** tap the left or right half of the screen to kick. The only on-screen control is a toggle at the bottom: **\/** means skate and **||** means classic.
+
+## Interface
+
+- **Play view (default):**
+  - Map and distance in the bottom left.
+  - Grade, cadence and speed in the bottom right.
+  - Stick diagrams with LT / RT readouts and the current mode in the centre. Trigger kicks show on the opposite stick, and when you're idle the diagrams demo the intended rhythm.
+  - A controller-layout panel in the top right.
+- **Dev view:** the full HUD, Tuning and stick debug tools. Toggle it with the **Dev** button or the **`** key.
 
 ## Mechanics
 

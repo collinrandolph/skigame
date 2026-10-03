@@ -49,6 +49,68 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 .dbgHead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.dbgHead b{font-family:var(--display);font-size:15px;letter-spacing:.06em;text-transform:uppercase}.dbgHead span{color:var(--muted)}
 .dbg pre{margin:0;max-height:150px;overflow:auto;white-space:pre-wrap;font:inherit;line-height:1.45}
 .dbg textarea{width:100%;height:90px;font:10px var(--mono);background:transparent;color:var(--ink);border:1px solid var(--line)}
+
+[hidden]{display:none !important}
+.padpanel,.hud,details,.dbg,.gradebig,.iconbtn{box-sizing:border-box}
+/* ---- views: play (default) shows only the race overlay; dev shows the full HUD, tuning and debug tools ---- */
+body:not(.dev) .hud, body:not(.dev) #tuneBox, body:not(.dev) .gradebig, body:not(.dev) .dbg { display:none !important }
+body.dev .play-only { display:none !important }
+.topbar{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);right:16px;display:flex;gap:8px;z-index:5}
+.iconbtn{height:40px;min-width:40px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(6px);cursor:pointer;font:600 12px/1 var(--display);letter-spacing:.12em;text-transform:uppercase}
+.iconbtn svg{width:24px;height:24px}
+.iconbtn[aria-pressed="true"],.iconbtn[aria-expanded="true"]{background:var(--ink);color:var(--snow);border-color:var(--ink)}
+.iconbtn:focus-visible{outline:2px solid var(--skier);outline-offset:2px}
+.padpanel{position:fixed;top:calc(env(safe-area-inset-top,0px) + 64px);right:16px;width:min(620px,calc(100vw - 32px));max-height:calc(100% - 96px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;backdrop-filter:blur(8px);z-index:5;display:grid;gap:12px}
+.padpanel header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.padpanel h2{margin:0;font:700 18px/1 var(--display);letter-spacing:.06em;text-transform:uppercase}
+.padpanel header span{color:var(--muted);font-size:11px}
+.padcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px 20px}
+.padcol h3{margin:0 0 6px;font:700 14px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.padcol dl{margin:0;display:grid;grid-template-columns:minmax(0,46%) minmax(0,1fr);gap:7px 12px;align-items:baseline;font-size:11.5px}
+.padcol dt{min-width:0}.padcol dd{margin:0;color:var(--ink);min-width:0}
+.chip{display:inline-block;padding:2px 6px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;font:500 11px/1.3 var(--mono);color:var(--ink);background:var(--snow)}
+.padkeys{font-size:11px;color:var(--muted);line-height:1.8;border-top:1px solid var(--line);padding-top:10px}
+.stats-left,.stats-right{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);display:flex;gap:18px;align-items:flex-end;pointer-events:none}
+.stats-left{left:16px}.stats-right{right:16px}
+.stat{display:grid;gap:2px;text-align:right;text-shadow:0 1px 0 var(--snow)}
+.stats-left .stat{text-align:left}
+.stat span{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.stat b{font:700 26px/1 var(--display);letter-spacing:.02em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.stat.big b{font-size:46px}
+.stat i{font-style:normal;font-size:11px;color:var(--muted)}
+.stat b[data-dir="up"]{color:var(--up)}.stat b[data-dir="down"]{color:var(--down)}
+.modebadge{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);display:grid;justify-items:center;gap:2px;pointer-events:none}
+.modebadge b{font:700 20px/1 var(--display);letter-spacing:.24em;text-transform:uppercase;color:var(--ink);padding-left:.24em}
+.modebadge span{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);min-height:1em}
+@media (max-width:560px){.stat.big b{font-size:34px}.stat b{font-size:20px}.stats-right{gap:12px}.modebadge{bottom:calc(env(safe-area-inset-bottom,0px) + 128px)}}
+
+
+/* ---- phones and tablets: everything hidden except the skate / classic toggle (the touch pads stay, unlabelled) ---- */
+.touchToggle{display:none}
+@media (hover:none) and (pointer:coarse){
+  .topbar,.padpanel,.stats-left,.stats-right,.modebadge,.hud,#tuneBox,.gradebig,.dbg{display:none !important}
+  .pad{color:transparent !important;border:0 !important}
+  .touchToggle{display:flex;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 22px);z-index:6;width:68px;height:68px;border-radius:50%;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,.12);touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  .touchToggle svg{width:34px;height:34px}
+  .touchToggle:active{transform:translateX(-50%) scale(.94)}
+}
+
+
+/* ---- phones and tablets (touch): no HUD at all, just the kick pads and one skate/classic toggle ---- */
+.mtoggle{display:none}
+@media (pointer:coarse){
+  #c,.topbar,.padpanel,.stats-left,.stats-right,.modebadge,.hud,#tuneBox,.gradebig,.dbg{display:none !important}
+  .pad{color:transparent}.pad.r{border-left:0}
+  .mtoggle{display:flex;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 24px);z-index:6;
+    width:64px;height:64px;border-radius:50%;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);
+    border:1px solid var(--line);backdrop-filter:blur(6px);touch-action:manipulation;box-sizing:border-box}
+  .mtoggle svg{width:30px;height:30px}
+  .mtoggle .ic-classic{display:none}
+  .mtoggle[data-mode="classic"] .ic-skate{display:none}
+  .mtoggle[data-mode="classic"] .ic-classic{display:block}
+  .mtoggle:focus-visible{outline:2px solid var(--skier);outline-offset:2px}
+}
+
 .help{font-size:11px;color:var(--muted);line-height:1.5;max-width:220px}
 .help b{color:var(--ink);font-weight:500}
 details{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 14px;width:min(260px,calc(100vw - 32px));backdrop-filter:blur(6px);font-size:11px;max-height:calc(100% - 32px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow:auto;overscroll-behavior:contain}
@@ -76,6 +138,22 @@ summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid
 <canvas id="gl"></canvas>
 <canvas id="c"></canvas>
 
+<div class="topbar">
+  <button id="padBtn" class="iconbtn" type="button" aria-expanded="false" aria-controls="padPanel" title="Controller layout"><svg viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h14c4 0 6.5 3 7 8l.6 5.5c.3 3-2.6 4.6-4.7 2.6L22.5 17h-13L6.1 20.1C4 22.1 1.1 20.5 1.4 17.5L2 12c.5-5 3-8 7-8z"/><path d="M8.5 9.5v5M6 12h5"/><circle cx="21.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="24.5" cy="13.5" r="1.1" fill="currentColor" stroke="none"/></svg></button>
+  <button id="devBtn" class="iconbtn" type="button" aria-pressed="false" title="Dev mode: full HUD, tuning and debug tools (`)">Dev</button>
+</div>
+<div id="padPanel" class="padpanel" hidden>
+  <header><h2>Controller</h2><span id="padScheme"></span></header>
+  <div class="padcols" id="padCols"></div>
+  <div class="padkeys">Keyboard: <span class="chip">←</span> <span class="chip">→</span> kick · <span class="chip">Space</span> double pole · <span class="chip">↓</span> snow plow · <span class="chip">↑</span> tuck · <span class="chip">Q</span> <span class="chip">E</span> or mouse steer (click the view; Esc releases) · <span class="chip">C</span> switch skate / classic · <span class="chip">`</span> dev mode</div>
+</div>
+<div class="stats-left play-only" id="playLeft"><div class="stat"><span>Distance</span><b id="pDist">0 m</b></div></div>
+<div class="stats-right play-only">
+  <div class="stat"><span>Grade</span><b id="pGrade">0.0%</b></div>
+  <div class="stat"><span>Cadence</span><b id="pCad">0</b><i>per min</i></div>
+  <div class="stat big"><span>Speed</span><b id="pSpd">0.0</b><i>km/h</i></div>
+</div>
+<div class="modebadge play-only"><b id="pMode">Skate</b><span id="pSub"></span></div>
 <div class="hud">
   <h1>Skate Ski</h1>
   <div class="row"><span>Speed</span><span id="spd">0.0 km/h</span></div>
@@ -91,7 +169,6 @@ summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid
   <div class="row"><span>Controller</span><span id="pad">none</span></div>
   <div class="legs"><div class="leg" id="legL">L kick</div><div class="leg" id="legR">R kick</div></div>
   <div class="glide"><span>Glide</span><div class="gbar"><i id="gfill"></i></div></div>
-  <div class="help"><b>← / →</b> (A / D) or <b>LT / RT</b>: kick. Hold each skating kick to push it all the way out and ride the glide.<br><b>↓</b> (S), left stick down, or both sticks down: hold to snow plow.<br><b>C</b> or <b>A button</b>: switch between skating and classic.<br><b>Space</b> or <b>LB / RB</b>: double pole.<br>Classic: kicks alternate; <b>↑</b> (W), left stick up, or both sticks up: hold to tuck; <b>Q / E</b> or left stick left/right steers.<br>Twin-stick skating: load a stick down-and-in, throw it up-and-out; flick a stick to the edge for a step or kick turn.</div>
 </div>
 
 <details id="tuneBox">
@@ -156,6 +233,11 @@ summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid
   <div class="btns"><button id="dbgCopy" type="button">Copy log</button><button id="dbgClear" type="button">Clear</button></div>
   <textarea id="dbgOut" hidden readonly></textarea>
 </div>
+<button class="touchToggle" id="touchToggle" type="button" aria-label="Switch between skate and classic"><svg id="ttIcon" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"></svg></button>
+<button class="mtoggle" id="mToggle" type="button" data-mode="skate" aria-label="Switch between skate and classic">
+  <svg class="ic-skate" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 5l9 20 9-20"/></svg>
+  <svg class="ic-classic" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M10 5v20M20 5v20"/></svg>
+</button>
 <div class="pads"><div class="pad l" id="padL">Left kick</div><div class="pad r" id="padR">Right kick</div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -356,7 +438,7 @@ function trailAssist(dt){
   if (P.assist <= 0){ assistTrail = null; return; }
   // hands off while you lean and for a moment after, and forget which trail you were on: you're steering yourself
   const now = performance.now();
-  if (lean || keySteer.q || keySteer.e){ assistQuietUntil = now + 800; assistTrail = null; return; }
+  if (lean || keySteer.q || keySteer.e || Math.abs(mouseLean) > 0.1){ assistQuietUntil = now + 800; assistTrail = null; return; }
   if (now < assistQuietUntil){ assistTrail = null; return; }
   const v = Math.hypot(S.vx, S.vy); if (v < 0.5) return;
   const twinSkate = P.scheme === 1 && !mode;
@@ -421,10 +503,12 @@ function newSki(side, ang, ax = S.x, ay = S.y){
 // where a foot is: the stance width out to that side of the body, square to the heading
 function footAt(side, th){ return [S.x + Math.cos(th)*side*STANCE, S.y + Math.sin(th)*side*STANCE]; }
 function headingOf(dx, dy){ return Math.atan2(dx, -dy); }
-function setParallel(side){
+function setParallel(side, alongHeading = false){
   // set a ski down beside the body, pointing the way the body is moving. in a snow plow the skis are pushed
   // wide and skid, so they sit further out and scrape a broader mark; in a tuck they run straight ahead.
-  const [mx, my] = mode === 'tuck' ? [Math.sin(S.th), -Math.cos(S.th)] : moveDir();
+  let [mx, my] = (mode === 'tuck' || alongHeading) ? [Math.sin(S.th), -Math.cos(S.th)] : moveDir();
+  // sliding backwards: the skis still point forward (and stay on their own sides), they're just moving tail-first
+  if (mx*Math.sin(S.th) - my*Math.cos(S.th) < 0){ mx = -mx; my = -my; }
   const st = mode === 'plow' ? PLOW_STANCE : STANCE;
   const s = newSki(side, headingOf(mx, my), S.x + (-my)*side*st, S.y + mx*side*st);
   if (mode === 'plow') s.w = 0.16;
@@ -494,9 +578,13 @@ function bumperPole(trig){
 }
 function doublePoleInput(){
   if (!mode){
-    // skating: a double pole straight down the stride's centre line (twin-stick) or the heading (triggers/keys)
-    const dir = P.scheme === 1 ? S.tgt - camPending : S.tgt;
-    polePush(dir); legFlash.L = legFlash.R = 0.6; lastKickAt = performance.now(); return;
+    // skating: a double pole works exactly as in classic. both skis come down side by side, pointing straight down
+    // the stride's centre line, and the push goes that way. your next kick picks the skate stride back up.
+    S.tgt -= camPending; camPending = 0; weightLeg = null;
+    for (const k of ['L','R']){ if (lastSki[k]) lastSki[k].live = false; }
+    S.th = S.tgt;
+    for (const k of ['L','R']) lastSki[k] = setParallel(k === 'L' ? -1 : 1, true);
+    polePush(S.tgt); legFlash.L = legFlash.R = 0.6; lastKickAt = performance.now(); return;
   }
   if (!inClassic()) return;
   if (mode === 'tuck' && tuckSrc) setTuck(false, tuckSrc);
@@ -645,7 +733,8 @@ function press(leg){ strideStyle = 'v1'; mode = null; held[leg] = true; kick(leg
 // pulling a trigger past halfway kicks; keep it pulled to hold the glide; it releases below 30%.
 const PAD_ON = 0.5, PAD_OFF = 0.3;
 const padDown = { L:false, R:false };
-let padIndex = null, padStatus = '', padStick = null, padRB = false;
+const keyKickHeld = { L: false, R: false };   // for the trigger readout
+let padIndex = null, padStatus = '', padStick = null, padRB = false, padAxes = null, padTriggers = [0, 0];
 addEventListener('gamepadconnected', e => { padIndex = e.gamepad.index; });
 addEventListener('gamepaddisconnected', e => { if (e.gamepad.index === padIndex){ padIndex = null; release('L'); release('R'); padDown.L = padDown.R = false; } });
 function pollPad(){
@@ -654,9 +743,12 @@ function pollPad(){
   catch (err){ padStatus = 'blocked here'; return; }
   let gp = padIndex !== null ? pads[padIndex] : null;
   if (!gp) for (const p of pads) if (p && p.connected){ gp = p; padIndex = p.index; break; }
-  if (!gp){ padStatus = 'none'; return; }
+  if (!gp){ padStatus = 'none'; padAxes = null; padTriggers = [0, 0]; return; }
   padStatus = gp.mapping === 'standard' ? 'connected' : 'connected (non-standard)';
   const trig = i => { const b = gp.buttons[i]; return b ? (typeof b === 'object' ? (b.value || (b.pressed ? 1 : 0)) : b) : 0; };
+  padAxes = [gp.axes[0] || 0, gp.axes[1] || 0, gp.axes[2] || 0, gp.axes[3] || 0];
+  padTriggers = [trig(6), trig(7)];
+  if (padAxes.some(v => Math.abs(v) > 0.15) || gp.buttons.some(b => b && (b.pressed || b.value > 0.1))){ anyInputAt = performance.now(); lastDevice = 'pad'; }
   if (P.scheme === 1){ pollTwin(gp); return; }
   // triggers scheme: A switches between skating and classic, LB or RB double poles (classic)
   bumperPole(trig);
@@ -916,6 +1008,7 @@ const keyLeg = k => (k === 'a' || k === 'arrowleft') ? 'L' : (k === 'd' || k ===
 // keyboard, matching the controller: ←/→ (A/D) kick, ↓ (S) held = snow plow, ↑ (W) = double pole in classic,
 // C switches between skating and classic
 addEventListener('keydown', e => {
+  anyInputAt = performance.now();
   const k = e.key.toLowerCase();
   if (k === 's' || k === 'arrowdown'){ e.preventDefault(); if (!e.repeat) setPlow(true, 'key'); return; }
   if (k === 'w' || k === 'arrowup'){ e.preventDefault(); if (!e.repeat) setTuck(true, 'key'); return; }
@@ -924,6 +1017,7 @@ addEventListener('keydown', e => {
   if (k === ' '){ e.preventDefault(); if (!e.repeat) doublePoleInput(); return; }
   const leg = keyLeg(k); if (!leg) return;
   e.preventDefault();
+  keyKickHeld[leg] = true;
   if (e.repeat) return;                                  // holding doesn't kick again; you have to press
   kickInput(leg);
 });
@@ -932,7 +1026,7 @@ addEventListener('keyup', e => {
   if (k === 's' || k === 'arrowdown'){ setPlow(false, 'key'); return; }
   if (k === 'w' || k === 'arrowup'){ setTuck(false, 'key'); return; }
   if (k === 'q' || k === 'e'){ keySteer[k] = 0; return; }
-  const leg = keyLeg(k); if (leg) release(leg);
+  const leg = keyLeg(k); if (leg){ keyKickHeld[leg] = false; release(leg); }
 });
 addEventListener('blur', () => { held.L = held.R = false; });
 for (const [id, leg] of [['padL','L'],['padR','R']]){
@@ -940,6 +1034,7 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
   el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture?.(e.pointerId); kickInput(leg); });
   for (const ev of ['pointerup','pointercancel']) el.addEventListener(ev, () => release(leg));
 }
+$('mToggle').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleClassic(); });
 $('reset').addEventListener('click', () => { glideLeg=null; Object.assign(S,{x:0,y:0,vx:0,vy:0,th:0,thv:0,tgt:0,vis:0,visv:0,travel:0,dist:0,grade:0,off:0,trail:null}); camTh=0; camVel=0; camH=null; clearTracks(); skis=[]; kicks=[]; lastTurn=null; lastLeg=null; streak=0; lastSki={L:null,R:null}; lastKickAt=0; kickDrive=null; vState=0; vChangedAt=-99; strokeNo=0; weightLeg=null; camPending=0; mode=null; focus=null; });
 $('tracks').addEventListener('click', e => { showTracks = !showTracks; e.target.textContent = 'Tracks: ' + (showTracks?'on':'off'); });
 
@@ -964,7 +1059,9 @@ function step(dt){
   trailAssist(dt);
   // leaning in a tuck carves you round steadily
   // (a lean carves on moving skis, so it fades out below about 10 km/h and does nothing standing still)
-  const ks = keySteer.e - keySteer.q, steer = ks || lean;   // Q/E on the keyboard, or the stick
+  mouseLean *= Math.exp(-dt * 2.5);                            // the mouse lean eases back to centre
+  if (Math.abs(mouseLean) < 0.02) mouseLean = 0;
+  const ks = keySteer.e - keySteer.q, steer = ks || lean || mouseLean;   // Q/E, the stick, or the mouse
   if ((mode === 'tuck' || mode === 'classic') && steer) S.tgt += steer * P.lean * Math.PI/180 * dt * Math.min(1, Math.hypot(S.vx, S.vy) / 3);
   if (mode !== 'tuck' && mode !== 'classic') lean = 0;
   // ease toward the kick's heading over the ski-set time; the total turn is exactly the step
@@ -1349,6 +1446,7 @@ function poseSkier(h0, arrowTh){
       const hx = sk.ax + sk.dx*sk.len - S.x, hy = sk.ay + sk.dy*sk.len - S.y;
       const lx = hx*Math.cos(th) + hy*Math.sin(th), lz = -(hx*Math.sin(th) - hy*Math.cos(th));
       fx = Math.max(-0.7, Math.min(0.7, lx)); fz += Math.max(-0.6, Math.min(0.6, lz));
+      fx = sd > 0 ? Math.max(fx, 0.05) : Math.min(fx, -0.05);   // a foot never crosses to the other side of the body
     }
     // the pushing leg extends out and back through the pole push, then is drawn in during recovery
     const ext = (!mode && k === lastLeg) ? (v2 === 'push' ? ease(vp) : v2 === 'recover' ? 1 - ease(vp) : 0) : 0;
@@ -1492,6 +1590,7 @@ function draw(){
 
   // overlay: signs and junctions projected into the view, fading with distance
   ctx.clearRect(0, 0, W, H);
+  if (isTouchUI) return;                                          // phones and tablets show only the mode toggle
   ctx.font = '500 11px "IBM Plex Mono", ui-monospace, monospace'; ctx.textBaseline = 'middle';
   for (const t of TRAILS){
     const d = Math.hypot(t.mid[0] - S.x, t.mid[1] - S.y); if (d > 120) continue;
@@ -1516,7 +1615,183 @@ function draw(){
   }
   ctx.globalAlpha = 1;
   drawMinimap();
-  if (P.scheme === 1) drawSticks();
+  if (devView){ if (P.scheme === 1) drawSticks(); }
+  else if (lastDevice === 'keys') drawPlayKeys();
+  else drawPlaySticks();
+}
+
+
+// play view: both sticks in the middle, under the skier. skate shows the load (down and in) and throw (up and out)
+// zones and the last stroke; classic shows a vertical lane up the centre, with the stance end that's in use lit.
+// idle demo: when the sticks have been left alone for a moment (or there's no controller), the diagrams play the
+// intended rhythm as a soft ghost. skate: left stick down-right then up-left, then the right stick down-left then
+// up-right, alternating. classic: left up / right down, gliding over to left down / right up and back.
+let sticksActiveAt = -1e9, triggersActiveAt = -1e9, anyInputAt = -1e9;   // for the diagrams
+const easeIO = x => x < 0 ? 0 : x > 1 ? 1 : x*x*(3 - 2*x);
+function demoSkate(leg, t){
+  const T = 1.6, ph = (t / T) % 2;                          // each stick takes one 1.6 s turn, then rests for the other's
+  const mine = leg === 'L' ? ph < 1 : ph >= 1;
+  if (!mine) return [0, 0];
+  const u = ph % 1, inS = leg === 'L' ? 1 : -1;
+  const load = [0.68*inS, 0.68], thr = [-0.68*inS, -0.68];
+  if (u < 0.25){ const f = easeIO(u/0.25); return [load[0]*f, load[1]*f]; }                       // ease down and in
+  if (u < 0.4) return load;                                                                      // short hold: loading
+  if (u < 0.7){ const f = easeIO((u - 0.4)/0.3); return [load[0] + (thr[0]-load[0])*f, load[1] + (thr[1]-load[1])*f]; }  // throw up and out
+  const f = easeIO((u - 0.7)/0.3); return [thr[0]*(1-f), thr[1]*(1-f)];                          // settle back to centre
+}
+function demoClassic(leg, t){
+  const T = 1.1, ph = (t / T) % 2, u = ph % 1;
+  const swing = u < 0.35 ? 0 : easeIO((u - 0.35)/0.65);                                         // hold, then swap
+  const lUp = ph < 1 ? -1 + 2*swing : 1 - 2*swing;                                               // left: -1 = up ... +1 = down
+  return [0, 0.85 * (leg === 'L' ? lUp : -lUp)];
+}
+
+// the last stroke's line stays while the stick is held out after the throw, then fades away over 0.6 s
+function strokeFade(t){
+  if (!t.last) return 0;
+  if (t.phase === 'thrown'){ t.last.endAt = 0; return 1; }
+  if (!t.last.endAt) t.last.endAt = performance.now();
+  return Math.max(0, 1 - (performance.now() - t.last.endAt) / 600);
+}
+
+
+// play view, keyboard players: the keys in use, lit while held, with keys that do nothing in this mode dimmed,
+// and a lean bar for Q / E or the mouse
+function drawPlayKeys(){
+  const cl = inClassic(), narrow = W < 560, k = narrow ? 30 : 36, g = 6;
+  const padB = parseFloat(getComputedStyle(document.documentElement).paddingBottom) || 0;
+  const bottom = H - padB - (narrow ? 128 : 14) - 62;
+  const cx = W/2, x0 = cx - (3*k + 2*g)/2;
+  const rows = [
+    [['q', 'Q', cl], ['arrowup', '↑', cl], ['e', 'E', cl]],
+    [['arrowleft', '←', true], ['arrowdown', '↓', true], ['arrowright', '→', true]],
+  ];
+  const y0 = bottom - (k*3 + g*2) - 14;
+  const held = name => keysDown.has(name) || (name === 'arrowleft' && keysDown.has('a')) || (name === 'arrowright' && keysDown.has('d'))
+    || (name === 'arrowup' && keysDown.has('w')) || (name === 'arrowdown' && keysDown.has('s'));
+  const cap = (x, y, w, label, on, active, col) => {
+    ctx.globalAlpha = active ? 1 : 0.35;
+    ctx.fillStyle = on ? col : C.mapbg; ctx.strokeStyle = on ? col : C.line; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, k, 6) : ctx.rect(x, y, w, k); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = on ? C.snow : C.ink; ctx.fillText(label, x + w/2, y + k/2 + 1);
+    ctx.globalAlpha = 1;
+  };
+  ctx.save();
+  ctx.font = '600 ' + (narrow ? 12 : 13) + 'px "IBM Plex Mono", ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  rows.forEach((row, ri) => row.forEach(([name, label, active], ci) => {
+    const col = name === 'arrowdown' ? C.up : C.down;
+    cap(x0 + ci*(k + g), y0 + ri*(k + g), k, label, held(name), active, col);
+  }));
+  // space bar (double pole) and C (switch)
+  const sy = y0 + 2*(k + g);
+  cap(x0, sy, 2*k + g, 'Space', keysDown.has(' '), true, C.down);
+  cap(x0 + 2*(k + g), sy, k, 'C', keysDown.has('c'), true, C.down);
+  // lean bar: Q / E or the mouse, classic and tuck only
+  const bw = 3*k + 2*g, by = bottom - 6;
+  ctx.globalAlpha = cl ? 1 : 0.35;
+  ctx.strokeStyle = C.line; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x0, by); ctx.lineTo(x0 + bw, by); ctx.stroke();
+  const lv = (keySteer.e - keySteer.q) || mouseLean;
+  ctx.fillStyle = Math.abs(lv) > 0.05 ? C.down : C.muted;
+  ctx.beginPath(); ctx.arc(cx + lv * bw/2, by, 5, 0, Math.PI*2); ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.font = '600 9.5px "IBM Plex Mono", ui-monospace, monospace'; ctx.fillStyle = C.muted;
+  if (cl) ctx.fillText(document.pointerLockElement === glc ? 'MOUSE STEERS · ESC RELEASES' : 'CLICK VIEW TO STEER WITH MOUSE', cx, by + 13);
+  ctx.restore();
+}
+
+function drawPlaySticks(){
+  const narrow = W < 560, r = narrow ? 30 : 38, gap = narrow ? 18 : 26;
+  const padB = parseFloat(getComputedStyle(document.documentElement).paddingBottom) || 0;
+  const cy = H - padB - (narrow ? 128 : 14) - 44 - r;
+  const cl = inClassic();
+  ctx.save();
+  ctx.font = '600 10px "IBM Plex Mono", ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ['L','R'].forEach((leg, i) => {
+    const cx = W/2 + (i ? 1 : -1) * (r + gap/2 + 6);
+    const inSign = leg === 'L' ? 1 : -1;
+    ctx.fillStyle = C.mapbg; ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, r + 6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    if (cl){
+      // classic: the vertical lane the stick travels in, with each end marked
+      const lw = r * 0.42;
+      ctx.fillStyle = C.line; ctx.globalAlpha = .8;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(cx - lw/2, cy - r, lw, 2*r, lw/2) : ctx.rect(cx - lw/2, cy - r, lw, 2*r); ctx.fill();
+      ctx.globalAlpha = 1;
+      const up = classic.pos ? ((classic.pos === 'A') === (leg === 'L')) : null;   // A = left stick up, right down
+      for (const end of [-1, 1]){
+        const lit = up !== null && ((end < 0) === up);
+        ctx.fillStyle = lit ? (end < 0 ? C.down : C.up) : C.mapbg; ctx.strokeStyle = C.muted; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(cx, cy + end * (r - lw/2), lw/2 - 2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      }
+    } else {
+      const zone = (deg, col) => {
+        const a = (deg - 90) * Math.PI/180;
+        ctx.fillStyle = col; ctx.globalAlpha = .25;
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, a - 0.42, a + 0.42); ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 1;
+      };
+      zone(180 - 45*inSign, C.up);     // load: down and in
+      zone(-45*inSign, C.down);        // throw: up and out
+      const t = twin[leg];
+      const fa = strokeFade(t);
+      if (t.last && P.scheme === 1 && fa > 0){
+        ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.globalAlpha = .55 * fa;
+        ctx.beginPath(); ctx.moveTo(cx + t.last.load[0]*r, cy + t.last.load[1]*r); ctx.lineTo(cx + t.last.throw[0]*r, cy + t.last.throw[1]*r); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+    // what the dot shows, in priority order:
+    //  1. the real stick, while the sticks are in use
+    //  2. trigger (or ← / →) kicks, drawn on the OPPOSITE stick, since a trigger kick off one leg is the same move as
+    //     throwing the other foot's stick: LT shows as a right-stick throw (classic: right up, left down), RT as left
+    //  3. the demo rhythm, once there's been no input of any kind for 1.5 s
+    //  4. otherwise a resting dot
+    const ax = padAxes ? (leg === 'L' ? [padAxes[0], padAxes[1]] : [padAxes[2], padAxes[3]]) : null;
+    const nowD = performance.now();
+    if (padAxes && padAxes.some(v => Math.abs(v) > 0.15)) sticksActiveAt = nowD;
+    const tL = Math.max(padTriggers[0], keyKickHeld.L ? 1 : 0), tR = Math.max(padTriggers[1], keyKickHeld.R ? 1 : 0);
+    if (tL > 0.02 || tR > 0.02) triggersActiveAt = nowD;
+    const dot = (x, y, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cx + x*r, cy + y*r, 5, 0, Math.PI*2); ctx.fill(); };
+    if (ax && nowD - sticksActiveAt < 400){
+      const t = twin[leg];
+      dot(ax[0], ax[1], (P.scheme === 1 && !cl) ? (t.phase === 'loading' ? C.up : t.phase === 'thrown' ? C.down : C.skier) : C.skier);
+    } else if (nowD - triggersActiveAt < 400){
+      if (cl){
+        const y = 0.85 * (leg === 'L' ? tL - tR : tR - tL);
+        dot(0, y, Math.abs(y) > 0.4 ? C.down : C.skier);
+      } else {
+        const v = leg === 'R' ? tL : tR;
+        dot(-0.68*inSign*v, -0.68*v, v >= 0.5 ? C.down : C.skier);
+      }
+    } else if (nowD - anyInputAt > 1500){
+      const tt = nowD / 1000, fn = cl ? demoClassic : demoSkate;
+      // a short fading trail behind the ghost dot shows the direction of travel
+      for (let k = 6; k >= 0; k--){
+        const [gx, gy] = fn(leg, tt - k*0.05);
+        ctx.fillStyle = C.skier; ctx.globalAlpha = k ? 0.08 * (7 - k) / 7 : 0.55;
+        ctx.beginPath(); ctx.arc(cx + gx*r, cy + gy*r, k ? 3.5 : 5, 0, Math.PI*2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    } else if (ax){
+      dot(ax[0], ax[1], C.skier);
+    } else {
+      ctx.fillStyle = C.muted; ctx.globalAlpha = .5; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
+    }
+    ctx.fillStyle = C.muted; ctx.fillText(leg, cx, cy - r - 14);
+    // trigger on the outside of each stick: LT left of the left stick, RT right of the right. it fills from the
+    // bottom as the trigger is pulled (or while ← / → is held on the keyboard)
+    const bw = narrow ? 22 : 26, bh = narrow ? 38 : 46, side = leg === 'L' ? -1 : 1;
+    const bx = cx + side*(r + 16) + (side < 0 ? -bw : 0), by = cy - bh/2;
+    const v = Math.max(padTriggers[leg === 'L' ? 0 : 1], keyKickHeld[leg] ? 1 : 0);
+    const round = (x, y, w, h, rr) => { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, rr) : ctx.rect(x, y, w, h); };
+    ctx.fillStyle = C.mapbg; ctx.strokeStyle = v > 0.5 ? C.down : C.line; ctx.lineWidth = 1;
+    round(bx, by, bw, bh, 6); ctx.fill(); ctx.stroke();
+    if (v > 0.02){ ctx.save(); round(bx, by, bw, bh, 6); ctx.clip(); ctx.fillStyle = C.down; ctx.globalAlpha = v >= 0.5 ? 1 : 0.5; ctx.fillRect(bx, by + bh*(1 - v), bw, bh*v); ctx.restore(); }
+    ctx.fillStyle = v >= 0.5 ? C.snow : C.ink; ctx.fillText(leg === 'L' ? 'LT' : 'RT', bx + bw/2, by + bh/2 + 1);
+  });
+  ctx.restore();
 }
 
 // twin-stick readout, bottom-left: target zones, the live stick, and the last stroke with its angle and power
@@ -1541,13 +1816,15 @@ function drawSticks(){
     zone(-45*inSign, C.down);              // throw
     ctx.strokeStyle = C.line; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
     // last stroke
-    if (t.last){
+    const fa = strokeFade(t);
+    if (t.last && fa > 0){
       const L = t.last;
-      ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.globalAlpha = .7;
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.globalAlpha = .7 * fa;
       ctx.beginPath(); ctx.moveTo(cx + L.load[0]*r, cy + L.load[1]*r); ctx.lineTo(cx + L.throw[0]*r, cy + L.throw[1]*r); ctx.stroke();
       ctx.globalAlpha = 1;
-      ctx.fillStyle = C.muted;
+      ctx.fillStyle = C.muted; ctx.globalAlpha = fa;
       ctx.fillText(Math.round(L.phi) + '° · ' + Math.round(L.power*100) + '% · turn ' + Math.abs(L.turn).toFixed(0) + '°', cx, cy + r + 18);
+      ctx.globalAlpha = 1;
     }
     if (t.load){ ctx.fillStyle = C.up; ctx.beginPath(); ctx.arc(cx + t.load[0]*r, cy + t.load[1]*r, 3, 0, Math.PI*2); ctx.fill(); }
     ctx.fillStyle = t.phase === 'loading' ? C.up : t.phase === 'thrown' ? C.down : C.skier;
@@ -1576,7 +1853,11 @@ function drawMinimap(){
   const size = W < 520 ? 104 : 150, pad = 16;
   const sc = size / Math.max(MAP.x1 - MAP.x0, MAP.y1 - MAP.y0);
   const mw = (MAP.x1 - MAP.x0)*sc, mh = (MAP.y1 - MAP.y0)*sc;
-  const mx = W - pad - mw, my = pad + (parseFloat(getComputedStyle(document.documentElement).paddingTop) || 0);
+  const cs = getComputedStyle(document.documentElement);
+  const padT = parseFloat(cs.paddingTop) || 0, padB = parseFloat(cs.paddingBottom) || 0;
+  // play view: bottom-left, with the distance readout beside it. dev view: top-right, under the buttons.
+  const mx = devView ? W - pad - mw : pad + 6, my = devView ? pad + padT + 54 : H - pad - padB - mh - 6;
+  if (!devView) $('playLeft').style.left = (pad + mw + 26) + 'px';
   ctx.fillStyle = C.mapbg; ctx.strokeStyle = C.line; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.roundRect ? ctx.roundRect(mx - 6, my - 6, mw + 12, mh + 12, 6) : ctx.rect(mx - 6, my - 6, mw + 12, mh + 12); ctx.fill(); ctx.stroke();
   const mX = x => mx + (x - MAP.x0)*sc, mY = y => my + (y - MAP.y0)*sc;
@@ -1592,8 +1873,115 @@ function drawMinimap(){
   ctx.strokeStyle = C.skier; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.sin(camTarget())*9, py - Math.cos(camTarget())*9); ctx.stroke();
 }
 
+
+// ---- views. play (default): race overlay only. dev: full HUD, tuning and debug. remembered per browser.
+let devView = false;
+try { devView = localStorage.getItem('skate-view') === 'dev'; } catch (e) {}
+function setView(dev){
+  devView = dev; document.body.classList.toggle('dev', dev);
+  $('devBtn').setAttribute('aria-pressed', String(dev));
+  try { localStorage.setItem('skate-view', dev ? 'dev' : 'play'); } catch (e) {}
+}
+setView(devView);
+$('devBtn').addEventListener('click', () => setView(!devView));
+addEventListener('keydown', e => { if (e.key === '`' && !e.repeat){ e.preventDefault(); setView(!devView); } });
+// controller layout panel, for whichever controller scheme is selected
+const chip = t => '<span class="chip">' + t + '</span>';
+function renderPadPanel(){
+  const twinScheme = P.scheme === 1;
+  $('padScheme').textContent = twinScheme ? 'Twin-stick scheme' : 'Triggers scheme';
+  const rows = twinScheme ? {
+    Skate: [
+      [chip('LT') + ' ' + chip('RT'), 'Kick left / right · hold to glide'],
+      ['Stick ' + chip('↓ in') + ' then ' + chip('↑ out'), 'Stroke onto that foot\'s ski (left stick = left foot)'],
+      ['Flick stick to edge', 'Step (other foot) · kick turn (same foot)'],
+      ['Both sticks ' + chip('↓') + ' hold', 'Snow plow'],
+      [chip('LB') + ' ' + chip('RB'), 'Double pole'],
+      [chip('A'), 'Switch to classic'],
+    ],
+    Classic: [
+      [chip('LT') + ' ' + chip('RT') + ' alternate', 'Kick'],
+      ['One stick ' + chip('↑') + ' one ' + chip('↓') + ', swap', 'Kick'],
+      [chip('LB') + ' ' + chip('RB'), 'Double pole'],
+      ['Both sticks ' + chip('↑') + ' hold', 'Tuck · tilt to lean'],
+      ['Both sticks ' + chip('↓') + ' hold', 'Snow plow'],
+      ['Left stick ' + chip('←') + ' ' + chip('→'), 'Steer'],
+      [chip('A'), 'Switch to skate'],
+    ],
+  } : {
+    Skate: [
+      [chip('LT') + ' ' + chip('RT'), 'Kick left / right · hold to glide'],
+      ['Left stick ' + chip('↓') + ' hold', 'Snow plow'],
+      [chip('LB') + ' ' + chip('RB'), 'Double pole'],
+      [chip('A'), 'Switch to classic'],
+    ],
+    Classic: [
+      [chip('LT') + ' ' + chip('RT') + ' alternate', 'Kick'],
+      [chip('LB') + ' ' + chip('RB'), 'Double pole'],
+      ['Left stick ' + chip('↑') + ' hold', 'Tuck'],
+      ['Left stick ' + chip('↓') + ' hold', 'Snow plow'],
+      ['Left stick ' + chip('←') + ' ' + chip('→'), 'Steer'],
+      [chip('A'), 'Switch to skate'],
+    ],
+  };
+  $('padCols').innerHTML = Object.entries(rows).map(([name, list]) =>
+    '<div class="padcol"><h3>' + name + '</h3><dl>' + list.map(([a, b]) => '<dt>' + a + '</dt><dd>' + b + '</dd>').join('') + '</dl></div>').join('');
+}
+$('padBtn').addEventListener('click', () => {
+  const open = $('padPanel').hidden; $('padPanel').hidden = !open; $('padBtn').setAttribute('aria-expanded', String(open));
+  if (open) renderPadPanel();
+});
+$('tScheme').addEventListener('input', () => {
+  // switching scheme lets go of anything the other scheme's sticks were holding
+  setPlow(false, 'pad'); setPlow(false, 'twin'); setTuck(false, 'pad'); setTuck(false, 'twin');
+  if (!$('padPanel').hidden) renderPadPanel();
+});
+
+
+// ---- which device the player is using (switches the play-view diagram between sticks and keys)
+let lastDevice = 'pad';
+const keysDown = new Set();
+addEventListener('keydown', e => { lastDevice = 'keys'; keysDown.add(e.key.toLowerCase()); });
+addEventListener('keyup', e => { keysDown.delete(e.key.toLowerCase()); });
+addEventListener('blur', () => keysDown.clear());
+
+// ---- mouse lean: click the view to capture the mouse (Esc releases it); moving it left / right leans you that
+// way in classic and in a tuck, easing back to centre when the mouse is still
+let mouseLean = 0;
+glc.addEventListener('mousedown', e => {
+  if (e.button !== 0 || document.pointerLockElement === glc) return;
+  try { const r = glc.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) {}
+});
+addEventListener('mousemove', e => {
+  if (document.pointerLockElement !== glc) return;
+  mouseLean = Math.max(-1, Math.min(1, mouseLean + (e.movementX || 0) * 0.006));
+  lastDevice = 'keys'; anyInputAt = performance.now();
+});
+
+// ---- touch: one toggle button, its icon showing the current technique (\/ skate, || classic)
+const isTouchUI = matchMedia('(hover: none) and (pointer: coarse)').matches;
+$('touchToggle').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleClassic(); });
+let ttShown = null;
+function updateTouchToggle(){
+  const cl = inClassic(); if (cl === ttShown) return; ttShown = cl;
+  $('ttIcon').innerHTML = cl ? '<path d="M12 6v22M22 6v22"/>' : '<path d="M7 7l10 20 10-20"/>';
+}
+
 function hud(){
-  const lean = (keySteer.e - keySteer.q) || globalLean();
+  $('mToggle').dataset.mode = inClassic() ? 'classic' : 'skate';
+  updateTouchToggle();
+  if (!devView){
+    const gp = S.grade*100, flat = Math.abs(gp) < 0.5;
+    const g = $('pGrade'); g.textContent = (flat ? '' : gp > 0 ? '+' : '−') + Math.abs(gp).toFixed(1) + '%'; g.dataset.dir = flat ? '' : gp > 0 ? 'up' : 'down';
+    $('pSpd').textContent = (Math.hypot(S.vx, S.vy)*3.6).toFixed(1);
+    const nowK = performance.now(); $('pCad').textContent = Math.round(kicks.filter(t => nowK - t < 4000).length * 15);
+    $('pDist').textContent = S.dist < 1000 ? Math.round(S.dist) + ' m' : (S.dist/1000).toFixed(2) + ' km';
+    const cl = inClassic();
+    $('pMode').textContent = cl ? 'Classic' : 'Skate';
+    const ld = loadState();
+    $('pSub').textContent = mode === 'plow' ? 'Snow plow' : mode === 'tuck' ? 'Tuck' : (ld.leg || ld.both) ? 'Loading' : '';
+  }
+  const lean = (keySteer.e - keySteer.q) || globalLean() || mouseLean;
   $('arow').textContent = Math.abs(assistOff) < 0.3 ? '—' : (assistOff > 0 ? 'pulling right ' : 'pulling left ') + Math.abs(assistOff).toFixed(0) + '°';
   $('vrow').textContent = (vState > 0 ? 'wide' : vState < 0 ? 'narrow' : 'normal') + ' · ' + skateV45().toFixed(0) + '°';
   { const ld = loadState(); if (!mode && (ld.leg || ld.both)){ $('mode').textContent = ld.both ? 'Loading double pole' : 'Loading ' + (ld.leg === 'L' ? 'left' : 'right') + ' leg'; } else

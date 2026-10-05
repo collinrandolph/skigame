@@ -227,7 +227,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tV1side">V1 hang side (triggers)<output id="oV1side"></output><input id="tV1side" type="range" min="0" max="1" step="1" value="1"></label>
     <label for="tRumble">Kick vibration on groomed snow (%)<output id="oRumble"></output><input id="tRumble" type="range" min="0" max="100" step="1" value="5"></label>
     <label for="tRumble2">Kick vibration on ungroomed snow (%)<output id="oRumble2"></output><input id="tRumble2" type="range" min="0" max="100" step="1" value="25"></label>
-    <label for="tRumbleL">Vibration while loading a stroke (%)<output id="oRumbleL"></output><input id="tRumbleL" type="range" min="0" max="20" step="0.5" value="1"></label>
+    <label for="tRumbleL">Buzz when a stroke starts loading (%)<output id="oRumbleL"></output><input id="tRumbleL" type="range" min="0" max="20" step="0.5" value="1"></label>
     <h4>Touch</h4>
     <label for="tSwait">Swipe wait before a tap kicks (ms)<output id="oSwait"></output><input id="tSwait" type="range" min="0" max="200" step="10" value="90"></label>
     <label for="tSpull">Slingshot pull (px)<output id="oSpull"></output><input id="tSpull" type="range" min="10" max="80" step="2" value="26"></label>
@@ -1209,7 +1209,7 @@ function pollPad(){
   padAxes = [gp.axes[0] || 0, gp.axes[1] || 0, gp.axes[2] || 0, gp.axes[3] || 0];
   padTriggers = [trig(6), trig(7)];
   if (padAxes.some(v => Math.abs(v) > 0.15) || gp.buttons.some(b => b && (b.pressed || b.value > 0.1))){ anyInputAt = performance.now(); lastDevice = 'pad'; }
-  pollTwin(gp); loadBuzz();
+  pollTwin(gp);
 }
 // ---- the controller: each stick is one leg (triggers kick too; see pollTwin).
 // load: pull the stick down and in (about 45°) to sink onto that ski. throw: drive it up and out to push off and
@@ -1318,6 +1318,7 @@ function pollTwin(gp){
     if (inLoad && t.phase !== 'loading'){
       if (t.phase === 'thrown') release(pushLeg(leg));
       t.phase = 'loading'; t.load = [x, y]; t.loadT = performance.now(); t.restSince = 0; dbgNote(leg, 'load started');
+      if (performance.now() - buzzAt > 120) buzz(leg, P.rumbleL / 100, 50);   // one short buzz on that side as the load starts
     }
     if (t.phase === 'loading'){
       if (inLoad && mag > Math.hypot(t.load[0], t.load[1])) t.load = [x, y];   // deepest point of the load
@@ -1411,16 +1412,6 @@ function rumble(leg, k = 1){
   const level = (P.rumble + (P.rumble2 - P.rumble) * Math.max(0, Math.min(1, S.off))) / 100;
   buzzAt = performance.now();
   buzz(leg, level * k, Math.round(45 + 30*Math.min(1.2, k)));
-}
-// a faint hum on the stick's side while it's pulled back loading a stroke (refreshed every 100 ms; it holds off just
-// after a kick so it doesn't cut that buzz short)
-let loadBuzzAt = 0;
-function loadBuzz(){
-  if (!(P.rumbleL > 0)) return;
-  const now = performance.now(); if (now - loadBuzzAt < 100 || now - buzzAt < 140) return;
-  const legs = ['L', 'R'].filter(k => twin[k].phase === 'loading'); if (!legs.length) return;
-  loadBuzzAt = now;
-  buzz(legs.length > 1 ? 'B' : legs[0], P.rumbleL / 100, 130);
 }
 function release(leg){ held[leg] = false; }
 function glideMult(){

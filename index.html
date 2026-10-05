@@ -237,6 +237,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tTurn">Turn per kick (°)<output id="oTurn"></output><input id="tTurn" type="range" min="0" max="30" step="0.5" value="5"></label>
     <label for="tTurn2">2nd same-side kick turn (°)<output id="oTurn2"></output><input id="tTurn2" type="range" min="0" max="30" step="0.5" value="5"></label>
     <label for="tTurn3">3rd same-side kick turn (°)<output id="oTurn3"></output><input id="tTurn3" type="range" min="0" max="45" step="0.5" value="15"></label>
+    <label for="tKfloor">Least turn after two same-side kicks, even after a pause (°)<output id="oKfloor"></output><input id="tKfloor" type="range" min="0" max="45" step="0.5" value="15"></label>
     <label for="tKwin">Kick-turn window (ms between kicks)<output id="oKwin"></output><input id="tKwin" type="range" min="200" max="2000" step="50" value="450"></label>
     <label for="tK180">Quick same-side kicks for a full turn<output id="oK180"></output><input id="tK180" type="range" min="3" max="12" step="1" value="6"></label>
     <label for="tK180t">Quick trigger kicks for a full turn<output id="oK180t"></output><input id="tK180t" type="range" min="3" max="12" step="1" value="5"></label>
@@ -317,7 +318,7 @@ addEventListener('resize', resize);
 
 const $ = id => document.getElementById(id);
 const P = {};
-const tune = [['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tSwait','oSwait','swait',v=>v.toFixed(0)],['tSpull','oSpull','spull',v=>v.toFixed(0)],['tSthrow','oSthrow','sthrow',v=>v.toFixed(0)],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tBsnap','oBsnap','bsnap',v=>v ? v.toFixed(0) : 'off'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
+const tune = [['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tSwait','oSwait','swait',v=>v.toFixed(0)],['tSpull','oSpull','spull',v=>v.toFixed(0)],['tSthrow','oSthrow','sthrow',v=>v.toFixed(0)],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tBsnap','oBsnap','bsnap',v=>v ? v.toFixed(0) : 'off'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKfloor','oKfloor','kfloor',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
   ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tOffglide','oOffglide','offglide',v=>v.toFixed(0)+'%'],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -1027,7 +1028,7 @@ function polePush(dir = S.th){
 // 5, 5, 15, 33.3, 51.7, 70), shrinking to 90° at a normal skating speed or above (5, 5, 15, 18.3, 21.7, 25), so the
 // same quick kicks give a tight turn while moving rather than spinning you round. the speed you start the run at
 // decides which (the kicks themselves speed you up, and that shouldn't shrink a turn you began from a standstill). no single kick turns more than 90°.
-let kickPrevT = -1e9, streakKmh = 0, streakTrig = false, snapSkip = 0, junctionTurnAt = -1e9;
+let kickPrevT = -1e9, streakKmh = 0, streakTrig = false, snapSkip = 0, junctionTurnAt = -1e9, sideRun = 0;
 function fullTurnDeg(speedKmh = Math.hypot(S.vx, S.vy) * 3.6, p = P){
   return p.tfStop + (p.tfMove - p.tfStop) * smooth01(p.tfVlo, p.tfVhi, speedKmh);
 }
@@ -1064,6 +1065,7 @@ function kick(leg, opt = {}){
   // two quick loaded strokes on one side turn exactly like two quick plain kicks
   const tNow = performance.now(), quick = (opt.startT !== undefined ? Math.min(opt.startT, tNow) : tNow) - kickPrevT <= P.kwin;
   streak = sameSide && quick ? streak + 1 : 1;
+  sideRun = sameSide ? sideRun + 1 : 1;          // same-side kicks in a row, however slow (an opposite kick resets it)
   kickPrevT = tNow;
   if (streak === 1){ streakKmh = Math.hypot(S.vx, S.vy) * 3.6; streakTrig = opt.src === 'trigger'; snapSkip = 0; }   // the speed (and input) a run starts with decides how far it can turn
   const thPre = S.tgt;
@@ -1104,6 +1106,9 @@ function kick(leg, opt = {}){
     // a kick that snaps onto a trail at a junction doesn't use up a step of the build: the next one carries on with
     // the step this one would have had (15, 25, line up, 40, 60 rather than 15, 25, 40, 60)
     lastTurnDeg = sameSideTurn(streak - snapSkip);
+    // from the third same-side kick in a row, a pause restarts the build but never drops below the floor (15°):
+    // 5, 5, pause, 15, pause, 15 ... instead of falling back to 5
+    if (sameSide && sideRun >= 3) lastTurnDeg = Math.max(lastTurnDeg, P.kfloor);
     let a = side * lastTurnDeg * Math.PI/180;
     let camRef = S.tgt - camPending;
     const prev = S.tgt;

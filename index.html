@@ -237,14 +237,14 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tTurn">Turn per kick (°)<output id="oTurn"></output><input id="tTurn" type="range" min="0" max="30" step="0.5" value="5"></label>
     <label for="tTurn2">2nd same-side kick turn (°)<output id="oTurn2"></output><input id="tTurn2" type="range" min="0" max="30" step="0.5" value="5"></label>
     <label for="tTurn3">3rd same-side kick turn (°)<output id="oTurn3"></output><input id="tTurn3" type="range" min="0" max="45" step="0.5" value="15"></label>
-    <label for="tKwin">Kick-turn window (ms between kicks)<output id="oKwin"></output><input id="tKwin" type="range" min="200" max="2000" step="50" value="650"></label>
+    <label for="tKwin">Kick-turn window (ms between kicks)<output id="oKwin"></output><input id="tKwin" type="range" min="200" max="2000" step="50" value="450"></label>
     <label for="tK180">Quick same-side kicks for a full turn<output id="oK180"></output><input id="tK180" type="range" min="3" max="12" step="1" value="6"></label>
     <label for="tK180t">Quick trigger kicks for a full turn<output id="oK180t"></output><input id="tK180t" type="range" min="3" max="12" step="1" value="5"></label>
     <label for="tTfStop">Full turn when slow or stopped (°)<output id="oTfStop"></output><input id="tTfStop" type="range" min="45" max="270" step="5" value="180"></label>
     <label for="tTfMove">Full turn at skating speed (°)<output id="oTfMove"></output><input id="tTfMove" type="range" min="30" max="270" step="5" value="90"></label>
-    <label for="tTfVlo">Slow below (km/h)<output id="oTfVlo"></output><input id="tTfVlo" type="range" min="0" max="20" step="1" value="4"></label>
+    <label for="tTfVlo">Slow below (km/h)<output id="oTfVlo"></output><input id="tTfVlo" type="range" min="0" max="20" step="1" value="1"></label>
     <label for="tTfVhi">Skating speed from (km/h)<output id="oTfVhi"></output><input id="tTfVhi" type="range" min="2" max="30" step="1" value="14"></label>
-    <label for="tDecay">Same-leg push loss (% per kick)<output id="oDecay"></output><input id="tDecay" type="range" min="0" max="60" step="5" value="30"></label>
+    <label for="tDecay">Same-leg push loss (% per kick)<output id="oDecay"></output><input id="tDecay" type="range" min="0" max="60" step="5" value="20"></label>
     <label for="tSnap">Ski set time (ms)<output id="oSnap"></output><input id="tSnap" type="range" min="0" max="400" step="10" value="160"></label>
     <label for="tSplay">Skate angle (°)<output id="oSplay"></output><span class="sl"><input id="tSplay" type="range" min="0" max="60" step="1" value="11"><i class="ghost" id="tSplayG"></i></span></label>
     <h4>Snow and glide</h4>
@@ -273,7 +273,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tAswitch">Trail switch ease-in (ms)<output id="oAswitch"></output><input id="tAswitch" type="range" min="0" max="4000" step="100" value="1500"></label>
     <label for="tAramp">Trail assist ease-in (ms)<output id="oAramp"></output><input id="tAramp" type="range" min="0" max="4000" step="100" value="1500"></label>
     <h4>Camera</h4>
-    <label for="tCamd">Camera distance (m)<output id="oCamd"></output><input id="tCamd" type="range" min="4" max="24" step="0.5" value="12"></label>
+    <label for="tCamd">Camera distance (m)<output id="oCamd"></output><input id="tCamd" type="range" min="4" max="24" step="0.5" value="24"></label>
     <label for="tSway">Camera side-follow (s)<output id="oSway"></output><input id="tSway" type="range" min="0.1" max="2" step="0.05" value="0.8"></label>
     <label for="tCam">Camera smoothing (s)<output id="oCam"></output><input id="tCam" type="range" min="0.1" max="1.5" step="0.05" value="0.6"></label>
     <label for="tAhug">Camera hugs trail (%)<output id="oAhug"></output><input id="tAhug" type="range" min="0" max="1" step="0.05" value="0.35"></label>

@@ -1664,7 +1664,9 @@ function snowPatterns(){
   const rgb = c => { const k = new THREE.Color(c); return [k.r*255, k.g*255, k.b*255]; };
   // shadows lean toward the theme's shade colour on light snow (toward the grid colour on dark snow, which is lighter)
   const base = rgb(C.snow), light = base[0] + base[1] + base[2] > 384;
-  const lo = light ? rgb(C.shade).map((c, i) => base[i] + (c - base[i])*0.5) : rgb(C.grid), hi = rgb(C.groomed);
+  const lo = light ? rgb(C.shade).map((c, i) => base[i] + (c - base[i])*0.5) : rgb(C.grid);
+  // the brightest ripple crests stop at a pale blue (part way to the corduroy colour), never the trails' white
+  const hi = light ? rgb(C.cord).map((c, i) => base[i] + (c - base[i])*0.6) : rgb(C.groomed);
   const make = (N, fn) => {
     const cv = document.createElement('canvas'); cv.width = cv.height = N;
     const cx = cv.getContext('2d'), im = cx.createImageData(N, N), d = im.data;
@@ -1681,7 +1683,7 @@ function snowPatterns(){
     const ph = v*21 + u*4 + warp(u, v)*2.2 + warp2(u, v)*0.6, r = ph - Math.floor(ph);
     const m = 0.3 + 0.7*smooth01(0.3, 0.66, 0.65*patch(u, v) + 0.35*patch2(u, v));
     const lee = r < 0.4 ? Math.pow(1 - r/0.4, 1.5) : 0, crest = r > 0.8 ? (r - 0.8)/0.2 : 0, gr = grain();
-    return [m*lee*1.1 + (gr > 0.93 ? 0.15 : 0), m*crest + (gr < 0.05 ? 0.6 : 0)];
+    return [m*lee*1.1 + (gr > 0.93 ? 0.15 : 0), Math.min(1, m*crest + (gr < 0.05 ? 0.6 : 0))];
   });
   const drift = periodicNoise(5, 53), drift2 = periodicNoise(11, 59);
   snowPat.b = make(230, (u, v) => {
@@ -1746,27 +1748,69 @@ function* bakeTile(t){
     for (const cr of LAKE_CRACKS){ tc.moveTo(TX(cr[0]), TY(cr[1])); for (let i = 2; i < cr.length; i += 2) tc.lineTo(TX(cr[i]), TY(cr[i+1])); }
     tc.stroke();
   }
-  // lawns round the landmarks: groomed snow with a fine diagonal corduroy and the trails' edge colour at the rim
-  if (LAWN_PARTS.some(p => p.bx[0] < X1 + 8 && p.bx[2] > X0 - 8 && p.bx[1] < Y1 + 8 && p.bx[3] > Y0 - 8)){
-    const PXl = R*TEX_PPM;
-    for (let j = 0; j < ny; j++){
-      if (j % 6 === 5) yield;
-      for (let i = 0; i < nx; i++){
-        const x = X0 + (i + 0.5)*R, y = Y0 + (j + 0.5)*R, e = lawnSD(x, y);
-        if (e > 0.25) continue;
-        tc.fillStyle = e > -0.45 ? C.edge : (Math.floor((x + y)/1.1) % 2 ? C.cord : C.groomed);
-        tc.fillRect(i*PXl, j*PXl, PXl + 0.5, PXl + 0.5);
+  // groomed ground (trails and lawns) is drawn as one shape. a mask of both is softened and cut at its midpoint, which
+  // rounds every corner (bends, junctions, and where a trail meets a lawn) into a smooth curve. the edge colour runs
+  // only round the outside of the whole shape, so there's no line where a lawn meets a trail.
+  const near = TRAILS.filter(tr => tr.bx[0] < X1 + 12 && tr.bx[2] > X0 - 12 && tr.bx[1] < Y1 + 12 && tr.bx[3] > Y0 - 12);
+  const lawnNear = LAWN_PARTS.some(p => p.bx[0] < X1 + 14 && p.bx[2] > X0 - 14 && p.bx[1] < Y1 + 14 && p.bx[3] > Y0 - 14);
+  if (near.length || lawnNear){
+    const BR = 6, PAD = 24, mw = tw + 2*PAD, mh = th + 2*PAD;          // blur radius (px, three box passes) and margin
+    const newCv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+    const mc = newCv(mw, mh), mx = mc.getContext('2d'), sc = newCv(tw, th), sx = sc.getContext('2d');
+    sx.fillStyle = C.groomed; sx.fillRect(0, 0, tw, th);
+    mx.fillStyle = '#fff';
+    if (lawnNear){
+      // lawn cells into the mask (with the margin), and the lawn's diagonal corduroy onto the surface
+      const PXl = R*TEX_PPM, m0 = Math.ceil(PAD/PXl);
+      for (let j = -m0; j < ny + m0; j++){
+        if (j % 8 === 7) yield;
+        for (let i = -m0; i < nx + m0; i++){
+          const x = X0 + (i + 0.5)*R, y = Y0 + (j + 0.5)*R, e = lawnSD(x, y);
+          if (e > 1.2) continue;
+          if (e <= 0.25) mx.fillRect(PAD + i*PXl, PAD + j*PXl, PXl + 0.5, PXl + 0.5);
+          if (i >= 0 && j >= 0 && i < nx && j < ny && (((Math.floor((x + y)/1.1) % 2) + 2) % 2)){ sx.fillStyle = C.cord; sx.fillRect(i*PXl, j*PXl, PXl + 0.5, PXl + 0.5); }
+        }
       }
     }
-  }
-  // groomed trails: edge, packed surface, then corduroy stripes running along the trail
-  const path = tr => { const p = tr.s; tc.moveTo(TX(p[0]), TY(p[1])); for (let i = 2; i < p.length; i += 2) tc.lineTo(TX(p[i]), TY(p[i+1])); };
-  tc.lineCap = 'round'; tc.lineJoin = 'round';
-  const near = TRAILS.filter(tr => tr.bx[0] < X1 + 5 && tr.bx[2] > X0 - 5 && tr.bx[1] < Y1 + 5 && tr.bx[3] > Y0 - 5);
-  if (near.length){
-    tc.strokeStyle = C.edge; tc.lineWidth = TRAIL_W*TEX_PPM + 4; tc.beginPath(); near.forEach(path); tc.stroke();
-    const cord = TRAIL_W*TEX_PPM;
-    for (let w = cord, k = 0; w > 1; w -= 2, k++){ tc.strokeStyle = k % 2 ? C.cord : C.groomed; tc.lineWidth = w; tc.beginPath(); near.forEach(path); tc.stroke(); }
+    if (near.length){
+      const pathM = (cx, tr, o) => { const p = tr.s; cx.moveTo(TX(p[0]) + o, TY(p[1]) + o); for (let i = 2; i < p.length; i += 2) cx.lineTo(TX(p[i]) + o, TY(p[i+1]) + o); };
+      mx.strokeStyle = '#fff'; mx.lineCap = 'round'; mx.lineJoin = 'round'; mx.lineWidth = TRAIL_W*TEX_PPM + 4;
+      mx.beginPath(); near.forEach(tr => pathM(mx, tr, PAD)); mx.stroke();
+      // corduroy stripes running along the trail
+      sx.lineCap = 'round'; sx.lineJoin = 'round';
+      for (let w = TRAIL_W*TEX_PPM, k = 0; w > 1; w -= 2, k++){ sx.strokeStyle = k % 2 ? C.cord : C.groomed; sx.lineWidth = w; sx.beginPath(); near.forEach(tr => pathM(sx, tr, 0)); sx.stroke(); }
+    }
+    yield;
+    // soften the mask: three box blurs each way (close to a gaussian, sigma about 1.3 m)
+    const md = mx.getImageData(0, 0, mw, mh).data, A = new Float32Array(mw*mh), T = new Float32Array(mw*mh);
+    for (let k = 0; k < A.length; k++) A[k] = md[k*4 + 3] / 255;
+    const boxH = (src, dst) => { const n = 2*BR + 1; for (let y = 0; y < mh; y++){ const o = y*mw; let acc = 0;
+      for (let x = -BR; x <= BR; x++) acc += src[o + Math.min(mw - 1, Math.max(0, x))];
+      for (let x = 0; x < mw; x++){ dst[o + x] = acc/n; acc += src[o + Math.min(mw - 1, x + BR + 1)] - src[o + Math.max(0, x - BR)]; } } };
+    const boxV = (src, dst) => { const n = 2*BR + 1; for (let x = 0; x < mw; x++){ let acc = 0;
+      for (let y = -BR; y <= BR; y++) acc += src[Math.min(mh - 1, Math.max(0, y))*mw + x];
+      for (let y = 0; y < mh; y++){ dst[y*mw + x] = acc/n; acc += src[Math.min(mh - 1, y + BR + 1)*mw + x] - src[Math.max(0, y - BR)*mw + x]; } } };
+    for (let pass = 0; pass < 3; pass++){ boxH(A, T); boxV(T, A); if (pass === 1) yield; }
+    // cut at 0.5. near the cut the softened value climbs about SL per pixel, which turns it into a depth (px) inside
+    // the shape: the outer EDGE px are the rim colour, and the cut itself is antialiased over about a pixel
+    const SL = 1 / (Math.sqrt(BR*(BR + 1)) * Math.sqrt(2*Math.PI)), EDGE = 2.2;
+    const ec = new THREE.Color(C.edge), er = ec.r*255, eg = ec.g*255, eb = ec.b*255;
+    const mI = sx.createImageData(tw, th), eI = sx.createImageData(tw, th), mD = mI.data, eD = eI.data;
+    for (let y = 0; y < th; y++){
+      const o = (y + PAD)*mw + PAD;
+      for (let x = 0; x < tw; x++){
+        const d = (A[o + x] - 0.5)/SL, cov = Math.min(1, Math.max(0, d + 0.5));
+        if (cov <= 0) continue;
+        const q = (y*tw + x)*4; mD[q+3] = cov*255;
+        const rim = cov * Math.min(1, Math.max(0, EDGE + 0.5 - d));
+        if (rim > 0){ eD[q] = er; eD[q+1] = eg; eD[q+2] = eb; eD[q+3] = rim*255; }
+      }
+    }
+    const mk = newCv(tw, th); mk.getContext('2d').putImageData(mI, 0, 0);
+    const ek = newCv(tw, th); ek.getContext('2d').putImageData(eI, 0, 0);
+    sx.globalCompositeOperation = 'destination-in'; sx.drawImage(mk, 0, 0);
+    sx.globalCompositeOperation = 'source-over'; sx.drawImage(ek, 0, 0);
+    tc.drawImage(sc, 0, 0);
   }
   yield;
   tc.globalAlpha = 1;

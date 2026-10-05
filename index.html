@@ -246,6 +246,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tFric">Snow friction (m/s²)<output id="oFric"></output><span class="sl"><input id="tFric" type="range" min="0" max="2" step="0.05" value="0.6"><i class="ghost" id="tFricG"></i></span></label>
     <label for="tGlide">Speed drag<output id="oGlide"></output><input id="tGlide" type="range" min="0.01" max="1" step="0.01" value="0.25"></label>
     <label for="tOff">Ungroomed snow (× friction)<output id="oOff"></output><input id="tOff" type="range" min="1" max="12" step="0.5" value="3.5"></label>
+    <label for="tOffglide">Held glide off-trail (% of the cut)<output id="oOffglide"></output><input id="tOffglide" type="range" min="0" max="100" step="5" value="100"></label>
     <label for="tGrip">Edge grip<output id="oGrip"></output><input id="tGrip" type="range" min="0.5" max="25" step="0.5" value="12"></label>
     <label for="tGwin">Glide window (ms)<output id="oGwin"></output><input id="tGwin" type="range" min="0" max="2000" step="50" value="900"></label>
     <label for="tGcut">Glide friction cut (%)<output id="oGcut"></output><input id="tGcut" type="range" min="0" max="100" step="5" value="85"></label>
@@ -309,7 +310,7 @@ addEventListener('resize', resize);
 const $ = id => document.getElementById(id);
 const P = {};
 const tune = [['tScheme','oScheme','scheme',v=>v ? 'Twin-stick (experimental)' : 'Triggers'],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tSboost','oSboost','sboost',v=>v.toFixed(2)+'×'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tVstep','oVstep','vstep',v=>v.toFixed(0)],['tVslow','oVslow','vslow',v=>v.toFixed(0)],['tVfast','oVfast','vfast',v=>v.toFixed(0)],['tVhill','oVhill','vhill',v=>v.toFixed(1)],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tSa0','oSa0','sa0',v=>v.toFixed(0)],['tSa45','oSa45','sa45',v=>v.toFixed(0)],['tSa90','oSa90','sa90',v=>v.toFixed(0)],['tSlen','oSlen','slen',v=>v.toFixed(2)],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tBuild','oBuild','build',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
-  ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
+  ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tOffglide','oOffglide','offglide',v=>v.toFixed(0)+'%'],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
 // only sliders you've actually moved are remembered, so everything else follows the current defaults. (the old format
@@ -1477,13 +1478,14 @@ function step(dt){
   const f = slopeFactors(S.grade);
   const nt = nearestTrail(S.x, S.y);
   S.off = offTrail(nt.d); S.trail = nt.t;
-  if (bridgeAt(S.x, S.y) || onLake(S.x, S.y)) S.off = 0;
-  if (S.off > 0) S.off = Math.min(S.off, apronOff(S.x, S.y));   // lawns round the landmarks and the paths in to them   // bridges, their ramps and the lake ice run like groomed trail
-  // ungroomed snow multiplies both friction and drag; a held glide only pays off on the groomed surface
+  if (bridgeAt(S.x, S.y) || onLake(S.x, S.y)) S.off = 0;          // bridges, their ramps and the lake ice run like groomed trail
+  if (S.off > 0) S.off = Math.min(S.off, apronOff(S.x, S.y));   // and so do the lawns round the landmarks
   S.gm = glideMult();
   // classic skis break their own track, so ungroomed snow adds no friction in classic mode
   const offK = mode === 'classic' ? 0 : S.off;
-  const surf = (1 + (P.off - 1) * offK) * (S.gm + (1 - S.gm) * offK);
+  // ungroomed snow multiplies friction and drag; a held glide's friction cut works off the trail at the share set by
+  // 'Held glide off-trail' (100% = the same as on the trail, so the ungroomed multiplier is the only difference)
+  const surf = (1 + (P.off - 1) * offK) * (S.gm + (1 - S.gm) * offK * (1 - P.offglide/100));
 
   // the body rides the ski it is standing on. after a kick that is the gliding ski, set at the skate angle,
   // so the body travels out along that ski's line, not along the torso heading like a car would. the
@@ -3987,7 +3989,7 @@ function hud(){
   if (S.off >= 0.99){ srf.textContent = 'Ungroomed'; srf.dataset.off = '1'; }
   else { srf.innerHTML = ''; srf.append(diffMark(S.trail.diff), ' ' + S.trail.name); srf.dataset.off = ''; }
   const f = slopeFactors(S.grade);
-  const offK = mode === 'classic' ? 0 : S.off, gm = S.gm ?? 1, surf = (1 + (P.off - 1) * offK) * (gm + (1 - gm) * offK);
+  const offK = mode === 'classic' ? 0 : S.off, gm = S.gm ?? 1, surf = (1 + (P.off - 1) * offK) * (gm + (1 - gm) * offK * (1 - P.offglide/100));
   $('oFric').textContent = P.fric.toFixed(2) + ' → ' + (P.fric*f.fric*surf).toFixed(2);
   $('oMax').textContent = P.max.toFixed(0) + ' → ' + (P.max*f.max).toFixed(0);
   const spn = splayNow();

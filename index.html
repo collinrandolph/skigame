@@ -248,6 +248,9 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <div class="btns"><button id="copySet" type="button">Copy settings</button><button id="defSet" type="button">Restore defaults</button></div>
     <p class="note" id="setNote">Your slider changes are kept in this browser.</p>
     <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button></div>
+    <label for="tOrb1">Zone 1 orbs collected<output id="oOrb1"></output><input id="tOrb1" type="range" min="0" max="20" step="1" value="0"></label>
+    <label for="tOrb2">Zone 2 orbs collected<output id="oOrb2"></output><input id="tOrb2" type="range" min="0" max="30" step="1" value="0"></label>
+    <p class="note">For testing: sets how many of a zone's orbs count as collected. All of them opens the gate or lowers the bridge. Not saved.</p>
   </div>
 </details>
 
@@ -1759,6 +1762,19 @@ function updateOrbs(dt){
   }
   if (toastT && now > toastT){ $('toast').classList.remove('on'); toastT = 0; }
 }
+// dev: mark the first n of a zone's orbs collected (the rest back in play) and open or shut its way on to match
+function setOrbsCollected(zone, n){
+  zoneOrbs(zone).forEach((o, k) => {
+    o.got = k < n; o.fade = o.got ? 1 : 0; o.g.visible = !o.got;
+    o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true;
+  });
+  if (zone === 1) setGateOpen(n === ORB_COUNT[1]);
+  if (zone === 2) bridgeWanted = n === ORB_COUNT[2];
+}
+for (const z of [1, 2]){
+  const el = $('tOrb' + z);
+  el.addEventListener('input', () => { setOrbsCollected(z, +el.value); $('oOrb' + z).textContent = el.value + ' / ' + ORB_COUNT[z]; });
+}
 function resetOrbs(){
   for (const o of orbs){ o.got = false; o.fade = 0; o.g.visible = true; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; }
   setGateOpen(false); gate.open = 0; bridgeWanted = false; bridgeDown = 0; animateGate(0);
@@ -2496,6 +2512,11 @@ function hud(){
     $('orbZone').textContent = z === 1 ? (gateOpen ? 'Gate open' : 'Orbs') : z === 2 ? (bridgeWanted ? 'Bridge down' : 'Orbs') : 'Coming soon';
   }
   $('mToggle').dataset.mode = inClassic() ? 'classic' : 'skate';
+  if (devView) for (const z of [1, 2]){           // keep the orb sliders in step with what's actually been collected
+    const el = $('tOrb' + z), n = orbsGot(z);
+    if (document.activeElement !== el && +el.value !== n) el.value = n;
+    $('oOrb' + z).textContent = n + ' / ' + ORB_COUNT[z];
+  }
   if (!devView){
     const gp = S.grade*100, flat = Math.abs(gp) < 0.5;
     const g = $('pGrade'); g.textContent = (flat ? '' : gp > 0 ? '+' : '−') + Math.abs(gp).toFixed(1) + '%'; g.dataset.dir = flat ? '' : gp > 0 ? 'up' : 'down';

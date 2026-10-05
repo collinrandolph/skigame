@@ -566,7 +566,7 @@ function obstacleSD(x, y, terrainOnly = false){
   d = Math.min(d, x - WORLD.x0 - EDGE_WALL, WORLD.x1 - EDGE_WALL - x, y - WORLD.y0 - EDGE_WALL, WORLD.y1 - EDGE_WALL - y);
   if (terrainOnly) return d;
   // buildings and equipment
-  for (const o of SOLIDS){ const q = Math.hypot(x - o.x, y - o.y) - o.r; if (q < d) d = q; }
+  for (const o of SOLIDS){ const q = o.foot ? footSD(o.foot, x, y) : Math.hypot(x - o.x, y - o.y) - o.r; if (q < d) d = q; }
   for (const m of MOOSE){ const q = Math.hypot(x - m.x, y - m.y) - 1.4; if (q < d) d = q; }
   for (const h of HERD){ const q = Math.hypot(x - h.x, y - h.y) - (h.calf ? 0.8 : 1.4); if (q < d) d = q; }
   for (const n of NPCS){ const q = Math.hypot(x - n.x, y - n.y) - 0.45; if (q < d) d = q; }
@@ -1659,14 +1659,28 @@ function periodicNoise(cells, seed){
     return (G(i, j)*(1 - sa) + G(i+1, j)*sa)*(1 - sb) + (G(i, j+1)*(1 - sa) + G(i+1, j+1)*sa)*sb;
   };
 }
-function snowPatterns(){
-  const key = C.snow + C.grid + C.groomed; if (snowPat.key === key) return snowPat;
+// ungroomed snow as it should look once lit: the theme's snow nudged toward its blue shade. the sun and sky together
+// light flat ground at more than full strength, which washed plain snow out to pure white, so the colours baked into
+// the ground texture are scaled back by that amount (snowLit). groomed snow is left to light up white.
+function snowLit(){
+  const sunY = sun.position.clone().normalize().y, flat = hemi.intensity + sun.intensity*Math.max(0, sunY);
+  return Math.min(1, 0.98/flat);
+}
+function snowRGB(){
   const rgb = c => { const k = new THREE.Color(c); return [k.r*255, k.g*255, k.b*255]; };
+  const s = rgb(C.snow), light = s[0] + s[1] + s[2] > 384, sh = rgb(C.shade), k = snowLit();
+  const target = light ? s.map((c, i) => c + (sh[i] - c)*0.09) : s;
+  return { light, k, rgb, target, scaled: target.map(c => c*k) };
+}
+const snowCSS = () => { const q = snowRGB().scaled.map(c => Math.round(c)); return 'rgb(' + q.join(',') + ')'; };
+function snowPatterns(){
+  const S0 = snowRGB(), key = S0.scaled.join() + C.grid + C.groomed + C.cord; if (snowPat.key === key) return snowPat;
+  const { rgb, light, k } = S0, t = S0.target;
   // shadows lean toward the theme's shade colour on light snow (toward the grid colour on dark snow, which is lighter)
-  const base = rgb(C.snow), light = base[0] + base[1] + base[2] > 384;
-  const lo = light ? rgb(C.shade).map((c, i) => base[i] + (c - base[i])*0.5) : rgb(C.grid);
+  const lo0 = light ? rgb(C.shade).map((c, i) => t[i] + (c - t[i])*0.5) : rgb(C.grid);
   // the brightest ripple crests stop at a pale blue (part way to the corduroy colour), never the trails' white
-  const hi = light ? rgb(C.cord).map((c, i) => base[i] + (c - base[i])*0.6) : rgb(C.groomed);
+  const hi0 = light ? rgb(C.cord).map((c, i) => t[i] + (c - t[i])*0.6) : rgb(C.groomed);
+  const base = S0.scaled, lo = lo0.map(c => c*k), hi = hi0.map(c => c*k);
   const make = (N, fn) => {
     const cv = document.createElement('canvas'); cv.width = cv.height = N;
     const cx = cv.getContext('2d'), im = cx.createImageData(N, N), d = im.data;
@@ -1698,7 +1712,7 @@ function* bakeTile(t){
   const TX = x => (x - X0) * TEX_PPM, TY = y => (y - Y0) * TEX_PPM;
   const R = TILE_R, nx = TILE_NX, ny = TILE_NY, hs = t.hs;
   const H = (i, j) => hs[j*(nx+1)+i];
-  tc.fillStyle = C.snow; tc.fillRect(0, 0, tw, th);
+  const snowFill = snowCSS(); tc.fillStyle = snowFill; tc.fillRect(0, 0, tw, th);
   // snow surface: wind ripples in drifting patches, with soft drifts over them (two patterns of different sizes,
   // pinned to the world so they run on seamlessly from tile to tile)
   const pats = snowPatterns();
@@ -1714,7 +1728,7 @@ function* bakeTile(t){
     const gx = (H(ii+2, jj) - H(ii, jj)), gy = (H(ii, jj+2) - H(ii, jj)), sl = Math.hypot(gx, gy);
     if (sl < 0.28) continue;
     const k = smooth01(0.28, 0.55, sl);
-    tc.globalAlpha = k; tc.fillStyle = C.snow; tc.fillRect(i*PX, j*PX, PX + 0.6, PX + 0.6);
+    tc.globalAlpha = k; tc.fillStyle = snowFill; tc.fillRect(i*PX, j*PX, PX + 0.6, PX + 0.6);
     const x = X0 + i*R, y = Y0 + j*R;
     const streak = 0.5 + 0.5*Math.sin(x*0.9 + Math.sin(y*0.31)*3) * Math.sin(y*0.7 - x*0.13);   // strata and gullies
     const rk = smooth01(0.7, 1.4, sl) * (0.35 + 0.65*streak);
@@ -1881,7 +1895,7 @@ const farGround = (() => {
   return { chunks };
 })();
 function colorFarGround(){
-  const a = new THREE.Color(C.snow), b = new THREE.Color(C.rock), w = new THREE.Color(C.water), c = new THREE.Color();
+  const a = new THREE.Color(snowCSS()), b = new THREE.Color(C.rock), w = new THREE.Color(C.water), c = new THREE.Color();
   for (const ch of farGround.chunks.values()){
     const pos = ch.g.attributes.position;
     for (let k = 0; k < pos.count; k++){
@@ -1987,7 +2001,7 @@ const STRUCTS = (() => {
 })();
 SOLIDS = STRUCTS.flatMap(s => s.solids
   ? s.solids.map(([lx, lz, r]) => ({ x: s.x + lx*Math.cos(s.rot) + lz*Math.sin(s.rot), y: s.y - lx*Math.sin(s.rot) + lz*Math.cos(s.rot), r }))
-  : [{ x: s.x, y: s.y, r: s.r * (RUINS.has(s.kind) ? 0.55 : 0.72) }]);
+  : [{ x: s.x, y: s.y, r: s.r * (RUINS.has(s.kind) ? 0.55 : 0.72) }]).map(o => ({ ...o, struct: true }));
 
 // ---- lawns: every landmark off the trails sits on a broad groomed lawn, joined to the nearest trail by a groomed
 // tongue about as wide as the lawn itself, curving a little and swelling and narrowing as it goes. lawn outlines
@@ -2184,41 +2198,73 @@ for (const o of orbs){
 const zoneOrbs = z => orbs.filter(o => o.zone === z);
 const orbsGot = z => zoneOrbs(z).filter(o => o.got).length;
 
+const lam = c => new THREE.MeshLambertMaterial({ color: c });
+const SM = {
+  hull: lam(0xe3e8ec), steel: lam(0x9fb0c1), slate: lam(0x4f6276), blue: lam(0x4f6f8f), blue2: lam(0x7c97b0),
+  dark: lam(0x2f3b48), orange: lam(0xc98a3e), green: lam(0x5d7a68), ice: lam(0xc3d4e0),
+  glass: new THREE.MeshLambertMaterial({ color: 0xa9c4d8, transparent: true, opacity: 0.36, depthWrite: false, side: THREE.DoubleSide }),
+  lamp: new THREE.MeshBasicMaterial({ color: 0xf0b867 }),
+  window: new THREE.MeshBasicMaterial({ color: 0xf3d9a4 }),
+  line: new THREE.LineBasicMaterial({ color: 0x6f849a }),
+};
+for (const k of ['hull', 'steel', 'slate', 'blue', 'blue2', 'dark', 'ice']) SM[k].flatShading = true;
+const bx = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+const cy = (rt, rb, h, n = 16, open = false) => new THREE.CylinderGeometry(rt, rb, h, n, 1, open);
+SM.glow = new THREE.MeshBasicMaterial({ color: 0x9cc8e8 });      // cool light strips on gates and bridges
 const stoneMat = new THREE.MeshLambertMaterial({ color: 0x8a939c }), woodMat = new THREE.MeshLambertMaterial({ color: 0x7a6250 }), darkWoodMat = new THREE.MeshLambertMaterial({ color: 0x4d3f35 });
-// the east gate: stone posts and walls across the pass, a beam over the doorway, and two timber doors that swing
-// out once zone 1's orbs are in
+// the zone gates (east and south): outpost tech. tall white pylons either side of the doorway with light strips up
+// their faces, a barrier of slate-footed panels out to the slopes, a steel lintel with a status light (amber while
+// shut, blue once open), and two armoured door leaves that swing out once the zone's orbs are in.
+// the footprint (pylons, barrier line, doors) is unchanged, so the collision walls still match.
 function buildGate(gx, gy, rotY, reach){
   // the doors open toward local +x; rotY turns the whole gate (0 = a passage running east-west)
   const g = new THREE.Group(), h0 = height(gx, gy);
   g.position.set(gx, h0, gy); g.rotation.y = rotY;
   const toW = (lx, lz) => [gx + lx*Math.cos(rotY) + lz*Math.sin(rotY), gy - lx*Math.sin(rotY) + lz*Math.cos(rotY)];
-  const post = z => { const m = new THREE.Mesh(new THREE.BoxGeometry(1.0, 4.2, 1.0), stoneMat); m.position.set(0, 2.1, z); g.add(m); };
-  post(-(DOOR_HW + 0.5)); post(DOOR_HW + 0.5);
-  // walls from each post out to the slopes, stepped down to follow the ground
-  for (const side of [-1, 1]) for (let z = DOOR_HW + 1; z < reach; z += 1.5){
-    const hz = height(...toW(0, side*(z + 0.75))) - h0;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.6, 1.55), stoneMat); m.position.set(0, hz + 1.0, side*(z + 0.75)); g.add(m);
+  const P = (geo, mat, x, y, z, par = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); par.add(m); return m; };
+  const status = new THREE.MeshBasicMaterial({ color: 0xe0a252 });
+  for (const sz of [-1, 1]){
+    const z = sz*(DOOR_HW + 0.5);
+    P(bx(1.3, 1.0, 1.3), SM.slate, 0, 0.3, z);                                  // footing
+    P(bx(1.0, 5.4, 1.0), SM.hull, 0, 2.9, z);                                  // pylon
+    P(bx(1.12, 0.35, 1.12), SM.steel, 0, 5.75, z);                             // cap
+    for (const fx of [-1, 1]) P(bx(0.04, 4.2, 0.14), SM.glow, fx*0.51, 3.0, z); // light strips up both faces
+    P(bx(0.9, 0.1, 0.9), SM.glow, 0, 5.98, z);
   }
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 2*DOOR_HW + 2.2), woodMat); beam.position.set(0, 4.2, 0); g.add(beam);
+  // barrier panels out to the slopes, stepped to follow the ground: a slate foot, a white panel, a light line on top
+  for (const side of [-1, 1]) for (let z = DOOR_HW + 1; z < reach; z += 1.5){
+    const hz = height(...toW(0, side*(z + 0.75))) - h0, zc = side*(z + 0.75);
+    P(bx(1.2, 1.1, 1.5), SM.slate, 0, hz - 0.05, zc);
+    P(bx(0.7, 1.6, 1.42), SM.hull, 0, hz + 1.3, zc);
+    P(bx(0.74, 0.07, 1.42), SM.glow, 0, hz + 2.13, zc);
+    P(bx(0.06, 0.08, 1.42), SM.dark, 0.36, hz + 0.75, zc); P(bx(0.06, 0.08, 1.42), SM.dark, -0.36, hz + 0.75, zc);
+  }
+  // lintel across the doorway with a light strip under it and the status light in the middle
+  P(bx(0.8, 0.55, 2*DOOR_HW + 2.4), SM.steel, 0, 5.0, 0);
+  P(bx(0.5, 0.06, 2*DOOR_HW - 0.2), SM.glow, 0, 4.7, 0);
+  P(bx(0.9, 0.3, 1.2), status, 0, 5.4, 0);
   const doors = [];
   for (const side of [-1, 1]){
-    // each door hinges on its post and spans half the opening; planks plus a cross brace
+    // each leaf hinges on its pylon and spans half the opening: a white armoured panel in a slate frame,
+    // with a light seam down the leading edge and a dark chevron band
     const hinge = new THREE.Group(); hinge.position.set(0, 0, side*DOOR_HW); g.add(hinge);
-    for (let k = 0; k < 4; k++){
-      const pl = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.3, DOOR_HW/4 - 0.06), woodMat);
-      pl.position.set(0, 1.35, -side*(k + 0.5)*DOOR_HW/4); hinge.add(pl);
-    }
-    for (const yb of [0.65, 2.05]){ const br = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.22, DOOR_HW - 0.1), darkWoodMat); br.position.set(0.05, yb, -side*DOOR_HW/2); hinge.add(br); }
+    const w = DOOR_HW - 0.06, mid = -side*w/2;
+    P(bx(0.22, 2.5, w), SM.hull, 0, 1.4, mid, hinge);
+    P(bx(0.28, 0.22, w), SM.slate, 0, 0.2, mid, hinge); P(bx(0.28, 0.22, w), SM.slate, 0, 2.62, mid, hinge);
+    P(bx(0.28, 2.6, 0.18), SM.slate, 0, 1.4, -side*0.09, hinge);
+    P(bx(0.3, 2.3, 0.08), SM.glow, 0, 1.4, -side*(w - 0.04), hinge);
+    P(bx(0.26, 0.3, w*0.8), SM.dark, 0, 1.6, mid, hinge);
     doors.push({ hinge, side });
   }
   scene.add(g);
-  return { g, doors, open: 0 };
+  return { g, doors, open: 0, status };
 }
 const gate = buildGate(GATE.x, GATE.y, 0, PASS_HW + 5);
 const gate2 = buildGate(SADDLE.x, SADDLE.y, -Math.PI/2, 9);    // the south gate: doors open toward zone 3 (south)
 function setGateOpen(on){ gateOpen = on; }
-// the drawbridge: a timber deck hinged on the far (south) bank between two stone towers, standing up on end until
-// zone 2's orbs are in, then lowered across the river
+// the drawbridge: a steel deck hinged on the far (south) bank between two white lifting pylons, standing up on end
+// until zone 2's orbs are in, then lowered across the river. the lower bridge is the same deck, always down.
+// both are outpost tech: steel deck plates, slate abutments, white bollards and light rails
 let bridgeWanted = false;
 function buildBridge(B){
   const D = deckLevel(B), { x: BX, yc, IN, OUT, W } = B, L = 2*IN;
@@ -2244,22 +2290,36 @@ function buildBridge(B){
     side.push(BX - W/2, D, yi, BX + W/2, D, yi, BX - W/2, bot, yi, BX + W/2, D, yi, BX + W/2, bot, yi, BX - W/2, bot, yi);
   }
   const mk = (arr, mat) => { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.material.side = THREE.DoubleSide; g.add(m); return m; };
-  mk(surf, new THREE.MeshLambertMaterial({ color: 0x7f6b58 })); mk(side, new THREE.MeshLambertMaterial({ color: 0x8a939c, side: THREE.DoubleSide }));
-  // stone posts where the leaf lands
+  mk(surf, new THREE.MeshLambertMaterial({ color: 0xb4c2cf })); mk(side, new THREE.MeshLambertMaterial({ color: 0x4f6276, side: THREE.DoubleSide }));
+  // white bollards with light caps where the leaf lands
   for (const dir of [-1, 1]) for (const sx of [-1, 1]){
-    const p = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.3, 0.7), stoneMat); p.position.set(BX + sx*(W/2 + 0.45), D + 0.3, yc + dir*(IN + 0.5)); g.add(p);
+    const p = new THREE.Mesh(cy(0.32, 0.4, 1.3, 8), SM.hull); p.position.set(BX + sx*(W/2 + 0.45), D + 0.3, yc + dir*(IN + 0.5)); g.add(p);
+    const c = new THREE.Mesh(cy(0.26, 0.3, 0.12, 8), SM.glow); c.position.set(BX + sx*(W/2 + 0.45), D + 1.0, yc + dir*(IN + 0.5)); g.add(c);
   }
   // the lifting towers on the south side of the water, with a beam across the top (the drawbridge only)
   const hinge = new THREE.Group(); hinge.position.set(BX, D, yc + IN); g.add(hinge);
-  if (B.gated) for (const sx of [-1, 1]){ const t = new THREE.Mesh(new THREE.BoxGeometry(1.3, 10, 1.3), stoneMat); t.position.set(BX + sx*(W/2 + 0.95), D + 2.5, yc + IN + 0.8); g.add(t); }
-  if (B.gated){ const top = new THREE.Mesh(new THREE.BoxGeometry(W + 3.6, 0.7, 1.1), woodMat); top.position.set(BX, D + 7.3, yc + IN + 0.8); g.add(top); }
+  if (B.gated) for (const sx of [-1, 1]){
+    const x = BX + sx*(W/2 + 0.95), z = yc + IN + 0.8, add = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); };
+    add(bx(1.7, 4, 1.7), SM.slate, D - 1.5);                     // footing down into the bank
+    add(bx(1.2, 7.6, 1.2), SM.hull, D + 4.2);                     // pylon
+    add(bx(1.32, 0.4, 1.32), SM.steel, D + 8.1);
+    for (const f of [-1, 1]){ const m = new THREE.Mesh(bx(0.05, 6, 0.16), SM.glow); m.position.set(x + f*0.61, D + 4.4, z); g.add(m); }
+  }
+  if (B.gated){
+    const top = new THREE.Mesh(bx(W + 3.6, 0.6, 1.0), SM.steel); top.position.set(BX, D + 7.3, yc + IN + 0.8); g.add(top);
+    const strip = new THREE.Mesh(bx(W + 1.2, 0.06, 0.6), SM.glow); strip.position.set(BX, D + 6.97, yc + IN + 0.8); g.add(strip);
+  }
   // the leaf: a deck whose top is exactly deck level, planks, rails; hinged at the south end, reaching north when down
   const leaf = new THREE.Group(); hinge.add(leaf);
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(W, 0.4, L), woodMat); deck.position.set(0, -0.2, -L/2); leaf.add(deck);
-  for (let z = 0.8; z < L; z += 1.6){ const s = new THREE.Mesh(new THREE.BoxGeometry(W, 0.02, 0.1), darkWoodMat); s.position.set(0, 0.005, -z); leaf.add(s); }
+  const deckMat = new THREE.MeshLambertMaterial({ color: 0xb4c2cf });
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(W, 0.4, L), deckMat); deck.position.set(0, -0.2, -L/2); leaf.add(deck);
+  const under = new THREE.Mesh(new THREE.BoxGeometry(W*0.7, 0.35, L), SM.slate); under.position.set(0, -0.55, -L/2); leaf.add(under);   // a keel under the deck
+  for (let z = 2; z < L; z += 4){ const s = new THREE.Mesh(new THREE.BoxGeometry(W, 0.02, 0.06), SM.slate); s.position.set(0, 0.005, -z); leaf.add(s); }   // plate seams
   for (const sx of [-1, 1]){
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, L), darkWoodMat); rail.position.set(sx*(W/2 - 0.06), 1.0, -L/2); leaf.add(rail);
-    for (let z = 0.4; z < L; z += 2.5){ const p = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.12), darkWoodMat); p.position.set(sx*(W/2 - 0.06), 0.5, -z); leaf.add(p); }
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, L), SM.slate); curb.position.set(sx*(W/2 - 0.1), 0.12, -L/2); leaf.add(curb);
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, L), SM.steel); rail.position.set(sx*(W/2 - 0.06), 1.0, -L/2); leaf.add(rail);
+    const light = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.05, L), SM.glow); light.position.set(sx*(W/2 - 0.06), 1.07, -L/2); leaf.add(light);
+    for (let z = 0.4; z < L; z += 2.5){ const p = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.0, 0.1), SM.steel); p.position.set(sx*(W/2 - 0.06), 0.5, -z); leaf.add(p); }
   }
   // chains from the beam to the leaf's far end, redrawn as it moves
   const chainMat = new THREE.LineBasicMaterial({ color: 0x2f3b48 });
@@ -2287,9 +2347,11 @@ function animateGate(dt){
   const e = gate.open*gate.open*(3 - 2*gate.open);
   // swing outward, toward zone 2 (+x)
   for (const d of gate.doors) d.hinge.rotation.y = -d.side * e * 1.75;
+  gate.status.color.setHex(gate.open > 0.5 ? 0x9cc8e8 : 0xe0a252);
   gate2.open += Math.sign((gate2Open ? 1 : 0) - gate2.open) * Math.min(Math.abs((gate2Open ? 1 : 0) - gate2.open), dt / 2.2);
   const e2 = gate2.open*gate2.open*(3 - 2*gate2.open);
   for (const d of gate2.doors) d.hinge.rotation.y = -d.side * e2 * 1.75;
+  gate2.status.color.setHex(gate2.open > 0.5 ? 0x9cc8e8 : 0xe0a252);
   animateBridge(dt);
 }
 let toastT = 0;
@@ -2337,18 +2399,6 @@ function resetOrbs(){
 // ---- structure models: low-poly sci-fi outpost kit in the frost palette (slate, steel blue, pale grey, an orange
 // accent). each is assembled from primitives, then merged into one mesh per material so a building costs a handful
 // of draw calls. origin at ground level in the middle of the footprint.
-const lam = c => new THREE.MeshLambertMaterial({ color: c });
-const SM = {
-  hull: lam(0xe3e8ec), steel: lam(0x9fb0c1), slate: lam(0x4f6276), blue: lam(0x4f6f8f), blue2: lam(0x7c97b0),
-  dark: lam(0x2f3b48), orange: lam(0xc98a3e), green: lam(0x5d7a68), ice: lam(0xc3d4e0),
-  glass: new THREE.MeshLambertMaterial({ color: 0xa9c4d8, transparent: true, opacity: 0.36, depthWrite: false, side: THREE.DoubleSide }),
-  lamp: new THREE.MeshBasicMaterial({ color: 0xf0b867 }),
-  window: new THREE.MeshBasicMaterial({ color: 0xf3d9a4 }),
-  line: new THREE.LineBasicMaterial({ color: 0x6f849a }),
-};
-for (const k of ['hull', 'steel', 'slate', 'blue', 'blue2', 'dark', 'ice']) SM[k].flatShading = true;
-const bx = (w, h, d) => new THREE.BoxGeometry(w, h, d);
-const cy = (rt, rb, h, n = 16, open = false) => new THREE.CylinderGeometry(rt, rb, h, n, 1, open);
 const dome = (r, ws = 20, hs = 8) => new THREE.SphereGeometry(r, ws, hs, 0, Math.PI*2, 0, Math.PI/2);
 function pt(g, geo, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0){ const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); g.add(m); return m; }
 function lines(g, geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, keep = null){
@@ -2759,6 +2809,91 @@ Object.assign(BUILD, {
     return g;
   },
 });
+// ---- footprints: what you actually bump into is read off each model. every surface of the model (and its plinth) is
+// sampled every 15 cm, and any sample between just above the snow and head height (2.1 m) marks a 25 cm cell solid;
+// parts overhead (an arch's span, a boom, a roof's overhang) are left out, so you ski under them. enclosed spaces
+// (the inside of a building) are filled in. the cells become a signed-distance grid (metres, negative inside) that
+// obstacleSD reads with a bilinear lookup. 'cover' keeps every cell with anything over it at any height, for
+// putting things (crystals) where nothing is drawn on top of them.
+const FOOT_CELL = 0.25, FOOT_PAD = 2.5;
+function buildFootprint(s){
+  const objs = [s.model]; if (s.plinth) objs.push(s.plinth);
+  const tris = [], v = new THREE.Vector3();
+  for (const o of objs){
+    o.updateMatrixWorld(true);
+    o.traverse(m => {
+      if (!m.isMesh) return;
+      const pa = m.geometry.attributes.position, idx = m.geometry.index, n = idx ? idx.count : pa.count;
+      for (let k = 0; k < n; k++){ v.fromBufferAttribute(pa, idx ? idx.getX(k) : k).applyMatrix4(m.matrixWorld); tris.push(v.x, v.y, v.z); }
+    });
+  }
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+  for (let i = 0; i < tris.length; i += 3){ x0 = Math.min(x0, tris[i]); x1 = Math.max(x1, tris[i]); z0 = Math.min(z0, tris[i+2]); z1 = Math.max(z1, tris[i+2]); }
+  x0 -= FOOT_PAD; z0 -= FOOT_PAD; x1 += FOOT_PAD; z1 += FOOT_PAD;
+  const C0 = FOOT_CELL, nx = Math.ceil((x1 - x0)/C0) + 1, nz = Math.ceil((z1 - z0)/C0) + 1;
+  // the snow under the model on a 1 m lattice, looked up bilinearly
+  const gw = Math.ceil(x1 - x0) + 2, gh = Math.ceil(z1 - z0) + 2, gH = new Float32Array(gw*gh);
+  for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) gH[j*gw + i] = height(x0 + i, z0 + j);
+  const ground = (x, z) => { const fx = Math.max(0, Math.min(gw - 1.001, x - x0)), fz = Math.max(0, Math.min(gh - 1.001, z - z0)), i = fx|0, j = fz|0, a = fx - i, b = fz - j;
+    return (gH[j*gw+i]*(1-a) + gH[j*gw+i+1]*a)*(1-b) + (gH[(j+1)*gw+i]*(1-a) + gH[(j+1)*gw+i+1]*a)*b; };
+  let gLo = Infinity, gHi = -Infinity; for (const h of gH){ gLo = Math.min(gLo, h); gHi = Math.max(gHi, h); }
+  const solid = new Uint8Array(nx*nz), cover = new Uint8Array(nx*nz), STEP = 0.15;
+  for (let t = 0; t < tris.length; t += 9){
+    const ax = tris[t], ay = tris[t+1], az = tris[t+2], bxx = tris[t+3], by = tris[t+4], bz = tris[t+5], cx = tris[t+6], cyy = tris[t+7], cz = tris[t+8];
+    const lowY = Math.min(ay, by, cyy), hiY = Math.max(ay, by, cyy);
+    if (hiY < gLo + 0.08) continue;                                       // buried entirely in the snow
+    const band = lowY < gHi + 2.1;                                        // could reach the skier's height somewhere
+    const n = Math.max(1, Math.ceil(Math.max(Math.hypot(bxx - ax, by - ay, bz - az), Math.hypot(cx - ax, cyy - ay, cz - az), Math.hypot(cx - bxx, cyy - by, cz - bz)) / STEP));
+    for (let i = 0; i <= n; i++) for (let j = 0; j <= n - i; j++){
+      const u = i/n, w = j/n, x = ax + (bxx - ax)*u + (cx - ax)*w, y = ay + (by - ay)*u + (cyy - ay)*w, z = az + (bz - az)*u + (cz - az)*w;
+      const ci = Math.round((x - x0)/C0), cj = Math.round((z - z0)/C0), q = cj*nx + ci;
+      const g = ground(x, z); if (y < g + 0.08) continue;
+      cover[q] = 1;
+      if (band && y < g + 2.1) solid[q] = 1;
+    }
+  }
+  // fill enclosed spaces: flood the open cells from the border; whatever the flood can't reach is inside
+  const seen = new Uint8Array(nx*nz), stack = [];
+  for (let i = 0; i < nx; i++){ stack.push(i, (nz - 1)*nx + i); } for (let j = 0; j < nz; j++){ stack.push(j*nx, j*nx + nx - 1); }
+  while (stack.length){ const q = stack.pop(); if (seen[q] || solid[q]) continue; seen[q] = 1; const i = q % nx, j = (q / nx) | 0;
+    if (i > 0) stack.push(q - 1); if (i < nx - 1) stack.push(q + 1); if (j > 0) stack.push(q - nx); if (j < nz - 1) stack.push(q + nx); }
+  for (let q = 0; q < solid.length; q++) if (!seen[q]) solid[q] = 1;
+  // signed distance from a two-pass chamfer transform, both ways
+  const chamfer = inside => {
+    const D = new Float32Array(nx*nz), BIG = 1e6, R2 = Math.SQRT2;
+    for (let q = 0; q < D.length; q++) D[q] = (solid[q] === 1) === inside ? BIG : 0;
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++){ const q = j*nx + i; let d = D[q]; if (!d) continue;
+      if (i > 0) d = Math.min(d, D[q-1] + 1); if (j > 0){ d = Math.min(d, D[q-nx] + 1); if (i > 0) d = Math.min(d, D[q-nx-1] + R2); if (i < nx - 1) d = Math.min(d, D[q-nx+1] + R2); } D[q] = d; }
+    for (let j = nz - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--){ const q = j*nx + i; let d = D[q]; if (!d) continue;
+      if (i < nx - 1) d = Math.min(d, D[q+1] + 1); if (j < nz - 1){ d = Math.min(d, D[q+nx] + 1); if (i < nx - 1) d = Math.min(d, D[q+nx+1] + R2); if (i > 0) d = Math.min(d, D[q+nx-1] + R2); } D[q] = d; }
+    return D;
+  };
+  const out = chamfer(false), ins = chamfer(true), sd = new Float32Array(nx*nz);
+  for (let q = 0; q < sd.length; q++) sd[q] = solid[q] ? -(ins[q] - 0.5)*C0 : (out[q] - 0.5)*C0;
+  return { x0, z0, nx, nz, sd, cover, bx: [x0, z0, x0 + (nx - 1)*C0, z0 + (nz - 1)*C0] };
+}
+function footSD(f, x, y){
+  const b = f.bx;
+  if (x < b[0] || x > b[2] || y < b[1] || y > b[3]){
+    // outside the grid: at least the margin away, plus however far out of the box
+    return FOOT_PAD - 0.3 + Math.hypot(Math.max(b[0] - x, 0, x - b[2]), Math.max(b[1] - y, 0, y - b[3]));
+  }
+  const fx = Math.min(f.nx - 1.001, (x - f.x0)/FOOT_CELL), fz = Math.min(f.nz - 1.001, (y - f.z0)/FOOT_CELL), i = fx|0, j = fz|0, a = fx - i, c = fz - j, n = f.nx, D = f.sd, q = j*n + i;
+  return (D[q]*(1-a) + D[q+1]*a)*(1-c) + (D[q+n]*(1-a) + D[q+n+1]*a)*c;
+}
+// is anything drawn over this point (at any height), or within r metres of it?
+function footCovered(x, y, r = 0){
+  for (const s of STRUCTS){
+    const f = s.foot; if (!f) continue; const b = f.bx;
+    if (x < b[0] - r || x > b[2] + r || y < b[1] - r || y > b[3] + r) continue;
+    const k = Math.ceil(r/FOOT_CELL), ci = Math.round((x - f.x0)/FOOT_CELL), cj = Math.round((y - f.z0)/FOOT_CELL);
+    for (let j = cj - k; j <= cj + k; j++) for (let i = ci - k; i <= ci + k; i++){
+      if (i < 0 || j < 0 || i >= f.nx || j >= f.nz) continue;
+      if (f.cover[j*f.nx + i] && Math.hypot(i - ci, j - cj)*FOOT_CELL <= r) return true;
+    }
+  }
+  return false;
+}
 // fold a model's pieces into one mesh per material (and one line set), so it renders in a few draw calls
 function mergeModel(src){
   src.updateMatrixWorld(true);
@@ -2795,11 +2930,17 @@ function mergeModel(src){
     if (!RUINS.has(s.kind) && !CAMPS.has(s.kind) && s.kind !== 'haul'){
       const pr = s.kind === 'pad' ? 12 : s.r*0.5;
       const plinth = new THREE.Mesh(cy(pr, pr*1.05, 6, 12), SM.slate); plinth.position.set(s.x, s.base - 3.02, s.y); scene.add(plinth);
+      s.plinth = plinth;
     }
     scene.add(model);
     const box3 = new THREE.Box3().setFromObject(model); s.top = box3.max.y;
     s.model = model;
   }
+  // collision now comes from the models themselves rather than a circle per building
+  const t0 = performance.now();
+  for (const s of STRUCTS) s.foot = buildFootprint(s);
+  SOLIDS = SOLIDS.filter(o => !o.struct).concat(STRUCTS.map(s => ({ x: s.x, y: s.y, r: 0, foot: s.foot, struct: true })));
+  if (/[?&]debug\b/.test(location.search)) console.log('footprints', (performance.now() - t0).toFixed(0) + ' ms');
 }
 
 // ---- tentacle moose: six-legged, purple, a beard of tentacles. each walks back and forth along its own path a
@@ -3095,10 +3236,11 @@ const crystals = (() => {
     let n = 0;
     for (const s of cands){
       if (n >= CRYSTAL_COUNT[z]) break;
-      const R = (s.solids ? 4 : s.r*0.72) + 2.6;
-      for (let k = 0; k < 16; k++){
-        const a = rnd()*Math.PI*2, x = s.x + Math.cos(a)*R, y = s.y + Math.sin(a)*R;
-        if (obstacleSD(x, y) < 1.4 || nearestTrail(x, y).d < 8 || zoneAt(x, y) !== z) continue;
+      // just outside the landmark's real footprint: try round it, stepping further out until a clear spot turns up
+      const R0 = (s.solids ? 4 : s.r*0.6) + 2;
+      for (let k = 0; k < 48; k++){
+        const R = R0 + k*0.35, a = rnd()*Math.PI*2, x = s.x + Math.cos(a)*R, y = s.y + Math.sin(a)*R;
+        if (obstacleSD(x, y) < 1.6 || footCovered(x, y, 1.6) || nearestTrail(x, y).d < 8 || zoneAt(x, y) !== z) continue;
         if (out.some(c => Math.hypot(c.x - x, c.y - y) < 25)) continue;
         out.push({ x, y, zone: z, got: false, fade: 0, ph: rnd()*6, by: s.kind }); n++; break;
       }

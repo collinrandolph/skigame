@@ -31,11 +31,11 @@ The keyboard and both controller schemes share one layout. Choose the controller
 
 ## Levels
 
-The map is four times its old area and split into zones, each locked until you clear the one before it. Progress isn't saved yet, and **Reset skier** in dev view puts the orbs and gate back.
+The map is four times its old area and split into zones, each locked until you clear the one before it. Progress isn't saved yet, and **Reset skier** in dev view resets the orbs, the gate and the bridge.
 
-- **Zone 1 (north-west):** the original trail network, enclosed by a ring of impassable mountains. 20 glowing orbs sit along its trails. Collect them all to open the **East Gate** in the mountain pass. The counter at the top of the screen tracks them, and the map shows the orbs that are left.
-- **Zone 2 (north-east):** past the gate. Its terrain, trails and 30 orbs come in the next update, along with the bridge over the river.
-- **Zone 3 (the southern half):** across a river that spans the whole map. A frozen lake, switchbacks back up to zone 1, and 50 orbs are still to come.
+- **Zone 1 (north-west):** the original trail network, enclosed by an irregular range of impassable mountains. 20 glowing orbs sit along its trails. Collect them all to open the **East Gate** in the wide, flat pass on the east side. The counter at the top of the screen tracks them, and the map shows the orbs that are left.
+- **Zone 2 (north-east):** past the gate. It's hillier, with five winding trails (green to black) that all lead to the river. Collect its 30 orbs to lower the **drawbridge** into zone 3. A spur ridge runs from zone 1's mountains to the river, so zone 2 can't reach the strip below zone 1 without crossing the river first.
+- **Zone 3 (the southern half):** across the river. A frozen lake, switchbacks back up to zone 1 (over a second bridge that doesn't need unlocking), a gate into zone 1, and 50 orbs come in the next update.
 
 ## Interface
 
@@ -53,7 +53,7 @@ The map is four times its old area and split into zones, each locked until you c
 - **Ski tracks:** marks are straight, the way a ski is, and are reset when you drift off a ski's line. Kick turns leave a herringbone pattern.
 - **Terrain and trails:**
   - Rolling terrain with a ridge and a valley, and gravity acts along the skis.
-  - Six groomed trails with green, blue and black ratings, plus the East Gate trail and scattered trees.
+  - Groomed trails with green, blue and black ratings, and scattered trees: six in zone 1, the East Gate connector, and five in zone 2.
   - Mountains, the river and the map edge stop you. The ground loads in tiles as you ski, and a coarse mesh carries the distant skyline.
   - Ungroomed snow is slower, except in classic. Double poles keep their full push off the trail.
 - **Trail assist:** gently steers your stride toward the trail ahead. It lets go when you lean, kick-turn or steer away.

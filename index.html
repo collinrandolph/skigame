@@ -1022,7 +1022,10 @@ function kick(leg, opt = {}){
   const thPre = S.tgt;
 
   // 1. print the push before any rotation: the kicking ski's own line carries straight on, same direction
-  const sp = opt.splay !== undefined ? opt.splay : splayNow();
+  // a boosted (loaded stick) push skates a narrower V: the angle is closed just enough that its sideways part is no
+  // bigger than a plain trigger kick's, so the extra push all goes forward. same bearing, just faster.
+  const sp0 = opt.splay !== undefined ? opt.splay : splayNow(), bst = opt.boost || 1;
+  const sp = bst > 1 ? Math.asin(Math.sin(sp0*Math.PI/180) / bst) * 180/Math.PI : sp0;
   const mine = lastSki[leg];
   if (mine && mine.live){ if (!opt.passive){ mine.len += PUSH_LEN; mine.dirty = true; } mine.live = false; }
   else {

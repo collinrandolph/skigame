@@ -23,7 +23,7 @@ The keyboard, controller and touch screen share one layout. On a controller the 
   - An opposite-leg kick is measured from the camera heading, so alternating kicks swing evenly around a steady line.
 - **Classic kicks:** these must alternate legs. Letting go of a snow plow returns you to the mode you started it from.
 - **Twin-stick strokes:** each stick is one foot.
-  - Flick a stick up and out from rest and it's exactly a trigger press for the other leg. Pull it down and in first (load), then throw it up and out, and it's the same kick with a bigger push (Loaded stroke boost, 1.4× by default). The stroke's angle and length don't change anything.
+  - Flick a stick up and out from rest and it's exactly a trigger press for the other leg. Pull it down and in first (load), then throw it up and out, and it's the same kick with a bigger push (Loaded stroke boost, 1.4× by default), skated at a slightly narrower angle so the extra push goes forward rather than side to side. The stroke's angle and length don't change anything.
   - In classic, swap one stick up and one down to kick.
 - **Animation:** trigger and key kicks animate as V1 (offset), and stick strokes as V2.
 - **Touch screens:** the orb counter shows at the top, and a map button in the top-right corner opens a full-screen map of all four zones. Tap the labelled **Left kick** / **Right kick** pads at the bottom of the screen. Between them sits the only other control, a toggle: **\/** means skate and **||** means classic. A speaker button in the top-left corner mutes the music on any device. Double-tap and pinch zoom, text selection and the long-press Copy/Share menu are all disabled so fast kicking doesn't disturb the page on iOS.

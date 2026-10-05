@@ -302,8 +302,11 @@ const tune = [['tScheme','oScheme','scheme',v=>v ? 'Twin-stick (experimental)' :
   ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tCexit','oCexit','cexit',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
-let saved = {}; try { saved = JSON.parse(localStorage.getItem('skate-tuning') || '{}'); } catch (e) {}
-const saveTuning = () => { try { const o = {}; tune.forEach(([i]) => { o[i] = $(i).value; }); localStorage.setItem('skate-tuning', JSON.stringify(o)); } catch (e) {} };
+// only sliders you've actually moved are remembered, so everything else follows the current defaults. (the old format
+// stored every slider, which froze a browser on whatever the defaults were the first time it was touched; phones can't
+// show the tuning panel, so they could be stuck on stale values with no way to see them. that store is dropped.)
+let saved = {}; try { saved = JSON.parse(localStorage.getItem('skate-tuning-2') || '{}'); localStorage.removeItem('skate-tuning'); } catch (e) {}
+const saveTuning = () => { try { const o = {}; tune.forEach(([i]) => { if ($(i).value !== DEFAULTS[i]) o[i] = $(i).value; }); localStorage.setItem('skate-tuning-2', JSON.stringify(o)); } catch (e) {} };
 tune.forEach(([i,o,k,f]) => {
   const el = $(i);
   if (saved[i] !== undefined) el.value = saved[i];
@@ -4003,7 +4006,10 @@ function camTarget(){
   return base;
 }
 function loop(t){
-  const dt = Math.min(0.05, (t-last)/1000); last = t; pollPad(); step(dt);
+  // the simulation runs in steps of at most 1/60 s however slowly the page draws (phones often manage 30 fps or less),
+  // so movement, friction and glide come out the same on every device
+  const dt = Math.min(0.1, (t-last)/1000); last = t; pollPad();
+  { const n = Math.max(1, Math.ceil(dt * 60 - 1e-6)); for (let k = 0; k < n; k++) step(dt/n); }
   updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt);
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through

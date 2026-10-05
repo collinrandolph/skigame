@@ -23,7 +23,7 @@ The keyboard, controller and touch screen share one layout. On a controller the 
   - An opposite-leg kick is measured from the camera heading, so alternating kicks swing evenly around a steady line.
 - **Classic kicks:** these must alternate legs. Letting go of a snow plow returns you to the mode you started it from.
 - **Twin-stick strokes:** each stick is one foot.
-  - Pull a stick down and inward to load, then throw it up and outward to step onto that foot's ski. The stroke's angle sets the ski angle, and stick strokes carry a bigger push to make up for being slower to perform.
+  - Pull a stick down and inward to load, then throw it up and outward to step onto that foot's ski. A throw is exactly a trigger kick for the other leg: the same turn per kick, same-leg build, skate angle and push. The stroke's angle and length don't change anything.
   - Flick a stick from centre to the edge for a passive step (other foot) or a kick turn (same foot).
   - In classic, swap one stick up and one down to kick.
 - **Animation:** trigger and key kicks animate as V1 (offset), and stick strokes as V2.

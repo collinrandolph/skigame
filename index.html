@@ -220,8 +220,6 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tRest">Load hold at centre (ms)<output id="oRest"></output><input id="tRest" type="range" min="0" max="800" step="10" value="250"></label>
     <label for="tTmin">Shortest throw (stick units)<output id="oTmin"></output><input id="tTmin" type="range" min="0.3" max="1.4" step="0.05" value="0.7"></label>
     <label for="tFedge">Flick needs (share of stick range)<output id="oFedge"></output><input id="tFedge" type="range" min="0.6" max="1" step="0.01" value="0.92"></label>
-    <label for="tSlen">Full stroke length (stick units)<output id="oSlen"></output><input id="tSlen" type="range" min="0.6" max="2" step="0.05" value="1.5"></label>
-    <label for="tSboost">Stick stroke boost (×)<output id="oSboost"></output><input id="tSboost" type="range" min="1" max="3" step="0.05" value="1.5"></label>
     <label for="tV1side">V1 hang side (triggers)<output id="oV1side"></output><input id="tV1side" type="range" min="0" max="1" step="1" value="1"></label>
     <div class="btns"><button id="dbgToggle" type="button">Stick debug: off</button></div>
     <h4>Kicks and strides</h4>
@@ -232,15 +230,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tBuild">Same-leg build (% per kick)<output id="oBuild"></output><input id="tBuild" type="range" min="0" max="50" step="1" value="50"></label>
     <label for="tDecay">Same-leg push loss (% per kick)<output id="oDecay"></output><input id="tDecay" type="range" min="0" max="60" step="5" value="30"></label>
     <label for="tSnap">Ski set time (ms)<output id="oSnap"></output><input id="tSnap" type="range" min="0" max="400" step="10" value="160"></label>
-    <h4>Skate angle</h4>
     <label for="tSplay">Skate angle (°)<output id="oSplay"></output><span class="sl"><input id="tSplay" type="range" min="0" max="60" step="1" value="11"><i class="ghost" id="tSplayG"></i></span></label>
-    <label for="tVstep">Skate V step (°)<output id="oVstep"></output><input id="tVstep" type="range" min="0" max="20" step="1" value="10"></label>
-    <label for="tVslow">Wider V below (km/h)<output id="oVslow"></output><input id="tVslow" type="range" min="0" max="30" step="1" value="10"></label>
-    <label for="tVfast">Narrower V above (km/h)<output id="oVfast"></output><input id="tVfast" type="range" min="10" max="50" step="1" value="22"></label>
-    <label for="tVhill">Hill grade for V change (%)<output id="oVhill"></output><input id="tVhill" type="range" min="1" max="15" step="0.5" value="4"></label>
-    <label for="tSa0">Ski angle, stroke straight up (°)<output id="oSa0"></output><input id="tSa0" type="range" min="0" max="60" step="1" value="10"></label>
-    <label for="tSa45">Ski angle, stroke at 45° (°)<output id="oSa45"></output><input id="tSa45" type="range" min="0" max="60" step="1" value="20"></label>
-    <label for="tSa90">Ski angle, stroke flat out (°)<output id="oSa90"></output><input id="tSa90" type="range" min="0" max="90" step="1" value="50"></label>
     <h4>Snow and glide</h4>
     <label for="tFric">Snow friction (m/s²)<output id="oFric"></output><span class="sl"><input id="tFric" type="range" min="0" max="2" step="0.05" value="0.4"><i class="ghost" id="tFricG"></i></span></label>
     <label for="tGlide">Speed drag<output id="oGlide"></output><input id="tGlide" type="range" min="0.01" max="1" step="0.01" value="0.25"></label>
@@ -310,7 +300,7 @@ addEventListener('resize', resize);
 
 const $ = id => document.getElementById(id);
 const P = {};
-const tune = [['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tSboost','oSboost','sboost',v=>v.toFixed(2)+'×'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tVstep','oVstep','vstep',v=>v.toFixed(0)],['tVslow','oVslow','vslow',v=>v.toFixed(0)],['tVfast','oVfast','vfast',v=>v.toFixed(0)],['tVhill','oVhill','vhill',v=>v.toFixed(1)],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tSa0','oSa0','sa0',v=>v.toFixed(0)],['tSa45','oSa45','sa45',v=>v.toFixed(0)],['tSa90','oSa90','sa90',v=>v.toFixed(0)],['tSlen','oSlen','slen',v=>v.toFixed(2)],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tBuild','oBuild','build',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
+const tune = [['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tBuild','oBuild','build',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
   ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tOffglide','oOffglide','offglide',v=>v.toFixed(0)+'%'],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -1113,43 +1103,16 @@ const twin = {
   L: { phase:'idle', load:null, x:0, y:0, last:null, pending:0, armed:false },
   R: { phase:'idle', load:null, x:0, y:0, last:null, pending:0, armed:false },
 };
-// skate V width: the ski angle a clean 45° stroke gives moves up or down one fixed step with speed and slope,
-// wider when slow or climbing and narrower when fast or descending. it only ever sits on one of three values and
-// only changes at the start of a stride (never between a left and its matching right), so both sides stay even.
-let vState = 0, vChangedAt = -99, strokeNo = 0;
-function vWanted(){
-  const kmh = Math.hypot(S.vx, S.vy) * 3.6, g = S.grade * 100;
-  // hysteresis: a state is left only once you're a margin past its threshold, so it doesn't flicker at the edge
-  const mS = 2, mG = 1;
-  const slow = kmh < P.vslow + (vState === 1 ? mS : 0), climb = g > P.vhill - (vState === 1 ? mG : 0);
-  const fast = kmh > P.vfast - (vState === -1 ? mS : 0), desc = g < -P.vhill + (vState === -1 ? mG : 0);
-  if (slow || climb) return 1;
-  if (fast || desc) return -1;
-  return 0;
-}
-function skateV45(){ return Math.max(P.sa0, Math.min(P.sa90, P.sa45 + vState * P.vstep)); }
-function updateV(){
-  strokeNo++;
-  const w = vWanted();
-  if (w !== vState && strokeNo - vChangedAt >= 2){ vState = w; vChangedAt = strokeNo; }
-}
-
 function strokeThrow(leg, t, from, x, y, power, how, passive = false){
-  updateV();
-  const inSign = leg === 'L' ? 1 : -1;
-  const dx = x - from[0], dy = y - from[1];
-  const up = -dy, outw = -dx * inSign;
-  const phi = Math.atan2(outw, up) * 180/Math.PI;                    // 0 = straight up, 45 = up and out
-  // stroke angle -> ski angle, scaled through three points: straight up, the 45° diagonal, and flat out to the
-  // side (10°, 30°, 50° by default), straight lines between them. strokes past those ends are held at the ends.
-  // anything from 40° to 50° counts as exactly 45°, so a good stride gets identical angles on both sides
-  const ph = (phi >= 40 && phi <= 50) ? 45 : Math.max(0, Math.min(90, phi));
-  const s45 = skateV45();
-  const turn = ph <= 45 ? P.sa0 + (s45 - P.sa0) * ph/45 : s45 + (P.sa90 - s45) * (ph - 45)/45;
-  t.last = { load: from.slice(), throw: [x, y], phi, power, turn };
+  // a stroke's direction and length no longer matter: a throw is a kick, exactly as if you'd pulled the trigger for
+  // that leg (same turn per kick, same build on repeated same-side kicks, same skate angle, same push). the angle
+  // is still worked out, but only so the diagrams can draw the stroke.
+  const inSign = leg === 'L' ? 1 : -1, dx = x - from[0], dy = y - from[1];
+  const phi = Math.atan2(-dx * inSign, -dy) * 180/Math.PI;
+  t.last = { load: from.slice(), throw: [x, y], phi, power: 1, turn: P.turn };
   t.phase = 'thrown'; t.armed = false;
-  throwStroke(leg, turn, power, passive);
-  dbgNote(leg, how + ' ' + Math.round(phi) + '°' + (ph === 45 && phi !== 45 ? ' (snapped to 45°)' : '') + (passive ? ' no push' : ' power ' + Math.round(power*100) + '%') + ' turn ' + turn.toFixed(1) + '°');
+  throwStroke(leg, passive);
+  dbgNote(leg, how + (passive ? ' (step, no push)' : ''));
 }
 // two-handed moves in the twin-stick scheme:
 //  - snow plow: hold LT and RT together
@@ -1202,7 +1165,7 @@ function pollTwin(gp){
       if (performance.now() - classic.downSince > P.plowhold){ classic.downSince = 0; setPlow(true, 'twin'); dbgNote('L', 'SNOW PLOW (classic)'); return; }
     } else classic.downSince = 0;
     if (posNow){
-      if (classic.pos && posNow !== classic.pos){ classicPush(P.sboost); dbgNote('L', 'CLASSIC KICK'); }
+      if (classic.pos && posNow !== classic.pos){ classicPush(1); dbgNote('L', 'CLASSIC KICK'); }
       classic.pos = posNow;
     }
     return;
@@ -1247,7 +1210,7 @@ function pollTwin(gp){
       // flat, sideways stroke for a hard turn counts even though it never reaches the top half of the stick.
       const sdx = x - t.load[0], sdy = y - t.load[1];
       if (!inLoad && mag > 0.55 && Math.hypot(sdx, sdy) >= P.tmin){
-        strokeThrow(leg, t, t.load, x, y, Math.min(1, Math.hypot(sdx, sdy) / P.slen), 'THROW');
+        strokeThrow(leg, t, t.load, x, y, 1, 'THROW');
       } else if (mag < 0.25){
         // the stroke passes through the centre on its way from down-in to up-out, so only give up on the
         // load if the stick rests at the centre for a moment
@@ -1265,7 +1228,7 @@ function pollTwin(gp){
       //    camera heading) and takes your weight, but nothing pushes. flick it again and it's a kick turn.
       if (mag < 0.3) t.armed = true;
       else if (t.armed && !inLoad && mag >= P.fedge && !(y < -0.3 && sticks[leg === 'L' ? 'R' : 'L'][1] < -0.4)){   // only right out at the edge of the stick's range, and not while both sticks are up (tuck and its lean)
-        if (lastLeg === pushLeg(leg)) strokeThrow(leg, t, [0, 0], x, y, Math.min(1, mag / (P.slen * 2/3)), 'KICK TURN');
+        if (lastLeg === pushLeg(leg)) strokeThrow(leg, t, [0, 0], x, y, 1, 'KICK TURN');
         else strokeThrow(leg, t, [0, 0], x, y, 0, 'STEP', true);
       }
     }
@@ -1312,14 +1275,15 @@ function dbgExport(){
 
 // a stick's throw steps that foot's ski out and puts your weight on it, so the push comes off the other leg
 const pushLeg = stickLeg => stickLeg === 'L' ? 'R' : 'L';
-function throwStroke(stickLeg, turnDeg, power, passive = false){
-  if (!passive) strideStyle = 'v2';
+function throwStroke(stickLeg, passive = false){
   const leg = pushLeg(stickLeg);
-  mode = null; held[leg] = true;
-  // stick strokes take longer to make than a trigger pull, so each one carries a bigger push (Stick stroke boost)
-  kick(leg, { turnDeg, power: passive ? 0 : power * P.sboost, splay: 0, passive });
-  glideLeg = leg; glideStart = performance.now();      // hold the stick up and out to ride the glide
-  rumble(stickLeg);
+  if (passive){
+    // a flick on the other stick: step onto that ski (same turn as a kick) without pushing
+    mode = null; held[leg] = true; kick(leg, { power: 0, passive: true });
+    glideLeg = leg; glideStart = performance.now(); rumble(stickLeg); return;
+  }
+  press(leg);                                           // identical to a trigger kick; hold the stick out to ride the glide
+  strideStyle = 'v2';                                   // (only the animation differs: stick strokes still show V2 poling)
 }
 
 function rumble(leg){
@@ -1432,7 +1396,7 @@ const music = (() => {
   return { set, chime, get on(){ return on; } };
 })();
 $('mToggle').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleClassic(); });
-$('reset').addEventListener('click', () => { glideLeg=null; Object.assign(S,{x:0,y:0,vx:0,vy:0,th:0,thv:0,tgt:0,vis:0,visv:0,travel:0,dist:0,grade:0,off:0,trail:null}); camTh=0; camVel=0; camH=null; clearTracks(); skis=[]; kicks=[]; lastTurn=null; lastLeg=null; streak=0; lastSki={L:null,R:null}; lastKickAt=0; kickDrive=null; vState=0; vChangedAt=-99; strokeNo=0; weightLeg=null; camPending=0; mode=null; focus=null; resetOrbs(); });
+$('reset').addEventListener('click', () => { glideLeg=null; Object.assign(S,{x:0,y:0,vx:0,vy:0,th:0,thv:0,tgt:0,vis:0,visv:0,travel:0,dist:0,grade:0,off:0,trail:null}); camTh=0; camVel=0; camH=null; clearTracks(); skis=[]; kicks=[]; lastTurn=null; lastLeg=null; streak=0; lastSki={L:null,R:null}; lastKickAt=0; kickDrive=null; weightLeg=null; camPending=0; mode=null; focus=null; resetOrbs(); });
 $('tracks').addEventListener('click', e => { showTracks = !showTracks; e.target.textContent = 'Tracks: ' + (showTracks?'on':'off'); });
 
 function moveDir(){
@@ -3951,7 +3915,7 @@ function hud(){
   }
   const lean = (keySteer.e - keySteer.q) || globalLean() || mouseLean;
   $('arow').textContent = Math.abs(assistOff) < 0.3 ? '—' : (assistOff > 0 ? 'pulling right ' : 'pulling left ') + Math.abs(assistOff).toFixed(0) + '°';
-  $('vrow').textContent = (vState > 0 ? 'wide' : vState < 0 ? 'narrow' : 'normal') + ' · ' + skateV45().toFixed(0) + '°';
+  $('vrow').textContent = splayNow().toFixed(0) + '°';
   { const ld = loadState(); if (!mode && (ld.leg || ld.both)){ $('mode').textContent = ld.both ? 'Loading double pole' : 'Loading ' + (ld.leg === 'L' ? 'left' : 'right') + ' leg'; } else
   $('mode').textContent = mode === 'classic' ? 'Classic' + (lean ? ' · steering ' + (lean > 0 ? 'right' : 'left') : '') : mode === 'plow' ? 'Snow plow' : mode === 'tuck' ? (lean ? 'Tuck · leaning ' + (lean > 0 ? 'right' : 'left') : 'Tuck') : 'Skating'; }
   $('pad').textContent = padStatus || 'none';
@@ -4036,7 +4000,7 @@ function loop(t){
 }
 loadProgress();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

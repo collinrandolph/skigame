@@ -349,9 +349,11 @@ const SPUR = (() => {
   return { x1, y1, x2, y2: riverY(x2), hw: 17, half: 25 };
 })();
 // the bridge from zone 2 into zone 3: a drawbridge hinged on the south bank, raised until zone 2's orbs are in
+// the crossing: a stone ramp on each bank rising from the snow to deck level, and a timber leaf spanning the water
+// between them. the ramps meet the snow flush and are always there; the leaf is what's raised.
 const BRIDGE = (() => {
-  const x = 300, yc = riverY(x), yN = yc - RIVER_BANK - 2.5, yS = yc + RIVER_BANK + 2.5;
-  return { x, yN, yS, hw: 1.8 };
+  const x = 300, yc = riverY(x), IN = RIVER_HW + 0.8, OUT = RIVER_BANK + 8;   // leaf half-length, ramp outer end
+  return { x, yc, IN, OUT, yN: yc - OUT, yS: yc + OUT, hw: 1.8, W: 4.0 };
 })();
 let bridgeDown = 0;       // 0 raised .. 1 lowered (animated)
 
@@ -406,17 +408,25 @@ function height(x, y){
   return roll*flat + ridge + valley + ringHeight(x, y) + spurHeight(x, y) + edgeHeight(x, y) + zone2Height(x, y) + riverCut(x, y);
 }
 // what you stand on: the terrain, or the bridge deck once it's down
-const deckH = () => { const a = height(BRIDGE.x, BRIDGE.yN), b = height(BRIDGE.x, BRIDGE.yS); return [a + 0.3, b + 0.3]; };
+// the deck sits level, a little above the middle of the two banks where the ramps start
 let DECK = null;
-function onBridge(x, y){ return bridgeDown > 0.98 && Math.abs(x - BRIDGE.x) < BRIDGE.hw + 0.4 && y > BRIDGE.yN && y < BRIDGE.yS; }
+const deckLevel = () => DECK ?? (DECK = (height(BRIDGE.x, BRIDGE.yN) + height(BRIDGE.x, BRIDGE.yS))/2 + 0.3);
+// a ramp's surface: the snow's own height across its outer end, rising evenly to the deck at the water's edge
+function rampH(x, y){
+  const dy = Math.abs(y - BRIDGE.yc), yo = y < BRIDGE.yc ? BRIDGE.yN : BRIDGE.yS;
+  const t = (BRIDGE.OUT - dy) / (BRIDGE.OUT - BRIDGE.IN), e = t*t*(3 - 2*t)*0.35 + t*0.65;   // eased a touch at each end
+  return height(x, yo) + (deckLevel() - height(x, yo)) * e;
+}
 function ground(x, y){
-  if (!onBridge(x, y)) return height(x, y);
-  DECK = DECK || deckH();
-  const t = (y - BRIDGE.yN) / (BRIDGE.yS - BRIDGE.yN);
-  return Math.max(height(x, y), DECK[0] + (DECK[1] - DECK[0])*t);
+  if (Math.abs(x - BRIDGE.x) > BRIDGE.W/2 + 0.05) return height(x, y);
+  const dy = Math.abs(y - BRIDGE.yc);
+  if (dy >= BRIDGE.OUT) return height(x, y);
+  if (dy > BRIDGE.IN) return Math.max(height(x, y), rampH(x, y));
+  return bridgeDown > 0.98 ? deckLevel() : height(x, y);
 }
 // what can't be crossed, as a signed distance in metres: negative inside an obstacle
 let gateOpen = false;
+let SOLIDS = [];           // round footprints of the outpost's buildings (filled in once they're placed)
 function obstacleSD(x, y){
   // zone 1's mountains, with the east pass carved through them
   const dx = x - RING.x, dy = y - RING.y, r = Math.hypot(dx, dy), th = Math.atan2(dy, dx);
@@ -432,9 +442,13 @@ function obstacleSD(x, y){
   d = Math.min(d, segDist(x, y, SPUR.x1, SPUR.y1, SPUR.x2, SPUR.y2) - SPUR.hw);
   // the river, with the bridge across it once it's lowered
   let river = Math.abs(y - riverY(x)) - RIVER_BANK;
-  if (bridgeDown > 0.98) river = Math.max(river, -(BRIDGE.hw - Math.abs(x - BRIDGE.x)));
+  // the crossing: open along the ramps; over the water too once the leaf is down, otherwise you stop at the ramp's end
+  river = Math.max(river, BRIDGE.hw - Math.abs(x - BRIDGE.x));
+  if (bridgeDown <= 0.98) river = Math.min(river, Math.abs(y - BRIDGE.yc) - BRIDGE.IN - 0.3);
   d = Math.min(d, river);
   d = Math.min(d, x - WORLD.x0 - EDGE_WALL, WORLD.x1 - EDGE_WALL - x, y - WORLD.y0 - EDGE_WALL, WORLD.y1 - EDGE_WALL - y);
+  // buildings and equipment
+  for (const o of SOLIDS){ const q = Math.hypot(x - o.x, y - o.y) - o.r; if (q < d) d = q; }
   return d;
 }
 const BODY_R = 0.35;
@@ -474,13 +488,13 @@ const TRAILS = [
   { name:'Serpent Run',      diff:'blue',   zone:2, pts:[[248,-75],[262,-105],[245,-130],[268,-158],[300,-150],[318,-178],[350,-175],[380,-150]] },
   { name:'High Traverse',    diff:'black',  zone:2, pts:[[380,-150],[415,-130],[432,-95],[410,-60],[426,-30],[400,-10]] },
   { name:'Wind Trail',       diff:'blue',   zone:2, pts:[[248,-75],[285,-60],[300,-30],[330,-45],[360,-20],[400,-10]] },
-  { name:'Bridge Run',       diff:'green',  zone:2, pts:[[400,-10],[392,25],[360,45],[372,80],[338,105],[305,122],[BRIDGE.x,BRIDGE.yN + 1]] },
-  { name:'Hollow Loop',      diff:'green',  zone:2, pts:[[248,-75],[236,-40],[256,-5],[232,30],[262,62],[246,95],[276,116],[BRIDGE.x,BRIDGE.yN + 1]] },
+  { name:'Bridge Run',       diff:'green',  zone:2, pts:[[400,-10],[392,25],[360,45],[372,80],[338,105],[305,122],[BRIDGE.x,BRIDGE.yN - 1]] },
+  { name:'Hollow Loop',      diff:'green',  zone:2, pts:[[248,-75],[236,-40],[256,-5],[232,30],[262,62],[246,95],[276,116],[BRIDGE.x,BRIDGE.yN - 1]] },
 ];
 for (const t of TRAILS) if (t.zone === undefined) t.zone = 1;   // trails carry their zone's orbs; zone 0 = connectors
 const JUNCTIONS = [
   { name:'Stadium', x:0, y:0 }, { name:'North Jct', x:0, y:-40 }, { name:'Summit Jct', x:5, y:-135 }, { name:'Valley Jct', x:-78, y:-30 }, { name:'East Jct', x:50, y:-62 },
-  { name:'Pass Jct', x:248, y:-75 }, { name:'Crown Jct', x:380, y:-150 }, { name:'Rim Jct', x:400, y:-10 }, { name:'Bridge', x:BRIDGE.x, y:BRIDGE.yN + 1 },
+  { name:'Pass Jct', x:248, y:-75 }, { name:'Crown Jct', x:380, y:-150 }, { name:'Rim Jct', x:400, y:-10 }, { name:'Bridge', x:BRIDGE.x, y:BRIDGE.yN - 1 },
 ];
 // smooth each trail through its control points (Catmull-Rom), sampled about every metre
 for (const t of TRAILS){
@@ -1298,6 +1312,7 @@ function step(dt){
   const f = slopeFactors(S.grade);
   const nt = nearestTrail(S.x, S.y);
   S.off = offTrail(nt.d); S.trail = nt.t;
+  if (Math.abs(S.x - BRIDGE.x) < BRIDGE.W/2 && Math.abs(S.y - BRIDGE.yc) < BRIDGE.OUT) S.off = 0;   // the bridge and its ramps run like groomed trail
   // ungroomed snow multiplies both friction and drag; a held glide only pays off on the groomed surface
   S.gm = glideMult();
   // classic skis break their own track, so ungroomed snow adds no friction in classic mode
@@ -1568,6 +1583,54 @@ function updateTiles(all = false){
 }
 function bakeTexture(){ colorFarGround(); for (const t of tiles.values()){ t.baked = false; t.job = null; } }
 
+// ---- structures: a research outpost's buildings. each zone has a few key buildings at chosen spots and smaller
+// equipment scattered just off the trails. positions are settled here, before the trees (which keep clear of them);
+// the models are built further down.
+const STRUCT_R = { excavator:12, haul:4.5, plant:14, dome:17, tower:9, biolab:12, comms:5, weather:3, fuel:7, pad:13, greenhouse:15, beacon:5, solar:5 };
+const STRUCT_NAME = { excavator:'Mine excavator', plant:'Processing plant', dome:'Habitat dome', tower:'Research tower', biolab:'Bio lab', comms:'Comms array', pad:'Landing pad', greenhouse:'Greenhouse complex', beacon:'Beacon' };
+const STRUCTS = (() => {
+  const out = [];
+  let seed = 4242; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const ok = (x, y, r, zone) => {
+    if (zoneAt(x, y) !== zone) return false;
+    if (nearestTrail(x, y).d < r + TRAIL_W/2 + 4) return false;           // never on or over a trail
+    if (obstacleSD(x, y) < r + 3) return false;                            // clear of mountains, river and walls
+    if (out.some(s => Math.hypot(s.x - x, s.y - y) < s.r + r + 6)) return false;
+    if (Math.hypot(x, y) < 18 + r) return false;                           // the stadium stays open
+    if (Math.hypot(x - BRIDGE.x, y - (BRIDGE.yN + BRIDGE.yS)/2) < 22 + r) return false;
+    let lo = Infinity, hi = -Infinity;                                     // and only on fairly level ground
+    for (let k = 0; k <= 8; k++){ const a = k/8*2*Math.PI, q = k === 8 ? 0 : r*0.8, h = height(x + Math.cos(a)*q, y + Math.sin(a)*q); lo = Math.min(lo, h); hi = Math.max(hi, h); }
+    return hi - lo < Math.max(1.5, r*0.28);
+  };
+  const put = (kind, x, y, zone) => {
+    const r = STRUCT_R[kind];
+    for (let ring = 0; ring <= 45; ring += 3) for (let k = 0, n = Math.max(1, ring); k < n; k++){   // spiral out from the chosen spot
+      const a = k/n*2*Math.PI, px = x + Math.cos(a)*ring, py = y + Math.sin(a)*ring;
+      if (ok(px, py, r, zone)){ out.push({ kind, x: px, y: py, r, zone, key: true, rot: rnd()*Math.PI*2 }); return; }
+    }
+  };
+  // key buildings: zone 1 is the settlement, zone 2 the mine and the farms. zone 3 (across the river) has none: it
+  // belongs to the ruins of an older civilisation
+  put('dome', -35, -88, 1); put('tower', 35, -95, 1); put('pad', 34, 16, 1);
+  put('plant', 325, -105, 2); put('excavator', 352, -130, 2); put('greenhouse', 300, 38, 2); put('biolab', 312, 80, 2); put('comms', 395, -88, 2);
+  // smaller equipment, a little way off the trails so you ski past it
+  const scatter = { 1: ['weather', 'fuel', 'solar', 'haul', 'comms', 'solar', 'weather'], 2: ['haul', 'haul', 'weather', 'fuel', 'solar', 'beacon', 'weather', 'solar', 'fuel', 'haul'] };
+  for (const z of [1, 2]){
+    const zt = TRAILS.filter(t => t.zone === z);
+    for (const kind of scatter[z]){
+      const r = STRUCT_R[kind];
+      for (let tries = 0; tries < 80; tries++){
+        const t = zt[(rnd()*zt.length) | 0], i = ((rnd()*(t.s.length/2 - 1)) | 0) * 2;
+        const dx = t.s[i+2] - t.s[i], dy = t.s[i+3] - t.s[i+1], L = Math.hypot(dx, dy) || 1, side = rnd() < 0.5 ? -1 : 1;
+        const off = r + TRAIL_W/2 + 6 + rnd()*14, x = t.s[i] - dy/L*off*side, y = t.s[i+1] + dx/L*off*side;
+        if (ok(x, y, r, z)){ out.push({ kind, x, y, r, zone: z, key: false, rot: Math.atan2(dx, dy) + (rnd() - 0.5)*0.8 }); break; }
+      }
+    }
+  }
+  return out;
+})();
+SOLIDS = STRUCTS.map(s => ({ x: s.x, y: s.y, r: s.r * 0.72 }));
+
 // ---- trees: simple spruces (a trunk and two cone tiers) scattered in patches, kept off the trails and the start.
 // placement is seeded so the forest is the same every time. drawn as instanced meshes, so hundreds cost little.
 const trees = (() => {
@@ -1587,9 +1650,10 @@ const trees = (() => {
     if (ringHeight(x, y) + spurHeight(x, y) + edgeHeight(x, y) > 14 + rnd()*6) continue;  // timberline on the mountains
     if (Math.abs(y - riverY(x)) < RIVER_BANK + 1.5) continue;          // nothing in the river
     if (Math.abs(x - GATE.x) < 70 && Math.abs(y - GATE.y) < PASS_FLAT + 4) continue;   // the pass stays clear
-    if (Math.abs(x - BRIDGE.x) < 8 && Math.abs(y - riverY(x)) < RIVER_BANK + 12) continue;  // and the bridge landings
+    if (Math.abs(x - BRIDGE.x) < 8 && Math.abs(y - riverY(x)) < BRIDGE.OUT + 6) continue;  // and the bridge ramps
     if (nearestTrail(x, y).d < TRAIL_W/2 + 3 + rnd()*3) continue;     // a clear corridor either side of every trail
     if (Math.hypot(x, y) < 14) continue;                              // open stadium
+    if (STRUCTS.some(o => Math.hypot(o.x - x, o.y - y) < o.r + 1.5)) continue;   // nor in the buildings
     if (crowded(x, y)) continue;                                      // no two trunks on top of each other
     const t = { x, y, s: 0.7 + rnd()*0.7, r: rnd()*Math.PI*2 };
     out.push(t); const c = cell(t); if (!grid.has(c)) grid.set(c, []); grid.get(c).push(t);
@@ -1698,39 +1762,61 @@ function setGateOpen(on){ gateOpen = on; }
 // zone 2's orbs are in, then lowered across the river
 let bridgeWanted = false;
 const bridge = (() => {
-  const [hN, hS] = deckH(), L = BRIDGE.yS - BRIDGE.yN, W = BRIDGE.hw*2 + 0.4;
-  const g = new THREE.Group(); g.position.set(BRIDGE.x, hS, BRIDGE.yS); scene.add(g);
-  for (const side of [-1, 1]){
-    const t = new THREE.Mesh(new THREE.BoxGeometry(1.4, 7, 1.4), stoneMat); t.position.set(side*(BRIDGE.hw + 1.1), 3.2, 0.4); g.add(t);
-    const n = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.4, 1.2), stoneMat); n.position.set(side*(BRIDGE.hw + 1.0), hN - hS + 0.4, -L - 0.2); g.add(n);   // north landing posts
+  const D = deckLevel(), { x: BX, yc, IN, OUT, W } = BRIDGE, L = 2*IN;
+  const g = new THREE.Group(); scene.add(g);
+  // ramps: a surface that starts just under the snow and rises to deck level, with stone sides down into the bank
+  const surf = [], side = [];
+  const cols = 9, rows = 10;
+  for (const dir of [-1, 1]){
+    const rowY = k => yc + dir*(OUT + 0.8 - (OUT + 0.8 - IN) * k/rows);           // from just past the outer end to the water
+    const hAt = (x, y) => Math.abs(y - yc) >= OUT ? height(x, y) - 0.18 : Math.max(height(x, y) + 0.02, rampH(x, y));   // never sunk under the snow
+    for (let k = 0; k < rows; k++) for (let c = 0; c < cols - 1; c++){
+      const xa = BX - W/2 + W*c/(cols - 1), xb = BX - W/2 + W*(c + 1)/(cols - 1), ya = rowY(k), yb = rowY(k + 1);
+      const A = [xa, hAt(xa, ya), ya], B = [xb, hAt(xb, ya), ya], C = [xb, hAt(xb, yb), yb], E = [xa, hAt(xa, yb), yb];
+      // wind each quad so it faces up whichever bank it's on
+      if (dir < 0) surf.push(...A, ...E, ...B, ...B, ...E, ...C); else surf.push(...A, ...B, ...E, ...B, ...C, ...E);
+    }
+    // stone sides and the face above the water
+    for (const sx of [-1, 1]) for (let k = 0; k < rows; k++){
+      const x = BX + sx*W/2, ya = rowY(k), yb = rowY(k + 1), ta = hAt(x, ya), tb = hAt(x, yb), ba = height(x, ya) - 1.5, bb = height(x, yb) - 3.2;
+      side.push(x, ta, ya, x, ba, ya, x, tb, yb, x, tb, yb, x, ba, ya, x, bb, yb);
+    }
+    const yi = yc + dir*IN, bot = D - 4;
+    side.push(BX - W/2, D, yi, BX + W/2, D, yi, BX - W/2, bot, yi, BX + W/2, D, yi, BX + W/2, bot, yi, BX - W/2, bot, yi);
   }
-  const top = new THREE.Mesh(new THREE.BoxGeometry(2*BRIDGE.hw + 3.6, 0.7, 1.0), woodMat); top.position.set(0, 6.9, 0.4); g.add(top);
-  // the leaf: deck planks with side rails, hinged at the south end; it extends north (-z) when down
-  const leaf = new THREE.Group(); g.add(leaf);
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(W, 0.3, L), woodMat); deck.position.set(0, 0.0, -L/2); leaf.add(deck);
-  for (let z = 1; z < L; z += 2.2){ const s = new THREE.Mesh(new THREE.BoxGeometry(W + 0.1, 0.06, 0.12), darkWoodMat); s.position.set(0, 0.18, -z); leaf.add(s); }
-  for (const side of [-1, 1]){
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, L), darkWoodMat); rail.position.set(side*(W/2 - 0.06), 1.0, -L/2); leaf.add(rail);
-    for (let z = 0.5; z < L; z += 3){ const p = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.12), darkWoodMat); p.position.set(side*(W/2 - 0.06), 0.5, -z); leaf.add(p); }
+  const mk = (arr, mat) => { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.material.side = THREE.DoubleSide; g.add(m); return m; };
+  mk(surf, new THREE.MeshLambertMaterial({ color: 0x8a6a4e })); mk(side, new THREE.MeshLambertMaterial({ color: 0x8b939b, side: THREE.DoubleSide }));
+  // stone posts where the leaf lands
+  for (const dir of [-1, 1]) for (const sx of [-1, 1]){
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.3, 0.7), stoneMat); p.position.set(BX + sx*(W/2 + 0.45), D + 0.3, yc + dir*(IN + 0.5)); g.add(p);
   }
-  // chains from the tower tops to the leaf's far end, redrawn as it moves
+  // the lifting towers on the south side of the water, with a beam across the top
+  const hinge = new THREE.Group(); hinge.position.set(BX, D, yc + IN); g.add(hinge);
+  for (const sx of [-1, 1]){ const t = new THREE.Mesh(new THREE.BoxGeometry(1.3, 10, 1.3), stoneMat); t.position.set(BX + sx*(W/2 + 0.95), D + 2.5, yc + IN + 0.8); g.add(t); }
+  const top = new THREE.Mesh(new THREE.BoxGeometry(W + 3.6, 0.7, 1.1), woodMat); top.position.set(BX, D + 7.3, yc + IN + 0.8); g.add(top);
+  // the leaf: a deck whose top is exactly deck level, planks, rails; hinged at the south end, reaching north when down
+  const leaf = new THREE.Group(); hinge.add(leaf);
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(W, 0.4, L), woodMat); deck.position.set(0, -0.2, -L/2); leaf.add(deck);
+  for (let z = 0.8; z < L; z += 1.6){ const s = new THREE.Mesh(new THREE.BoxGeometry(W, 0.02, 0.1), darkWoodMat); s.position.set(0, 0.005, -z); leaf.add(s); }
+  for (const sx of [-1, 1]){
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, L), darkWoodMat); rail.position.set(sx*(W/2 - 0.06), 1.0, -L/2); leaf.add(rail);
+    for (let z = 0.4; z < L; z += 2.5){ const p = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.12), darkWoodMat); p.position.set(sx*(W/2 - 0.06), 0.5, -z); leaf.add(p); }
+  }
+  // chains from the beam to the leaf's far end, redrawn as it moves
   const chainMat = new THREE.LineBasicMaterial({ color: 0x2b3138 });
-  const chains = [-1, 1].map(side => { const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]); const l = new THREE.Line(geo, chainMat); g.add(l); return { l, side }; });
-  const pitch = Math.asin((hN - hS) / L);  // lowered, the deck slopes from bank to bank
-  return { g, leaf, chains, L, W, pitch };
+  const chains = [-1, 1].map(sx => { const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]); const l = new THREE.Line(geo, chainMat); hinge.add(l); return { l, sx }; });
+  return { g, leaf, chains, L, W };
 })();
-const _cv = new THREE.Vector3();
 function animateBridge(dt){
   const target = bridgeWanted ? 1 : 0;
   bridgeDown += Math.sign(target - bridgeDown) * Math.min(Math.abs(target - bridgeDown), dt / 4);
   const e = bridgeDown*bridgeDown*(3 - 2*bridgeDown);
-  // raised: stood up at 82 degrees; lowered: lying along the slope between the banks
-  const a = (1 - e) * 82*Math.PI/180 + e*bridge.pitch;   // tilt of the leaf about its hinge; positive lifts the far end
+  const a = (1 - e) * 82*Math.PI/180;      // raised: stood up at 82 degrees; lowered: level with the ramps
   bridge.leaf.rotation.x = a;
   for (const c of bridge.chains){
     const pos = c.l.geometry.attributes.position;
-    pos.setXYZ(0, c.side*(BRIDGE.hw + 0.4), 6.6, 0.2);
-    pos.setXYZ(1, c.side*(bridge.W/2 - 0.06), Math.sin(a)*bridge.L*0.95, -Math.cos(a)*bridge.L*0.95);
+    pos.setXYZ(0, c.sx*(bridge.W/2 + 0.2), 7.0, 0.8);
+    pos.setXYZ(1, c.sx*(bridge.W/2 - 0.06), Math.sin(a)*bridge.L*0.95 + 1.0*Math.cos(a), -Math.cos(a)*bridge.L*0.95 + 1.0*Math.sin(a));
     pos.needsUpdate = true;
   }
 }
@@ -1778,6 +1864,300 @@ for (const z of [1, 2]){
 function resetOrbs(){
   for (const o of orbs){ o.got = false; o.fade = 0; o.g.visible = true; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; }
   setGateOpen(false); gate.open = 0; bridgeWanted = false; bridgeDown = 0; animateGate(0);
+}
+
+// ---- structure models: low-poly sci-fi outpost kit in the frost palette (slate, steel blue, pale grey, an orange
+// accent). each is assembled from primitives, then merged into one mesh per material so a building costs a handful
+// of draw calls. origin at ground level in the middle of the footprint.
+const lam = c => new THREE.MeshLambertMaterial({ color: c });
+const SM = {
+  hull: lam(0xdfe5ec), steel: lam(0x9aa7b4), slate: lam(0x5d6b80), blue: lam(0x4d7aa6), blue2: lam(0x6f93b8),
+  dark: lam(0x2f3a46), orange: lam(0xe8862a), green: lam(0x4f8a4a), ice: lam(0xc4dcec),
+  glass: new THREE.MeshLambertMaterial({ color: 0xa9c9e2, transparent: true, opacity: 0.36, depthWrite: false, side: THREE.DoubleSide }),
+  lamp: new THREE.MeshBasicMaterial({ color: 0xffa340 }),
+  window: new THREE.MeshBasicMaterial({ color: 0xffdc96 }),
+  line: new THREE.LineBasicMaterial({ color: 0x6d7c8c }),
+};
+for (const k of ['hull', 'steel', 'slate', 'blue', 'blue2', 'dark', 'ice']) SM[k].flatShading = true;
+const bx = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+const cy = (rt, rb, h, n = 16, open = false) => new THREE.CylinderGeometry(rt, rb, h, n, 1, open);
+const dome = (r, ws = 20, hs = 8) => new THREE.SphereGeometry(r, ws, hs, 0, Math.PI*2, 0, Math.PI/2);
+function pt(g, geo, mat, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0){ const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); g.add(m); return m; }
+function lines(g, geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, keep = null){
+  // the edges of a shape as a wire frame (struts on glass); keep() can drop segments, e.g. below a dome's base
+  let e = new THREE.EdgesGeometry(geo, 1);
+  if (keep){
+    const a = e.attributes.position.array, out = [];
+    for (let i = 0; i < a.length; i += 6) if (keep(a[i], a[i+1], a[i+2]) && keep(a[i+3], a[i+4], a[i+5])) out.push(...a.slice(i, i + 6));
+    e = new THREE.BufferGeometry(); e.setAttribute('position', new THREE.Float32BufferAttribute(out, 3));
+  }
+  const l = new THREE.LineSegments(e, SM.line); l.position.set(x, y, z); l.rotation.set(rx, ry, rz); g.add(l); return l;
+}
+function geoDome(g, r, x = 0, y = 0, z = 0){
+  // glass hemisphere with a geodesic frame over it
+  pt(g, dome(r, 24, 10), SM.glass, x, y, z);
+  lines(g, new THREE.IcosahedronGeometry(r * 1.004, 2), x, y, z, 0, 0, 0, (a, b, c) => b > -0.01);
+  pt(g, cy(r + 0.15, r + 0.25, 0.5, 24), SM.steel, x, y + 0.25, z);
+}
+function arch(g, r, len, x, y, z, ry = 0){
+  // a barrel-vaulted glass hall running along z, with ribs and end walls
+  const a = new THREE.CylinderGeometry(r, r, len, 14, 6, true, Math.PI/2, Math.PI);
+  pt(g, a, SM.glass, x, y, z, Math.PI/2, ry, 0);
+  lines(g, new THREE.CylinderGeometry(r * 1.01, r * 1.01, len, 7, 6, true, Math.PI/2, Math.PI), x, y, z, Math.PI/2, ry, 0);
+  for (const e of [-1, 1]) pt(g, new THREE.CircleGeometry(r, 14, 0, Math.PI), SM.glass, x + Math.sin(ry)*e*len/2, y, z + Math.cos(ry)*e*len/2, 0, ry, 0);
+  pt(g, bx(2*r + 0.6, 0.6, len + 0.6), SM.steel, x, y + 0.3, z, 0, ry, 0);
+}
+const BUILD = {
+  dome(){
+    const g = new THREE.Group();
+    pt(g, cy(15, 15.6, 3, 32), SM.hull, 0, 1.5, 0);
+    pt(g, cy(15.08, 15.08, 0.7, 32), SM.slate, 0, 1.9, 0);
+    pt(g, cy(15.12, 15.12, 0.25, 32), SM.window, 0, 1.9, 0);
+    geoDome(g, 14, 0, 3, 0);
+    // inside: two blocks of quarters and a garden
+    pt(g, bx(8, 4, 6), SM.steel, -3, 5, -2); pt(g, bx(5, 6, 5), SM.blue2, 4, 6, 3); pt(g, cy(4, 4, 0.6, 16), SM.green, -2, 3.3, 6);
+    // entrance tunnels with orange doors, a mast on the crown
+    for (const a of [0, Math.PI*0.75, -Math.PI*0.7]){
+      const c = Math.cos(a), s = Math.sin(a);
+      pt(g, bx(4, 3.2, 7), SM.hull, s*17, 1.6, c*17, 0, a, 0);
+      pt(g, bx(2, 2.2, 0.2), SM.orange, s*20.6, 1.4, c*20.6, 0, a, 0);
+    }
+    pt(g, cy(0.12, 0.12, 6, 6), SM.steel, 0, 19, 0); pt(g, new THREE.SphereGeometry(0.3, 8, 6), SM.lamp, 0, 22, 0);
+    return g;
+  },
+  tower(){
+    const g = new THREE.Group();
+    pt(g, bx(14, 4, 10), SM.hull, 0, 2, 0);
+    for (const z of [-5.06, 5.06]) pt(g, bx(12, 0.8, 0.1), SM.window, 0, 2.6, z);
+    pt(g, bx(8, 3.5, 7), SM.slate, -2, 5.7, 0);
+    pt(g, cy(2.6, 3.2, 18, 8), SM.hull, 2, 13, 0);
+    for (const y of [9, 15, 19]) pt(g, cy(3.4, 3.4, 0.5, 8), SM.slate, 2, y, 0);
+    pt(g, cy(4.8, 4.2, 1.6, 8), SM.blue2, 2, 22.6, 0);
+    pt(g, cy(4.85, 4.85, 0.4, 8), SM.window, 2, 22.6, 0);
+    pt(g, cy(2.2, 2.8, 4, 8), SM.hull, 2, 25.4, 0);
+    pt(g, bx(2, 15, 2), SM.slate, 6.2, 7.5, -2.5);
+    pt(g, bx(0.3, 9, 0.3), SM.steel, 2, 31.5, 0);
+    pt(g, bx(3, 0.15, 0.15), SM.steel, 2, 30, 0); pt(g, bx(2, 0.15, 0.15), SM.steel, 2, 32.5, 0);
+    pt(g, new THREE.SphereGeometry(0.35, 8, 6), SM.lamp, 2, 36.2, 0);
+    pt(g, bx(0.6, 0.6, 10.2), SM.orange, -7.1, 3.6, 0);
+    return g;
+  },
+  pad(){
+    const g = new THREE.Group();
+    pt(g, cy(12, 12.6, 1.2, 6), SM.slate, 0, 0.4, 0);
+    pt(g, cy(11.4, 11.4, 0.06, 6), SM.dark, 0, 1.02, 0);
+    const ring = new THREE.RingGeometry(6.6, 7.2, 36); ring.rotateX(-Math.PI/2);
+    pt(g, ring, SM.orange, 0, 1.06, 0);
+    pt(g, bx(0.7, 0.04, 6), SM.orange, -1.6, 1.07, 0); pt(g, bx(0.7, 0.04, 6), SM.orange, 1.6, 1.07, 0); pt(g, bx(3.2, 0.04, 0.7), SM.orange, 0, 1.07, 0);
+    for (let k = 0; k < 6; k++){ const a = k/6*Math.PI*2 + Math.PI/6; pt(g, bx(0.5, 0.4, 0.5), SM.lamp, Math.sin(a)*11.2, 1.2, Math.cos(a)*11.2); }
+    // a shuttle parked off-centre
+    const sh = new THREE.Group(); sh.position.set(3, 1, -2); sh.rotation.y = 0.6; g.add(sh);
+    pt(sh, cy(1.1, 1.4, 9, 12), SM.hull, 0, 1.9, 0, Math.PI/2);
+    pt(sh, new THREE.ConeGeometry(1.1, 2.6, 12), SM.hull, 0, 1.9, -5.8, -Math.PI/2);
+    pt(sh, bx(1.4, 0.5, 1.6), SM.window, 0, 2.7, -4.2);
+    pt(sh, bx(9, 0.25, 3), SM.slate, 0, 1.6, 1.4);
+    pt(sh, bx(0.25, 2.4, 2.2), SM.slate, 0, 3.6, 3.6);
+    pt(sh, bx(9.1, 0.1, 0.5), SM.orange, 0, 1.75, 0.3);
+    for (const x of [-0.7, 0.7]) pt(sh, cy(0.5, 0.65, 1.2, 10), SM.dark, x, 1.9, 5.1, Math.PI/2);
+    for (const [x, z] of [[-1.5, -3], [1.5, -3], [-2.5, 2], [2.5, 2]]) pt(sh, bx(0.2, 1.2, 0.2), SM.steel, x, 0.6, z);
+    return g;
+  },
+  plant(){
+    const g = new THREE.Group();
+    pt(g, bx(18, 7, 10), SM.steel, 0, 3.5, 0); pt(g, bx(18.4, 0.5, 10.4), SM.slate, 0, 7.2, 0);
+    for (const z of [-5.06, 5.06]) for (let x = -7; x <= 7; x += 3.5) pt(g, bx(1.6, 1.0, 0.1), SM.window, x, 5, z);
+    for (const [x, z, h] of [[-6, -2, 22], [-2.5, -3, 18], [1, -2.5, 25]]){
+      pt(g, cy(0.9, 1.2, h, 10), SM.hull, x, h/2, z);
+      pt(g, cy(1.0, 1.0, 0.8, 10), SM.orange, x, h - 2, z);
+      pt(g, cy(1.3, 1.3, 0.5, 10), SM.slate, x, h * 0.55, z);
+    }
+    for (const x of [5, 9.5]){ pt(g, cy(2.3, 2.3, 10, 14), SM.blue2, x, 5, 8); pt(g, dome(2.3, 14, 5), SM.blue2, x, 10, 8); pt(g, cy(2.35, 2.35, 0.4, 14), SM.slate, x, 7, 8); }
+    pt(g, cy(0.35, 0.35, 16, 8), SM.slate, 0, 8.5, 6.2, 0, 0, Math.PI/2);
+    pt(g, cy(0.35, 0.35, 16, 8), SM.orange, 0, 9.3, 6.6, 0, 0, Math.PI/2);
+    pt(g, cy(1.6, 1.6, 8, 12), SM.hull, -12, 1.8, 2, Math.PI/2);       // a horizontal tank
+    pt(g, bx(1.4, 0.7, 18), SM.dark, 8, 4.5, -10, 0.42, 0, 0);         // conveyor down to the yard
+    pt(g, bx(6, 2.2, 5), SM.slate, 8, 1.1, -17);
+    return g;
+  },
+  excavator(rnd){
+    const g = new THREE.Group();
+    // the bench of ice and rock it's cutting into
+    for (let k = 0; k < 14; k++){
+      const a = rnd()*Math.PI*1.2 - Math.PI*1.1, d = 10 + rnd()*5, s = 2 + rnd()*3.5;
+      pt(g, bx(s, s*(0.6 + rnd()*0.8), s*(0.7 + rnd()*0.6)), SM.ice, Math.sin(a)*d, s*0.35, Math.cos(a)*d, rnd()*0.4, rnd()*3, rnd()*0.4);
+    }
+    for (const x of [-2.6, 2.6]) pt(g, bx(1.8, 1.6, 8), SM.dark, x, 0.8, 0);
+    pt(g, bx(6, 3, 7), SM.steel, 0, 3.1, 0.5); pt(g, bx(6.05, 0.4, 7.05), SM.orange, 0, 2.0, 0.5);
+    pt(g, bx(2.6, 2.4, 2.6), SM.hull, 1.6, 5.8, -1.6); pt(g, bx(2.4, 0.9, 0.06), SM.window, 1.6, 6.1, -2.93);
+    pt(g, bx(5, 2.6, 3), SM.slate, 0, 3.4, 4.8);
+    for (const x of [-1, 1]) pt(g, bx(0.3, 7, 0.3), SM.steel, x*1.2, 7.5, 1.5, 0.25, 0, x*0.12);
+    // the boom reaching out to the cutting wheel
+    const boom = new THREE.Group(); boom.position.set(-0.8, 4.6, -1.5); boom.rotation.x = 0.42; g.add(boom);
+    pt(boom, bx(1.3, 1.3, 17), SM.steel, 0, 0, -8.5);
+    pt(boom, bx(1.32, 0.3, 17), SM.orange, 0, 0.7, -8.5);
+    const wheel = new THREE.Group(); wheel.position.set(0, 0, -17); boom.add(wheel);
+    pt(wheel, cy(3.2, 3.2, 1.0, 18), SM.slate, 0, 0, 0, 0, 0, Math.PI/2);
+    for (let k = 0; k < 9; k++){ const a = k/9*Math.PI*2; pt(wheel, bx(1.3, 0.9, 1.1), SM.dark, 0, Math.sin(a)*3.4, Math.cos(a)*3.4, a); }
+    // a cable stay from the mast to the boom
+    const cable = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 10.8, 1.5), new THREE.Vector3(-0.8, 4.6 + Math.sin(0.42)*12, -1.5 - Math.cos(0.42)*12)]);
+    g.add(new THREE.LineSegments(cable, SM.line));
+    return g;
+  },
+  haul(){
+    const g = new THREE.Group();
+    pt(g, bx(3, 1, 7), SM.dark, 0, 1.4, 0);
+    for (const x of [-1.75, 1.75]) for (const z of [-2.4, 0.2, 2.5]){ pt(g, cy(0.9, 0.9, 0.7, 14), SM.dark, x, 0.9, z, 0, 0, Math.PI/2); pt(g, cy(0.45, 0.45, 0.72, 10), SM.steel, x, 0.9, z, 0, 0, Math.PI/2); }
+    pt(g, bx(2.9, 1.6, 4.6), SM.hull, 0, 2.7, 1.1); pt(g, bx(2.5, 0.8, 4.1), SM.slate, 0, 3.6, 1.2);
+    pt(g, bx(2.7, 1.8, 1.9), SM.hull, 0, 2.8, -2.4); pt(g, bx(2.3, 0.7, 0.06), SM.window, 0, 3.2, -3.37);
+    pt(g, bx(3.05, 0.3, 7.05), SM.orange, 0, 2.0, 0);
+    pt(g, bx(0.3, 0.3, 0.3), SM.lamp, 0.9, 3.85, -2.4);
+    return g;
+  },
+  greenhouse(){
+    const g = new THREE.Group();
+    for (const x of [-9, 0, 9]){
+      arch(g, 4, 20, x, 0.6, 0);
+      for (const dx of [-2, 0, 2]) pt(g, bx(1.1, 0.6, 18), SM.green, x + dx, 0.9, 0);
+    }
+    pt(g, bx(26, 3.4, 4), SM.hull, 0, 1.7, -12); pt(g, bx(26.1, 0.5, 4.1), SM.orange, 0, 2.6, -12);
+    for (let x = -11; x <= 11; x += 2.75) pt(g, bx(1.2, 0.8, 0.06), SM.window, x, 1.8, -14.05);
+    pt(g, cy(0.12, 0.12, 6, 6), SM.steel, 11, 6, -12); pt(g, new THREE.SphereGeometry(0.25, 8, 6), SM.lamp, 11, 9.1, -12);
+    return g;
+  },
+  biolab(){
+    const g = new THREE.Group();
+    pt(g, cy(7, 7.3, 1.4, 24), SM.hull, 0, 0.7, 0); geoDome(g, 6.5, 0, 1.4, 0);
+    pt(g, cy(5, 5.2, 1.2, 20), SM.hull, 10, 0.6, 3); geoDome(g, 4.6, 10, 1.2, 3);
+    pt(g, cy(4.4, 4.6, 1.2, 20), SM.hull, -9.5, 0.6, 4); geoDome(g, 4, -9.5, 1.2, 4);
+    for (const [x, z, r] of [[0, 0, 3], [10, 3, 2], [-9.5, 4, 2]]) pt(g, cy(r, r, 0.8, 14), SM.green, x, 1.8, z);
+    // glass walkways between the domes
+    for (const [ax, az, bx2, bz] of [[5, 1.2, 6, 2.2], [-5.5, 2, -6, 3]]){
+      const L = Math.hypot(bx2 - ax, bz - az) + 3, a = Math.atan2(bx2 - ax, bz - az);
+      const w = pt(g, cy(1.1, 1.1, L, 10, true), SM.glass, (ax + bx2)/2, 1.5, (az + bz)/2); w.rotation.order = 'YXZ'; w.rotation.set(Math.PI/2, a, 0);
+    }
+    pt(g, bx(6, 4, 4.5), SM.hull, 2, 2, -8.5); pt(g, bx(6.05, 0.5, 4.55), SM.orange, 2, 3.4, -8.5);
+    pt(g, bx(5, 0.7, 0.06), SM.window, 2, 2.3, -10.78);
+    pt(g, cy(0.12, 0.12, 9, 6), SM.steel, 4, 8.5, -8.5); pt(g, bx(1.6, 0.12, 0.12), SM.steel, 4, 11, -8.5); pt(g, new THREE.SphereGeometry(0.25, 8, 6), SM.lamp, 4, 13.1, -8.5);
+    return g;
+  },
+  comms(){
+    const g = new THREE.Group();
+    pt(g, cy(2.4, 2.8, 0.6, 10), SM.slate, 0, 0.3, 0);
+    pt(g, cy(0.9, 1.3, 4, 10), SM.steel, 0, 2.6, 0);
+    pt(g, bx(3.4, 0.9, 1.2), SM.slate, 0, 4.8, 0);
+    const dish = new THREE.Group(); dish.position.set(0, 5.6, 0); dish.rotation.x = -0.75; g.add(dish);
+    const bowl = new THREE.SphereGeometry(5, 24, 6, 0, Math.PI*2, Math.PI - 0.85, 0.85);   // a shallow cap, open side up
+    pt(dish, bowl, SM.hull, 0, 5, 0).material = SM.hull;
+    lines(dish, new THREE.SphereGeometry(5.02, 12, 3, 0, Math.PI*2, Math.PI - 0.85, 0.85), 0, 5, 0);
+    for (let k = 0; k < 3; k++){ const a = k/3*Math.PI*2; const st = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(Math.cos(a)*3.6, 1.6, Math.sin(a)*3.6), new THREE.Vector3(0, 3.6, 0)]); dish.add(new THREE.LineSegments(st, SM.line)); }
+    pt(dish, cy(0.3, 0.3, 0.8, 8), SM.orange, 0, 3.8, 0);
+    return g;
+  },
+  weather(){
+    const g = new THREE.Group();
+    pt(g, bx(3, 0.4, 3), SM.slate, 0, 0.2, 0);
+    const H = 10, b = 0.9, t = 0.35;
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]){
+      const leg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(sx*b, 0.4, sz*b), new THREE.Vector3(sx*t, H, sz*t)]);
+      g.add(new THREE.LineSegments(leg, SM.line));
+      pt(g, cy(0.07, 0.1, H - 0.4, 4), SM.steel, sx*(b + t)/2, (H + 0.4)/2, sz*(b + t)/2, sz*Math.atan((b - t)/H), 0, -sx*Math.atan((b - t)/H));
+    }
+    // cross bracing on each face
+    const br = [];
+    for (let y = 0.4; y < H - 1; y += 1.6){
+      const w0 = b - (b - t)*(y/H), w1 = b - (b - t)*((y + 1.6)/H);
+      for (const [ax, az, cx, cz] of [[-1, -1, 1, -1], [1, -1, 1, 1], [1, 1, -1, 1], [-1, 1, -1, -1]]){
+        br.push(ax*w0, y, az*w0, cx*w1, y + 1.6, cz*w1, cx*w0, y, cz*w0, ax*w1, y + 1.6, az*w1);
+      }
+    }
+    const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(br, 3)); g.add(new THREE.LineSegments(bg, SM.line));
+    pt(g, bx(1.6, 0.2, 1.6), SM.slate, 0, H, 0);
+    pt(g, bx(0.9, 0.7, 0.6), SM.hull, 0.3, H + 0.45, 0);
+    pt(g, cy(0.05, 0.05, 1.4, 4), SM.steel, -0.5, H + 0.8, 0);
+    for (let k = 0; k < 3; k++){ const a = k/3*Math.PI*2; pt(g, new THREE.SphereGeometry(0.13, 6, 4, 0, Math.PI*2, 0, Math.PI/2), SM.orange, -0.5 + Math.cos(a)*0.35, H + 1.5, Math.sin(a)*0.35, 0, 0, Math.PI/2); }
+    pt(g, new THREE.SphereGeometry(0.22, 8, 6), SM.lamp, 0, H + 1.9, 0.5);
+    pt(g, bx(1.2, 1.5, 1.0), SM.hull, 1.3, 0.95, 0.9);
+    return g;
+  },
+  fuel(){
+    const g = new THREE.Group();
+    pt(g, bx(15, 0.6, 6.5), SM.slate, 0, 0.3, 0);
+    for (const x of [-4.8, 0, 4.8]){
+      pt(g, cy(2.1, 2.1, 6, 18), SM.hull, x, 3.6, 0); pt(g, dome(2.1, 18, 6), SM.hull, x, 6.6, 0);
+      pt(g, cy(2.15, 2.15, 0.45, 18), SM.orange, x, 5.2, 0); pt(g, cy(2.15, 2.15, 0.25, 18), SM.slate, x, 1.4, 0);
+      pt(g, bx(0.08, 6, 0.4), SM.steel, x + 2.15, 3.6, 0);
+    }
+    pt(g, cy(0.25, 0.25, 12, 8), SM.blue2, 0, 1.2, 2.6, 0, 0, Math.PI/2);
+    pt(g, cy(0.25, 0.25, 12, 8), SM.slate, 0, 8.4, 0, 0, 0, Math.PI/2);
+    for (const x of [-4.8, 0, 4.8]) pt(g, cy(0.2, 0.2, 1.4, 6), SM.slate, x, 7.8, 0);
+    return g;
+  },
+  solar(){
+    const g = new THREE.Group();
+    for (const z of [-2.2, 2.2]) for (const x of [-3.3, 0, 3.3]){
+      pt(g, cy(0.1, 0.1, 1.4, 6), SM.steel, x, 0.7, z);
+      pt(g, bx(3, 0.08, 1.9), SM.blue, x, 1.5, z, -0.55);
+      pt(g, bx(3.02, 0.02, 1.92), SM.slate, x, 1.45, z, -0.55);
+    }
+    pt(g, bx(1.2, 1, 0.8), SM.hull, 5.5, 0.5, 0); pt(g, bx(1.22, 0.2, 0.82), SM.orange, 5.5, 0.9, 0);
+    return g;
+  },
+  beacon(rnd){
+    const g = new THREE.Group();
+    for (let k = 0; k < 6; k++){ const a = rnd()*Math.PI*2, d = 1 + rnd()*2.5, s = 1.4 + rnd()*1.8; pt(g, new THREE.DodecahedronGeometry(s, 0), SM.ice, Math.cos(a)*d, s*0.3, Math.sin(a)*d, rnd(), rnd(), rnd()); }
+    pt(g, cy(1.1, 1.8, 14, 10), SM.hull, 0, 8, 0);
+    for (const y of [4, 8, 12]) pt(g, cy(1.85 - y*0.05, 1.9 - y*0.05, 0.6, 10), SM.slate, 0, y, 0);
+    pt(g, cy(1.9, 1.9, 0.25, 10), SM.steel, 0, 15.1, 0);
+    pt(g, cy(1.2, 1.2, 1.8, 10, true), SM.glass, 0, 16.1, 0);
+    lines(g, cy(1.22, 1.22, 1.8, 10), 0, 16.1, 0);
+    pt(g, new THREE.SphereGeometry(0.55, 10, 8), SM.lamp, 0, 16.1, 0);
+    pt(g, new THREE.ConeGeometry(1.5, 1.6, 10), SM.orange, 0, 17.8, 0);
+    pt(g, cy(0.06, 0.06, 2.4, 4), SM.steel, 0, 19.6, 0);
+    pt(g, bx(0.5, 1.6, 0.06), SM.window, 0, 7, 1.62);
+    return g;
+  },
+};
+// fold a model's pieces into one mesh per material (and one line set), so it renders in a few draw calls
+function mergeModel(src){
+  src.updateMatrixWorld(true);
+  const meshes = new Map(), segs = [];
+  src.traverse(o => {
+    if (o.isMesh){
+      const geo = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()); geo.applyMatrix4(o.matrixWorld);
+      if (!meshes.has(o.material)) meshes.set(o.material, { p: [], n: [] });
+      const m = meshes.get(o.material); m.p.push(geo.attributes.position.array); m.n.push(geo.attributes.normal.array);
+    } else if (o.isLineSegments){
+      const geo = o.geometry.clone(); geo.applyMatrix4(o.matrixWorld); segs.push(geo.attributes.position.array);
+    }
+  });
+  const cat = arrs => { const n = arrs.reduce((a, b) => a + b.length, 0), out = new Float32Array(n); let i = 0; for (const a of arrs){ out.set(a, i); i += a.length; } return out; };
+  const out = new THREE.Group();
+  for (const [mat, m] of meshes){
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(cat(m.p), 3)); geo.setAttribute('normal', new THREE.BufferAttribute(cat(m.n), 3));
+    geo.computeBoundingSphere(); const mesh = new THREE.Mesh(geo, mat); if (mat === SM.glass) mesh.renderOrder = 2; out.add(mesh);
+  }
+  if (segs.length){ const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(cat(segs), 3)); geo.computeBoundingSphere(); out.add(new THREE.LineSegments(geo, SM.line)); }
+  return out;
+}
+// build and set down every placed structure. it sits at the lower side of its footprint, on a plinth that runs down
+// into the snow so there's never a gap under it on sloping ground
+{
+  let seed = 99; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (const s of STRUCTS){
+    const model = mergeModel(BUILD[s.kind](rnd));
+    let lo = Infinity;
+    for (let k = 0; k <= 8; k++){ const a = k/8*2*Math.PI, q = k === 8 ? 0 : s.r*0.55; lo = Math.min(lo, height(s.x + Math.cos(a)*q, s.y + Math.sin(a)*q)); }
+    s.base = lo + 0.05;
+    model.position.set(s.x, s.base, s.y); model.rotation.y = s.rot;
+    if (s.kind !== 'haul'){
+      const pr = s.kind === 'pad' ? 12 : s.r*0.5;
+      const plinth = new THREE.Mesh(cy(pr, pr*1.05, 6, 12), SM.slate); plinth.position.set(s.x, s.base - 3.02, s.y); scene.add(plinth);
+    }
+    scene.add(model);
+    const box3 = new THREE.Box3().setFromObject(model); s.top = box3.max.y;
+    s.model = model;
+  }
 }
 
 // skier: a simple jointed figure built from boxes and cylinders, posed every frame from the game state. the pose is
@@ -2087,6 +2467,7 @@ function draw(){
   const cxw = focus.x - dx*back, cyw = focus.y - dy*back;
   camera.position.set(cxw, Math.max(camH + up, ground(cxw, cyw) + 1.5), cyw);
   camera.lookAt(focus.x + dx*ahead, camH + 0.4, focus.y + dy*ahead);
+  if (window.__cam){ const c = window.__cam; camera.position.set(c[0], c[1], c[2]); camera.lookAt(c[3], c[4], c[5]); }   // test hook: a free camera
   renderer.render(scene, camera);
 
   // overlay: signs and junctions projected into the view, fading with distance
@@ -2400,6 +2781,9 @@ function drawMinimap(){
     for (let i = 2; i < t.s.length; i += 2) ctx.lineTo(mX(t.s[i]), mY(t.s[i+1]));
     ctx.stroke();
   }
+  // buildings, as small grey blocks (the key ones larger)
+  ctx.fillStyle = C.muted;
+  for (const o of STRUCTS){ const q = o.key ? 4 : 2.4; ctx.fillRect(mX(o.x) - q/2, mY(o.y) - q/2, q, q); }
   // orbs still out there, the gate (a bar across the pass) and the bridge: dark while shut, gold once open
   ctx.fillStyle = C.orb;
   for (const o of orbs) if (!o.got){ ctx.beginPath(); ctx.arc(mX(o.x), mY(o.y), 2, 0, Math.PI*2); ctx.fill(); }
@@ -2611,7 +2995,7 @@ function loop(t){
   draw(); hud(); requestAnimationFrame(loop);
 }
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

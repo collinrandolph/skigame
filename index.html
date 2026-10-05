@@ -1672,10 +1672,12 @@ function snowRGB(){
   const rgb = c => { const k = new THREE.Color(c); return [k.r*255, k.g*255, k.b*255]; };
   const s = rgb(C.snow), light = s[0] + s[1] + s[2] > 384, k = snowLit();
   // on the light theme the open snow is a light, clear ice blue (darker themes keep their own snow colour)
-  const target = light ? rgb(ICE.snow) : s;
+  const target = light ? brighten(rgb(ICE.snow)) : s;
   return { light, k, rgb, target, scaled: target.map(c => c*k) };
 }
 // the light theme's wintry blues for open ground: snow, its ripple shadows and crests, and the icy mountain faces
+// brighten: 30% of the way to white, keeping the hue
+const SNOW_BRIGHT = 0.3, brighten = c => c.map(v => v + (255 - v)*SNOW_BRIGHT);
 const ICE = { snow: '#d3ebf4', shadow: '#5f9fc2', crest: '#f1fafd', face: '#b2dcea', face2: '#94c7db' };
 const faceCSS = (dark = false) => {
   const S0 = snowRGB(); if (!S0.light) return C.rock;
@@ -1686,7 +1688,7 @@ function snowPatterns(){
   const S0 = snowRGB(), key = S0.scaled.join() + C.grid + C.groomed + C.cord; if (snowPat.key === key) return snowPat;
   const { rgb, light, k } = S0, t = S0.target;
   // shadows lean toward the theme's shade colour on light snow (toward the grid colour on dark snow, which is lighter)
-  const lo0 = light ? rgb(ICE.shadow).map((c, i) => t[i] + (c - t[i])*0.42) : rgb(C.grid);
+  const lo0 = light ? brighten(rgb(ICE.shadow)).map((c, i) => t[i] + (c - t[i])*0.42) : rgb(C.grid);
   // the brightest ripple crests stop at a pale blue (part way to the corduroy colour), never the trails' white
   const hi0 = light ? rgb(ICE.crest).map((c, i) => t[i] + (c - t[i])*0.7) : rgb(C.groomed);
   const base = S0.scaled, lo = lo0.map(c => c*k), hi = hi0.map(c => c*k);

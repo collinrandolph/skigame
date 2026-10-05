@@ -31,12 +31,13 @@ The keyboard and both controller schemes share one layout. Choose the controller
 
 ## Levels
 
-The map is four times its old area and split into zones, each locked until you clear the one before it. Progress isn't saved yet, and **Reset skier** in dev view resets the orbs, the gate and the bridge. For testing, the **Zone 1 / Zone 2 orbs collected** sliders in dev view's Tuning panel set the counts directly; maxing one opens that zone's gate or bridge.
+The map is four times its old area and split into zones, each locked until you clear the one before it. Progress isn't saved yet, and **Reset skier** in dev view resets the orbs, the gate and the bridge. For testing, the **Zone 1 / 2 / 3 orbs collected** sliders in dev view's Tuning panel set the counts directly; maxing one opens that zone's gate or lowers its bridge.
 
 - **Zone 1 (north-west):** the original trail network, enclosed by an irregular range of impassable mountains. 20 glowing orbs sit along its trails. Collect them all to open the **East Gate** in the wide, flat pass on the east side. The counter at the top of the screen tracks them, and the map shows the orbs that are left.
 - **Zone 2 (north-east):** past the gate. It's hillier, with five winding trails (green to black) that all lead to the river. Collect its 30 orbs to lower the **drawbridge** into zone 3. Stone ramps on both banks meet the snow flush, and the lowered deck skis like groomed trail. A spur ridge runs from zone 1's mountains to the river, so zone 2 can't reach the strip below zone 1 without crossing the river first.
 - **Outpost:** zones 1 and 2 hold a sci-fi research outpost. Zone 1 has a habitat dome, a research tower and a landing pad. Zone 2 has a processing plant, a mine excavator, a greenhouse complex, a bio lab and a comms array. Smaller equipment (weather stations, fuel tanks, solar arrays, haul vehicles) sits just off the trails. Buildings are solid and show on the map.
-- **Zone 3 (the southern half):** across the river, with ruins of an alien civilisation around the lake and small makeshift camps rather than outpost buildings. A frozen lake, switchbacks back up to zone 1 (over a second bridge that doesn't need unlocking), a gate into zone 1, and 50 orbs come in the next update.
+- **Zone 3 (the southern half):** across the river, around a frozen lake you can ski across (the ice runs like groomed trail). Six trails circle and cross the lake, with 50 orbs. Instead of outpost buildings, it holds the remnants of an alien civilisation: the Sleeping Ribs, the Spine Arch (which Bridge Road passes under), the Watcher spire and the Broken Circle, plus bone shards. Makeshift camps sit among them: tents and tarps, stilt shacks, ice harvesters on the shore and signal towers. Collecting all 50 orbs opens the **South Gate**.
+- **The way back:** a fixed lower bridge crosses from zone 3 to the strip below zone 1. From there, black-rated **Switchbacks** climb benches cut into the mountainside to a saddle, where the South Gate leads down into zone 1's Home Stretch.
 
 ## Interface
 

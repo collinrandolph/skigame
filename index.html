@@ -10,15 +10,15 @@
 /* Layout: full-bleed 2.5D chase view of the snowfield, skier ahead of the camera, slim HUD top-left, tuning drawer bottom-right, touch pads on phones */
 :root{
   --snow:#dfe7ee; --grid:#c4d1dd; --grid-major:#a9bccd; --ink:#1d2a36; --muted:#5d7083;
-  --skier:#d2462e; --track:#8fa6ba; --shade:#5b7a96; --contour:#9a8466; --groomed:#fbfdff; --cord:#eef3f8; --sky:#d3dee8; --trail-edge:#b9c8d6; --d-green:#2f8a4f; --d-blue:#2563b8; --d-black:#1d2a36; --map-bg:rgba(255,255,255,.88); --up:#b5532a; --down:#2f7a5a; --panel:rgba(255,255,255,.86); --line:#d3dde6; --rock:#6f7f8e; --water:#5f8fb0; --water2:#4a7a9e; --ice:#c9dceb; --orb:#f5b324;
+  --skier:#d2462e; --track:#8fa6ba; --shade:#5b7a96; --contour:#9a8466; --groomed:#fbfdff; --cord:#eef3f8; --sky:#d3dee8; --trail-edge:#b9c8d6; --d-green:#2f8a4f; --d-blue:#2563b8; --d-black:#1d2a36; --map-bg:rgba(255,255,255,.88); --up:#b5532a; --down:#2f7a5a; --panel:rgba(255,255,255,.86); --line:#d3dde6; --rock:#6f7f8e; --water:#5f8fb0; --water2:#4a7a9e; --ice:#c9dceb; --orb:#f5b324; --lake:#b4cfe3; --lake2:#9cbdd6;
   --display:"Barlow Condensed","Arial Narrow",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --snow:#0b1218; --grid:#1d2a37; --grid-major:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4;
-  --skier:#ff6a4d; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; --rock:#3a4652; --water:#1d3b52; --water2:#163045; --ice:#2a4256; --orb:#ffc64a; color-scheme:dark}}
+  --skier:#ff6a4d; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; --rock:#3a4652; --water:#1d3b52; --water2:#163045; --ice:#2a4256; --orb:#ffc64a; --lake:#24394c; --lake2:#1d3142; color-scheme:dark}}
 :root[data-theme="dark"]{
   --snow:#0b1218; --grid:#1d2a37; --grid-major:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4;
-  --skier:#ff6a4d; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; --rock:#3a4652; --water:#1d3b52; --water2:#163045; --ice:#2a4256; --orb:#ffc64a; color-scheme:dark}
+  --skier:#ff6a4d; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; --rock:#3a4652; --water:#1d3b52; --water2:#163045; --ice:#2a4256; --orb:#ffc64a; --lake:#24394c; --lake2:#1d3142; color-scheme:dark}
 html,body{height:100%;touch-action:manipulation;-webkit-text-size-adjust:100%}
 *{-webkit-tap-highlight-color:transparent}
 body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -250,7 +250,8 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button></div>
     <label for="tOrb1">Zone 1 orbs collected<output id="oOrb1"></output><input id="tOrb1" type="range" min="0" max="20" step="1" value="0"></label>
     <label for="tOrb2">Zone 2 orbs collected<output id="oOrb2"></output><input id="tOrb2" type="range" min="0" max="30" step="1" value="0"></label>
-    <p class="note">For testing: sets how many of a zone's orbs count as collected. All of them opens the gate or lowers the bridge. Not saved.</p>
+    <label for="tOrb3">Zone 3 orbs collected<output id="oOrb3"></output><input id="tOrb3" type="range" min="0" max="50" step="1" value="0"></label>
+    <p class="note">For testing: sets how many of a zone's orbs count as collected. All of them opens that zone's gate or lowers its bridge. Not saved.</p>
   </div>
 </details>
 
@@ -348,13 +349,24 @@ const SPUR = (() => {
   const x1 = RING.x + r*Math.cos(th), y1 = RING.y + r*Math.sin(th), x2 = x1 - 8;
   return { x1, y1, x2, y2: riverY(x2), hw: 17, half: 25 };
 })();
-// the bridge from zone 2 into zone 3: a drawbridge hinged on the south bank, raised until zone 2's orbs are in
-// the crossing: a stone ramp on each bank rising from the snow to deck level, and a timber leaf spanning the water
-// between them. the ramps meet the snow flush and are always there; the leaf is what's raised.
-const BRIDGE = (() => {
-  const x = 300, yc = riverY(x), IN = RIVER_HW + 0.8, OUT = RIVER_BANK + 8;   // leaf half-length, ramp outer end
-  return { x, yc, IN, OUT, yN: yc - OUT, yS: yc + OUT, hw: 1.8, W: 4.0 };
-})();
+// river crossings: a stone ramp on each bank rising from the snow to deck level, and a timber deck spanning the
+// water between them. the ramps meet the snow flush. the zone 2 crossing is a drawbridge, raised until zone 2's orbs
+// are in; the lower crossing (zone 3 to the switchbacks below zone 1) is a plain fixed bridge.
+function makeBridge(x, gated){
+  const yc = riverY(x), IN = RIVER_HW + 0.8, OUT = RIVER_BANK + 8;           // deck half-length, ramp outer end
+  return { x, yc, IN, OUT, yN: yc - OUT, yS: yc + OUT, hw: 1.8, W: 4.0, gated, deck: null };
+}
+const BRIDGE = makeBridge(300, true), BRIDGE2 = makeBridge(20, false), BRIDGES = [BRIDGE, BRIDGE2];
+// zone 3's frozen lake: an irregular oval, flat ice that skis like groomed trail
+const LAKE = { x: 175, y: 300, rx: 78, ry: 48, h: -1.4 };
+function lakeQ(x, y){
+  const dx = (x - LAKE.x)/LAKE.rx, dy = (y - LAKE.y)/LAKE.ry, th = Math.atan2(dy, dx);
+  return Math.hypot(dx, dy) * (1 + 0.07*Math.sin(3*th + 0.6) + 0.05*Math.sin(5*th + 2.1));
+}
+const onLake = (x, y) => lakeQ(x, y) < 1;
+// the saddle: a notch in the south side of zone 1's mountains, reached by switchbacks from the river below. the south
+// gate sits in it, opened by zone 3's orbs
+const SADDLE = { x: RING.x, y: RING.y + ringCrest(Math.PI/2), h: 18 };
 let bridgeDown = 0;       // 0 raised .. 1 lowered (animated)
 
 // ---- terrain: gentle rolling hills, heights in metres (about ±3 m over 20–60 m wavelengths)
@@ -368,6 +380,7 @@ function ringHeight(x, y){
   const rough = 1 + 0.16*Math.sin(x/11 + Math.sin(y/7)) * Math.sin(y/13 - x/29) + 0.08*Math.sin(th*41 + r/5);
   let h = amp * rough * 0.5*(1 + Math.cos(Math.PI*u));
   if (dx > 0) h *= smooth01(PASS_FLAT, PASS_FLAT + 20, Math.abs(y - GATE.y));   // the east pass, cut flat
+  if (dy > 0) h *= 1 - 0.55*Math.exp(-(((x - SADDLE.x)/40)**2));                   // lower around the south saddle
   return h;
 }
 function segDist(x, y, ax, ay, bx, by){
@@ -395,8 +408,16 @@ function zone2Height(x, y){
           - 5*Math.exp(-((x-330)**2 + (y-40)**2) / (2*36*36));
   return m*h;
 }
+// zone 3: the lake basin, highlands to the west around the watcher, low ridges to the east
+function zone3Height(x, y){
+  const m = smooth01(12, 60, y - riverY(x));
+  if (m <= 0) return 0;
+  const hills = 3.5*Math.sin(x/41 + 1.2)*Math.cos(y/33) + 1.6*Math.sin((x + 2*y)/29)
+              + 9*Math.exp(-((x-30)**2 + (y-300)**2) / (2*45*45)) + 6*Math.exp(-((x-370)**2 + (y-320)**2) / (2*40*40));
+  return m*hills;
+}
 function riverCut(x, y){ return -2.6 * (1 - smooth01(RIVER_HW - 1, RIVER_BANK + 4, Math.abs(y - riverY(x)))); }
-function height(x, y){
+function heightNat(x, y){
   if (FLAT_GROUND) return 0;
   const roll = 1.5*Math.sin(x/23 + .7)*Math.cos(y/31)
              + 1.1*Math.sin((x + y)/41)
@@ -405,27 +426,53 @@ function height(x, y){
   const ridge  =  8 * Math.exp(-((x-58)**2 + (y+92)**2) / (2*32*32));   // the ridge in the north-east
   const valley = -6 * Math.exp(-((x+68)**2 + (y+68)**2) / (2*28*28));   // the valley in the west
   const flat = 1 - 0.8*Math.exp(-(x*x + (y-5)**2) / (2*18*18));          // stadium is nearly level
-  return roll*flat + ridge + valley + ringHeight(x, y) + spurHeight(x, y) + edgeHeight(x, y) + zone2Height(x, y) + riverCut(x, y);
+  let h = roll*flat + ridge + valley + ringHeight(x, y) + spurHeight(x, y) + edgeHeight(x, y) + zone2Height(x, y) + zone3Height(x, y) + riverCut(x, y);
+  // the lake: flattened to an ice sheet, the shore easing down to it
+  const q = lakeQ(x, y);
+  if (q < 1.35) h += (LAKE.h - h) * (1 - smooth01(0.98, 1.35, q));
+  return h;
 }
-// what you stand on: the terrain, or the bridge deck once it's down
-// the deck sits level, a little above the middle of the two banks where the ramps start
-let DECK = null;
-const deckLevel = () => DECK ?? (DECK = (height(BRIDGE.x, BRIDGE.yN) + height(BRIDGE.x, BRIDGE.yS))/2 + 0.3);
+// the switchbacks: below the saddle the mountainside is reshaped into an even slope, and each leg of the trail is cut
+// into it as a level-across bench at the trail's own height. SWB is filled in once the trail exists (see below).
+let SWB = null;
+const SWB_SLOPE = { y0: SADDLE.y, y1: 140, xc: 5, hw: 34 };
+function slopePlane(y){ return SADDLE.h + (SWB.e1 - SADDLE.h) * Math.max(0, Math.min(1, (y - SWB_SLOPE.y0)/(SWB_SLOPE.y1 - SWB_SLOPE.y0))); }
+function swbSample(x, y){
+  // bilinear lookup in the bench grid: [distance to the trail, the trail's height there]
+  const g = SWB, fx = (x - g.x0)/g.st, fy = (y - g.y0)/g.st, i = Math.floor(fx), j = Math.floor(fy);
+  if (i < 0 || j < 0 || i >= g.nx - 1 || j >= g.ny - 1) return null;
+  const u = fx - i, v = fy - j, k = j*g.nx + i;
+  const L = (a) => (a[k]*(1-u) + a[k+1]*u)*(1-v) + (a[k+g.nx]*(1-u) + a[k+g.nx+1]*u)*v;
+  return [L(g.d), L(g.e)];
+}
+function height(x, y){
+  let h = heightNat(x, y);
+  if (!SWB || x < SWB.x0 || x > SWB.x1 || y < SWB.y0 || y > SWB.y1) return h;
+  // the even slope below the saddle, outside the river
+  const m = (1 - smooth01(SWB_SLOPE.hw, SWB_SLOPE.hw + 14, Math.abs(x - SWB_SLOPE.xc))) * smooth01(SWB_SLOPE.y0 - 3, SWB_SLOPE.y0 + 3, y) * (1 - smooth01(SWB_SLOPE.y1, SWB_SLOPE.y1 + 6, y));
+  if (m > 0) h += (slopePlane(y) + riverCut(x, y) - h) * m;
+  const b = swbSample(x, y);
+  if (b){ const w = 1 - smooth01(2.8, 5.5, b[0]); if (w > 0) h += (b[1] - h) * w; }
+  return h;
+}
+// what you stand on: the terrain, or a bridge. each deck sits level, a little above the middle of its two banks
+const bridgeOpen = B => !B.gated || bridgeDown > 0.98;
+const deckLevel = (B = BRIDGE) => B.deck ?? (B.deck = (height(B.x, B.yN) + height(B.x, B.yS))/2 + 0.3);
 // a ramp's surface: the snow's own height across its outer end, rising evenly to the deck at the water's edge
-function rampH(x, y){
-  const dy = Math.abs(y - BRIDGE.yc), yo = y < BRIDGE.yc ? BRIDGE.yN : BRIDGE.yS;
-  const t = (BRIDGE.OUT - dy) / (BRIDGE.OUT - BRIDGE.IN), e = t*t*(3 - 2*t)*0.35 + t*0.65;   // eased a touch at each end
-  return height(x, yo) + (deckLevel() - height(x, yo)) * e;
+function rampH(x, y, B = BRIDGE){
+  const dy = Math.abs(y - B.yc), yo = y < B.yc ? B.yN : B.yS;
+  const t = (B.OUT - dy) / (B.OUT - B.IN), e = t*t*(3 - 2*t)*0.35 + t*0.65;   // eased a touch at each end
+  return height(x, yo) + (deckLevel(B) - height(x, yo)) * e;
 }
+function bridgeAt(x, y){ for (const B of BRIDGES) if (Math.abs(x - B.x) <= B.W/2 + 0.05 && Math.abs(y - B.yc) < B.OUT) return B; return null; }
 function ground(x, y){
-  if (Math.abs(x - BRIDGE.x) > BRIDGE.W/2 + 0.05) return height(x, y);
-  const dy = Math.abs(y - BRIDGE.yc);
-  if (dy >= BRIDGE.OUT) return height(x, y);
-  if (dy > BRIDGE.IN) return Math.max(height(x, y), rampH(x, y));
-  return bridgeDown > 0.98 ? deckLevel() : height(x, y);
+  const B = bridgeAt(x, y); if (!B) return height(x, y);
+  const dy = Math.abs(y - B.yc);
+  if (dy > B.IN) return Math.max(height(x, y), rampH(x, y, B));
+  return bridgeOpen(B) ? deckLevel(B) : height(x, y);
 }
 // what can't be crossed, as a signed distance in metres: negative inside an obstacle
-let gateOpen = false;
+let gateOpen = false, gate2Open = false;
 let SOLIDS = [];           // round footprints of the outpost's buildings (filled in once they're placed)
 function obstacleSD(x, y){
   // zone 1's mountains, with the east pass carved through them
@@ -433,7 +480,11 @@ function obstacleSD(x, y){
   let ring = Math.max(ringIn(th) - r, r - ringOut(th));
   const lat = Math.abs(y - GATE.y);
   ring = Math.max(ring, -Math.max(lat - PASS_HW, Math.abs(x - GATE.x) - 60));
+  // the switchbacks: a lane along the trail, up through the mountains to the saddle
+  if (SWB){ const b = swbSample(x, y); if (b) ring = Math.max(ring, -(b[0] - (TRAIL_W/2 + 0.6))); }
   let d = ring;
+  // the south gate across the saddle, shut until zone 3's orbs are in
+  if (!gate2Open) d = Math.min(d, Math.max(Math.abs(y - SADDLE.y) - 0.35, Math.abs(x - SADDLE.x) - 4.6));
   // the gate: stone walls either side of the doors always, the doors themselves until zone 1's orbs are in
   const gx = Math.abs(x - GATE.x);
   d = Math.min(d, Math.max(gx - 0.6, lat - (PASS_HW + 2), (DOOR_HW + 0.6) - lat));
@@ -442,9 +493,13 @@ function obstacleSD(x, y){
   d = Math.min(d, segDist(x, y, SPUR.x1, SPUR.y1, SPUR.x2, SPUR.y2) - SPUR.hw);
   // the river, with the bridge across it once it's lowered
   let river = Math.abs(y - riverY(x)) - RIVER_BANK;
-  // the crossing: open along the ramps; over the water too once the leaf is down, otherwise you stop at the ramp's end
-  river = Math.max(river, BRIDGE.hw - Math.abs(x - BRIDGE.x));
-  if (bridgeDown <= 0.98) river = Math.min(river, Math.abs(y - BRIDGE.yc) - BRIDGE.IN - 0.3);
+  // crossings: open along the ramps, and over the water once the deck is down (else you stop at the ramp's end)
+  for (const B of BRIDGES){
+    if (Math.abs(x - B.x) > 30) continue;
+    let r = Math.max(river, B.hw - Math.abs(x - B.x));
+    if (!bridgeOpen(B)) r = Math.min(r, Math.abs(y - B.yc) - B.IN - 0.3);
+    river = r;
+  }
   d = Math.min(d, river);
   d = Math.min(d, x - WORLD.x0 - EDGE_WALL, WORLD.x1 - EDGE_WALL - x, y - WORLD.y0 - EDGE_WALL, WORLD.y1 - EDGE_WALL - y);
   // buildings and equipment
@@ -490,11 +545,23 @@ const TRAILS = [
   { name:'Wind Trail',       diff:'blue',   zone:2, pts:[[248,-75],[285,-60],[300,-30],[330,-45],[360,-20],[400,-10]] },
   { name:'Bridge Run',       diff:'green',  zone:2, pts:[[400,-10],[392,25],[360,45],[372,80],[338,105],[305,122],[BRIDGE.x,BRIDGE.yN - 1]] },
   { name:'Hollow Loop',      diff:'green',  zone:2, pts:[[248,-75],[236,-40],[256,-5],[232,30],[262,62],[246,95],[276,116],[BRIDGE.x,BRIDGE.yN - 1]] },
+  // the way back: from zone 1's home stretch up to the saddle, then switchbacks down the far side to the lower bridge
+  { name:'Switchbacks',      diff:'black',  zone:0, saddleAt:6, pts:[[-30,18],[-48,38],[-30,52],[5,48],[12,62],[-6,80],[SADDLE.x,SADDLE.y],
+      [-8,95],[-18,99],[-24,105],[-18,111],[26,111],[32,117],[26,123],[-14,123],[-20,129],[-14,135],[12,135],[BRIDGE2.x,BRIDGE2.yN - 1]] },
+  // zone 3: around and across the frozen lake, among the ruins
+  { name:'Bridge Road',      diff:'green',  zone:3, pts:[[BRIDGE2.x,BRIDGE2.yS + 1],[45,195],[100,212],[150,218],[200,214],[250,205],[285,190],[BRIDGE.x,BRIDGE.yS + 1]] },
+  { name:'Lake Loop',        diff:'green',  zone:3, pts:[[175.0,236.0],[209.6,243.2],[238.6,256.7],[262.4,275.4],[269.0,300.0],[264.5,325.2],[239.8,344.1],[209.2,356.2],[175.0,364.0],[137.6,361.5],[105.6,347.2],[88.7,324.3],[81.0,300.0],[90.8,276.3],[106.9,253.6],[137.2,237.9],[175.0,236.0]] },
+  { name:'Ice Crossing',     diff:'blue',   zone:3, pts:[[175,236],[179,270],[171,330],[175,364]] },
+  { name:'Watcher Climb',    diff:'black',  zone:3, pts:[[100,212],[70,240],[40,272],[33,318],[52,350],[81,300]] },
+  { name:'Ribs Traverse',    diff:'blue',   zone:3, pts:[[250,205],[300,232],[333,270],[340,318],[305,350],[264.5,325.2]] },
+  { name:'Far Shore',        diff:'green',  zone:3, pts:[[175,364],[228,396],[290,398],[322,378],[305,350]] },
 ];
 for (const t of TRAILS) if (t.zone === undefined) t.zone = 1;   // trails carry their zone's orbs; zone 0 = connectors
 const JUNCTIONS = [
   { name:'Stadium', x:0, y:0 }, { name:'North Jct', x:0, y:-40 }, { name:'Summit Jct', x:5, y:-135 }, { name:'Valley Jct', x:-78, y:-30 }, { name:'East Jct', x:50, y:-62 },
   { name:'Pass Jct', x:248, y:-75 }, { name:'Crown Jct', x:380, y:-150 }, { name:'Rim Jct', x:400, y:-10 }, { name:'Bridge', x:BRIDGE.x, y:BRIDGE.yN - 1 },
+  { name:'Saddle', x:SADDLE.x, y:SADDLE.y }, { name:'Lower Bridge', x:BRIDGE2.x, y:BRIDGE2.yS + 1 }, { name:'Watcher Jct', x:100, y:212 }, { name:'Ribs Jct', x:250, y:205 },
+  { name:'North Shore', x:175, y:236 }, { name:'South Shore', x:175, y:364 }, { name:'West Shore', x:81, y:300 }, { name:'East Shore', x:264.5, y:325.2 }, { name:'Far Jct', x:305, y:350 },
 ];
 // smooth each trail through its control points (Catmull-Rom), sampled about every metre
 for (const t of TRAILS){
@@ -519,10 +586,38 @@ for (const t of TRAILS){
   { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; for (let i = 0; i < out.length; i += 2){ a = Math.min(a, out[i]); b = Math.min(b, out[i+1]); c = Math.max(c, out[i]); d = Math.max(d, out[i+1]); } t.bx = [a - TRAIL_W, b - TRAIL_W, c + TRAIL_W, d + TRAIL_W]; }
   const m = (out.length/4|0)*2; t.mid = [out[m], out[m+1]];
 }
+// the switchbacks' bench grid: for each metre of ground near the trail, how far it is from the centre line and how high
+// the trail runs there. the trail climbs evenly to the saddle, then drops evenly to the lower bridge.
+{
+  const t = TRAILS.find(t => t.name === 'Switchbacks'), p = t.s, n = p.length/2;
+  const cum = [0]; for (let i = 1; i < n; i++) cum.push(cum[i-1] + Math.hypot(p[i*2] - p[i*2-2], p[i*2+1] - p[i*2-1]));
+  let si = 0, bd = Infinity; for (let i = 0; i < n; i++){ const d = Math.hypot(p[i*2] - SADDLE.x, p[i*2+1] - SADDLE.y); if (d < bd){ bd = d; si = i; } }
+  const e0 = heightNat(p[0], p[1]), e1 = 1.2, sS = cum[si], sE = cum[n-1];
+  const elev = s => s <= sS ? e0 + (SADDLE.h - e0) * s/sS : SADDLE.h + (e1 - SADDLE.h) * (s - sS)/(sE - sS);
+  const st = 1, x0 = -70, x1 = 55, y0 = 8, y1 = 150, nx = Math.round((x1 - x0)/st) + 1, ny = Math.round((y1 - y0)/st) + 1;
+  const D = new Float32Array(nx*ny), E = new Float32Array(nx*ny);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++){
+    const x = x0 + i*st, y = y0 + j*st; let best = Infinity, bs = 0;
+    for (let k = 0; k < n - 1; k++){
+      const ax = p[k*2], ay = p[k*2+1], dx = p[k*2+2] - ax, dy = p[k*2+3] - ay, L2 = dx*dx + dy*dy;
+      const u = L2 ? Math.max(0, Math.min(1, ((x-ax)*dx + (y-ay)*dy)/L2)) : 0, d = Math.hypot(x - ax - u*dx, y - ay - u*dy);
+      if (d < best){ best = d; bs = cum[k] + u*(cum[k+1] - cum[k]); }
+    }
+    D[j*nx + i] = Math.min(best, 30); E[j*nx + i] = elev(bs);
+  }
+  SWB = { x0, x1, y0, y1, st, nx, ny, d: D, e: E, e1 };
+  for (const tr of TRAILS){   // re-measure climbs now the terrain is final
+    let climb = 0; for (let i = 2; i < tr.s.length; i += 2){ const dh = height(tr.s[i], tr.s[i+1]) - height(tr.s[i-2], tr.s[i-1]); if (dh > 0) climb += dh; }
+    tr.climb = climb;
+  }
+}
 // distance from a point to the nearest groomed centre line
 function nearestTrail(x, y){
   let best = Infinity, bt = null;
   for (const t of TRAILS){
+    // skip a trail whose bounding box (padded by the trail width) is already further away than the best so far
+    const b = t.bx, bxd = Math.max(b[0] - x, 0, x - b[2]), byd = Math.max(b[1] - y, 0, y - b[3]);
+    if (bxd*bxd + byd*byd > (best + TRAIL_W)*(best + TRAIL_W)) continue;
     const p = t.s;
     for (let i = 0; i < p.length - 2; i += 2){
       const ax = p[i], ay = p[i+1], bx = p[i+2], by = p[i+3];
@@ -1312,7 +1407,7 @@ function step(dt){
   const f = slopeFactors(S.grade);
   const nt = nearestTrail(S.x, S.y);
   S.off = offTrail(nt.d); S.trail = nt.t;
-  if (Math.abs(S.x - BRIDGE.x) < BRIDGE.W/2 && Math.abs(S.y - BRIDGE.yc) < BRIDGE.OUT) S.off = 0;   // the bridge and its ramps run like groomed trail
+  if (bridgeAt(S.x, S.y) || onLake(S.x, S.y)) S.off = 0;   // bridges, their ramps and the lake ice run like groomed trail
   // ungroomed snow multiplies both friction and drag; a held glide only pays off on the groomed surface
   S.gm = glideMult();
   // classic skis break their own track, so ungroomed snow adds no friction in classic mode
@@ -1385,7 +1480,7 @@ function step(dt){
 }
 
 function css(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
-let C = {}; function readColors(){ C = { snow:css('--snow'), grid:css('--grid'), major:css('--grid-major'), skier:css('--skier'), track:css('--track'), contour:css('--contour'), groomed:css('--groomed'), edge:css('--trail-edge'), green:css('--d-green'), blue:css('--d-blue'), black:css('--d-black'), mapbg:css('--map-bg'), muted:css('--muted'), line:css('--line'), ink:css('--ink'), shade:css('--shade'), up:css('--up'), down:css('--down'), sky:css('--sky'), cord:css('--cord'), rock:css('--rock'), water:css('--water'), water2:css('--water2'), ice:css('--ice'), orb:css('--orb') }; }
+let C = {}; function readColors(){ C = { snow:css('--snow'), grid:css('--grid'), major:css('--grid-major'), skier:css('--skier'), track:css('--track'), contour:css('--contour'), groomed:css('--groomed'), edge:css('--trail-edge'), green:css('--d-green'), blue:css('--d-blue'), black:css('--d-black'), mapbg:css('--map-bg'), muted:css('--muted'), line:css('--line'), ink:css('--ink'), shade:css('--shade'), up:css('--up'), down:css('--down'), sky:css('--sky'), cord:css('--cord'), rock:css('--rock'), water:css('--water'), water2:css('--water2'), ice:css('--ice'), orb:css('--orb'), lake:css('--lake'), lake2:css('--lake2') }; }
 readColors();
 
 let camTh = 0;     // camera heading, eases after the skier's heading
@@ -1403,6 +1498,19 @@ const sun = new THREE.DirectionalLight(0xffffff, 0.65); sun.position.set(-60, 80
 // the terrain is cut into tiles, each a 1 m mesh with its own baked texture. only the tiles near the skier exist at
 // any time: new ones are built (at most one per frame) as you approach and far ones are thrown away, so the big map
 // costs about what the old single field did.
+// cracks in the lake ice: wandering lines from a few points, kept on the ice
+const LAKE_CRACKS = (() => {
+  let seed = 777; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const out = [];
+  for (let k = 0; k < 26; k++){
+    let x = LAKE.x + (rnd() - 0.5)*LAKE.rx*1.6, y = LAKE.y + (rnd() - 0.5)*LAKE.ry*1.6, a = rnd()*Math.PI*2;
+    if (lakeQ(x, y) > 0.9) continue;
+    const line = [x, y];
+    for (let i = 0; i < 6 + rnd()*8; i++){ a += (rnd() - 0.5)*1.1; x += Math.cos(a)*(3 + rnd()*5); y += Math.sin(a)*(3 + rnd()*5); if (lakeQ(x, y) > 0.97) break; line.push(x, y); }
+    if (line.length > 3) out.push(line);
+  }
+  return out;
+})();
 const TILE_W = 110, TILE_H = 85;
 const TILES_X = Math.round((WORLD.x1 - WORLD.x0) / TILE_W), TILES_Y = Math.round((WORLD.y1 - WORLD.y0) / TILE_H);
 const TEX_PPM = 5;   // texture pixels per metre
@@ -1451,6 +1559,23 @@ function* bakeTile(t){
       tc.closePath(); tc.fill();
     };
     band(RIVER_HW + 1.2, C.ice); band(RIVER_HW, C.water); band(RIVER_HW * 0.45, C.water2);
+  }
+  // the frozen lake: pale blue ice with a darker rim and a web of cracks
+  if (X1 > LAKE.x - LAKE.rx*1.3 && X0 < LAKE.x + LAKE.rx*1.3 && Y1 > LAKE.y - LAKE.ry*1.3 && Y0 < LAKE.y + LAKE.ry*1.3){
+    const shape = (k, col, a = 1) => {
+      tc.fillStyle = col; tc.globalAlpha = a; tc.beginPath();
+      for (let i = 0; i <= 180; i++){
+        // walk the shoreline: find the radius where lakeQ reaches k along each direction
+        const th = i/180*Math.PI*2, c = Math.cos(th), sn = Math.sin(th);
+        let lo = 0, hi = 2; for (let it = 0; it < 18; it++){ const m = (lo + hi)/2; lakeQ(LAKE.x + c*m*LAKE.rx, LAKE.y + sn*m*LAKE.ry) < k ? lo = m : hi = m; }
+        tc.lineTo(TX(LAKE.x + c*lo*LAKE.rx), TY(LAKE.y + sn*lo*LAKE.ry));
+      }
+      tc.closePath(); tc.fill(); tc.globalAlpha = 1;
+    };
+    shape(1.04, C.ice); shape(1.0, C.lake); shape(0.82, C.lake2, 0.55);
+    tc.strokeStyle = C.ice; tc.lineWidth = 1.5; tc.beginPath();
+    for (const cr of LAKE_CRACKS){ tc.moveTo(TX(cr[0]), TY(cr[1])); for (let i = 2; i < cr.length; i += 2) tc.lineTo(TX(cr[i]), TY(cr[i+1])); }
+    tc.stroke();
   }
   // groomed trails: edge, packed surface, then corduroy stripes running along the trail
   const path = tr => { const p = tr.s; tc.moveTo(TX(p[0]), TY(p[1])); for (let i = 2; i < p.length; i += 2) tc.lineTo(TX(p[i]), TY(p[i+1])); };
@@ -1557,6 +1682,7 @@ function colorFarGround(){
     for (let k = 0; k < pos.count; k++){
       const x = pos.getX(k), z = pos.getZ(k);
       if (Math.abs(z - riverY(x)) < RIVER_HW) c.copy(w);
+      else if (onLake(x, z)) c.set(C.lake);
       else c.copy(a).lerp(b, smooth01(0.7, 1.4, ch.slope[k]) * 0.6);
       ch.col.set([c.r, c.g, c.b], k*3);
     }
@@ -1586,36 +1712,53 @@ function bakeTexture(){ colorFarGround(); for (const t of tiles.values()){ t.bak
 // ---- structures: a research outpost's buildings. each zone has a few key buildings at chosen spots and smaller
 // equipment scattered just off the trails. positions are settled here, before the trees (which keep clear of them);
 // the models are built further down.
-const STRUCT_R = { excavator:12, haul:4.5, plant:14, dome:17, tower:9, biolab:12, comms:5, weather:3, fuel:7, pad:13, greenhouse:15, beacon:5, solar:5 };
+const STRUCT_R = { excavator:12, haul:4.5, plant:14, dome:17, tower:9, biolab:12, comms:5, weather:3, fuel:7, pad:13, greenhouse:15, beacon:5, solar:5,
+  // zone 3: ruins of the old civilisation, and the makeshift camps of the people living among them
+  ribs:24, arch:13, watcher:9, circle:22, shard:4, camp:6, harvester:4, signal:4.5, shacks:10 };
+const RUINS = new Set(['ribs', 'arch', 'watcher', 'circle', 'shard']), CAMPS = new Set(['camp', 'harvester', 'signal', 'shacks']);
 const STRUCT_NAME = { excavator:'Mine excavator', plant:'Processing plant', dome:'Habitat dome', tower:'Research tower', biolab:'Bio lab', comms:'Comms array', pad:'Landing pad', greenhouse:'Greenhouse complex', beacon:'Beacon' };
 const STRUCTS = (() => {
   const out = [];
   let seed = 4242; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const ok = (x, y, r, zone) => {
+  const ok = (x, y, r, zone, rough = false) => {
     if (zoneAt(x, y) !== zone) return false;
     if (nearestTrail(x, y).d < r + TRAIL_W/2 + 4) return false;           // never on or over a trail
     if (obstacleSD(x, y) < r + 3) return false;                            // clear of mountains, river and walls
     if (out.some(s => Math.hypot(s.x - x, s.y - y) < s.r + r + 6)) return false;
     if (Math.hypot(x, y) < 18 + r) return false;                           // the stadium stays open
-    if (Math.hypot(x - BRIDGE.x, y - (BRIDGE.yN + BRIDGE.yS)/2) < 22 + r) return false;
+    if (BRIDGES.some(B => Math.hypot(x - B.x, y - B.yc) < 22 + r)) return false;
+    if (lakeQ(x, y) < 1.15 + r/LAKE.ry) return false;
+    if (rough) return true;                                                // ruins lie where they fell, slope or not
     let lo = Infinity, hi = -Infinity;                                     // and only on fairly level ground
     for (let k = 0; k <= 8; k++){ const a = k/8*2*Math.PI, q = k === 8 ? 0 : r*0.8, h = height(x + Math.cos(a)*q, y + Math.sin(a)*q); lo = Math.min(lo, h); hi = Math.max(hi, h); }
     return hi - lo < Math.max(1.5, r*0.28);
   };
   const put = (kind, x, y, zone) => {
-    const r = STRUCT_R[kind];
+    const r = STRUCT_R[kind], rough = RUINS.has(kind);
     for (let ring = 0; ring <= 45; ring += 3) for (let k = 0, n = Math.max(1, ring); k < n; k++){   // spiral out from the chosen spot
       const a = k/n*2*Math.PI, px = x + Math.cos(a)*ring, py = y + Math.sin(a)*ring;
-      if (ok(px, py, r, zone)){ out.push({ kind, x: px, y: py, r, zone, key: true, rot: rnd()*Math.PI*2 }); return; }
+      if (ok(px, py, r, zone, rough)){ out.push({ kind, x: px, y: py, r, zone, key: true, rot: rnd()*Math.PI*2 }); return; }
     }
   };
   // key buildings: zone 1 is the settlement, zone 2 the mine and the farms. zone 3 (across the river) has none: it
   // belongs to the ruins of an older civilisation
   put('dome', -35, -88, 1); put('tower', 35, -95, 1); put('pad', 34, 16, 1);
   put('plant', 325, -105, 2); put('excavator', 352, -130, 2); put('greenhouse', 300, 38, 2); put('biolab', 312, 80, 2); put('comms', 395, -88, 2);
+  // zone 3: the great ruins around the lake, and a camp or village beside a couple of them
+  put('ribs', 398, 300, 3); put('watcher', 62, 296, 3); put('circle', 100, 396, 3);
+  put('shacks', 392, 250, 3); put('shacks', 20, 250, 3);
+  {
+    // the spine arch stands right over Bridge Road, its feet either side of the trail
+    const t = TRAILS.find(t => t.name === 'Bridge Road'); let bi = 0, bd = Infinity;
+    for (let i = 0; i < t.s.length; i += 2){ const d = Math.hypot(t.s[i] - 172, t.s[i+1] - 217); if (d < bd){ bd = d; bi = i; } }
+    const tx = t.s[bi+2] - t.s[bi], ty = t.s[bi+3] - t.s[bi+1], L = Math.hypot(tx, ty);
+    out.push({ kind: 'arch', x: t.s[bi], y: t.s[bi+1], r: STRUCT_R.arch, zone: 3, key: true, rot: Math.atan2(-tx/L, -ty/L), over: true,
+               solids: [[-12, 0, 2.2], [12, 0, 2.2]] });
+  }
   // smaller equipment, a little way off the trails so you ski past it
-  const scatter = { 1: ['weather', 'fuel', 'solar', 'haul', 'comms', 'solar', 'weather'], 2: ['haul', 'haul', 'weather', 'fuel', 'solar', 'beacon', 'weather', 'solar', 'fuel', 'haul'] };
-  for (const z of [1, 2]){
+  const scatter = { 1: ['weather', 'fuel', 'solar', 'haul', 'comms', 'solar', 'weather'], 2: ['haul', 'haul', 'weather', 'fuel', 'solar', 'beacon', 'weather', 'solar', 'fuel', 'haul'],
+                    3: ['camp', 'shard', 'camp', 'signal', 'shard', 'camp', 'shard', 'signal', 'shard', 'camp', 'shard', 'shard'] };
+  for (const z of [1, 2, 3]){
     const zt = TRAILS.filter(t => t.zone === z);
     for (const kind of scatter[z]){
       const r = STRUCT_R[kind];
@@ -1623,13 +1766,23 @@ const STRUCTS = (() => {
         const t = zt[(rnd()*zt.length) | 0], i = ((rnd()*(t.s.length/2 - 1)) | 0) * 2;
         const dx = t.s[i+2] - t.s[i], dy = t.s[i+3] - t.s[i+1], L = Math.hypot(dx, dy) || 1, side = rnd() < 0.5 ? -1 : 1;
         const off = r + TRAIL_W/2 + 6 + rnd()*14, x = t.s[i] - dy/L*off*side, y = t.s[i+1] + dx/L*off*side;
-        if (ok(x, y, r, z)){ out.push({ kind, x, y, r, zone: z, key: false, rot: Math.atan2(dx, dy) + (rnd() - 0.5)*0.8 }); break; }
+        if (ok(x, y, r, z, RUINS.has(kind))){ out.push({ kind, x, y, r, zone: z, key: false, rot: Math.atan2(dx, dy) + (rnd() - 0.5)*0.8 }); break; }
       }
     }
   }
+  // ice harvesters along the lake shore, just off the ice
+  for (let k = 0, placed = 0; k < 40 && placed < 3; k++){
+    const th = 0.7 + k*2.39, c = Math.cos(th), sn = Math.sin(th);
+    let lo = 0, hi = 2; for (let it = 0; it < 16; it++){ const m = (lo + hi)/2; lakeQ(LAKE.x + c*m*LAKE.rx, LAKE.y + sn*m*LAKE.ry) < 1 ? lo = m : hi = m; }
+    const x = LAKE.x + c*(lo*LAKE.rx + 2), y = LAKE.y + sn*(lo*LAKE.ry + 2);
+    if (nearestTrail(x, y).d < 8 || out.some(s => Math.hypot(s.x - x, s.y - y) < s.r + 8)) continue;
+    out.push({ kind: 'harvester', x, y, r: STRUCT_R.harvester, zone: 3, key: false, rot: Math.atan2(c, sn) }); placed++;
+  }
   return out;
 })();
-SOLIDS = STRUCTS.map(s => ({ x: s.x, y: s.y, r: s.r * 0.72 }));
+SOLIDS = STRUCTS.flatMap(s => s.solids
+  ? s.solids.map(([lx, lz, r]) => ({ x: s.x + lx*Math.cos(s.rot) + lz*Math.sin(s.rot), y: s.y - lx*Math.sin(s.rot) + lz*Math.cos(s.rot), r }))
+  : [{ x: s.x, y: s.y, r: s.r * (RUINS.has(s.kind) ? 0.55 : 0.72) }]);
 
 // ---- trees: simple spruces (a trunk and two cone tiers) scattered in patches, kept off the trails and the start.
 // placement is seeded so the forest is the same every time. drawn as instanced meshes, so hundreds cost little.
@@ -1650,7 +1803,9 @@ const trees = (() => {
     if (ringHeight(x, y) + spurHeight(x, y) + edgeHeight(x, y) > 14 + rnd()*6) continue;  // timberline on the mountains
     if (Math.abs(y - riverY(x)) < RIVER_BANK + 1.5) continue;          // nothing in the river
     if (Math.abs(x - GATE.x) < 70 && Math.abs(y - GATE.y) < PASS_FLAT + 4) continue;   // the pass stays clear
-    if (Math.abs(x - BRIDGE.x) < 8 && Math.abs(y - riverY(x)) < BRIDGE.OUT + 6) continue;  // and the bridge ramps
+    if (BRIDGES.some(B => Math.abs(x - B.x) < 8 && Math.abs(y - riverY(x)) < B.OUT + 6)) continue;  // and the bridge ramps
+    if (lakeQ(x, y) < 1.12) continue;                                  // and the lake
+    if (y > riverY(x) + 12 && rnd() < 0.72) continue;                 // across the river it's open tundra, trees only here and there
     if (nearestTrail(x, y).d < TRAIL_W/2 + 3 + rnd()*3) continue;     // a clear corridor either side of every trail
     if (Math.hypot(x, y) < 14) continue;                              // open stadium
     if (STRUCTS.some(o => Math.hypot(o.x - x, o.y - y) < o.r + 1.5)) continue;   // nor in the buildings
@@ -1686,7 +1841,7 @@ const treeMats = {
 
 // ---- orbs: glowing collectables strung along each zone's trails. collect a zone's set to open its way onward:
 // zone 1's open the east gate, zone 2's lower the bridge over the river.
-const ORB_COUNT = { 1: 20, 2: 30 }, ORB_R = 1.7;
+const ORB_COUNT = { 1: 20, 2: 30, 3: 50 }, ORB_R = 1.7;
 const ORB_COUNT_Z1 = ORB_COUNT[1];
 function placeOrbs(zone, n){
   const zt = TRAILS.filter(t => t.zone === zone), total = zt.reduce((a, t) => a + t.len, 0);
@@ -1708,7 +1863,7 @@ function placeOrbs(zone, n){
   }
   return out;
 }
-const orbs = [...placeOrbs(1, ORB_COUNT[1]), ...placeOrbs(2, ORB_COUNT[2])];
+const orbs = [...placeOrbs(1, ORB_COUNT[1]), ...placeOrbs(2, ORB_COUNT[2]), ...placeOrbs(3, ORB_COUNT[3])];
 const orbGlowTex = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
   const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -1732,14 +1887,16 @@ const orbsGot = z => zoneOrbs(z).filter(o => o.got).length;
 const stoneMat = new THREE.MeshLambertMaterial({ color: 0x8b939b }), woodMat = new THREE.MeshLambertMaterial({ color: 0x7a5236 }), darkWoodMat = new THREE.MeshLambertMaterial({ color: 0x4a3322 });
 // the east gate: stone posts and walls across the pass, a beam over the doorway, and two timber doors that swing
 // out once zone 1's orbs are in
-const gate = (() => {
-  const g = new THREE.Group(), h0 = height(GATE.x, GATE.y);
-  g.position.set(GATE.x, h0, GATE.y);
+function buildGate(gx, gy, rotY, reach){
+  // the doors open toward local +x; rotY turns the whole gate (0 = a passage running east-west)
+  const g = new THREE.Group(), h0 = height(gx, gy);
+  g.position.set(gx, h0, gy); g.rotation.y = rotY;
+  const toW = (lx, lz) => [gx + lx*Math.cos(rotY) + lz*Math.sin(rotY), gy - lx*Math.sin(rotY) + lz*Math.cos(rotY)];
   const post = z => { const m = new THREE.Mesh(new THREE.BoxGeometry(1.0, 4.2, 1.0), stoneMat); m.position.set(0, 2.1, z); g.add(m); };
   post(-(DOOR_HW + 0.5)); post(DOOR_HW + 0.5);
   // walls from each post out to the slopes, stepped down to follow the ground
-  for (const side of [-1, 1]) for (let z = DOOR_HW + 1; z < PASS_HW + 5; z += 1.5){
-    const hz = height(GATE.x, GATE.y + side*(z + 0.75)) - h0;
+  for (const side of [-1, 1]) for (let z = DOOR_HW + 1; z < reach; z += 1.5){
+    const hz = height(...toW(0, side*(z + 0.75))) - h0;
     const m = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.6, 1.55), stoneMat); m.position.set(0, hz + 1.0, side*(z + 0.75)); g.add(m);
   }
   const beam = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 2*DOOR_HW + 2.2), woodMat); beam.position.set(0, 4.2, 0); g.add(beam);
@@ -1756,20 +1913,22 @@ const gate = (() => {
   }
   scene.add(g);
   return { g, doors, open: 0 };
-})();
+}
+const gate = buildGate(GATE.x, GATE.y, 0, PASS_HW + 5);
+const gate2 = buildGate(SADDLE.x, SADDLE.y, -Math.PI/2, 9);    // the south gate: doors open toward zone 3 (south)
 function setGateOpen(on){ gateOpen = on; }
 // the drawbridge: a timber deck hinged on the far (south) bank between two stone towers, standing up on end until
 // zone 2's orbs are in, then lowered across the river
 let bridgeWanted = false;
-const bridge = (() => {
-  const D = deckLevel(), { x: BX, yc, IN, OUT, W } = BRIDGE, L = 2*IN;
+function buildBridge(B){
+  const D = deckLevel(B), { x: BX, yc, IN, OUT, W } = B, L = 2*IN;
   const g = new THREE.Group(); scene.add(g);
   // ramps: a surface that starts just under the snow and rises to deck level, with stone sides down into the bank
   const surf = [], side = [];
   const cols = 9, rows = 10;
   for (const dir of [-1, 1]){
     const rowY = k => yc + dir*(OUT + 0.8 - (OUT + 0.8 - IN) * k/rows);           // from just past the outer end to the water
-    const hAt = (x, y) => Math.abs(y - yc) >= OUT ? height(x, y) - 0.18 : Math.max(height(x, y) + 0.02, rampH(x, y));   // never sunk under the snow
+    const hAt = (x, y) => Math.abs(y - yc) >= OUT ? height(x, y) - 0.18 : Math.max(height(x, y) + 0.02, rampH(x, y, B));   // never sunk under the snow
     for (let k = 0; k < rows; k++) for (let c = 0; c < cols - 1; c++){
       const xa = BX - W/2 + W*c/(cols - 1), xb = BX - W/2 + W*(c + 1)/(cols - 1), ya = rowY(k), yb = rowY(k + 1);
       const A = [xa, hAt(xa, ya), ya], B = [xb, hAt(xb, ya), ya], C = [xb, hAt(xb, yb), yb], E = [xa, hAt(xa, yb), yb];
@@ -1790,10 +1949,10 @@ const bridge = (() => {
   for (const dir of [-1, 1]) for (const sx of [-1, 1]){
     const p = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.3, 0.7), stoneMat); p.position.set(BX + sx*(W/2 + 0.45), D + 0.3, yc + dir*(IN + 0.5)); g.add(p);
   }
-  // the lifting towers on the south side of the water, with a beam across the top
+  // the lifting towers on the south side of the water, with a beam across the top (the drawbridge only)
   const hinge = new THREE.Group(); hinge.position.set(BX, D, yc + IN); g.add(hinge);
-  for (const sx of [-1, 1]){ const t = new THREE.Mesh(new THREE.BoxGeometry(1.3, 10, 1.3), stoneMat); t.position.set(BX + sx*(W/2 + 0.95), D + 2.5, yc + IN + 0.8); g.add(t); }
-  const top = new THREE.Mesh(new THREE.BoxGeometry(W + 3.6, 0.7, 1.1), woodMat); top.position.set(BX, D + 7.3, yc + IN + 0.8); g.add(top);
+  if (B.gated) for (const sx of [-1, 1]){ const t = new THREE.Mesh(new THREE.BoxGeometry(1.3, 10, 1.3), stoneMat); t.position.set(BX + sx*(W/2 + 0.95), D + 2.5, yc + IN + 0.8); g.add(t); }
+  if (B.gated){ const top = new THREE.Mesh(new THREE.BoxGeometry(W + 3.6, 0.7, 1.1), woodMat); top.position.set(BX, D + 7.3, yc + IN + 0.8); g.add(top); }
   // the leaf: a deck whose top is exactly deck level, planks, rails; hinged at the south end, reaching north when down
   const leaf = new THREE.Group(); hinge.add(leaf);
   const deck = new THREE.Mesh(new THREE.BoxGeometry(W, 0.4, L), woodMat); deck.position.set(0, -0.2, -L/2); leaf.add(deck);
@@ -1804,9 +1963,11 @@ const bridge = (() => {
   }
   // chains from the beam to the leaf's far end, redrawn as it moves
   const chainMat = new THREE.LineBasicMaterial({ color: 0x2b3138 });
-  const chains = [-1, 1].map(sx => { const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]); const l = new THREE.Line(geo, chainMat); hinge.add(l); return { l, sx }; });
+  const chains = (B.gated ? [-1, 1] : []).map(sx => { const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]); const l = new THREE.Line(geo, chainMat); hinge.add(l); return { l, sx }; });
   return { g, leaf, chains, L, W };
-})();
+}
+const bridge = buildBridge(BRIDGE);
+buildBridge(BRIDGE2);                 // the lower bridge is always down
 function animateBridge(dt){
   const target = bridgeWanted ? 1 : 0;
   bridgeDown += Math.sign(target - bridgeDown) * Math.min(Math.abs(target - bridgeDown), dt / 4);
@@ -1826,6 +1987,9 @@ function animateGate(dt){
   const e = gate.open*gate.open*(3 - 2*gate.open);
   // swing outward, toward zone 2 (+x)
   for (const d of gate.doors) d.hinge.rotation.y = -d.side * e * 1.75;
+  gate2.open += Math.sign((gate2Open ? 1 : 0) - gate2.open) * Math.min(Math.abs((gate2Open ? 1 : 0) - gate2.open), dt / 2.2);
+  const e2 = gate2.open*gate2.open*(3 - 2*gate2.open);
+  for (const d of gate2.doors) d.hinge.rotation.y = -d.side * e2 * 1.75;
   animateBridge(dt);
 }
 let toastT = 0;
@@ -1844,6 +2008,7 @@ function updateOrbs(dt){
       o.got = true; o.fade = 0; music.chime(orbsGot(o.zone) / zoneOrbs(o.zone).length);
       if (o.zone === 1 && orbsGot(1) === ORB_COUNT[1] && !gateOpen){ setGateOpen(true); toast('All orbs found. The east gate is open.'); music.chime(1, true); }
       if (o.zone === 2 && orbsGot(2) === ORB_COUNT[2] && !bridgeWanted){ bridgeWanted = true; toast('All orbs found. The bridge is coming down.'); music.chime(1, true); }
+      if (o.zone === 3 && orbsGot(3) === ORB_COUNT[3] && !gate2Open){ gate2Open = true; toast('All orbs found. The south gate above the switchbacks is open.'); music.chime(1, true); }
     }
   }
   if (toastT && now > toastT){ $('toast').classList.remove('on'); toastT = 0; }
@@ -1856,14 +2021,15 @@ function setOrbsCollected(zone, n){
   });
   if (zone === 1) setGateOpen(n === ORB_COUNT[1]);
   if (zone === 2) bridgeWanted = n === ORB_COUNT[2];
+  if (zone === 3) gate2Open = n === ORB_COUNT[3];
 }
-for (const z of [1, 2]){
+for (const z of [1, 2, 3]){
   const el = $('tOrb' + z);
   el.addEventListener('input', () => { setOrbsCollected(z, +el.value); $('oOrb' + z).textContent = el.value + ' / ' + ORB_COUNT[z]; });
 }
 function resetOrbs(){
   for (const o of orbs){ o.got = false; o.fade = 0; o.g.visible = true; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; }
-  setGateOpen(false); gate.open = 0; bridgeWanted = false; bridgeDown = 0; animateGate(0);
+  setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; bridgeWanted = false; bridgeDown = 0; animateGate(0);
 }
 
 // ---- structure models: low-poly sci-fi outpost kit in the frost palette (slate, steel blue, pale grey, an orange
@@ -2117,6 +2283,180 @@ const BUILD = {
     return g;
   },
 };
+// ---- zone 3: the ruins (organic, bone-pale, grown rather than built) and the camps around them (scrap timber,
+// tarpaulin, rope and lantern light)
+Object.assign(SM, {
+  bone: lam(0xe1e7ee), bone2: lam(0xc4d0dc), hole: new THREE.MeshBasicMaterial({ color: 0x22374c }), glow: new THREE.MeshBasicMaterial({ color: 0x8cc4f0 }),
+  timber: lam(0x6b4f3a), timber2: lam(0x4a3526), tarp: lam(0xd5652a), tarpRed: lam(0xae3b2b), rust: lam(0x8f5a3a), scrap: lam(0x7a8088),
+  flag: new THREE.MeshLambertMaterial({ color: 0xc8452c, side: THREE.DoubleSide }),
+});
+for (const k of ['bone', 'bone2', 'timber', 'timber2', 'tarp', 'tarpRed', 'rust', 'scrap']) SM[k].flatShading = true;
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+function tube(g, pts, r, mat, seg = 24, rs = 7){
+  const c = new THREE.CatmullRomCurve3(pts.map(p => V(...p)));
+  const m = new THREE.Mesh(new THREE.TubeGeometry(c, seg, r, rs, false), mat); g.add(m); return c;
+}
+function beam(g, a, b, r, mat, n = 6){
+  // a round strut from point a to point b
+  const A = V(...a), B = V(...b), d = B.clone().sub(A), L = d.length();
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, L, n), mat);
+  m.position.copy(A).add(B).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(V(0, 1, 0), d.normalize()); g.add(m); return m;
+}
+function flag(g, x, y, z, mat = SM.flag, ry = 0){
+  pt(g, cy(0.05, 0.05, y, 5), SM.timber2, x, y/2, z);
+  const f = new THREE.PlaneGeometry(1.1, 0.6); f.translate(0.55, 0, 0);
+  pt(g, f, mat, x, y - 0.4, z, 0, ry, 0);
+}
+Object.assign(BUILD, {
+  ribs(rnd){
+    // the sleeping ribs: a collapsed ribcage tens of metres long, a hollow skull-hub at its head, glowing faintly inside
+    const g = new THREE.Group();
+    tube(g, [[0, 0, -26], [0, 3.5, -12], [0.5, 4.5, 0], [-0.5, 3, 12], [0, -0.5, 24]], 1.9, SM.bone2, 40, 8);
+    for (let k = 0; k < 7; k++){
+      const z = -14 + k*6, H = 21 - Math.abs(k - 1.5)*2.4, w = 13 - k*0.9, lean = 2 + k*0.4;
+      const broken = k === 2 || k === 5;
+      const pts = [[-w, -1, z], [-w*0.95, H*0.45, z + lean*0.3], [-w*0.55, H*0.92, z + lean*0.7], [0, H, z + lean]];
+      if (!broken) pts.push([w*0.55, H*0.9, z + lean*0.7], [w*0.95, H*0.42, z + lean*0.3], [w, -1, z]);
+      else pts.push([w*0.25, H*0.85, z + lean*1.3]);
+      tube(g, pts, 1.6 + 0.3*Math.sin(k*1.7), SM.bone, 36, 8);
+      for (let i = 1; i < pts.length - 1; i++) pt(g, new THREE.SphereGeometry(2.0, 8, 6), SM.bone2, ...pts[i]);   // knuckles along each rib
+      if (!broken) for (let i = 0; i < 3; i++) pt(g, new THREE.ConeGeometry(0.22, 1.2 + rnd()*1.6, 5), SM.ice, (rnd() - 0.5)*w, H*0.85 - 1, z + lean*0.8, Math.PI);   // icicles
+    }
+    // the hub: a broken shell pierced with round openings, light inside
+    const hub = new THREE.Group(); hub.position.set(0, -2, -27); g.add(hub);
+    pt(hub, new THREE.SphereGeometry(13, 16, 12, 0.4, Math.PI*2 - 0.8, 0, Math.PI*0.62), SM.bone, 0, 0, 0).material.side = THREE.DoubleSide;
+    for (let k = 0; k < 9; k++){
+      const a = 0.9 + k*0.62, el = 0.35 + (k % 3)*0.28, r = 2 + (k % 4)*0.9;
+      const n = V(Math.cos(a)*Math.cos(el), Math.sin(el), Math.sin(a)*Math.cos(el));
+      const c = new THREE.Mesh(new THREE.CircleGeometry(r, 14), SM.hole); c.position.copy(n.clone().multiplyScalar(13.08)); c.lookAt(n.clone().multiplyScalar(30)); hub.add(c);
+    }
+    pt(hub, new THREE.SphereGeometry(2.4, 12, 8), SM.glow, 0, 6, 0);
+    for (let k = 0; k < 5; k++){ const a = rnd()*Math.PI*2; tube(g, [[Math.cos(a)*16, -1, -27 + Math.sin(a)*16], [Math.cos(a)*11, 5 + rnd()*4, -27 + Math.sin(a)*11], [Math.cos(a)*6, 10 + rnd()*3, -27 + Math.sin(a)*6]], 0.8, SM.bone2, 16, 6); }
+    return g;
+  },
+  arch(rnd){
+    // the spine arch: one vertebral span over the trail, knobbed and spined, with a fallen piece beside it
+    const g = new THREE.Group();
+    const c = tube(g, [[-12, -1.5, 0], [-12.5, 7, 0.8], [-8, 15.5, 1.2], [0, 19, 0], [8, 16, -1.2], [12.4, 8, -0.4], [12, -1.5, 0]], 1.5, SM.bone, 60, 9);
+    for (let k = 1; k < 18; k++){
+      const p = c.getPoint(k/18), tn = c.getTangent(k/18);
+      pt(g, new THREE.SphereGeometry(1.75, 8, 6), SM.bone2, p.x, p.y, p.z);
+      const out = V(-tn.y, tn.x, 0).normalize();            // the outside of the curve
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.45, 2.6 + (k % 3), 6), SM.bone); sp.position.copy(p).add(out.clone().multiplyScalar(2.6));
+      sp.quaternion.setFromUnitVectors(V(0, 1, 0), out.add(V(0, 0, (k % 2 ? 0.5 : -0.5))).normalize()); g.add(sp);
+    }
+    tube(g, [[15, -1, 6], [19, 6, 7], [23, 10, 3], [24, 9, -2]], 1.1, SM.bone2, 20, 7);
+    return g;
+  },
+  watcher(rnd){
+    // the watcher: a tall, ribbed spire, slits up its sides and a pale light near the top
+    const g = new THREE.Group(), H = 40, prof = [];
+    for (let i = 0; i <= 24; i++){ const y = i/24*H; prof.push(new THREE.Vector2(Math.max(0.3, 6.5*Math.pow(1 - y/H, 0.75) + 0.7*Math.sin(y*0.55) + 0.4), y - 1.5)); }
+    pt(g, new THREE.LatheGeometry(prof, 11), SM.bone);
+    for (const ph of [0, Math.PI*2/3, Math.PI*4/3]){
+      const pts = []; for (let i = 0; i <= 10; i++){ const y = i/10*(H - 8), r = 6.5*Math.pow(1 - y/H, 0.75) + 1.4, a = ph + i*0.5; pts.push([Math.cos(a)*r, y, Math.sin(a)*r]); }
+      tube(g, pts, 0.55, SM.bone2, 40, 6);
+    }
+    for (let k = 0; k < 7; k++){ const y = 6 + k*4.4, r = 6.5*Math.pow(1 - y/H, 0.75) + 0.55, a = k*1.9; pt(g, bx(0.25, 2.4, 0.8), SM.hole, Math.cos(a)*r, y, Math.sin(a)*r, 0, -a, 0); }
+    pt(g, new THREE.SphereGeometry(0.9, 10, 8), SM.glow, 0, H - 7, 0);
+    for (let k = 0; k < 5; k++){ const a = rnd()*Math.PI*2, d = 9 + rnd()*5; pt(g, new THREE.DodecahedronGeometry(1 + rnd()*1.6, 0), SM.bone2, Math.cos(a)*d, 0, Math.sin(a)*d, rnd(), rnd(), rnd()); }
+    return g;
+  },
+  circle(rnd){
+    // the broken circle: a ring of curved standing pieces around a low dais, gaps where some have fallen
+    const g = new THREE.Group(), R = 19;
+    pt(g, cy(6.5, 7.5, 1.2, 12), SM.bone2, 0, 0.3, 0);
+    pt(g, new THREE.TorusGeometry(4, 0.35, 6, 24), SM.glow, 0, 1, 0, Math.PI/2);
+    for (let k = 0; k < 14; k++){
+      if (k === 3 || k === 9 || k === 10) continue;
+      const a = k/14*Math.PI*2, h = 4 + ((k*7) % 5)*1.6, len = 6.2;
+      const pc = new THREE.Group(); pc.position.set(Math.cos(a)*R, 0, Math.sin(a)*R); pc.rotation.y = -a; g.add(pc);
+      pt(pc, bx(1.6, h, len), SM.bone, 0, h/2 - 0.5, 0, 0, 0, (k % 4 === 1) ? 0.18 : 0);
+      pt(pc, new THREE.ConeGeometry(0.7, 2.2, 6), SM.bone2, 0, h + 0.5, len*0.25);
+      pt(pc, new THREE.ConeGeometry(0.55, 1.6, 6), SM.bone2, 0, h + 0.2, -len*0.3);
+      if (k % 3 === 0) pt(pc, new THREE.CircleGeometry(0.9, 10), SM.hole, 0.82, h*0.55, 0, 0, Math.PI/2);
+    }
+    for (const a of [3/14*Math.PI*2 + 0.1, 9.5/14*Math.PI*2]) pt(g, bx(6, 1.4, 1.8), SM.bone2, Math.cos(a)*(R + 3), 0.3, Math.sin(a)*(R + 3), 0.1, -a + 1.2, 0.15);
+    return g;
+  },
+  shard(rnd){
+    // a fragment: bone spikes pushing out of the snow, and half a rib
+    const g = new THREE.Group();
+    for (let k = 0; k < 3 + (rnd()*3 | 0); k++){ const h = 3 + rnd()*5; pt(g, new THREE.ConeGeometry(0.5 + rnd()*0.5, h, 6), k % 2 ? SM.bone2 : SM.bone, (rnd() - 0.5)*4, h/2 - 0.6, (rnd() - 0.5)*4, (rnd() - 0.5)*0.6, 0, (rnd() - 0.5)*0.6); }
+    tube(g, [[-4, -1, 0], [-3.6, 3, 0.4], [-1, 6, 0.6], [2, 6.5, 0.2]], 0.6, SM.bone, 16, 6);
+    return g;
+  },
+  camp(rnd){
+    // a ridge camp: tents and a tarp lean-to, crates, a fire, flags, and a little lookout platform
+    const g = new THREE.Group();
+    const tent = (x, z, ry, mat) => { pt(g, new THREE.ConeGeometry(2, 2.4, 4), mat, x, 1.2, z, 0, ry + Math.PI/4); pt(g, cy(0.04, 0.04, 3.2, 4), SM.timber2, x, 1.6, z); };
+    tent(-2.5, 0.5, 0, SM.tarp); tent(1.8, -2.2, 0.6, SM.tarpRed);
+    beam(g, [2, 0, 2], [2, 2.2, 2], 0.07, SM.timber2); beam(g, [5, 0, 2], [5, 2.2, 2], 0.07, SM.timber2);
+    pt(g, bx(3.4, 0.06, 2.6), SM.tarp, 3.5, 1.6, 3, -0.55);
+    for (let k = 0; k < 4; k++) pt(g, bx(0.9, 0.7, 0.7), SM.timber, 3 + (k % 2)*1.0, 0.35 + (k > 1 ? 0.7 : 0), 3.4 + (k % 2)*0.2, 0, rnd(), 0);
+    pt(g, cy(0.35, 0.35, 0.9, 8), SM.rust, -1, 0.45, 3.5);
+    for (let k = 0; k < 6; k++){ const a = k/6*Math.PI*2; pt(g, new THREE.DodecahedronGeometry(0.22, 0), SM.scrap, -0.5 + Math.cos(a)*0.6, 0.1, 1.5 + Math.sin(a)*0.6); }
+    pt(g, new THREE.SphereGeometry(0.28, 8, 6), SM.lamp, -0.5, 0.35, 1.5);
+    // lookout: four posts, a deck, a ladder, a lantern
+    for (const [x, z] of [[-4.5, -2.5], [-2.7, -2.5], [-4.5, -4.3], [-2.7, -4.3]]) beam(g, [x, 0, z], [x, 3.2, z], 0.09, SM.timber2);
+    pt(g, bx(2.2, 0.15, 2.2), SM.timber, -3.6, 3.2, -3.4);
+    beam(g, [-2.4, 0, -1.6], [-2.6, 3.2, -2.4], 0.05, SM.timber2); beam(g, [-1.9, 0, -1.6], [-2.1, 3.2, -2.4], 0.05, SM.timber2);
+    pt(g, new THREE.SphereGeometry(0.18, 8, 6), SM.lamp, -3.6, 3.7, -3.4);
+    flag(g, -4.5, 5.2, -4.3); flag(g, 0.5, 4, 3.8, SM.tarp, 0.8);
+    return g;
+  },
+  harvester(rnd){
+    // an ice harvester: a timber tripod over the shore with a block of lake ice hanging from it, a sled of cut blocks
+    const g = new THREE.Group(), top = [0, 7, 0];
+    for (let k = 0; k < 3; k++){ const a = k/3*Math.PI*2; beam(g, [Math.cos(a)*2.4, 0, Math.sin(a)*2.4], top, 0.11, SM.timber2); }
+    pt(g, bx(0.8, 0.5, 0.5), SM.rust, 0, 6.8, 0);
+    const rope = new THREE.BufferGeometry().setFromPoints([V(0, 6.6, 0), V(0, 2.6, 0)]); g.add(new THREE.LineSegments(rope, SM.line));
+    pt(g, bx(1.3, 1.1, 1.3), SM.ice, 0, 2.0, 0, 0, 0.4, 0);
+    pt(g, bx(1.4, 0.9, 1.2), SM.scrap, 2.8, 0.45, -1.8); pt(g, cy(0.3, 0.3, 1.3, 8), SM.rust, 2.8, 1.0, -1.8, 0, 0, Math.PI/2);
+    pt(g, bx(1.8, 0.25, 3.4), SM.timber, -3, 0.35, 1.5);
+    for (let k = 0; k < 4; k++) pt(g, bx(0.75, 0.6, 0.75), SM.ice, -3 + (k % 2)*0.8 - 0.4, 0.8 + (k > 1 ? 0.6 : 0), 1 + (k % 2)*0.9, 0, rnd(), 0);
+    flag(g, 2.2, 4.2, 1.6, SM.tarp, 1.2);
+    pt(g, new THREE.SphereGeometry(0.16, 8, 6), SM.lamp, 0, 6.2, 0.35);
+    return g;
+  },
+  signal(rnd){
+    // a signal tower: a rickety lattice mast with antennas and pennants, a scrap hut at its foot
+    const g = new THREE.Group(), H = 15, b = 1.4, t = 0.4;
+    for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) beam(g, [sx*b, 0, sz*b], [sx*t, H, sz*t], 0.08, SM.rust);
+    const br = [];
+    for (let y = 0; y < H - 1; y += 1.8){
+      const w0 = b - (b - t)*(y/H), w1 = b - (b - t)*((y + 1.8)/H);
+      for (const [ax, az, cx, cz] of [[-1, -1, 1, -1], [1, -1, 1, 1], [1, 1, -1, 1], [-1, 1, -1, -1]]) br.push(ax*w0, y, az*w0, cx*w1, y + 1.8, cz*w1);
+    }
+    const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(br, 3)); g.add(new THREE.LineSegments(bg, SM.line));
+    pt(g, bx(1.6, 0.15, 1.6), SM.timber, 0, H*0.62, 0); pt(g, bx(1.1, 0.15, 1.1), SM.timber, 0, H, 0);
+    beam(g, [0, H, 0], [0, H + 4, 0], 0.05, SM.scrap); beam(g, [-0.9, H + 2.6, 0], [0.9, H + 2.6, 0], 0.03, SM.scrap); beam(g, [0, H + 1.6, -0.7], [0, H + 1.6, 0.7], 0.03, SM.scrap);
+    pt(g, new THREE.SphereGeometry(0.9, 10, 4, 0, Math.PI*2, 0, 0.9), SM.scrap, 0.9, H*0.62 + 0.9, 0.3, -1.6).material = SM.scrap;
+    pt(g, new THREE.SphereGeometry(0.2, 8, 6), SM.lamp, 0, H + 4.1, 0);
+    flag(g, 0.6, H + 2.2, 0.6, SM.tarp); flag(g, -0.6, H - 1, -0.6);
+    pt(g, bx(2.6, 2, 2.2), SM.timber, 2.6, 1, 1.8); pt(g, bx(3.0, 0.08, 2.6), SM.tarpRed, 2.6, 2.2, 1.8, 0.18);
+    pt(g, bx(0.6, 0.5, 0.05), SM.window, 2.6, 1.2, 2.92);
+    return g;
+  },
+  shacks(rnd){
+    // a cluster of stilt shacks joined by plank walkways, tarps for roofs, lit windows
+    const g = new THREE.Group(), huts = [[-5, 2, 0.8], [0.5, -3.5, 2.2], [5.5, 1.5, 1.2], [0, 5, 0.4]];
+    for (const [x, z, lift] of huts){
+      for (const [dx, dz] of [[-1.4, -1.2], [1.4, -1.2], [-1.4, 1.2], [1.4, 1.2]]) beam(g, [x + dx, -0.5, z + dz], [x + dx, lift + 0.1, z + dz], 0.09, SM.timber2);
+      pt(g, bx(3.2, 2.3, 2.8), rnd() < 0.5 ? SM.timber : SM.scrap, x, lift + 1.25, z, 0, (rnd() - 0.5)*0.3, 0);
+      pt(g, bx(3.8, 0.08, 3.4), rnd() < 0.5 ? SM.tarp : SM.tarpRed, x, lift + 2.6, z, 0.22, 0, 0);
+      pt(g, bx(0.7, 0.55, 0.05), SM.window, x, lift + 1.4, z + 1.42);
+    }
+    for (let k = 0; k < huts.length - 1; k++){
+      const [ax, az, al] = huts[k], [bx2, bz, bl] = huts[k + 1];
+      const L = Math.hypot(bx2 - ax, bz - az), a = Math.atan2(bx2 - ax, bz - az);
+      const w = pt(g, bx(0.9, 0.08, L), SM.timber, (ax + bx2)/2, (al + bl)/2 + 0.12, (az + bz)/2); w.rotation.order = 'YXZ'; w.rotation.set(-Math.atan2(bl - al, L), a, 0);
+    }
+    flag(g, 6.5, 6.5, 3, SM.tarp); pt(g, new THREE.SphereGeometry(0.18, 8, 6), SM.lamp, -5, 3.6, 3.6);
+    beam(g, [0.5, 4.5, -3.5], [0.5, 8, -3.5], 0.05, SM.scrap);
+    return g;
+  },
+});
 // fold a model's pieces into one mesh per material (and one line set), so it renders in a few draw calls
 function mergeModel(src){
   src.updateMatrixWorld(true);
@@ -2148,9 +2488,9 @@ function mergeModel(src){
     const model = mergeModel(BUILD[s.kind](rnd));
     let lo = Infinity;
     for (let k = 0; k <= 8; k++){ const a = k/8*2*Math.PI, q = k === 8 ? 0 : s.r*0.55; lo = Math.min(lo, height(s.x + Math.cos(a)*q, s.y + Math.sin(a)*q)); }
-    s.base = lo + 0.05;
+    s.base = lo + (RUINS.has(s.kind) ? -1.2 : 0.05);          // ruins sit a little sunk into the snow
     model.position.set(s.x, s.base, s.y); model.rotation.y = s.rot;
-    if (s.kind !== 'haul'){
+    if (!RUINS.has(s.kind) && !CAMPS.has(s.kind) && s.kind !== 'haul'){
       const pr = s.kind === 'pad' ? 12 : s.r*0.5;
       const plinth = new THREE.Mesh(cy(pr, pr*1.05, 6, 12), SM.slate); plinth.position.set(s.x, s.base - 3.02, s.y); scene.add(plinth);
     }
@@ -2513,6 +2853,15 @@ function draw(){
       ctx.fillText('BRIDGE · ' + (bridgeWanted ? 'DOWN' : orbsGot(2) + ' / ' + ORB_COUNT[2] + ' ORBS'), p[0], p[1]);
     }
   }
+  {
+    const d = Math.hypot(SADDLE.x - S.x, SADDLE.y - S.y);
+    const p = d < 140 && project(SADDLE.x, SADDLE.y, height(SADDLE.x, SADDLE.y) + 5.6);
+    if (p){
+      ctx.globalAlpha = Math.min(1, (140 - d) / 40);
+      ctx.fillStyle = gate2Open ? C.orb : C.ink;
+      ctx.fillText('SOUTH GATE · ' + (gate2Open ? 'OPEN' : orbsGot(3) + ' / ' + ORB_COUNT[3] + ' ORBS'), p[0], p[1]);
+    }
+  }
   ctx.globalAlpha = 1;
   drawMinimap();
   if (devView){ if (P.scheme === 1) drawSticks(); }
@@ -2746,10 +3095,10 @@ function drawDiff(d, x, y, r){
 // overview map: inside the ring it frames zone 1; beyond the gate it shows the whole map
 const mapBox = zone => {
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-  for (const t of TRAILS) if (t.zone === zone) for (let i = 0; i < t.s.length; i += 2){ x0 = Math.min(x0, t.s[i]); x1 = Math.max(x1, t.s[i]); y0 = Math.min(y0, t.s[i+1]); y1 = Math.max(y1, t.s[i+1]); }
+  for (const t of TRAILS) if (t.zone === zone || (zone === 3 && t.name === 'Switchbacks')) for (let i = 0; i < t.s.length; i += 2){ x0 = Math.min(x0, t.s[i]); x1 = Math.max(x1, t.s[i]); y0 = Math.min(y0, t.s[i+1]); y1 = Math.max(y1, t.s[i+1]); }
   return { x0: x0 - 30, x1: x1 + 30, y0: y0 - 30, y1: y1 + 30 };
 };
-const MAP_BOX = { 1: mapBox(1), 2: mapBox(2), 3: { x0: WORLD.x0, x1: WORLD.x1, y0: WORLD.y0, y1: WORLD.y1 } };
+const MAP_BOX = { 1: mapBox(1), 2: mapBox(2), 3: mapBox(3) };
 function drawMinimap(){
   const MAP = MAP_BOX[zoneAt(S.x, S.y)];
   const size = W < 520 ? 104 : 150, pad = 16;
@@ -2773,6 +3122,9 @@ function drawMinimap(){
   ctx.lineWidth = Math.max(3, SPUR.hw*2*sc); ctx.beginPath(); ctx.moveTo(mX(SPUR.x1), mY(SPUR.y1)); ctx.lineTo(mX(SPUR.x2), mY(SPUR.y2)); ctx.stroke();
   ctx.globalAlpha = 0.8; ctx.strokeStyle = C.water; ctx.lineWidth = Math.max(1.5, RIVER_HW*2*sc);
   ctx.beginPath(); for (let x = WORLD.x0; x <= WORLD.x1; x += 6){ x === WORLD.x0 ? ctx.moveTo(mX(x), mY(riverY(x))) : ctx.lineTo(mX(x), mY(riverY(x))); } ctx.stroke();
+  ctx.globalAlpha = 0.9; ctx.fillStyle = C.lake; ctx.beginPath();
+  for (let k = 0; k <= 48; k++){ const th = k/48*2*Math.PI; let lo = 0, hi = 2; for (let it = 0; it < 12; it++){ const m = (lo + hi)/2; lakeQ(LAKE.x + Math.cos(th)*m*LAKE.rx, LAKE.y + Math.sin(th)*m*LAKE.ry) < 1 ? lo = m : hi = m; } const x = mX(LAKE.x + Math.cos(th)*lo*LAKE.rx), y = mY(LAKE.y + Math.sin(th)*lo*LAKE.ry); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+  ctx.fill();
   ctx.globalAlpha = 1;
   ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   for (const t of TRAILS){
@@ -2792,6 +3144,9 @@ function drawMinimap(){
   ctx.beginPath(); ctx.moveTo(mX(GATE.x), mY(GATE.y - PASS_HW)); ctx.lineTo(mX(GATE.x), mY(GATE.y + PASS_HW)); ctx.stroke();
   ctx.strokeStyle = bridgeWanted ? C.orb : C.ink;
   ctx.beginPath(); ctx.moveTo(mX(BRIDGE.x), mY(BRIDGE.yN)); ctx.lineTo(mX(BRIDGE.x), mY(BRIDGE.yS)); ctx.stroke();
+  ctx.strokeStyle = C.ink; ctx.beginPath(); ctx.moveTo(mX(BRIDGE2.x), mY(BRIDGE2.yN)); ctx.lineTo(mX(BRIDGE2.x), mY(BRIDGE2.yS)); ctx.stroke();
+  ctx.strokeStyle = gate2Open ? C.orb : C.ink;
+  ctx.beginPath(); ctx.moveTo(mX(SADDLE.x - 5), mY(SADDLE.y)); ctx.lineTo(mX(SADDLE.x + 5), mY(SADDLE.y)); ctx.stroke();
   ctx.restore();
   const px = Math.min(mx + mw, Math.max(mx, mX(S.x))), py = Math.min(my + mh, Math.max(my, mY(S.y)));
   ctx.fillStyle = C.skier; ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI*2); ctx.fill();
@@ -2890,13 +3245,13 @@ function hud(){
   {
     // the counter follows the zone you're in: its orbs, and whether its way onward is open yet
     const z = zoneAt(S.x, S.y), tot = ORB_COUNT[z], n = tot ? orbsGot(z) : 0;
-    const txt = tot ? n + ' / ' + tot : 'Zone 3';
+    const txt = n + ' / ' + tot;
     const el = $('orbN'); if (el.textContent !== txt){ if (tot && n > 0) { const h = $('orbHud'); h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); } el.textContent = txt; }
     $('orbHud').dataset.done = tot && n === tot ? '1' : '';
-    $('orbZone').textContent = z === 1 ? (gateOpen ? 'Gate open' : 'Orbs') : z === 2 ? (bridgeWanted ? 'Bridge down' : 'Orbs') : 'Coming soon';
+    $('orbZone').textContent = z === 1 ? (gateOpen ? 'Gate open' : 'Orbs') : z === 2 ? (bridgeWanted ? 'Bridge down' : 'Orbs') : (gate2Open ? 'South gate open' : 'Orbs');
   }
   $('mToggle').dataset.mode = inClassic() ? 'classic' : 'skate';
-  if (devView) for (const z of [1, 2]){           // keep the orb sliders in step with what's actually been collected
+  if (devView) for (const z of [1, 2, 3]){           // keep the orb sliders in step with what's actually been collected
     const el = $('tOrb' + z), n = orbsGot(z);
     if (document.activeElement !== el && +el.value !== n) el.value = n;
     $('oOrb' + z).textContent = n + ' / ' + ORB_COUNT[z];
@@ -2995,7 +3350,7 @@ function loop(t){
   draw(); hud(); requestAnimationFrame(loop);
 }
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

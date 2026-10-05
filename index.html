@@ -232,6 +232,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tTurn3">3rd same-side kick turn (°)<output id="oTurn3"></output><input id="tTurn3" type="range" min="0" max="45" step="0.5" value="15"></label>
     <label for="tKwin">Kick-turn window (ms between kicks)<output id="oKwin"></output><input id="tKwin" type="range" min="200" max="2000" step="50" value="650"></label>
     <label for="tK180">Quick same-side kicks for a full turn<output id="oK180"></output><input id="tK180" type="range" min="3" max="12" step="1" value="6"></label>
+    <label for="tK180t">Quick trigger kicks for a full turn<output id="oK180t"></output><input id="tK180t" type="range" min="3" max="12" step="1" value="5"></label>
     <label for="tTfStop">Full turn when slow or stopped (°)<output id="oTfStop"></output><input id="tTfStop" type="range" min="45" max="270" step="5" value="180"></label>
     <label for="tTfMove">Full turn at skating speed (°)<output id="oTfMove"></output><input id="tTfMove" type="range" min="30" max="270" step="5" value="90"></label>
     <label for="tTfVlo">Slow below (km/h)<output id="oTfVlo"></output><input id="tTfVlo" type="range" min="0" max="20" step="1" value="4"></label>
@@ -308,7 +309,7 @@ addEventListener('resize', resize);
 
 const $ = id => document.getElementById(id);
 const P = {};
-const tune = [['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
+const tune = [['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
   ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tOffglide','oOffglide','offglide',v=>v.toFixed(0)+'%'],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -912,8 +913,8 @@ function setTuck(on, src){
 }
 const inClassic = () => mode === 'classic' || (mode === 'tuck' && tuckSrc) || (mode === 'plow' && plowReturn === 'classic');
 // a kick on either leg: a skating kick, or in classic a diagonal-stride kick
-function kickInput(leg){
-  if (!inClassic()){ press(leg); return; }
+function kickInput(leg, src = null){
+  if (!inClassic()){ press(leg, 1, src); return; }
   // classic kicks go through straight away (double pole has its own buttons now, so there's nothing to wait for)
   if (mode === 'tuck' && tuckSrc) setTuck(false, tuckSrc);          // a kick stands you up out of the tuck
   if (mode === 'classic') classicTrigger(leg);
@@ -981,13 +982,21 @@ function polePush(dir = S.th){
 // 5, 5, 15, 33.3, 51.7, 70), shrinking to 90° at a normal skating speed or above (5, 5, 15, 18.3, 21.7, 25), so the
 // same quick kicks give a tight turn while moving rather than spinning you round. the speed you start the run at
 // decides which (the kicks themselves speed you up, and that shouldn't shrink a turn you began from a standstill). no single kick turns more than 90°.
-let kickPrevT = -1e9, streakKmh = 0;
+let kickPrevT = -1e9, streakKmh = 0, streakTrig = false;
 function fullTurnDeg(speedKmh = Math.hypot(S.vx, S.vy) * 3.6, p = P){
   return p.tfStop + (p.tfMove - p.tfStop) * smooth01(p.tfVlo, p.tfVhi, speedKmh);
 }
 function sameSideTurn(k, p = P){
   if (k <= 1) return p.turn;
   if (k === 2) return p.turn2;
+  if (streakTrig){
+    // controller triggers are slower to pull than a key or a flick, so a run of trigger kicks reaches the full turn in
+    // fewer kicks (5 by default): after the 2nd, each kick grows by an even step (from a standstill 5, 5, 30.8, 56.7,
+    // 82.5 = 180°; at skating speed 5, 5, 15.8, 26.7, 37.5 = 90°)
+    const n = Math.max(3, Math.round(p.k180t)), m = n - 2, need = fullTurnDeg(streakKmh, p) - p.turn - p.turn2;
+    const step = Math.max(0, (need - p.turn2*m) / (m*(m + 1)/2));
+    return Math.min(90, p.turn2 + step*(k - 2));
+  }
   const n = Math.max(3, Math.round(p.k180));
   const rest = n - 2, need = fullTurnDeg(streakKmh, p) - p.turn - p.turn2;   // kicks 3..n share what's left of the turn
   const step = rest > 1 ? Math.max(0, (need - p.turn3*rest) / (rest*(rest - 1)/2)) : 0;
@@ -1009,7 +1018,7 @@ function kick(leg, opt = {}){
   const tNow = performance.now(), quick = tNow - kickPrevT <= P.kwin;
   streak = sameSide && quick ? streak + 1 : 1;
   kickPrevT = tNow;
-  if (streak === 1) streakKmh = Math.hypot(S.vx, S.vy) * 3.6;   // the speed a run starts at decides how far it can turn
+  if (streak === 1){ streakKmh = Math.hypot(S.vx, S.vy) * 3.6; streakTrig = opt.src === 'trigger'; }   // the speed (and input) a run starts with decides how far it can turn
   const thPre = S.tgt;
 
   // 1. print the push before any rotation: the kicking ski's own line carries straight on, same direction
@@ -1101,7 +1110,7 @@ const held = { L:false, R:false };
 let glideLeg = null, glideStart = 0;
 // which arm animation the last skating kick uses: trigger/key kicks are V1, stick strokes are V2
 let strideStyle = 'v2';
-function press(leg, boost = 1){ strideStyle = 'v1'; mode = null; held[leg] = true; kick(leg, boost !== 1 ? { boost } : {}); glideLeg = leg; glideStart = performance.now(); rumble(leg); }
+function press(leg, boost = 1, src = null){ strideStyle = 'v1'; mode = null; held[leg] = true; kick(leg, { boost, src }); glideLeg = leg; glideStart = performance.now(); rumble(leg); }
 
 // ---- Xbox-style controller (standard mapping): LT = left kick, RT = right kick.
 // pulling a trigger past halfway kicks; keep it pulled to hold the glide; it releases below 30%.
@@ -1176,7 +1185,7 @@ function pollTwin(gp){
     const v = trig(i);
     if (!padDown[leg] && v >= PAD_ON){
       padDown[leg] = true;
-      kickInput(leg); dbgNote(leg, 'TRIGGER KICK');
+      kickInput(leg, 'trigger'); dbgNote(leg, 'TRIGGER KICK');
     } else if (padDown[leg] && v <= PAD_OFF){ padDown[leg] = false; release(leg); }
   }
 

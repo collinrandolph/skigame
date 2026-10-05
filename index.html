@@ -1440,7 +1440,8 @@ function step(dt){
   const f = slopeFactors(S.grade);
   const nt = nearestTrail(S.x, S.y);
   S.off = offTrail(nt.d); S.trail = nt.t;
-  if (bridgeAt(S.x, S.y) || onLake(S.x, S.y)) S.off = 0;   // bridges, their ramps and the lake ice run like groomed trail
+  if (bridgeAt(S.x, S.y) || onLake(S.x, S.y)) S.off = 0;
+  if (S.off > 0) S.off = Math.min(S.off, apronOff(S.x, S.y));   // lawns round the landmarks and the paths in to them   // bridges, their ramps and the lake ice run like groomed trail
   // ungroomed snow multiplies both friction and drag; a held glide only pays off on the groomed surface
   S.gm = glideMult();
   // classic skis break their own track, so ungroomed snow adds no friction in classic mode
@@ -1609,6 +1610,22 @@ function* bakeTile(t){
     tc.strokeStyle = C.ice; tc.lineWidth = 1.5; tc.beginPath();
     for (const cr of LAKE_CRACKS){ tc.moveTo(TX(cr[0]), TY(cr[1])); for (let i = 2; i < cr.length; i += 2) tc.lineTo(TX(cr[i]), TY(cr[i+1])); }
     tc.stroke();
+  }
+  // lawns round the landmarks and the narrow paths in to them, groomed like the trails but finer
+  {
+    const lawns = LAWNS.filter(L => L.x + L.R > X0 - 2 && L.x - L.R < X1 + 2 && L.y + L.R > Y0 - 2 && L.y - L.R < Y1 + 2);
+    const spurs = SPURS.filter(sp => sp.bx[0] < X1 + 3 && sp.bx[2] > X0 - 3 && sp.bx[1] < Y1 + 3 && sp.bx[3] > Y0 - 3);
+    if (lawns.length || spurs.length){
+      const sp = p => { tc.moveTo(TX(p.s[0]), TY(p.s[1])); for (let i = 2; i < p.s.length; i += 2) tc.lineTo(TX(p.s[i]), TY(p.s[i+1])); };
+      tc.lineCap = 'round'; tc.lineJoin = 'round';
+      tc.strokeStyle = C.edge; tc.lineWidth = SPUR_W*TEX_PPM + 3; tc.beginPath(); spurs.forEach(sp); tc.stroke();
+      tc.fillStyle = C.edge; for (const L of lawns){ tc.beginPath(); tc.arc(TX(L.x), TY(L.y), (L.R + 0.3)*TEX_PPM, 0, Math.PI*2); tc.fill(); }
+      tc.fillStyle = C.groomed; for (const L of lawns){ tc.beginPath(); tc.arc(TX(L.x), TY(L.y), L.R*TEX_PPM, 0, Math.PI*2); tc.fill(); }
+      tc.strokeStyle = C.cord; tc.lineWidth = 2; tc.beginPath();
+      for (const L of lawns) for (let r = L.R - 1; r > 1; r -= 1.2){ tc.moveTo(TX(L.x) + r*TEX_PPM, TY(L.y)); tc.arc(TX(L.x), TY(L.y), r*TEX_PPM, 0, Math.PI*2); }
+      tc.stroke();
+      for (let w = SPUR_W*TEX_PPM, k = 0; w > 1; w -= 2, k++){ tc.strokeStyle = k % 2 ? C.cord : C.groomed; tc.lineWidth = w; tc.beginPath(); spurs.forEach(sp); tc.stroke(); }
+    }
   }
   // groomed trails: edge, packed surface, then corduroy stripes running along the trail
   const path = tr => { const p = tr.s; tc.moveTo(TX(p[0]), TY(p[1])); for (let i = 2; i < p.length; i += 2) tc.lineTo(TX(p[i]), TY(p[i+1])); };
@@ -1817,6 +1834,47 @@ SOLIDS = STRUCTS.flatMap(s => s.solids
   ? s.solids.map(([lx, lz, r]) => ({ x: s.x + lx*Math.cos(s.rot) + lz*Math.sin(s.rot), y: s.y - lx*Math.sin(s.rot) + lz*Math.cos(s.rot), r }))
   : [{ x: s.x, y: s.y, r: s.r * (RUINS.has(s.kind) ? 0.55 : 0.72) }]);
 
+// ---- lawns and side paths: every landmark off the trails gets a groomed apron round it, and a narrow groomed path
+// in from the nearest trail. they ski like trail but aren't trails: no signs, no orbs, not on the map.
+const SPUR_W = 2.6;
+const LAWNS = STRUCTS.filter(s => !s.over).map(s => ({ x: s.x, y: s.y, R: s.r*0.85 + 3 }));
+const SPURS = (() => {
+  const out = [];
+  for (const L of LAWNS){
+    // the trail samples nearest this lawn, tried in order until one gives a clear straight run in
+    const cands = [];
+    for (const t of TRAILS) for (let i = 0; i < t.s.length; i += 2){ const d = Math.hypot(t.s[i] - L.x, t.s[i+1] - L.y); if (d < L.R + 70) cands.push([d, t.s[i], t.s[i+1]]); }
+    cands.sort((a, b) => a[0] - b[0]);
+    for (const [d, tx, ty] of cands.slice(0, 40)){
+      if (d <= L.R + 0.5) break;                                   // the lawn already reaches the trail
+      const ux = (L.x - tx)/d, uy = (L.y - ty)/d, end = d - L.R + 1.5, pts = [];
+      let clear = true;
+      for (let k = 0; k <= Math.ceil(end); k++){
+        const q = Math.min(k, end), x = tx + ux*q, y = ty + uy*q;
+        if (q > 2 && q < end - 1 && obstacleSD(x, y) < SPUR_W/2 + 0.6) { clear = false; break; }
+        pts.push(x, y);
+      }
+      if (!clear) continue;
+      const bx = [Infinity, Infinity, -Infinity, -Infinity];
+      for (let i = 0; i < pts.length; i += 2){ bx[0] = Math.min(bx[0], pts[i]); bx[1] = Math.min(bx[1], pts[i+1]); bx[2] = Math.max(bx[2], pts[i]); bx[3] = Math.max(bx[3], pts[i+1]); }
+      out.push({ s: pts, bx }); break;
+    }
+  }
+  return out;
+})();
+// how groomed the snow is here from the lawns and side paths: 0 groomed, 1 ungroomed, with the same soft edge as trails
+function apronOff(x, y){
+  let best = 1;
+  for (const L of LAWNS){ const e = Math.hypot(x - L.x, y - L.y) - L.R; if (e < 0.5) best = Math.min(best, e <= -0.5 ? 0 : (e + 0.5)); }
+  for (const sp of SPURS){
+    const b = sp.bx; if (x < b[0] - 3 || x > b[2] + 3 || y < b[1] - 3 || y > b[3] + 3) continue;
+    const p = sp.s; let d = Infinity;
+    for (let i = 0; i < p.length - 2; i += 2) d = Math.min(d, segDist(x, y, p[i], p[i+1], p[i+2], p[i+3]));
+    const e = d - SPUR_W/2; if (e < 0.5) best = Math.min(best, e <= -0.5 ? 0 : (e + 0.5));
+  }
+  return best;
+}
+
 // ---- trees: simple spruces (a trunk and two cone tiers) scattered in patches, kept off the trails and the start.
 // placement is seeded so the forest is the same every time. drawn as instanced meshes, so hundreds cost little.
 const trees = (() => {
@@ -1844,6 +1902,7 @@ const trees = (() => {
     if (nearestTrail(x, y).d < TRAIL_W/2 + 3 + rnd()*3) continue;     // a clear corridor either side of every trail
     if (Math.hypot(x, y) < 14) continue;                              // open stadium
     if (STRUCTS.some(o => Math.hypot(o.x - x, o.y - y) < o.r + 1.5)) continue;   // nor in the buildings
+    if (apronOff(x, y) < 1 || LAWNS.some(L => Math.hypot(L.x - x, L.y - y) < L.R + 2.5)) continue;   // nor on their lawns and paths
     if (crowded(x, y)) continue;                                      // no two trunks on top of each other
     const t = { x, y, s: 0.7 + rnd()*0.7, r: rnd()*Math.PI*2 };
     out.push(t); const c = cell(t); if (!grid.has(c)) grid.set(c, []); grid.get(c).push(t);
@@ -3783,7 +3842,7 @@ function loop(t){
   draw(); hud(); requestAnimationFrame(loop);
 }
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { LAWNS, SPURS, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

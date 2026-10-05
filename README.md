@@ -6,12 +6,12 @@ Open `index.html` in a browser. It loads three.js from cdnjs, so it needs an int
 
 ## Controls
 
-The keyboard and both controller schemes share one layout. Choose the controller scheme under **Controller scheme** in the Tuning panel.
+The keyboard, controller and touch screen share one layout. On a controller the sticks stroke and the triggers kick, and you can mix them freely.
 
 | Action | Keyboard | Controller |
 |---|---|---|
 | Kick (left / right) | ← / → or A / D | LT / RT |
-| Snow plow (hold) | ↓ or S | Left stick down (triggers scheme) / both sticks down (twin-stick) |
+| Snow plow (hold) | ↓ or S | Both sticks down |
 | Double pole | Space | LB or RB |
 | Switch skating / classic | C | A button |
 | Music on / off | M | — |

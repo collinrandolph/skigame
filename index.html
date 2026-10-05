@@ -217,7 +217,6 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
   <summary>Tuning</summary>
   <div class="tune">
     <h4>Controller</h4>
-    <label for="tScheme">Controller scheme<output id="oScheme"></output><input id="tScheme" type="range" min="0" max="1" step="1" value="1"></label>
     <label for="tRest">Load hold at centre (ms)<output id="oRest"></output><input id="tRest" type="range" min="0" max="800" step="10" value="250"></label>
     <label for="tTmin">Shortest throw (stick units)<output id="oTmin"></output><input id="tTmin" type="range" min="0.3" max="1.4" step="0.05" value="0.7"></label>
     <label for="tFedge">Flick needs (share of stick range)<output id="oFedge"></output><input id="tFedge" type="range" min="0.6" max="1" step="0.01" value="0.92"></label>
@@ -311,7 +310,7 @@ addEventListener('resize', resize);
 
 const $ = id => document.getElementById(id);
 const P = {};
-const tune = [['tScheme','oScheme','scheme',v=>v ? 'Twin-stick (experimental)' : 'Triggers'],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tSboost','oSboost','sboost',v=>v.toFixed(2)+'×'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tVstep','oVstep','vstep',v=>v.toFixed(0)],['tVslow','oVslow','vslow',v=>v.toFixed(0)],['tVfast','oVfast','vfast',v=>v.toFixed(0)],['tVhill','oVhill','vhill',v=>v.toFixed(1)],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tSa0','oSa0','sa0',v=>v.toFixed(0)],['tSa45','oSa45','sa45',v=>v.toFixed(0)],['tSa90','oSa90','sa90',v=>v.toFixed(0)],['tSlen','oSlen','slen',v=>v.toFixed(2)],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tBuild','oBuild','build',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
+const tune = [['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tSboost','oSboost','sboost',v=>v.toFixed(2)+'×'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tVstep','oVstep','vstep',v=>v.toFixed(0)],['tVslow','oVslow','vslow',v=>v.toFixed(0)],['tVfast','oVfast','vfast',v=>v.toFixed(0)],['tVhill','oVhill','vhill',v=>v.toFixed(1)],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tSa0','oSa0','sa0',v=>v.toFixed(0)],['tSa45','oSa45','sa45',v=>v.toFixed(0)],['tSa90','oSa90','sa90',v=>v.toFixed(0)],['tSlen','oSlen','slen',v=>v.toFixed(2)],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tBuild','oBuild','build',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
   ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tOffglide','oOffglide','offglide',v=>v.toFixed(0)+'%'],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -320,6 +319,7 @@ const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
 // show the tuning panel, so they could be stuck on stale values with no way to see them. that store is dropped.)
 let saved = {}; try { saved = JSON.parse(localStorage.getItem('skate-tuning-2') || '{}'); localStorage.removeItem('skate-tuning'); } catch (e) {}
 const saveTuning = () => { try { const o = {}; tune.forEach(([i]) => { if ($(i).value !== DEFAULTS[i]) o[i] = $(i).value; }); localStorage.setItem('skate-tuning-2', JSON.stringify(o)); } catch (e) {} };
+P.scheme = 1;   // one controller scheme: sticks stroke, triggers kick, both at once (the old triggers-only scheme is gone)
 tune.forEach(([i,o,k,f]) => {
   const el = $(i);
   if (saved[i] !== undefined) el.value = saved[i];
@@ -889,7 +889,7 @@ function enterMode(m, push = true){
   legFlash.L = legFlash.R = 0.6;
 }
 function exitMode(){ mode = null; }   // both skis stay down until your next stroke
-// ---- the same actions for every input (keyboard, triggers scheme, twin-stick)
+// ---- the same actions for every input (keyboard, controller, touch)
 // snow plow is held: it starts when the input goes down and ends when it's let go, returning you to classic if
 // that's where you plowed from, otherwise to skating
 // (src says which input is holding the plow, so letting go of one input doesn't cancel a plow another is holding)
@@ -1103,26 +1103,9 @@ function pollPad(){
   padAxes = [gp.axes[0] || 0, gp.axes[1] || 0, gp.axes[2] || 0, gp.axes[3] || 0];
   padTriggers = [trig(6), trig(7)];
   if (padAxes.some(v => Math.abs(v) > 0.15) || gp.buttons.some(b => b && (b.pressed || b.value > 0.1))){ anyInputAt = performance.now(); lastDevice = 'pad'; }
-  if (P.scheme === 1){ pollTwin(gp); return; }
-  // triggers scheme: A switches between skating and classic, LB or RB double poles (classic)
-  bumperPole(trig);
-  const rb = trig(0);
-  if (rb > 0.5 && !padRB){ padRB = true; toggleClassic(); }
-  else if (rb < 0.3) padRB = false;
-  const ax0 = gp.axes && gp.axes.length > 0 ? gp.axes[0] : 0, ay = gp.axes && gp.axes.length > 1 ? gp.axes[1] : 0;
-  // left stick: hold down for snow plow (both modes); in classic, flick up to double pole and tilt left/right to steer
-  if (mode === 'classic' || mode === 'tuck') lean = Math.abs(ax0) < 0.15 ? 0 : Math.max(-1, Math.min(1, ax0 / 0.6));
-  if (ay >= 0.6) setPlow(true, 'pad');
-  else if (ay < 0.3) setPlow(false, 'pad');
-  if (ay <= -0.6) setTuck(true, 'pad');                                   // classic only: hold the left stick up to tuck
-  else if (ay > -0.35) setTuck(false, 'pad');
-  for (const [leg, i] of [['L', 6], ['R', 7]]){
-    const v = trig(i);
-    if (!padDown[leg] && v >= PAD_ON){ padDown[leg] = true; kickInput(leg); }
-    else if (padDown[leg] && v <= PAD_OFF){ padDown[leg] = false; release(leg); }
-  }
+  pollTwin(gp);
 }
-// ---- experimental twin-stick scheme: each stick is one leg.
+// ---- the controller: each stick is one leg (triggers kick too; see pollTwin).
 // load: pull the stick down and in (about 45°) to sink onto that ski. throw: drive it up and out to push off and
 // send your weight onto the other ski. the line from the load point to the throw point is the stroke: its angle
 // steers where the new ski is placed (45° up-and-out keeps you straight), its length sets the power.
@@ -3868,7 +3851,7 @@ addEventListener('keydown', e => { if (e.key === '`' && !e.repeat){ e.preventDef
 const chip = t => '<span class="chip">' + t + '</span>';
 function renderPadPanel(){
   const twinScheme = P.scheme === 1;
-  $('padScheme').textContent = twinScheme ? 'Twin-stick scheme' : 'Triggers scheme';
+  $('padScheme').textContent = 'Sticks stroke, triggers kick';
   const rows = twinScheme ? {
     Skate: [
       [chip('LT') + ' ' + chip('RT'), 'Kick left / right · hold to glide'],
@@ -3909,11 +3892,6 @@ function renderPadPanel(){
 $('padBtn').addEventListener('click', () => {
   const open = $('padPanel').hidden; $('padPanel').hidden = !open; $('padBtn').setAttribute('aria-expanded', String(open));
   if (open) renderPadPanel();
-});
-$('tScheme').addEventListener('input', () => {
-  // switching scheme lets go of anything the other scheme's sticks were holding
-  setPlow(false, 'pad'); setPlow(false, 'twin'); setTuck(false, 'pad'); setTuck(false, 'twin');
-  if (!$('padPanel').hidden) renderPadPanel();
 });
 
 

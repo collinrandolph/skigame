@@ -474,6 +474,7 @@ function ground(x, y){
 // what can't be crossed, as a signed distance in metres: negative inside an obstacle
 let gateOpen = false, gate2Open = false;
 let SOLIDS = [];           // round footprints of the outpost's buildings (filled in once they're placed)
+let MOOSE = [];            // the tentacle moose wandering zones 2 and 3 (they're solid too)
 function obstacleSD(x, y){
   // zone 1's mountains, with the east pass carved through them
   const dx = x - RING.x, dy = y - RING.y, r = Math.hypot(dx, dy), th = Math.atan2(dy, dx);
@@ -504,6 +505,7 @@ function obstacleSD(x, y){
   d = Math.min(d, x - WORLD.x0 - EDGE_WALL, WORLD.x1 - EDGE_WALL - x, y - WORLD.y0 - EDGE_WALL, WORLD.y1 - EDGE_WALL - y);
   // buildings and equipment
   for (const o of SOLIDS){ const q = Math.hypot(x - o.x, y - o.y) - o.r; if (q < d) d = q; }
+  for (const m of MOOSE){ const q = Math.hypot(x - m.x, y - m.y) - 1.4; if (q < d) d = q; }
   return d;
 }
 const BODY_R = 0.35;
@@ -2500,6 +2502,140 @@ function mergeModel(src){
   }
 }
 
+// ---- tentacle moose: six-legged, purple, a beard of tentacles. each walks back and forth along its own path a
+// little way off a trail, turning round at the ends. one roams zone 2, ten roam zone 3. they're solid, so you have
+// to go round them, and they're only animated while you're near enough to see them.
+const MOOSE_MAT = {
+  hide: lam(0x7b3fa3), dark: lam(0x562a73), belly: lam(0x9a63c2), tent: lam(0xa868d0), tip: lam(0xd7a8f0),
+  antler: lam(0x4c335f), eye: new THREE.MeshBasicMaterial({ color: 0xf6e27a }),
+};
+for (const k of ['hide', 'dark', 'belly', 'tent', 'tip', 'antler']) MOOSE_MAT[k].flatShading = true;
+const MG = {
+  ball: new THREE.SphereGeometry(1, 14, 10), small: new THREE.SphereGeometry(1, 8, 6),
+  thigh: (() => { const g = new THREE.CylinderGeometry(0.17, 0.12, 1.0, 7); g.translate(0, -0.5, 0); return g; })(),
+  shin: (() => { const g = new THREE.CylinderGeometry(0.11, 0.07, 1.0, 7); g.translate(0, -0.5, 0); return g; })(),
+  hoof: new THREE.CylinderGeometry(0.1, 0.14, 0.14, 7),
+  seg: [0.085, 0.07, 0.057, 0.045, 0.034, 0.024].map((r, i, a) => { const g = new THREE.CylinderGeometry(a[i + 1] ?? r*0.7, r, 0.36, 6); g.translate(0, -0.15, 0); return g; /* a little longer than the joint spacing, so bends don't open gaps */ }),
+  tine: new THREE.ConeGeometry(0.07, 0.5, 5), beam: new THREE.CylinderGeometry(0.07, 0.09, 0.7, 6),
+};
+function mpart(parent, geo, mat, x, y, z, sx = 1, sy = 1, sz = 1){ const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); parent.add(m); return m; }
+function buildMoose(){
+  // faces -z (north) at rotation 0, like the skier; feet on y = 0
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  mpart(body, MG.ball, MOOSE_MAT.hide, 0, 2.1, 0.1, 0.85, 0.8, 1.65);          // barrel
+  mpart(body, MG.ball, MOOSE_MAT.belly, 0, 1.8, 0.1, 0.7, 0.55, 1.4);
+  mpart(body, MG.ball, MOOSE_MAT.hide, 0, 2.6, -0.85, 0.7, 0.65, 0.8);        // shoulder hump
+  mpart(body, MG.ball, MOOSE_MAT.dark, 0, 2.3, 1.55, 0.35, 0.3, 0.3);          // stubby tail
+  const head = new THREE.Group(); head.position.set(0, 2.75, -1.7); body.add(head);
+  { const n = mpart(head, MG.ball, MOOSE_MAT.hide, 0, 0, -0.35, 0.38, 0.42, 0.65); n.rotation.x = 0.5; }   // neck
+  mpart(head, MG.ball, MOOSE_MAT.hide, 0, 0.15, -0.95, 0.4, 0.45, 0.6);       // skull
+  mpart(head, MG.ball, MOOSE_MAT.dark, 0, -0.15, -1.5, 0.32, 0.32, 0.45);     // long drooping muzzle
+  for (const sx of [-1, 1]) mpart(head, MG.small, MOOSE_MAT.eye, sx*0.3, 0.3, -1.12, 0.07, 0.07, 0.07);
+  for (const sx of [-1, 1]){
+    // palmate antlers: a beam out to a broad flat palm with tines round its edge
+    const a = new THREE.Group();
+    const bm = mpart(a, MG.beam, MOOSE_MAT.antler, sx*0.3, 0.2, 0); bm.rotation.z = -sx*1.0;
+    const palm = mpart(a, MG.ball, MOOSE_MAT.antler, sx*0.85, 0.45, 0.05, 0.7, 0.08, 0.45); palm.rotation.z = sx*0.35;
+    for (let k = 0; k < 5; k++){ const t = mpart(a, MG.tine, MOOSE_MAT.antler, sx*(0.4 + k*0.25), 0.75 + Math.sin(k)*0.1, -0.25 + k*0.12); t.rotation.z = -sx*0.25; }
+    const merged = mergeModel(a); merged.position.set(sx*0.28, 0.5, -0.85); merged.rotation.z = -sx*0.5; head.add(merged);   // one mesh per antler
+  }
+  // the beard: tentacles hanging from the muzzle and jaw, each a chain of tapering segments
+  const tentacles = [];
+  const tentacle = (parent, x, y, z, n, phase) => {
+    let p = parent; const segs = [];
+    for (let k = 0; k < n; k++){
+      const g = new THREE.Group(); g.position.set(k ? 0 : x, k ? -0.3 : y, k ? 0 : z); p.add(g);
+      mpart(g, MG.seg[Math.min(k, MG.seg.length - 1)], k >= n - 2 ? MOOSE_MAT.tip : MOOSE_MAT.tent, 0, 0, 0);
+      segs.push(g); p = g;
+    }
+    tentacles.push({ segs, phase });
+  };
+  for (let k = 0; k < 6; k++){ const a = (k/5 - 0.5)*2.2; tentacle(head, Math.sin(a)*0.26, -0.38, -1.55 + Math.cos(a)*0.22, 4 + (k % 3), k*0.9); }
+  for (const sx of [-1, 1]) tentacle(body, sx*0.35, 1.45, -0.6, 4, sx*2);         // two on the chest
+  tentacle(body, 0, 2.2, 1.75, 4, 5);                                            // and one for a tail
+  // six legs in three pairs; each a hip joint, thigh, knee joint, shin and hoof
+  const legs = [];
+  for (const [z, sx, set] of [[-0.95, -1, 0], [-0.95, 1, 1], [0.1, -1, 1], [0.1, 1, 0], [1.1, -1, 0], [1.1, 1, 1]]){
+    const hip = new THREE.Group(); hip.position.set(sx*0.55, 2.0, z); body.add(hip);
+    mpart(hip, MG.thigh, MOOSE_MAT.dark, 0, 0, 0);
+    const knee = new THREE.Group(); knee.position.set(0, -1.0, 0); hip.add(knee);
+    mpart(knee, MG.shin, MOOSE_MAT.dark, 0, 0, 0);
+    mpart(knee, MG.hoof, MOOSE_MAT.antler, 0, -1.0, 0);
+    legs.push({ hip, knee, set });
+  }
+  scene.add(root);
+  return { root, body, head, legs, tentacles };
+}
+// paths: a stretch of trail, offset to one side, kept clear of the trails themselves and of anything solid
+{
+  let seed = 31337; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const want = { 2: 1, 3: 10 };
+  for (const z of [2, 3]){
+    const zt = TRAILS.filter(t => t.zone === z);
+    for (let n = 0, tries = 0; n < want[z] && tries < 400; tries++){
+      const t = zt[(rnd()*zt.length) | 0], p = t.s, N = p.length/2, len = 50 + rnd()*50 | 0;
+      if (N < len + 4) continue;
+      const i0 = 2 + ((rnd()*(N - len - 4)) | 0), side = rnd() < 0.5 ? -1 : 1, off = 9 + rnd()*6;
+      const path = []; let bad = false;
+      for (let i = i0; i < i0 + len && !bad; i++){
+        const dx = p[i*2+2] - p[i*2-2], dy = p[i*2+3] - p[i*2-1], L = Math.hypot(dx, dy) || 1;
+        const x = p[i*2] - dy/L*off*side, y = p[i*2+1] + dx/L*off*side;
+        if (obstacleSD(x, y) < 3 || nearestTrail(x, y).d < 6.5 || zoneAt(x, y) !== z) bad = true;
+        if (path.length){ const q = path[path.length - 1]; const st = Math.hypot(x - q[0], y - q[1]); if (st < 0.3 || Math.abs(height(x, y) - height(q[0], q[1])) / st > 0.4) bad = true; }
+        path.push([x, y]);
+      }
+      if (bad || MOOSE.some(m => Math.hypot(m.path[0][0] - path[0][0], m.path[0][1] - path[0][1]) < 30)) continue;
+      // arc length along the path, for walking it at a steady pace
+      const cum = [0]; for (let k = 1; k < path.length; k++) cum.push(cum[k-1] + Math.hypot(path[k][0] - path[k-1][0], path[k][1] - path[k-1][1]));
+      MOOSE.push({ path, cum, len: cum[cum.length - 1], s: rnd()*cum[cum.length - 1], dir: rnd() < 0.5 ? 1 : -1, speed: 1.0 + rnd()*0.5,
+                   x: path[0][0], y: path[0][1], th: 0, turn: 0, gait: rnd()*10, zone: z, rig: null });
+      n++;
+    }
+  }
+  for (const m of MOOSE) m.rig = buildMoose();
+}
+function mooseAt(m, s){
+  // position and heading at arc length s along the path
+  let k = 1; while (k < m.cum.length - 1 && m.cum[k] < s) k++;
+  const a = m.path[k-1], b = m.path[k], u = (s - m.cum[k-1]) / Math.max(1e-6, m.cum[k] - m.cum[k-1]);
+  return [a[0] + (b[0] - a[0])*u, a[1] + (b[1] - a[1])*u, Math.atan2(b[0] - a[0], -(b[1] - a[1]))];
+}
+function updateMoose(dt){
+  const now = performance.now()/1000;
+  for (const m of MOOSE){
+    // walk; at either end stop and turn round on the spot
+    let stepping = 0;
+    if (m.turn > 0){ m.turn -= dt; stepping = 0.35; }
+    else {
+      m.s += m.dir * m.speed * dt; stepping = m.speed;
+      if (m.s >= m.len || m.s <= 0){ m.s = Math.max(0, Math.min(m.len, m.s)); m.dir = -m.dir; m.turn = 2.4; }
+    }
+    const [x, y, th0] = mooseAt(m, Math.max(0.01, Math.min(m.len - 0.01, m.s)));
+    const want = m.dir > 0 ? th0 : th0 + Math.PI;
+    let d = want - m.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI;
+    m.th += d * Math.min(1, dt * (m.turn > 0 ? 1.4 : 3));
+    m.x = x; m.y = y; m.gait += stepping * dt;
+    const r = m.rig, far = Math.hypot(x - S.x, y - S.y) > 150;
+    r.root.visible = !far; if (far) continue;
+    r.root.position.set(x, height(x, y), y); r.root.rotation.y = -m.th;
+    // tripod gait: two sets of three legs swing alternately; the swinging set lifts at the knee
+    const ph = m.gait / 1.7 * Math.PI*2, amp = Math.min(1, stepping) * 0.42;
+    for (const L of r.legs){
+      const q = ph + (L.set ? Math.PI : 0);
+      L.hip.rotation.x = amp * Math.sin(q);
+      L.knee.rotation.x = -Math.max(0, Math.cos(q)) * amp * 1.5;
+    }
+    r.body.position.y = Math.abs(Math.sin(ph)) * 0.06 * Math.min(1, stepping);
+    r.head.rotation.x = 0.06*Math.sin(ph*2) + 0.08*Math.sin(now*0.7 + m.gait);
+    r.head.rotation.y = 0.15*Math.sin(now*0.4 + m.s*0.1);
+    // tentacles curl and sway, more so while it walks
+    for (const T of r.tentacles) T.segs.forEach((g, k) => {
+      g.rotation.x = (0.22 + 0.1*stepping) * Math.sin(now*1.9 + T.phase + k*0.7) + 0.12;
+      g.rotation.z = 0.2 * Math.sin(now*1.3 + T.phase*1.7 + k*0.5);
+    });
+  }
+}
+
 // skier: a simple jointed figure built from boxes and cylinders, posed every frame from the game state. the pose is
 // for looks only and never feeds back into movement. the heading arrow sits on the snow in front.
 const skier = new THREE.Group(); scene.add(skier);              // holds the heading arrow (camera direction)
@@ -3133,6 +3269,9 @@ function drawMinimap(){
     for (let i = 2; i < t.s.length; i += 2) ctx.lineTo(mX(t.s[i]), mY(t.s[i+1]));
     ctx.stroke();
   }
+  // the moose, as purple dots
+  ctx.fillStyle = '#8e4fbf';
+  for (const m of MOOSE){ ctx.beginPath(); ctx.arc(mX(m.x), mY(m.y), 2.2, 0, Math.PI*2); ctx.fill(); }
   // buildings, as small grey blocks (the key ones larger)
   ctx.fillStyle = C.muted;
   for (const o of STRUCTS){ const q = o.key ? 4 : 2.4; ctx.fillRect(mX(o.x) - q/2, mY(o.y) - q/2, q, q); }
@@ -3338,7 +3477,7 @@ function camTarget(){
 }
 function loop(t){
   const dt = Math.min(0.05, (t-last)/1000); last = t; pollPad(); step(dt);
-  updateTiles(); updateOrbs(dt); animateGate(dt);
+  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt);
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through
   const w = 3 / Math.max(0.05, P.cam);
@@ -3350,7 +3489,7 @@ function loop(t){
   draw(); hud(); requestAnimationFrame(loop);
 }
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

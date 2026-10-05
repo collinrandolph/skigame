@@ -475,6 +475,7 @@ function ground(x, y){
 let gateOpen = false, gate2Open = false;
 let SOLIDS = [];           // round footprints of the outpost's buildings (filled in once they're placed)
 let MOOSE = [];            // the tentacle moose wandering zones 2 and 3 (they're solid too)
+let NPCS = [];             // people and natives, standing or walking loops (solid, small)
 function obstacleSD(x, y){
   // zone 1's mountains, with the east pass carved through them
   const dx = x - RING.x, dy = y - RING.y, r = Math.hypot(dx, dy), th = Math.atan2(dy, dx);
@@ -506,6 +507,7 @@ function obstacleSD(x, y){
   // buildings and equipment
   for (const o of SOLIDS){ const q = Math.hypot(x - o.x, y - o.y) - o.r; if (q < d) d = q; }
   for (const m of MOOSE){ const q = Math.hypot(x - m.x, y - m.y) - 1.4; if (q < d) d = q; }
+  for (const n of NPCS){ const q = Math.hypot(x - n.x, y - n.y) - 0.45; if (q < d) d = q; }
   return d;
 }
 const BODY_R = 0.35;
@@ -2636,6 +2638,145 @@ function updateMoose(dt){
   }
 }
 
+// ---- people. outpost crews and settlers (zones 1-3) in parkas, and the short blue robed natives of zone 3 with their
+// long ears and trailing robes. some stand about near buildings, ruins and camps; others walk slow loops around them.
+// like the moose they're solid, and only drawn and animated near you.
+const NPC_MAT = {
+  skin: lam(0xe2b79c), skin2: lam(0xa9785b), pants: lam(0x2b3340), boot: lam(0x1d2229), pack: lam(0x5d6b80),
+  parka: [0xe8862a, 0x4d7aa6, 0xc8452c, 0x6f93b8, 0x8a9a5b, 0xd6dde5, 0x7b5a3c].map(c => lam(c)),
+  hat: [0x2f3a46, 0xe8862a, 0xc8452c, 0xdfe5ec].map(c => lam(c)),
+  alien: lam(0x4f86c9), alien2: lam(0x3b6ea8), robe: lam(0x6b4a2e), robe2: lam(0x553a23), sash: lam(0xb08a4a),
+  eye: new THREE.MeshBasicMaterial({ color: 0x0f1d2b }),
+};
+for (const k of ['robe', 'robe2', 'alien', 'alien2']) NPC_MAT[k].flatShading = true;
+const NG = {
+  ball: new THREE.SphereGeometry(1, 12, 9), leg: (() => { const g = new THREE.CylinderGeometry(0.075, 0.06, 0.86, 7); g.translate(0, -0.43, 0); return g; })(),
+  arm: (() => { const g = new THREE.CylinderGeometry(0.06, 0.05, 0.6, 7); g.translate(0, -0.3, 0); return g; })(),
+  sleeve: (() => { const g = new THREE.CylinderGeometry(0.06, 0.12, 0.5, 8); g.translate(0, -0.25, 0); return g; })(),
+  torso: new THREE.CylinderGeometry(0.2, 0.25, 0.62, 10), boot: new THREE.BoxGeometry(0.13, 0.1, 0.24),
+  robe: new THREE.ConeGeometry(0.42, 1.0, 12), ear: (() => { const g = new THREE.ConeGeometry(0.035, 0.42, 6); g.translate(0, 0.21, 0); return g; })(),
+};
+function npart(parent, geo, mat, x, y, z, sx = 1, sy = 1, sz = 1){ const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); parent.add(m); return m; }
+function buildHuman(rnd){
+  // ~1.8 m tall, facing -z; parka, beanie, some with a backpack
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const parka = NPC_MAT.parka[(rnd()*NPC_MAT.parka.length) | 0], skin = rnd() < 0.5 ? NPC_MAT.skin : NPC_MAT.skin2;
+  const legs = [-1, 1].map(sx => { const h = new THREE.Group(); h.position.set(sx*0.11, 0.9, 0); body.add(h); npart(h, NG.leg, NPC_MAT.pants, 0, 0, 0); npart(h, NG.boot, NPC_MAT.boot, 0, -0.86, -0.05); return h; });
+  npart(body, NG.torso, parka, 0, 1.22, 0);
+  npart(body, NG.ball, parka, 0, 1.52, 0, 0.24, 0.1, 0.17);                     // shoulders
+  const head = new THREE.Group(); head.position.set(0, 1.66, 0); body.add(head);
+  npart(head, NG.ball, skin, 0, 0, 0, 0.115, 0.13, 0.12);
+  npart(head, NG.ball, NPC_MAT.hat[(rnd()*NPC_MAT.hat.length) | 0], 0, 0.05, 0.01, 0.125, 0.1, 0.13);
+  if (rnd() < 0.45) npart(body, new THREE.BoxGeometry(0.3, 0.38, 0.16), NPC_MAT.pack, 0, 1.25, 0.2);
+  const arms = [-1, 1].map(sx => { const s = new THREE.Group(); s.position.set(sx*0.25, 1.5, 0); s.rotation.z = sx*0.12; body.add(s); npart(s, NG.arm, parka, 0, 0, 0); npart(s, NG.ball, NPC_MAT.pants, 0, -0.62, 0, 0.055, 0.055, 0.055); return s; });
+  scene.add(root);
+  return { root, body, head, legs, arms };
+}
+function buildAlien(rnd){
+  // ~1.3 m: a long brown robe whose train drags behind, a blue head with long swept-back ears
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  npart(body, NG.robe, rnd() < 0.5 ? NPC_MAT.robe : NPC_MAT.robe2, 0, 0.5, 0);
+  const train = new THREE.Group(); train.position.set(0, 0.04, 0.15); body.add(train);
+  npart(train, NG.ball, NPC_MAT.robe2, 0, 0, 0.55, 0.36, 0.05, 0.75);           // the hem trailing over the snow
+  npart(train, NG.ball, NPC_MAT.robe2, 0, 0.02, 1.15, 0.24, 0.035, 0.4);
+  npart(body, NG.ball, NPC_MAT.robe, 0, 0.98, 0, 0.24, 0.16, 0.22);             // mantle over the shoulders
+  npart(body, NG.ball, NPC_MAT.sash, 0, 0.72, 0, 0.27, 0.035, 0.25);
+  const head = new THREE.Group(); head.position.set(0, 1.17, -0.02); body.add(head);
+  const skin = rnd() < 0.6 ? NPC_MAT.alien : NPC_MAT.alien2;
+  npart(head, NG.ball, skin, 0, 0, 0, 0.14, 0.17, 0.14);
+  for (const sx of [-1, 1]){
+    npart(head, NG.ball, NPC_MAT.eye, sx*0.055, 0.02, -0.125, 0.03, 0.04, 0.02);
+    const ear = npart(head, NG.ear, skin, sx*0.12, 0.03, 0.02); ear.rotation.set(0.55, 0, -sx*1.15);   // long, out and swept back
+  }
+  npart(head, NG.ball, NPC_MAT.robe2, 0, 0.06, 0.09, 0.15, 0.13, 0.1);           // a hood fallen back
+  const arms = [-1, 1].map(sx => { const s = new THREE.Group(); s.position.set(sx*0.2, 0.98, 0); s.rotation.z = sx*0.18; body.add(s); npart(s, NG.sleeve, NPC_MAT.robe, 0, 0, 0); npart(s, NG.ball, skin, 0, -0.52, 0, 0.045, 0.05, 0.045); return s; });
+  scene.add(root);
+  return { root, body, head, arms, train, ears: head.children.filter(c => c.geometry === NG.ear) };
+}
+{
+  let seed = 2026; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const clear = (x, y) => obstacleSD(x, y) > 0.9 && nearestTrail(x, y).d > 3.2;
+  const facing = (x, y, tx, ty) => Math.atan2(tx - x, -(ty - y));
+  const stand = (kind, s, zone) => {
+    for (let k = 0; k < 14; k++){
+      const a = rnd()*Math.PI*2, d = (s.solids ? 3 : s.r*0.72) + 1.0 + rnd()*2.5, x = s.x + Math.cos(a)*d, y = s.y + Math.sin(a)*d;
+      if (!clear(x, y)) continue;
+      NPCS.push({ kind, mode: 'stand', x, y, th: facing(x, y, s.x, s.y) + (rnd() - 0.5)*1.6, ph: rnd()*10, zone }); return;
+    }
+  };
+  const loop = (kind, s, zone, speed) => {
+    const base = s.solids ? 6 : s.r*0.72;
+    for (const R of [base + 2.5, base + 4.5, base + 7]){
+      let ok = true; const cx = s.x + (rnd() - 0.5)*2, cy = s.y + (rnd() - 0.5)*2;
+      for (let k = 0; k < 32 && ok; k++){
+        const a = k/32*Math.PI*2, b = (k + 1)/32*Math.PI*2;
+        const x = cx + Math.cos(a)*R, y = cy + Math.sin(a)*R, x2 = cx + Math.cos(b)*R, y2 = cy + Math.sin(b)*R;
+        if (!clear(x, y) || Math.abs(height(x, y) - height(x2, y2)) > 0.45 * Math.hypot(x2 - x, y2 - y)) ok = false;
+      }
+      if (!ok) continue;
+      NPCS.push({ kind, mode: 'loop', cx, cy, R, a: rnd()*Math.PI*2, dir: rnd() < 0.5 ? 1 : -1, speed, x: cx + R, y: cy, th: 0, ph: rnd()*10, zone }); return;
+    }
+  };
+  for (const s of STRUCTS){
+    if (RUINS.has(s.kind)){
+      // the natives keep to the ruins: two walking round the big ones, one or two standing, one by a shard now and then
+      if (s.kind === 'shard'){ if (rnd() < 0.5) stand('alien', s, 3); continue; }
+      loop('alien', s, 3, 0.65); if (s.kind !== 'arch') loop('alien', s, 3, 0.55);
+      stand('alien', s, 3); if (rnd() < 0.6) stand('alien', s, 3);
+      continue;
+    }
+    // people: someone standing by most buildings and camps, and walkers circling the key buildings and the camps
+    if (rnd() < (s.zone === 3 ? 0.95 : 0.6)) stand('human', s, s.zone);
+    if ((s.key || CAMPS.has(s.kind)) && rnd() < 0.75) loop('human', s, s.zone, 1.0 + rnd()*0.35);
+    if (s.kind === 'shacks') stand('human', s, 3);
+  }
+  for (const n of NPCS) n.rig = n.kind === 'alien' ? buildAlien(rnd) : buildHuman(rnd);
+}
+function updateNPCs(dt){
+  const now = performance.now()/1000;
+  for (const n of NPCS){
+    if (n.mode === 'loop'){
+      n.a += n.dir * n.speed / n.R * dt;
+      n.x = n.cx + Math.cos(n.a)*n.R; n.y = n.cy + Math.sin(n.a)*n.R;
+      n.th = Math.atan2(-Math.sin(n.a)*n.dir, -Math.cos(n.a)*n.dir);
+      n.ph += n.speed * dt;
+    }
+    const r = n.rig, far = Math.hypot(n.x - S.x, n.y - S.y) > 110;
+    r.root.visible = !far; if (far) continue;
+    r.root.position.set(n.x, height(n.x, n.y), n.y); r.root.rotation.y = -n.th;
+    const walking = n.mode === 'loop';
+    if (n.kind === 'human'){
+      const q = n.ph / 1.35 * Math.PI*2;
+      if (walking){
+        r.legs[0].rotation.x = 0.5*Math.sin(q); r.legs[1].rotation.x = -0.5*Math.sin(q);
+        r.arms[0].rotation.x = -0.4*Math.sin(q); r.arms[1].rotation.x = 0.4*Math.sin(q);
+        r.body.position.y = Math.abs(Math.cos(q))*0.04;
+        r.head.rotation.y = 0.2*Math.sin(now*0.5 + n.ph);
+      } else {
+        // standing about: weight shifting, looking around, now and then a wave or a point
+        const look = Math.sin(now*0.35 + n.ph*3);
+        r.head.rotation.y = 0.8*look*look*look; r.body.rotation.z = 0.025*Math.sin(now*0.6 + n.ph);
+        const gesture = Math.max(0, Math.sin(now*0.23 + n.ph*7) - 0.85) * 6.6;   // a short raise of the arm every so often
+        r.arms[1].rotation.x = -1.6*gesture; r.arms[0].rotation.x = 0.05*Math.sin(now + n.ph);
+      }
+    } else {
+      // natives glide: the robe hides the steps, so the body sways and bobs, the train swishes behind
+      const q = n.ph / 0.9 * Math.PI*2;
+      if (walking){
+        r.body.position.y = Math.abs(Math.sin(q))*0.03; r.body.rotation.z = 0.05*Math.sin(q);
+        r.train.rotation.y = 0.12*Math.sin(q*0.5); r.train.rotation.x = -0.04 + 0.03*Math.sin(q);
+        r.arms[0].rotation.x = 0.25*Math.sin(q); r.arms[1].rotation.x = -0.25*Math.sin(q);
+      } else {
+        r.body.rotation.z = 0.03*Math.sin(now*0.5 + n.ph); r.train.rotation.y = 0.05*Math.sin(now*0.3 + n.ph);
+        r.arms[0].rotation.x = -0.5; r.arms[1].rotation.x = -0.5;              // hands folded in the sleeves
+      }
+      r.head.rotation.y = 0.5*Math.sin(now*0.3 + n.ph*2);
+      const tw = Math.max(0, Math.sin(now*1.7 + n.ph*5) - 0.9) * 4;            // the odd ear twitch
+      r.ears.forEach((e, i) => { e.rotation.x = 0.55 + tw*0.4*(i ? 1 : -1); });
+    }
+  }
+}
+
 // skier: a simple jointed figure built from boxes and cylinders, posed every frame from the game state. the pose is
 // for looks only and never feeds back into movement. the heading arrow sits on the snow in front.
 const skier = new THREE.Group(); scene.add(skier);              // holds the heading arrow (camera direction)
@@ -3477,7 +3618,7 @@ function camTarget(){
 }
 function loop(t){
   const dt = Math.min(0.05, (t-last)/1000); last = t; pollPad(); step(dt);
-  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt);
+  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt);
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through
   const w = 3 / Math.max(0.05, P.cam);
@@ -3489,7 +3630,7 @@ function loop(t){
   draw(); hud(); requestAnimationFrame(loop);
 }
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

@@ -626,6 +626,8 @@ const TRAILS = [
   { name:'Crystal Gate',     diff:'blue',   zone:0, pts:[[175,364],[150,392],[124,420],[104,446],[G4.x,G4.y],[G4.x,G4.y + 30]] },
   { name:'Frost Road',       diff:'blue',   zone:4, pts:[[G4.x,G4.y + 30],[130,530],[176,520],[214,548],[204,586],[250,610],[300,590],[345,616],[360,660],[322,690],[272,676],[226,700],[170,688],[130,660],[80,676],[40,640],[56,600],[20,566],[46,530],[G4.x,G4.y + 30]] },
   { name:'Herd Trail',       diff:'green',  zone:4, pts:[[226,700],[238,716],[262,722],[282,716]] },
+  // across the middle of Frost Road's loop, through the lawn round the sleeping giant
+  { name:"Giant's Way",      diff:'green',  zone:4, pts:[[56,600],[84,584],[112,572],[140,566],[168,568],[190,576],[204,586]] },
 ];
 for (const t of TRAILS) if (t.zone === undefined) t.zone = 1;   // trails carry their zone's orbs; zone 0 = connectors
 const JUNCTIONS = [
@@ -1097,8 +1099,10 @@ function kick(leg, opt = {}){
   const other = leg === 'L' ? 'R' : 'L';
   const o = lastSki[other];
   // re-set it unless it's already a gliding ski from the last stride. after coasting or a stop both skis sit
-  // straight and parallel, and keeping that one meant the first push ran straight instead of out at the skate angle
-  if (!o || !o.live || !o.glide || streak > 1){
+  // straight and parallel, and keeping that one meant the first push ran straight instead of out at the skate angle.
+  // a same-side kick is always a kick turn, however long after the last one: the ski you ride is re-set along the new
+  // heading every time (a slow one just restarts the build at the base turn), or you'd ride the old line straight on
+  if (!o || !o.live || !o.glide || sameSide){
     if (o) o.live = false;
     lastSki[other] = newSki(side, S.tgt + side * sp*Math.PI/180, ...footAt(side, S.tgt));   // tail under that foot, tip splayed out
     lastSki[other].glide = true;
@@ -2083,19 +2087,13 @@ function apronOff(x, y){ const e = lawnSD(x, y); return e <= -0.5 ? 0 : e >= 0 ?
 // ---- zone 4: purple crystal outcrops scattered over the snowfields (just rock, no glow), and at the far southern
 // end, a herd of purple moose: adults and antlerless calves, some asleep in the snow
 const HERD_C = { x: 312, y: 730 };
-// the giant: a moose as big as the skeleton by the lake, asleep in the middle of Frost Road's loop. its spot is the
-// clearest ground near the loop's centre, well away from the trail
-const GIANT = (() => {
-  const p = TRAILS.find(t => t.name === 'Frost Road').pts.slice(1, -1);
-  const cx = p.reduce((a, q) => a + q[0], 0)/p.length, cy = p.reduce((a, q) => a + q[1], 0)/p.length;
-  let best = { x: cx, y: cy }, bs = -Infinity;
-  for (let r = 0; r <= 40; r += 4) for (let k = 0, n = Math.max(1, r); k < n; k++){
-    const a = k/n*2*Math.PI, x = cx + Math.cos(a)*r, y = cy + Math.sin(a)*r;
-    const sc = Math.min(nearestTrail(x, y).d - 8, obstacleSD(x, y, true)) - r*0.3;
-    if (sc > bs){ bs = sc; best = { x, y }; }
-  }
-  return { ...best, rot: 2.3 };
-})();
+// the giant: a moose as big as the skeleton by the lake, asleep in the middle of Frost Road's loop (rot turns it so its
+// body lies off to the south-west of this anchor). Giant's Way crosses the loop past it, through a broad lawn
+const GIANT = { x: 147.6, y: 603.5, rot: 2.3 };
+{
+  const x = 137, y = 614, R = 46;           // the lawn: centred on the body, its north side taking in Giant's Way
+  LAWN_PARTS.push({ kind: 'lawn', x, y, R, ph: [0.7, 2.9, 4.4], wob: [0.09, 0.05, 0.03], bx: [x - R*1.25, y - R*1.25, x + R*1.25, y + R*1.25] });
+}
 // herds strung along Frost Road, each straddling the trail so you ski right through the middle of them
 const HERD_SITES = (() => {
   const s = TRAILS.find(t => t.name === 'Frost Road').s, cum = [0];

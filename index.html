@@ -1619,7 +1619,7 @@ const renderer = new THREE.WebGLRenderer({ canvas: glc, antialias: true });
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, 1, 0.3, 600);
 scene.fog = new THREE.Fog(0xffffff, 55, 270);
-const hemi = new THREE.HemisphereLight(0xffffff, 0x8a9bb0, 0.75); scene.add(hemi);
+const hemi = new THREE.HemisphereLight(0xffffff, 0xa8c4d8, 0.75); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 0.65); sun.position.set(-60, 80, -50); scene.add(sun);
 
 // the terrain is cut into tiles, each a 1 m mesh with its own baked texture. only the tiles near the skier exist at
@@ -1670,18 +1670,25 @@ function snowLit(){
 }
 function snowRGB(){
   const rgb = c => { const k = new THREE.Color(c); return [k.r*255, k.g*255, k.b*255]; };
-  const s = rgb(C.snow), light = s[0] + s[1] + s[2] > 384, sh = rgb(C.shade), k = snowLit();
-  const target = light ? s.map((c, i) => c + (sh[i] - c)*0.09) : s;
+  const s = rgb(C.snow), light = s[0] + s[1] + s[2] > 384, k = snowLit();
+  // on the light theme the open snow is a light, clear ice blue (darker themes keep their own snow colour)
+  const target = light ? rgb(ICE.snow) : s;
   return { light, k, rgb, target, scaled: target.map(c => c*k) };
 }
+// the light theme's wintry blues for open ground: snow, its ripple shadows and crests, and the icy mountain faces
+const ICE = { snow: '#d3ebf4', shadow: '#5f9fc2', crest: '#f1fafd', face: '#b2dcea', face2: '#94c7db' };
+const faceCSS = (dark = false) => {
+  const S0 = snowRGB(); if (!S0.light) return C.rock;
+  const q = S0.rgb(dark ? ICE.face2 : ICE.face).map(c => Math.round(c*S0.k)); return 'rgb(' + q.join(',') + ')';
+};
 const snowCSS = () => { const q = snowRGB().scaled.map(c => Math.round(c)); return 'rgb(' + q.join(',') + ')'; };
 function snowPatterns(){
   const S0 = snowRGB(), key = S0.scaled.join() + C.grid + C.groomed + C.cord; if (snowPat.key === key) return snowPat;
   const { rgb, light, k } = S0, t = S0.target;
   // shadows lean toward the theme's shade colour on light snow (toward the grid colour on dark snow, which is lighter)
-  const lo0 = light ? rgb(C.shade).map((c, i) => t[i] + (c - t[i])*0.5) : rgb(C.grid);
+  const lo0 = light ? rgb(ICE.shadow).map((c, i) => t[i] + (c - t[i])*0.42) : rgb(C.grid);
   // the brightest ripple crests stop at a pale blue (part way to the corduroy colour), never the trails' white
-  const hi0 = light ? rgb(C.cord).map((c, i) => t[i] + (c - t[i])*0.6) : rgb(C.groomed);
+  const hi0 = light ? rgb(ICE.crest).map((c, i) => t[i] + (c - t[i])*0.7) : rgb(C.groomed);
   const base = S0.scaled, lo = lo0.map(c => c*k), hi = hi0.map(c => c*k);
   const make = (N, fn) => {
     const cv = document.createElement('canvas'); cv.width = cv.height = N;
@@ -1714,7 +1721,7 @@ function* bakeTile(t){
   const TX = x => (x - X0) * TEX_PPM, TY = y => (y - Y0) * TEX_PPM;
   const R = TILE_R, nx = TILE_NX, ny = TILE_NY, hs = t.hs;
   const H = (i, j) => hs[j*(nx+1)+i];
-  const snowFill = snowCSS(); tc.fillStyle = snowFill; tc.fillRect(0, 0, tw, th);
+  const snowFill = snowCSS(), faceFill = faceCSS(), faceDark = faceCSS(true); tc.fillStyle = snowFill; tc.fillRect(0, 0, tw, th);
   // snow surface: wind ripples in drifting patches, with soft drifts over them (two patterns of different sizes,
   // pinned to the world so they run on seamlessly from tile to tile)
   const pats = snowPatterns();
@@ -1734,7 +1741,7 @@ function* bakeTile(t){
     const x = X0 + i*R, y = Y0 + j*R;
     const streak = 0.5 + 0.5*Math.sin(x*0.9 + Math.sin(y*0.31)*3) * Math.sin(y*0.7 - x*0.13);   // strata and gullies
     const rk = smooth01(0.7, 1.4, sl) * (0.35 + 0.65*streak);
-    if (rk > 0.04){ tc.globalAlpha = Math.min(0.85, rk); tc.fillStyle = C.rock; tc.fillRect(i*PX, j*PX, PX + 0.6, PX + 0.6); }
+    if (rk > 0.04){ tc.globalAlpha = Math.min(0.85, rk); tc.fillStyle = streak > 0.62 ? faceDark : faceFill; tc.fillRect(i*PX, j*PX, PX + 0.6, PX + 0.6); }
   }}
   tc.globalAlpha = 1;
   // river: water down the middle, ice along the edges
@@ -1765,8 +1772,8 @@ function* bakeTile(t){
     tc.stroke();
   }
   // groomed ground (trails and lawns) is drawn as one shape. a mask of both is softened and cut at its midpoint, which
-  // rounds every corner (bends, junctions, and where a trail meets a lawn) into a smooth curve. the edge colour runs
-  // only round the outside of the whole shape, so there's no line where a lawn meets a trail.
+  // rounds every corner (bends, junctions, and where a trail meets a lawn) into a smooth curve. there is no rim line
+  // anywhere: groomed snow simply meets the open snow along a soft edge.
   const near = TRAILS.filter(tr => tr.bx[0] < X1 + 12 && tr.bx[2] > X0 - 12 && tr.bx[1] < Y1 + 12 && tr.bx[3] > Y0 - 12);
   const lawnNear = LAWN_PARTS.some(p => p.bx[0] < X1 + 14 && p.bx[2] > X0 - 14 && p.bx[1] < Y1 + 14 && p.bx[3] > Y0 - 14);
   if (near.length || lawnNear){
@@ -1808,24 +1815,20 @@ function* bakeTile(t){
       for (let y = 0; y < mh; y++){ dst[y*mw + x] = acc/n; acc += src[Math.min(mh - 1, y + BR + 1)*mw + x] - src[Math.max(0, y - BR)*mw + x]; } } };
     for (let pass = 0; pass < 3; pass++){ boxH(A, T); boxV(T, A); if (pass === 1) yield; }
     // cut at 0.5. near the cut the softened value climbs about SL per pixel, which turns it into a depth (px) inside
-    // the shape: the outer EDGE px are the rim colour, and the cut itself is antialiased over about a pixel
-    const SL = 1 / (Math.sqrt(BR*(BR + 1)) * Math.sqrt(2*Math.PI)), EDGE = 2.2;
-    const ec = new THREE.Color(C.edge), er = ec.r*255, eg = ec.g*255, eb = ec.b*255;
-    const mI = sx.createImageData(tw, th), eI = sx.createImageData(tw, th), mD = mI.data, eD = eI.data;
+    // the shape, used to soften the cut over a couple of pixels
+    const SL = 1 / (Math.sqrt(BR*(BR + 1)) * Math.sqrt(2*Math.PI));
+    const mI = sx.createImageData(tw, th), mD = mI.data;
     for (let y = 0; y < th; y++){
       const o = (y + PAD)*mw + PAD;
       for (let x = 0; x < tw; x++){
-        const d = (A[o + x] - 0.5)/SL, cov = Math.min(1, Math.max(0, d + 0.5));
+        const d = (A[o + x] - 0.5)/SL, cov = Math.min(1, Math.max(0, d/2 + 0.5));   // a soft two-pixel edge, no rim line
         if (cov <= 0) continue;
-        const q = (y*tw + x)*4; mD[q+3] = cov*255;
-        const rim = cov * Math.min(1, Math.max(0, EDGE + 0.5 - d));
-        if (rim > 0){ eD[q] = er; eD[q+1] = eg; eD[q+2] = eb; eD[q+3] = rim*255; }
+        mD[(y*tw + x)*4 + 3] = cov*255;
       }
     }
     const mk = newCv(tw, th); mk.getContext('2d').putImageData(mI, 0, 0);
-    const ek = newCv(tw, th); ek.getContext('2d').putImageData(eI, 0, 0);
     sx.globalCompositeOperation = 'destination-in'; sx.drawImage(mk, 0, 0);
-    sx.globalCompositeOperation = 'source-over'; sx.drawImage(ek, 0, 0);
+    sx.globalCompositeOperation = 'source-over';
     tc.drawImage(sc, 0, 0);
   }
   yield;
@@ -1897,7 +1900,7 @@ const farGround = (() => {
   return { chunks };
 })();
 function colorFarGround(){
-  const a = new THREE.Color(snowCSS()), b = new THREE.Color(C.rock), w = new THREE.Color(C.water), c = new THREE.Color();
+  const a = new THREE.Color(snowCSS()), b = new THREE.Color(faceCSS()), w = new THREE.Color(C.water), c = new THREE.Color();
   for (const ch of farGround.chunks.values()){
     const pos = ch.g.attributes.position;
     for (let k = 0; k < pos.count; k++){

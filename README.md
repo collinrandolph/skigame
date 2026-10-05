@@ -19,7 +19,7 @@ The keyboard, controller and touch screen share one layout. On a controller the 
 | Steer (classic and tuck) | Q / E | Left stick left / right |
 
 - **Skating kicks:** hold a skating kick to push it all the way out and ride the glide. Each kick turns you a step away from the kicking leg.
-  - Same-leg kicks build into a kick turn, measured from your current heading.
+  - Same-leg kicks build into a kick turn, measured from your current heading: each one turns 10° more than the last (5°, 15°, 25°, 35°, 45°, 55°), so six on one side make a 180° about-turn.
   - An opposite-leg kick is measured from the camera heading, so alternating kicks swing evenly around a steady line.
 - **Classic kicks:** these must alternate legs. Letting go of a snow plow returns you to the mode you started it from.
 - **Twin-stick strokes:** each stick is one foot.

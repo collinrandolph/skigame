@@ -227,7 +227,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tTap">Tap power (% of a full kick)<output id="oTap"></output><input id="tTap" type="range" min="10" max="100" step="5" value="80"></label>
     <label for="tKlen">Full kick length (ms)<output id="oKlen"></output><input id="tKlen" type="range" min="50" max="800" step="10" value="50"></label>
     <label for="tTurn">Turn per kick (°)<output id="oTurn"></output><input id="tTurn" type="range" min="0" max="30" step="0.5" value="5"></label>
-    <label for="tBuild">Same-leg build (% per kick)<output id="oBuild"></output><input id="tBuild" type="range" min="0" max="50" step="1" value="50"></label>
+    <label for="tBuildDeg">Same-leg build (° more per kick)<output id="oBuildDeg"></output><input id="tBuildDeg" type="range" min="0" max="20" step="0.5" value="10"></label>
     <label for="tDecay">Same-leg push loss (% per kick)<output id="oDecay"></output><input id="tDecay" type="range" min="0" max="60" step="5" value="30"></label>
     <label for="tSnap">Ski set time (ms)<output id="oSnap"></output><input id="tSnap" type="range" min="0" max="400" step="10" value="160"></label>
     <label for="tSplay">Skate angle (°)<output id="oSplay"></output><span class="sl"><input id="tSplay" type="range" min="0" max="60" step="1" value="11"><i class="ghost" id="tSplayG"></i></span></label>
@@ -300,7 +300,7 @@ addEventListener('resize', resize);
 
 const $ = id => document.getElementById(id);
 const P = {};
-const tune = [['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tBuild','oBuild','build',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
+const tune = [['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tBuildDeg','oBuildDeg','buildDeg',v=>v.toFixed(1) + '° · 180° in ' + (()=>{ let t = 0, k = 0; while (t < 180 && k < 60){ t += Math.min(90, P.turn + v*k); k++; } return k; })() + ' kicks'],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
   ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tOffglide','oOffglide','offglide',v=>v.toFixed(0)+'%'],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -339,7 +339,6 @@ $('defSet').addEventListener('click', () => {
 // state: position (m), velocity (m/s), heading (rad, 0 = north, clockwise +), target heading set by the last kick
 const S = { x:0, y:0, vx:0, vy:0, th:0, thv:0, tgt:0, vis:0, visv:0, travel:0, dist:0, grade:0, off:0, trail:null };
 let lastTurn = null, lastTurnDeg = 0, streak = 0;
-const MAX_BUILD = 2.5;    // same-leg turn step can grow to at most 2.5x the base
 const PUSH_LEN = 0.7;     // push-off adds this much to the end of a ski's line
 const SKI_MAX = 4;        // longest a single ski mark can run before the next kick
 const G = 9.81;
@@ -1011,8 +1010,9 @@ function kick(leg, opt = {}){
     // stick strokes. a kick on the same leg as the last one turns from your current heading (a kick turn: steps add
     // up and the camera follows one step behind). a kick on the other leg is measured from the camera heading, so it
     // swings back across and undoes the last kick's rotation instead of stacking on top of it.
-    const mult = Math.min(MAX_BUILD, 1 + (P.build/100) * (streak - 1));
-    lastTurnDeg = P.turn * mult;
+    // each further kick on the same leg turns that many degrees more than the last (5, 15, 25, 35, 45, 55 by
+    // default: a full 180° about-turn in six pushes), up to 90° for a single kick
+    lastTurnDeg = Math.min(90, P.turn + P.buildDeg * (streak - 1));
     const a = side * lastTurnDeg * Math.PI/180;
     let camRef = S.tgt - camPending;
     const prev = S.tgt;
@@ -3594,12 +3594,6 @@ function drawPlaySticks(){
       zone(180 - 45*inSign, C.up);     // load: down and in
       zone(-45*inSign, C.down);        // throw: up and out
       const t = twin[leg];
-      const fa = strokeFade(t);
-      if (t.last && P.scheme === 1 && fa > 0){
-        ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.globalAlpha = .55 * fa;
-        ctx.beginPath(); ctx.moveTo(cx + t.last.load[0]*r, cy + t.last.load[1]*r); ctx.lineTo(cx + t.last.throw[0]*r, cy + t.last.throw[1]*r); ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
     }
     ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
     // what the dot shows, in priority order:
@@ -3678,12 +3672,8 @@ function drawSticks(){
     // last stroke
     const fa = strokeFade(t);
     if (t.last && fa > 0){
-      const L = t.last;
-      ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.globalAlpha = .7 * fa;
-      ctx.beginPath(); ctx.moveTo(cx + L.load[0]*r, cy + L.load[1]*r); ctx.lineTo(cx + L.throw[0]*r, cy + L.throw[1]*r); ctx.stroke();
-      ctx.globalAlpha = 1;
       ctx.fillStyle = C.muted; ctx.globalAlpha = fa;
-      ctx.fillText(Math.round(L.phi) + '° · ' + Math.round(L.power*100) + '% · turn ' + Math.abs(L.turn).toFixed(0) + '°', cx, cy + r + 18);
+      ctx.fillText('turn ' + lastTurnDeg.toFixed(1) + '°' + (streak > 1 ? ' ×' + streak : ''), cx, cy + r + 18);
       ctx.globalAlpha = 1;
     }
     if (t.load){ ctx.fillStyle = C.up; ctx.beginPath(); ctx.arc(cx + t.load[0]*r, cy + t.load[1]*r, 3, 0, Math.PI*2); ctx.fill(); }

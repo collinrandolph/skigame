@@ -568,7 +568,7 @@ function obstacleSD(x, y, terrainOnly = false){
   // buildings and equipment
   for (const o of SOLIDS){ const q = o.foot ? footSD(o.foot, x, y) : Math.hypot(x - o.x, y - o.y) - o.r; if (q < d) d = q; }
   for (const m of MOOSE){ const q = Math.hypot(x - m.x, y - m.y) - 1.4; if (q < d) d = q; }
-  for (const h of HERD){ const q = Math.hypot(x - h.x, y - h.y) - (h.calf ? 0.8 : 1.4); if (q < d) d = q; }
+  for (const h of HERD){ const q = Math.hypot(x - h.x, y - h.y) - h.cr; if (q < d) d = q; }
   for (const n of NPCS){ const q = Math.hypot(x - n.x, y - n.y) - 0.45; if (q < d) d = q; }
   return d;
 }
@@ -2083,6 +2083,34 @@ function apronOff(x, y){ const e = lawnSD(x, y); return e <= -0.5 ? 0 : e >= 0 ?
 // ---- zone 4: purple crystal outcrops scattered over the snowfields (just rock, no glow), and at the far southern
 // end, a herd of purple moose: adults and antlerless calves, some asleep in the snow
 const HERD_C = { x: 312, y: 730 };
+// the giant: a moose as big as the skeleton by the lake, asleep in the middle of Frost Road's loop. its spot is the
+// clearest ground near the loop's centre, well away from the trail
+const GIANT = (() => {
+  const p = TRAILS.find(t => t.name === 'Frost Road').pts.slice(1, -1);
+  const cx = p.reduce((a, q) => a + q[0], 0)/p.length, cy = p.reduce((a, q) => a + q[1], 0)/p.length;
+  let best = { x: cx, y: cy }, bs = -Infinity;
+  for (let r = 0; r <= 40; r += 4) for (let k = 0, n = Math.max(1, r); k < n; k++){
+    const a = k/n*2*Math.PI, x = cx + Math.cos(a)*r, y = cy + Math.sin(a)*r;
+    const sc = Math.min(nearestTrail(x, y).d - 8, obstacleSD(x, y, true)) - r*0.3;
+    if (sc > bs){ bs = sc; best = { x, y }; }
+  }
+  return { ...best, rot: 2.3 };
+})();
+// herds strung along Frost Road, each straddling the trail so you ski right through the middle of them
+const HERD_SITES = (() => {
+  const s = TRAILS.find(t => t.name === 'Frost Road').s, cum = [0];
+  for (let i = 2; i < s.length; i += 2) cum.push(cum[cum.length - 1] + Math.hypot(s[i] - s[i-2], s[i+1] - s[i-1]));
+  const L = cum[cum.length - 1], out = [];
+  for (const f of [0.13, 0.3, 0.46, 0.61, 0.77, 0.9]){
+    const i = Math.max(0, cum.findIndex(c => c >= f*L)), x = s[i*2], y = s[i*2+1];
+    if (Math.hypot(x - HERD_C.x, y - HERD_C.y) < 70 || Math.hypot(x - G4.x, y - G4.y) < 60) continue;
+    const j = Math.min(cum.length - 1, i + 3), k = Math.max(0, i - 3), dx = s[j*2] - s[k*2], dy = s[j*2+1] - s[k*2+1], l = Math.hypot(dx, dy) || 1;
+    out.push({ x, y, tx: dx/l, ty: dy/l });
+  }
+  return out;
+})();
+// ground kept open for the moose: the far herd, the giant, and the trail herds
+const nearHerd = (x, y, r) => Math.hypot(x - HERD_C.x, y - HERD_C.y) < r || Math.hypot(x - GIANT.x, y - GIANT.y) < r + 12 || HERD_SITES.some(h => Math.hypot(x - h.x, y - h.y) < r - 10);
 const OUTCROPS = (() => {
   let seed = 4040; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const out = [];
@@ -2091,7 +2119,7 @@ const OUTCROPS = (() => {
     const size = 0.8 + rnd()*rnd()*2.6;
     if (zoneAt(x, y) !== 4 || obstacleSD(x, y, true) < 3 + size) continue;
     if (nearestTrail(x, y).d < 6 + size*2) continue;
-    if (Math.hypot(x - HERD_C.x, y - HERD_C.y) < 40) continue;
+    if (nearHerd(x, y, 40)) continue;
     if (out.some(o => Math.hypot(o.x - x, o.y - y) < 16 + (o.size + size)*3)) continue;
     out.push({ x, y, size, rot: rnd()*6.3, seed: (rnd()*1e6) | 0 });
   }
@@ -2129,7 +2157,7 @@ const trees = (() => {
     if (Math.hypot(x, y) < 14) continue;                              // open stadium
     if (STRUCTS.some(o => Math.hypot(o.x - x, o.y - y) < o.r + 1.5)) continue;   // nor in the buildings
     if (lawnSD(x, y) < 2.5) continue;                                 // nor on their lawns
-    if (OUTCROPS.some(o => Math.hypot(o.x - x, o.y - y) < o.size*2 + 2) || Math.hypot(x - HERD_C.x, y - HERD_C.y) < 38) continue;
+    if (OUTCROPS.some(o => Math.hypot(o.x - x, o.y - y) < o.size*2 + 2) || nearHerd(x, y, 38)) continue;
     if (crowded(x, y)) continue;                                      // no two trunks on top of each other
     const t = { x, y, s: 0.7 + rnd()*0.7, r: rnd()*Math.PI*2 };
     out.push(t); const c = cell(t); if (!grid.has(c)) grid.set(c, []); grid.get(c).push(t);
@@ -2675,30 +2703,87 @@ function flag(g, x, y, z, mat = SM.flag, ry = 0){
 }
 Object.assign(BUILD, {
   ribs(rnd){
-    // the sleeping ribs: a collapsed ribcage tens of metres long, a hollow skull-hub at its head, glowing faintly inside
-    const g = new THREE.Group();
-    tube(g, [[0, 0, -26], [0, 3.5, -12], [0.5, 4.5, 0], [-0.5, 3, 12], [0, -0.5, 24]], 1.9, SM.bone2, 40, 8);
-    for (let k = 0; k < 7; k++){
-      const z = -14 + k*6, H = 21 - Math.abs(k - 1.5)*2.4, w = 13 - k*0.9, lean = 2 + k*0.4;
-      const broken = k === 2 || k === 5;
-      const pts = [[-w, -1, z], [-w*0.95, H*0.45, z + lean*0.3], [-w*0.55, H*0.92, z + lean*0.7], [0, H, z + lean]];
-      if (!broken) pts.push([w*0.55, H*0.9, z + lean*0.7], [w*0.95, H*0.42, z + lean*0.3], [w, -1, z]);
-      else pts.push([w*0.25, H*0.85, z + lean*1.3]);
-      tube(g, pts, 1.6 + 0.3*Math.sin(k*1.7), SM.bone, 36, 8);
-      for (let i = 1; i < pts.length - 1; i++) pt(g, new THREE.SphereGeometry(2.0, 8, 6), SM.bone2, ...pts[i]);   // knuckles along each rib
-      if (!broken) for (let i = 0; i < 3; i++) pt(g, new THREE.ConeGeometry(0.22, 1.2 + rnd()*1.6, 5), SM.ice, (rnd() - 0.5)*w, H*0.85 - 1, z + lean*0.8, Math.PI);   // icicles
+    // the sleeping ribs: the bones of a full-grown purple moose, about eleven times the size of the living ones, lying
+    // where it lay down to sleep and never got up. six legs folded under it and splayed as the body fell in, the long
+    // shoulder hump of spines, the rib cage still arched over a cluster of purple crystal where its heart was, the
+    // skull on the snow with its palmate antlers, and the tentacle beard a scatter of bead-like bones
+    const root = new THREE.Group(), g = new THREE.Group(); g.position.z = 8; root.add(g);   // centred on its footprint
+    const knob = (x, y, z, r, mat = SM.bone2) => pt(g, new THREE.SphereGeometry(r, 8, 6), mat, x, y, z);
+    // the spine: tail, pelvis, the long back, up over the shoulders, then the neck sweeping down to the skull
+    const spinePts = [[0, 1, 25], [0, 7, 21], [0, 12, 16], [0, 15.5, 7], [0, 17, -2], [0, 19, -10], [0, 17.5, -16], [0.5, 13, -21], [1.5, 8, -26], [2.5, 4.5, -30]];
+    const spine = tube(g, spinePts, 1.25, SM.bone2, 60, 8);
+    for (let k = 0; k <= 26; k++){
+      const p = spine.getPoint(k/26), z = p.z;
+      knob(p.x, p.y, p.z, 1.6 - 0.5*(k/26 > 0.75 ? (k/26 - 0.75)*4 : 0), SM.bone);                  // vertebrae
+      if (z < 20 && z > -19){
+        // neural spines: the moose hump. tallest over the shoulders, leaning back
+        const h = 1.8 + 7.5*Math.exp(-Math.pow((z + 9)/7, 2)) + 1.2*Math.exp(-Math.pow((z - 15)/4, 2));
+        beam(g, [p.x, p.y, p.z], [p.x, p.y + h, p.z + h*0.35], 0.42, SM.bone);
+        knob(p.x, p.y + h, p.z + h*0.35, 0.55);
+      }
     }
-    // the hub: a broken shell pierced with round openings, light inside
-    const hub = new THREE.Group(); hub.position.set(0, -2, -27); g.add(hub);
-    pt(hub, new THREE.SphereGeometry(13, 16, 12, 0.4, Math.PI*2 - 0.8, 0, Math.PI*0.62), SM.bone, 0, 0, 0).material.side = THREE.DoubleSide;
+    // the rib cage: arched pairs from the spine out and down to the snow, sweeping back a little; a few broken or fallen
     for (let k = 0; k < 9; k++){
-      const a = 0.9 + k*0.62, el = 0.35 + (k % 3)*0.28, r = 2 + (k % 4)*0.9;
-      const n = V(Math.cos(a)*Math.cos(el), Math.sin(el), Math.sin(a)*Math.cos(el));
-      const c = new THREE.Mesh(new THREE.CircleGeometry(r, 14), SM.hole); c.position.copy(n.clone().multiplyScalar(13.08)); c.lookAt(n.clone().multiplyScalar(30)); hub.add(c);
+      const z = -12 + k*3.1, top = spine.getPoint(0.18 + 0.34*(1 - k/8)).y;
+      const w = 10.5 * Math.sqrt(Math.max(0.2, 1 - Math.pow((z + 1)/18, 2)));
+      for (const sx of [-1, 1]){
+        const id = k*2 + (sx > 0 ? 1 : 0), broken = id === 5 || id === 12, fallen = id === 9 || id === 16;
+        const ys = Math.min(top, 17) - 0.5;
+        let pts = [[0, ys, z], [sx*w*0.6, ys - 1, z + 0.6], [sx*w, ys*0.55, z + 1.3], [sx*w*0.92, ys*0.15, z + 1.8], [sx*w*0.72, -1, z + 2]];
+        if (broken) pts = pts.slice(0, 3);
+        if (fallen) pts = [[sx*3, 0.2, z + 1], [sx*(w*0.6), 0.6, z + 3], [sx*(w + 3), 0.4, z + 5], [sx*(w + 6), 0, z + 6]];
+        tube(g, pts, 0.75 + 0.2*Math.sin(k*1.9), SM.bone, 30, 7);
+        if (!broken && !fallen && rnd() < 0.5) pt(g, new THREE.ConeGeometry(0.2, 1.0 + rnd()*1.4, 5), SM.ice, sx*w*0.7, ys*0.8, z + 1, Math.PI);   // icicles
+      }
     }
-    pt(hub, new THREE.SphereGeometry(2.4, 12, 8), SM.glow, 0, 6, 0);
-    for (let k = 0; k < 5; k++){ const a = rnd()*Math.PI*2; tube(g, [[Math.cos(a)*16, -1, -27 + Math.sin(a)*16], [Math.cos(a)*11, 5 + rnd()*4, -27 + Math.sin(a)*11], [Math.cos(a)*6, 10 + rnd()*3, -27 + Math.sin(a)*6]], 0.8, SM.bone2, 16, 6); }
-    return g;
+    // shoulder blades and the pelvis
+    for (const sx of [-1, 1]){
+      const sc = pt(g, new THREE.SphereGeometry(1, 10, 8), SM.bone, sx*6.5, 12.5, -9, 0, 0, sx*0.35); sc.scale.set(0.7, 5.5, 3.6);
+      const il = pt(g, new THREE.SphereGeometry(1, 10, 8), SM.bone, sx*4.2, 11, 17, 0.5, 0, -sx*0.6); il.scale.set(3.6, 1.2, 3.2);
+      tube(g, [[sx*4.5, 10, 18], [sx*4.8, 5, 20], [sx*4, 1, 21.5]], 0.9, SM.bone2, 12, 6);
+    }
+    // six legs: thigh bones down from the hip and shin bones laid along the snow, folded under as it slept, splayed
+    // outward as the body sank; knuckled joints and split hooves
+    for (const [z, sx, fold] of [[-9, -1, 1], [-9, 1, 0.8], [2, -1, 0.9], [2, 1, 1.2], [14, -1, 1.1], [14, 1, 0.9]]){
+      const hip = [sx*5, 8.5, z], knee = [sx*(9.5 + 2*fold), 0.6, z + 3], hoof = [sx*(12 + 3*fold), 0.3, z - 8*fold];
+      knob(...hip, 1.7, SM.bone); knob(...knee, 1.4, SM.bone);
+      tube(g, [hip, [sx*(7.5 + fold), 4.5, z + 1.8], knee], 1.0, SM.bone2, 12, 7);
+      tube(g, [knee, [(knee[0] + hoof[0])/2, 0.6, (knee[2] + hoof[2])/2], hoof], 0.75, SM.bone2, 12, 7);
+      for (const h of [-1, 1]){ const c = pt(g, new THREE.ConeGeometry(0.7, 2.4, 6), SM.bone, hoof[0] + h*0.6, 0.3, hoof[2] - 1.2, -Math.PI/2); c.scale.set(1, 1, 0.7); }
+    }
+    // the skull, lying turned on the snow: a long drooping muzzle, dark eye sockets and nostril, the jaw fallen loose
+    const sk = new THREE.Group(); sk.position.set(3.5, 3.6, -33); sk.rotation.set(0.1, 0.35, 0.3); g.add(sk);
+    pt(sk, new THREE.SphereGeometry(1, 14, 10), SM.bone, 0, 0.6, 0).scale.set(3.4, 3.3, 4.2);
+    pt(sk, new THREE.SphereGeometry(1, 14, 10), SM.bone, 0, -0.8, -5.5).scale.set(2.3, 2.2, 5.2);
+    pt(sk, new THREE.SphereGeometry(1, 10, 8), SM.bone2, 0, -1.4, -9.6).scale.set(2.0, 1.8, 1.6);
+    for (const sx of [-1, 1]){ const e = pt(sk, new THREE.CircleGeometry(1.1, 12), SM.hole, sx*3.1, 1.3, -1.6, 0, sx*Math.PI/2.4, 0); e.scale.set(1, 0.8, 1); }
+    pt(sk, new THREE.CircleGeometry(0.9, 12), SM.hole, 0, -1.2, -11.15, 0, Math.PI, 0);
+    tube(g, [[0.5, 0.3, -31], [2.5, 0.4, -37], [5, 0.3, -43]], 0.8, SM.bone2, 12, 6);   // the jaw
+    // palmate antlers: a beam out to a broad flat palm edged with tines. one still on the skull, one broken off
+    const antler = (par, x, y, z, sx, ry, rz) => {
+      const a = new THREE.Group(); a.position.set(x, y, z); a.rotation.set(0, ry, rz); par.add(a);
+      beam(a, [0, 0, 0], [sx*4, 2.2, 0.5], 0.7, SM.bone2);
+      const palm = pt(a, new THREE.SphereGeometry(1, 12, 8), SM.bone, sx*8.5, 3.6, 1); palm.scale.set(5, 0.55, 3.6); palm.rotation.z = sx*0.3;
+      for (let k = 0; k < 7; k++){ const t = k/6; pt(a, new THREE.ConeGeometry(0.42, 3.2, 5), SM.bone2, sx*(5 + t*8), 5.1 + Math.sin(t*3)*1.2, -1.6 + t*4.6, 0, 0, -sx*0.35); }
+      return a;
+    };
+    antler(sk, 2, 2.8, 0.5, 1, 0, -0.15);
+    antler(g, -14, 0.4, -38, -1, 0.9, 1.25);                    // the broken one, lying flat on the snow
+    // the beard: tentacles of small bead bones, curling out over the snow from under the jaw
+    for (let k = 0; k < 6; k++){
+      let x = 1 + (k - 2.5)*1.5, z = -40 - (k % 2)*1.5, a = -Math.PI/2 + (k - 2.5)*0.45, r = 0.75;
+      for (let i = 0; i < 11; i++){ knob(x, r*0.6, z, r, i % 2 ? SM.bone2 : SM.bone); a += (k % 2 ? 0.28 : -0.24); x += Math.cos(a)*1.35*(r + 0.5); z += Math.sin(a)*1.35*(r + 0.5); r *= 0.9; }
+    }
+    // where its heart was: a cluster of purple crystal, glowing faintly under the arch of the ribs
+    const heartMat = new THREE.MeshLambertMaterial({ color: 0x7e66b4, emissive: 0x352659, flatShading: true });
+    const heartMat2 = new THREE.MeshLambertMaterial({ color: 0xa993d6, emissive: 0x4a3a7a, flatShading: true });
+    for (let k = 0; k < 9; k++){
+      const a = k*0.9, d = k ? 1.4 + (k % 3)*0.9 : 0, h = k ? 2.5 + ((k*37) % 5)*0.7 : 6;
+      const c = pt(g, new THREE.OctahedronGeometry(1, 0), k % 2 ? heartMat2 : heartMat, Math.cos(a)*d, h*0.45 - 0.5, -3 + Math.sin(a)*d, k ? Math.sin(a)*0.5 : 0, a, k ? Math.cos(a)*0.5 : 0);
+      c.scale.set(k ? 0.7 : 1.1, h, k ? 0.7 : 1.1);
+    }
+    pt(g, new THREE.SphereGeometry(2.2, 12, 8), SM.glow, 0, 3, -3);
+    return root;
   },
   arch(rnd){
     // the spine arch: one vertebral span over the trail, knobbed and spined, with a fallen piece beside it
@@ -3349,24 +3434,91 @@ function animateGate4(dt){
     const merged = mergeModel(g); merged.position.set(o.x, height(o.x, o.y), o.y); merged.rotation.y = o.rot; scene.add(merged);
   }
 }
-// the herd: grazers wander small circles and stop to graze; sleepers lie folded in the snow, breathing slowly.
-// calves are smaller and have no antlers.
+// the herds: grazers wander small circles and stop to graze; sleepers lie folded in the snow, breathing slowly.
+// calves are smaller and have no antlers; the big bulls are one and a half to two times a grown moose.
+// one herd lies at the far end of Herd Trail, and more are strung along Frost Road on both sides of the trail
 HERD = (() => {
   let seed = 777; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const out = [], roles = ['sleep', 'sleep', 'sleep', 'sleep', 'graze', 'graze', 'graze', 'graze', 'graze', 'calfsleep', 'calfsleep', 'calf', 'calf', 'calf'];
-  for (const role of roles){
-    const calf = role.startsWith('calf');
+  const out = [];
+  const make = role => {
+    const calf = role.startsWith('calf'), big = role.startsWith('big'), scale = calf ? 0.55 : big ? 1.5 + rnd()*0.5 : 1;
+    return { role, calf, big, scale, cr: calf ? 0.8 : 1.4*scale, sleep: role.includes('sleep') };
+  };
+  const clear = (x, y, cr) => obstacleSD(x, y) > cr + 1 && !out.some(h => Math.hypot(h.x - x, h.y - y) < h.cr + cr + 2.2)
+                               && !trees.some(t => Math.abs(t.x - x) < cr + 1.5 && Math.abs(t.y - y) < cr + 1.5);
+  const add = (m, x, y, R) => out.push({ ...m, x, y, hx: x, hy: y, R, a: rnd()*6.3, dir: rnd() < 0.5 ? 1 : -1, th: rnd()*6.3, ph: rnd()*10, timer: rnd()*5, grazing: false, gait: 0 });
+  // the far herd
+  for (const role of ['sleep', 'sleep', 'sleep', 'sleep', 'graze', 'graze', 'graze', 'graze', 'graze', 'calfsleep', 'calfsleep', 'calf', 'calf', 'calf', 'big', 'bigsleep']){
+    const m = make(role);
     for (let t = 0; t < 60; t++){
-      const a = rnd()*Math.PI*2, d = rnd()*24, x = HERD_C.x + Math.cos(a)*d, y = HERD_C.y + Math.sin(a)*d*0.6;
-      if (obstacleSD(x, y, true) < 3 || out.some(h => Math.hypot(h.x - x, h.y - y) < (calf || h.calf ? 4 : 6))) continue;
-      out.push({ role, calf, sleep: role.includes('sleep'), x, y, hx: x, hy: y, R: 3 + rnd()*5, a: rnd()*6.3, dir: rnd() < 0.5 ? 1 : -1,
-                 th: rnd()*6.3, ph: rnd()*10, timer: rnd()*5, grazing: false, gait: 0 });
-      break;
+      const a = rnd()*Math.PI*2, d = rnd()*26, x = HERD_C.x + Math.cos(a)*d, y = HERD_C.y + Math.sin(a)*d*0.6;
+      if (obstacleSD(x, y, true) < 3 || !clear(x, y, m.cr)) continue;
+      add(m, x, y, 3 + rnd()*5); break;
     }
   }
-  for (const h of out){ h.rig = buildMoose(h.calf); if (h.calf) h.rig.root.scale.setScalar(0.55); }
+  // the trail herds: members either side of the trail, off the groomed snow (grazers' whole circle stays off it)
+  const offTrail = (x, y, cr) => nearestTrail(x, y).d > TRAIL_W/2 + 1.2 + cr;
+  for (const H of HERD_SITES){
+    const roles = ['sleep', 'graze', 'graze', 'big', 'bigsleep', 'calf', 'calfsleep', rnd() < 0.5 ? 'sleep' : 'graze'];
+    roles.forEach((role, n) => {
+      const m = make(role), side = n % 2 ? 1 : -1;
+      for (let t = 0; t < 60; t++){
+        const along = (rnd() - 0.5)*44, off = TRAIL_W/2 + 1.5 + m.cr + rnd()*12;
+        const x = H.x + H.tx*along - H.ty*off*side, y = H.y + H.ty*along + H.tx*off*side, R = 2 + rnd()*3;
+        if (zoneAt(x, y) !== 4 || !offTrail(x, y, m.cr) || !clear(x, y, m.cr)) continue;
+        if (!m.sleep){ let ok = true; for (let k = 0; k < 8 && ok; k++){ const a = k/8*Math.PI*2, px = x + Math.cos(a)*R, py = y + Math.sin(a)*R*0.7; if (!offTrail(px, py, m.cr) || obstacleSD(px, py) < m.cr + 0.5) ok = false; } if (!ok) continue; }
+        add(m, x, y, R); break;
+      }
+    });
+  }
+  for (const h of out){ h.rig = buildMoose(h.calf); h.rig.root.scale.setScalar(h.scale); }
   return out;
 })();
+// the giant, asleep: a grown moose eleven times over, legs folded under, head down, breathing slow clouds of vapour.
+// solid, with its footprint read off the model like the buildings'
+const giant = (() => {
+  const rig = buildMoose(false), K = 11;
+  rig.root.scale.setScalar(K);
+  rig.root.position.set(GIANT.x, height(GIANT.x, GIANT.y) - 0.5, GIANT.y); rig.root.rotation.y = GIANT.rot;
+  rig.body.position.y = -1.3;
+  for (const L of rig.legs){ L.hip.rotation.x = 1.25; L.knee.rotation.x = -2.5; }
+  rig.head.rotation.set(-0.3, 0.45, 0.2);                        // muzzle down toward the snow
+  for (const T of rig.tentacles) T.segs.forEach((g, k) => { g.rotation.x = 0.35; });
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, -0.25, -1.95); rig.head.add(muzzle);
+  rig.root.updateMatrixWorld(true);
+  const foot = buildFootprint({ model: rig.root });
+  SOLIDS.push({ x: GIANT.x, y: GIANT.y, r: 0, foot });
+  const vapour = (() => {   // a soft white disc for the breath clouds
+    const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c);
+  })();
+  const puffs = [0, 1, 2].map(() => {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: vapour, color: 0xf2f8fb, transparent: true, opacity: 0, depthWrite: false }));
+    scene.add(sp); return { sp, t: 9 };
+  });
+  return { rig, muzzle, puffs, foot, next: 0, K };
+})();
+function updateGiant(dt){
+  const now = performance.now()/1000, r = giant.rig, far = Math.hypot(GIANT.x - S.x, GIANT.y - S.y) > 420;
+  r.root.visible = !far; if (far) return;
+  // one slow breath every seven seconds: the chest swells, then a cloud rolls out of the muzzle
+  const br = Math.sin(now*2*Math.PI/7);
+  r.body.scale.y = 1 + 0.03*br; r.body.scale.x = 1 + 0.015*br;
+  r.head.rotation.x = -0.3 + 0.02*br;
+  for (const T of r.tentacles) T.segs.forEach((g, k) => { g.rotation.x = 0.35 + 0.06*Math.sin(now*0.5 + T.phase + k*0.6); g.rotation.z = 0.05*Math.sin(now*0.35 + T.phase + k); });
+  const exhale = Math.floor(now/7 + 0.5);
+  if (exhale !== giant.next){
+    giant.next = exhale;
+    const p = giant.puffs.find(q => q.t >= 3.2); if (p){ p.t = 0; giant.muzzle.getWorldPosition(p.sp.position); }
+  }
+  for (const p of giant.puffs){
+    if (p.t >= 3.2){ p.sp.material.opacity = 0; continue; }
+    p.t += dt; const u = Math.min(1, p.t/3.2), size = 3 + u*14;
+    p.sp.scale.set(size, size*0.75, 1); p.sp.position.y += dt*1.2;
+    p.sp.material.opacity = 0.55 * Math.sin(Math.PI*Math.min(1, u*1.4)) * (1 - u*0.4);
+  }
+}
 function updateHerd(dt){
   const now = performance.now()/1000;
   for (const h of HERD){
@@ -4291,7 +4443,7 @@ function loop(t){
   // so movement, friction and glide come out the same on every device
   const dt = Math.min(0.1, (t-last)/1000); last = t; pollPad();
   { const n = Math.max(1, Math.ceil(dt * 60 - 1e-6)); for (let k = 0; k < n; k++) step(dt/n); }
-  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt);
+  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updateGiant(dt);
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through
   const w = 3 / Math.max(0.05, P.cam);
@@ -4304,7 +4456,7 @@ function loop(t){
 }
 loadProgress();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

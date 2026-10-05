@@ -156,6 +156,17 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 .toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 66px);left:50%;transform:translate(-50%,-6px);z-index:6;max-width:calc(100vw - 32px);box-sizing:border-box;padding:9px 14px;border-radius:6px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(6px);color:var(--ink);font:600 13px/1.3 var(--display);letter-spacing:.06em;text-align:center;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){.orbhud.bump .gem{animation:none}.toast{transition:none}}
+
+/* ---- phones: a map button (top right) opening a full-screen map of the whole world ---- */
+.mapbtn{display:none}
+.bigmap{position:fixed;inset:0;z-index:20;background:var(--panel);backdrop-filter:blur(8px);display:none;touch-action:none}
+.bigmap.on{display:block}
+.bigmap canvas{position:absolute;inset:0;width:100%;height:100%}
+.bigmap .close{position:absolute;top:calc(env(safe-area-inset-top,0px) + 16px);right:16px;width:40px;height:40px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:600 20px/1 var(--display);display:flex;align-items:center;justify-content:center}
+@media (pointer:coarse){
+  .mapbtn{display:inline-flex;position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);right:16px;z-index:7;width:40px;height:40px;padding:0;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(6px);box-sizing:border-box;touch-action:manipulation}
+  .mapbtn svg{width:22px;height:22px}
+}
 </style>
 </head>
 <body>
@@ -163,6 +174,8 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 <canvas id="c"></canvas>
 
 <button class="musicbtn" id="musicBtn" type="button" aria-pressed="true" aria-label="Music on/off" title="Music (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" fill-opacity=".15"/><g class="ic-on"><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/></g><g class="ic-off"><path d="M16 9.5l5 5M21 9.5l-5 5"/></g></svg></button>
+<button class="mapbtn" id="mapBtn" type="button" aria-label="Open the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg></button>
+<div class="bigmap" id="bigMap" role="dialog" aria-label="Map"><canvas id="bigMapCv"></canvas><button class="close" id="mapClose" type="button" aria-label="Close the map">✕</button></div>
 <div class="orbhud" id="orbHud" aria-live="polite"><i class="gem" aria-hidden="true"></i><b id="orbN">0 / 20</b><span id="orbZone">Orbs</span></div>
 <div class="toast" id="toast" role="status"></div>
 <div class="topbar">
@@ -418,7 +431,7 @@ function zone2Height(x, y){
 }
 // zone 3: the lake basin, highlands to the west around the watcher, low ridges to the east
 function zone3Height(x, y){
-  const m = smooth01(12, 60, y - riverY(x));
+  const m = smooth01(12, 60, y - riverY(x)) * (1 - smooth01(0, 45, y - divideY(x)));   // fades out beyond the divide
   if (m <= 0) return 0;
   const hills = 3.5*Math.sin(x/41 + 1.2)*Math.cos(y/33) + 1.6*Math.sin((x + 2*y)/29)
               + 9*Math.exp(-((x-30)**2 + (y-300)**2) / (2*45*45)) + 6*Math.exp(-((x-370)**2 + (y-320)**2) / (2*40*40));
@@ -434,7 +447,7 @@ function divideHeight(x, y){
 // zone 4: broad open snowfields beyond the divide, long gentle swells
 function zone4Height(x, y){
   const m = smooth01(20, 70, y - divideY(x)); if (m <= 0) return 0;
-  return m * (5*Math.sin(x/61 + 0.4)*Math.cos(y/47) + 2.5*Math.sin((x - y)/33) + 7*Math.exp(-((x-330)**2 + (y-640)**2)/(2*55*55)));
+  return m * (5*Math.sin(x/61 + 0.4)*Math.cos(y/47) + 1.5*Math.sin((x - y)/33) + 7*Math.exp(-((x-330)**2 + (y-640)**2)/(2*55*55)));
 }
 function riverCut(x, y){ return -2.6 * (1 - smooth01(RIVER_HW - 1, RIVER_BANK + 4, Math.abs(y - riverY(x)))); }
 function heightNat(x, y){
@@ -496,6 +509,7 @@ let gateOpen = false, gate2Open = false, gate4Open = false;
 let SOLIDS = [];           // round footprints of the outpost's buildings (filled in once they're placed)
 let MOOSE = [];            // the tentacle moose wandering zones 2 and 3 (they're solid too)
 let NPCS = [];             // people and natives, standing or walking loops (solid, small)
+let HERD = [];             // the moose herd at the far end of zone 4
 function obstacleSD(x, y, terrainOnly = false){
   // zone 1's mountains, with the east pass carved through them
   const dx = x - RING.x, dy = y - RING.y, r = Math.hypot(dx, dy), th = Math.atan2(dy, dx);
@@ -533,6 +547,7 @@ function obstacleSD(x, y, terrainOnly = false){
   // buildings and equipment
   for (const o of SOLIDS){ const q = Math.hypot(x - o.x, y - o.y) - o.r; if (q < d) d = q; }
   for (const m of MOOSE){ const q = Math.hypot(x - m.x, y - m.y) - 1.4; if (q < d) d = q; }
+  for (const h of HERD){ const q = Math.hypot(x - h.x, y - h.y) - (h.calf ? 0.8 : 1.4); if (q < d) d = q; }
   for (const n of NPCS){ const q = Math.hypot(x - n.x, y - n.y) - 0.45; if (q < d) d = q; }
   return d;
 }
@@ -588,14 +603,15 @@ const TRAILS = [
   { name:'Far Shore',        diff:'green',  zone:3, pts:[[175,364],[228,396],[290,398],[322,378],[305,350]] },
   // through the divide: from the south shore past the broken circle to the crystal gate, and on into zone 4
   { name:'Crystal Gate',     diff:'blue',   zone:0, pts:[[175,364],[150,392],[124,420],[104,446],[G4.x,G4.y],[G4.x,G4.y + 30]] },
-  { name:'Frost Road',       diff:'green',  zone:4, pts:[[G4.x,G4.y + 30],[140,540],[205,562],[262,604],[236,652],[166,682],[96,656],[62,594],[G4.x,G4.y + 30]] },
+  { name:'Frost Road',       diff:'blue',   zone:4, pts:[[G4.x,G4.y + 30],[130,530],[176,520],[214,548],[204,586],[250,610],[300,590],[345,616],[360,660],[322,690],[272,676],[226,700],[170,688],[130,660],[80,676],[40,640],[56,600],[20,566],[46,530],[G4.x,G4.y + 30]] },
+  { name:'Herd Trail',       diff:'green',  zone:4, pts:[[226,700],[238,716],[262,722],[282,716]] },
 ];
 for (const t of TRAILS) if (t.zone === undefined) t.zone = 1;   // trails carry their zone's orbs; zone 0 = connectors
 const JUNCTIONS = [
   { name:'Stadium', x:0, y:0 }, { name:'North Jct', x:0, y:-40 }, { name:'Summit Jct', x:5, y:-135 }, { name:'Valley Jct', x:-78, y:-30 }, { name:'East Jct', x:50, y:-62 },
   { name:'Pass Jct', x:248, y:-75 }, { name:'Crown Jct', x:380, y:-150 }, { name:'Rim Jct', x:400, y:-10 }, { name:'Bridge', x:BRIDGE.x, y:BRIDGE.yN - 1 },
   { name:'Saddle', x:SADDLE.x, y:SADDLE.y }, { name:'Lower Bridge', x:BRIDGE2.x, y:BRIDGE2.yS + 1 }, { name:'Watcher Jct', x:100, y:212 }, { name:'Ribs Jct', x:250, y:205 },
-  { name:'North Shore', x:175, y:236 }, { name:'South Shore', x:175, y:364 }, { name:'West Shore', x:81, y:300 }, { name:'East Shore', x:264.5, y:325.2 }, { name:'Far Jct', x:305, y:350 }, { name:'Crystal Gate', x:G4.x, y:G4.y }, { name:'Frost Jct', x:G4.x, y:G4.y + 30 },
+  { name:'North Shore', x:175, y:236 }, { name:'South Shore', x:175, y:364 }, { name:'West Shore', x:81, y:300 }, { name:'East Shore', x:264.5, y:325.2 }, { name:'Far Jct', x:305, y:350 }, { name:'Crystal Gate', x:G4.x, y:G4.y }, { name:'Frost Jct', x:G4.x, y:G4.y + 30 }, { name:'Herd Jct', x:226, y:700 },
 ];
 // smooth each trail through its control points (Catmull-Rom), sampled about every metre
 for (const t of TRAILS){
@@ -1902,6 +1918,25 @@ function lawnSD(x, y){
 // how groomed the snow is from the lawns: 0 groomed, 1 ungroomed, with the same soft edge as trails
 function apronOff(x, y){ const e = lawnSD(x, y); return e <= -0.5 ? 0 : e >= 0 ? 1 : (e + 0.5)/0.5; }
 
+// ---- zone 4: purple crystal outcrops scattered over the snowfields (just rock, no glow), and at the far southern
+// end, a herd of purple moose: adults and antlerless calves, some asleep in the snow
+const HERD_C = { x: 312, y: 730 };
+const OUTCROPS = (() => {
+  let seed = 4040; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const out = [];
+  for (let k = 0; k < 900 && out.length < 30; k++){
+    const x = WORLD.x0 + 40 + rnd()*(WORLD.x1 - WORLD.x0 - 80), y = divideY(x) + 30 + rnd()*(WORLD.y1 - divideY(x) - 60);
+    const size = 0.8 + rnd()*rnd()*2.6;
+    if (zoneAt(x, y) !== 4 || obstacleSD(x, y, true) < 3 + size) continue;
+    if (nearestTrail(x, y).d < 6 + size*2) continue;
+    if (Math.hypot(x - HERD_C.x, y - HERD_C.y) < 40) continue;
+    if (out.some(o => Math.hypot(o.x - x, o.y - y) < 16 + (o.size + size)*3)) continue;
+    out.push({ x, y, size, rot: rnd()*6.3, seed: (rnd()*1e6) | 0 });
+  }
+  return out;
+})();
+for (const o of OUTCROPS) if (o.size > 1.6) SOLIDS.push({ x: o.x, y: o.y, r: o.size*0.9 });
+
 // ---- trees: simple spruces (a trunk and two cone tiers) scattered in patches, kept off the trails and the start.
 // placement is seeded so the forest is the same every time. drawn as instanced meshes, so hundreds cost little.
 const trees = (() => {
@@ -1930,6 +1965,7 @@ const trees = (() => {
     if (Math.hypot(x, y) < 14) continue;                              // open stadium
     if (STRUCTS.some(o => Math.hypot(o.x - x, o.y - y) < o.r + 1.5)) continue;   // nor in the buildings
     if (lawnSD(x, y) < 2.5) continue;                                 // nor on their lawns
+    if (OUTCROPS.some(o => Math.hypot(o.x - x, o.y - y) < o.size*2 + 2) || Math.hypot(x - HERD_C.x, y - HERD_C.y) < 38) continue;
     if (crowded(x, y)) continue;                                      // no two trunks on top of each other
     const t = { x, y, s: 0.7 + rnd()*0.7, r: rnd()*Math.PI*2 };
     out.push(t); const c = cell(t); if (!grid.has(c)) grid.set(c, []); grid.get(c).push(t);
@@ -2126,7 +2162,7 @@ function updateOrbs(dt){
     const bob = Math.sin(now/600 + o.ph) * 0.12, pulse = 1.45 + Math.sin(now/380 + o.ph) * 0.12;
     o.g.position.y = height(o.x, o.y) + 1.1 + bob; o.halo.scale.set(pulse, pulse, 1);
     if (Math.hypot(S.x - o.x, S.y - o.y) < ORB_R){
-      o.got = true; o.fade = 0; music.chime(orbsGot(o.zone) / zoneOrbs(o.zone).length);
+      o.got = true; o.fade = 0; music.chime(orbsGot(o.zone) / zoneOrbs(o.zone).length); saveProgress();
       if (o.zone === 1 && orbsGot(1) === ORB_COUNT[1] && !gateOpen){ setGateOpen(true); toast('All orbs found. The east gate is open.'); music.chime(1, true); }
       if (o.zone === 2 && orbsGot(2) === ORB_COUNT[2] && !bridgeWanted){ bridgeWanted = true; toast('All orbs found. The bridge is coming down.'); music.chime(1, true); }
       if (o.zone === 3 && orbsGot(3) === ORB_COUNT[3] && !gate2Open){ gate2Open = true; setCrystalsActive(true); toast('All orbs found. The south gate is open, and purple crystals have appeared across the map.'); music.chime(1, true); }
@@ -2144,14 +2180,15 @@ function setOrbsCollected(zone, n){
   if (zone === 2) bridgeWanted = n === ORB_COUNT[2];
   if (zone === 3){ gate2Open = n === ORB_COUNT[3]; setCrystalsActive(gate2Open); }
 }
-{ const el = $('tCry'); el.addEventListener('input', () => { if (!crystalsActive) setCrystalsActive(true); setCrystalsCollected(+el.value); $('oCry').textContent = el.value + ' / ' + CRYSTAL_TOTAL; }); }
+{ const el = $('tCry'); el.addEventListener('input', () => { if (!crystalsActive) setCrystalsActive(true); setCrystalsCollected(+el.value); saveProgress(); $('oCry').textContent = el.value + ' / ' + CRYSTAL_TOTAL; }); }
 for (const z of [1, 2, 3]){
   const el = $('tOrb' + z);
-  el.addEventListener('input', () => { setOrbsCollected(z, +el.value); $('oOrb' + z).textContent = el.value + ' / ' + ORB_COUNT[z]; });
+  el.addEventListener('input', () => { setOrbsCollected(z, +el.value); saveProgress(); $('oOrb' + z).textContent = el.value + ' / ' + ORB_COUNT[z]; });
 }
 function resetOrbs(){
   for (const o of orbs){ o.got = false; o.fade = 0; o.g.visible = true; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; }
   setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; setCrystalsCollected(0); setCrystalsActive(false); gate4Open = false; gate4.open = 0; bridgeWanted = false; bridgeDown = 0; animateGate(0);
+  saveProgress();
 }
 
 // ---- structure models: low-poly sci-fi outpost kit in the frost palette (slate, steel blue, pale grey, an orange
@@ -2639,7 +2676,7 @@ const MG = {
   tine: new THREE.ConeGeometry(0.07, 0.5, 5), beam: new THREE.CylinderGeometry(0.07, 0.09, 0.7, 6),
 };
 function mpart(parent, geo, mat, x, y, z, sx = 1, sy = 1, sz = 1){ const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); parent.add(m); return m; }
-function buildMoose(){
+function buildMoose(calf = false){
   // faces -z (north) at rotation 0, like the skier; feet on y = 0
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
   mpart(body, MG.ball, MOOSE_MAT.hide, 0, 2.1, 0.1, 0.85, 0.8, 1.65);          // barrel
@@ -2651,7 +2688,7 @@ function buildMoose(){
   mpart(head, MG.ball, MOOSE_MAT.hide, 0, 0.15, -0.95, 0.4, 0.45, 0.6);       // skull
   mpart(head, MG.ball, MOOSE_MAT.dark, 0, -0.15, -1.5, 0.32, 0.32, 0.45);     // long drooping muzzle
   for (const sx of [-1, 1]) mpart(head, MG.small, MOOSE_MAT.eye, sx*0.3, 0.3, -1.12, 0.07, 0.07, 0.07);
-  for (const sx of [-1, 1]){
+  if (!calf) for (const sx of [-1, 1]){
     // palmate antlers: a beam out to a broad flat palm with tines round its edge
     const a = new THREE.Group();
     const bm = mpart(a, MG.beam, MOOSE_MAT.antler, sx*0.3, 0.2, 0); bm.rotation.z = -sx*1.0;
@@ -2953,7 +2990,7 @@ function updateCrystals(dt){
     c.g.rotation.y = now*0.3 + c.ph;
     c.beam.scale.set(1 + 0.08*Math.sin(now*3 + c.ph), 1, 1 + 0.08*Math.sin(now*3 + c.ph));
     if (Math.hypot(S.x - c.x, S.y - c.y) < 2.4){
-      c.got = true; c.fade = 0; music.chime(crystalsGot()/CRYSTAL_TOTAL, crystalsGot() === CRYSTAL_TOTAL);
+      c.got = true; c.fade = 0; music.chime(crystalsGot()/CRYSTAL_TOTAL, crystalsGot() === CRYSTAL_TOTAL); saveProgress();
       if (crystalsGot() === CRYSTAL_TOTAL && !gate4Open){ gate4Open = true; toast('All crystals found. The crystal gate in the southern divide is opening.'); }
       else toast('Crystal ' + crystalsGot() + ' of ' + CRYSTAL_TOTAL);
     }
@@ -2994,6 +3031,90 @@ function animateGate4(dt){
   const e = gate4.open*gate4.open*(3 - 2*gate4.open);
   for (const d of gate4.doors) d.hinge.rotation.y = d.sx * e * 1.6;         // swing in toward zone 4 (+y)
   gate4.gemTop.rotation.y += dt*0.5;
+}
+
+// outcrop meshes: a cluster of long faceted crystals leaning out of the snow, merged into one mesh each
+{
+  const m1 = lam(0x7d45b8), m2 = lam(0xa679d6), m3 = lam(0x5b3290);
+  for (const k of [m1, m2, m3]) k.flatShading = true;
+  for (const o of OUTCROPS){
+    let seed = o.seed || 1; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const g = new THREE.Group(), n = 4 + (rnd()*6 | 0);
+    for (let k = 0; k < n; k++){
+      const h = (k ? 0.6 + rnd()*1.2 : 1.6) * o.size, w = (0.25 + rnd()*0.2) * o.size, a = rnd()*Math.PI*2, d = k ? (0.3 + rnd()*0.7)*o.size : 0;
+      const m = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), [m1, m2, m3][k % 3]);
+      m.scale.set(w, h, w*(0.7 + rnd()*0.5)); m.position.set(Math.cos(a)*d, h*0.55 - 0.2, Math.sin(a)*d);
+      m.rotation.set((rnd() - 0.5)*0.9, rnd()*3, (rnd() - 0.5)*0.9); g.add(m);
+    }
+    for (let k = 0; k < 3; k++){ const r = new THREE.Mesh(new THREE.DodecahedronGeometry(0.35*o.size, 0), SM.scrap); r.position.set((rnd() - 0.5)*o.size*2, 0, (rnd() - 0.5)*o.size*2); g.add(r); }
+    const merged = mergeModel(g); merged.position.set(o.x, height(o.x, o.y), o.y); merged.rotation.y = o.rot; scene.add(merged);
+  }
+}
+// the herd: grazers wander small circles and stop to graze; sleepers lie folded in the snow, breathing slowly.
+// calves are smaller and have no antlers.
+HERD = (() => {
+  let seed = 777; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const out = [], roles = ['sleep', 'sleep', 'sleep', 'sleep', 'graze', 'graze', 'graze', 'graze', 'graze', 'calfsleep', 'calfsleep', 'calf', 'calf', 'calf'];
+  for (const role of roles){
+    const calf = role.startsWith('calf');
+    for (let t = 0; t < 60; t++){
+      const a = rnd()*Math.PI*2, d = rnd()*24, x = HERD_C.x + Math.cos(a)*d, y = HERD_C.y + Math.sin(a)*d*0.6;
+      if (obstacleSD(x, y, true) < 3 || out.some(h => Math.hypot(h.x - x, h.y - y) < (calf || h.calf ? 4 : 6))) continue;
+      out.push({ role, calf, sleep: role.includes('sleep'), x, y, hx: x, hy: y, R: 3 + rnd()*5, a: rnd()*6.3, dir: rnd() < 0.5 ? 1 : -1,
+                 th: rnd()*6.3, ph: rnd()*10, timer: rnd()*5, grazing: false, gait: 0 });
+      break;
+    }
+  }
+  for (const h of out){ h.rig = buildMoose(h.calf); if (h.calf) h.rig.root.scale.setScalar(0.55); }
+  return out;
+})();
+function updateHerd(dt){
+  const now = performance.now()/1000;
+  for (const h of HERD){
+    const r = h.rig, far = Math.hypot(h.x - S.x, h.y - S.y) > 150;
+    r.root.visible = !far; if (far) continue;
+    if (h.sleep){
+      // lying down: the body sunk to the snow, legs folded under, head low and turned, a slow breath
+      r.body.position.y = -1.3; r.body.scale.y = 1 + 0.025*Math.sin(now*1.1 + h.ph);
+      for (const L of r.legs){ L.hip.rotation.x = 1.25; L.knee.rotation.x = -2.5; }
+      r.head.rotation.set(0.55, 0.5*Math.sin(h.ph), 0.15);
+      for (const T of r.tentacles) T.segs.forEach((g, k) => { g.rotation.x = 0.35 + 0.05*Math.sin(now*0.8 + T.phase + k); g.rotation.z = 0; });
+    } else {
+      // graze: walk a few seconds round a little circle, stop, dip the head to the snow, carry on
+      h.timer -= dt;
+      if (h.timer <= 0){ h.grazing = !h.grazing; h.timer = h.grazing ? 3 + Math.random()*4 : 3 + Math.random()*5; }
+      const speed = h.grazing ? 0 : (h.calf ? 0.9 : 0.6);
+      h.a += h.dir * speed / h.R * dt;
+      h.x = h.hx + Math.cos(h.a)*h.R; h.y = h.hy + Math.sin(h.a)*h.R*0.7;
+      if (speed){ const want = Math.atan2(-Math.sin(h.a)*h.dir, -Math.cos(h.a)*0.7*h.dir); let d = want - h.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; h.th += d*Math.min(1, dt*2); }
+      h.gait += speed*dt;
+      const ph = h.gait/1.4*Math.PI*2, amp = speed ? 0.4 : 0;
+      for (const L of r.legs){ const q = ph + (L.set ? Math.PI : 0); L.hip.rotation.x = amp*Math.sin(q); L.knee.rotation.x = -Math.max(0, Math.cos(q))*amp*1.5; }
+      r.body.position.y = speed ? Math.abs(Math.sin(ph))*0.05 : 0;
+      const dip = h.grazing ? 0.75 + 0.08*Math.sin(now*2.3 + h.ph) : 0.05*Math.sin(now*0.7 + h.ph);
+      r.head.rotation.x += (dip - r.head.rotation.x) * Math.min(1, dt*2.5);
+      r.head.rotation.y = 0.2*Math.sin(now*0.4 + h.ph);
+      for (const T of r.tentacles) T.segs.forEach((g, k) => { g.rotation.x = 0.2*Math.sin(now*1.7 + T.phase + k*0.7) + 0.12; g.rotation.z = 0.18*Math.sin(now*1.2 + T.phase + k*0.5); });
+    }
+    r.root.position.set(h.x, height(h.x, h.y), h.y); r.root.rotation.y = -h.th;
+  }
+}
+
+// ---- progress: which orbs and crystals you've collected is kept in this browser, so the gates and the bridge stay open
+const PROGRESS_KEY = 'skate-progress';
+function saveProgress(){
+  try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ v: 1, orbs: orbs.map(o => o.got ? 1 : 0).join(''), crystals: crystals.map(c => c.got ? 1 : 0).join('') })); } catch (e) {}
+}
+function loadProgress(){
+  let p = null; try { p = JSON.parse(localStorage.getItem(PROGRESS_KEY) || 'null'); } catch (e) {}
+  if (!p || p.v !== 1) return;
+  orbs.forEach((o, i) => { if (p.orbs?.[i] === '1'){ o.got = true; o.fade = 1; o.g.visible = false; } });
+  if (orbsGot(1) === ORB_COUNT[1]){ gateOpen = true; gate.open = 1; }
+  if (orbsGot(2) === ORB_COUNT[2]){ bridgeWanted = true; bridgeDown = 1; }
+  if (orbsGot(3) === ORB_COUNT[3]){ gate2Open = true; gate2.open = 1; crystalsActive = true; }
+  crystals.forEach((c, i) => { if (p.crystals?.[i] === '1'){ c.got = true; c.fade = 1; } c.g.visible = crystalsActive && !c.got; });
+  if (crystalsGot() === CRYSTAL_TOTAL){ gate4Open = true; gate4.open = 1; }
+  animateGate(0); animateGate4(0);
 }
 
 // skier: a simple jointed figure built from boxes and cylinders, posed every frame from the game state. the pose is
@@ -3604,6 +3725,54 @@ const mapBox = zone => {
   return { x0: x0 - 30, x1: x1 + 30, y0: y0 - 30, y1: y1 + 30 };
 };
 const MAP_BOX = { 1: mapBox(1), 2: mapBox(2), 3: mapBox(3), 4: mapBox(4) };
+// the map's contents (terrain features, trails, buildings, orbs, crystals, gates), drawn into any 2D context at any
+// scale: the corner minimap uses it, and so does the full-screen map on phones. people and animals aren't shown.
+function renderMapLayers(g, MAP, mx, my, mw, mh, sc){
+  const mX = x => mx + (x - MAP.x0)*sc, mY = y => my + (y - MAP.y0)*sc;
+  g.save(); g.beginPath(); g.rect(mx - 6, my - 6, mw + 12, mh + 12); g.clip();
+  // mountains (drawn as a band along their crest, plus the spur) and the river
+  g.globalAlpha = 0.35; g.strokeStyle = C.rock; g.lineJoin = 'round'; g.lineCap = 'round';
+  g.lineWidth = Math.max(3, 50 * sc);
+  g.beginPath();
+  for (let k = 0; k <= 96; k++){ const th = k/96*2*Math.PI, r = ringCrest(th), x = mX(RING.x + r*Math.cos(th)), y = mY(RING.y + r*Math.sin(th)); k ? g.lineTo(x, y) : g.moveTo(x, y); }
+  g.stroke();
+  g.lineWidth = Math.max(3, SPUR.hw*2*sc); g.beginPath(); g.moveTo(mX(SPUR.x1), mY(SPUR.y1)); g.lineTo(mX(SPUR.x2), mY(SPUR.y2)); g.stroke();
+  g.globalAlpha = 0.8; g.strokeStyle = C.water; g.lineWidth = Math.max(1.5, RIVER_HW*2*sc);
+  g.beginPath(); for (let x = WORLD.x0; x <= WORLD.x1; x += 6){ x === WORLD.x0 ? g.moveTo(mX(x), mY(riverY(x))) : g.lineTo(mX(x), mY(riverY(x))); } g.stroke();
+  g.globalAlpha = 0.9; g.fillStyle = C.lake; g.beginPath();
+  for (let k = 0; k <= 48; k++){ const th = k/48*2*Math.PI; let lo = 0, hi = 2; for (let it = 0; it < 12; it++){ const m = (lo + hi)/2; lakeQ(LAKE.x + Math.cos(th)*m*LAKE.rx, LAKE.y + Math.sin(th)*m*LAKE.ry) < 1 ? lo = m : hi = m; } const x = mX(LAKE.x + Math.cos(th)*lo*LAKE.rx), y = mY(LAKE.y + Math.sin(th)*lo*LAKE.ry); k ? g.lineTo(x, y) : g.moveTo(x, y); }
+  g.fill();
+  g.globalAlpha = 1;
+  g.lineWidth = 2.5; g.lineCap = 'round'; g.lineJoin = 'round';
+  for (const t of TRAILS){
+    g.strokeStyle = C[t.diff]; g.beginPath();
+    g.moveTo(mX(t.s[0]), mY(t.s[1]));
+    for (let i = 2; i < t.s.length; i += 2) g.lineTo(mX(t.s[i]), mY(t.s[i+1]));
+    g.stroke();
+  }
+  // the divide (a rock band) with the crystal gate, and the crystals once they're out (purple diamonds)
+  g.globalAlpha = 0.35; g.strokeStyle = C.rock; g.lineWidth = Math.max(3, DIVIDE_BAND*2*sc);
+  g.beginPath(); for (let x = WORLD.x0; x <= WORLD.x1; x += 8){ x === WORLD.x0 ? g.moveTo(mX(x), mY(divideY(x))) : g.lineTo(mX(x), mY(divideY(x))); } g.stroke();
+  g.globalAlpha = 1; g.lineWidth = 3; g.strokeStyle = gate4Open ? '#a45ae6' : C.ink;
+  g.beginPath(); g.moveTo(mX(G4.x - G4.hw), mY(G4.y)); g.lineTo(mX(G4.x + G4.hw), mY(G4.y)); g.stroke();
+  if (crystalsActive){ g.fillStyle = '#a45ae6'; for (const c of crystals) if (!c.got){ const X = mX(c.x), Y = mY(c.y); g.beginPath(); g.moveTo(X, Y - 4); g.lineTo(X + 3, Y); g.lineTo(X, Y + 4); g.lineTo(X - 3, Y); g.fill(); } }
+  // buildings, as small grey blocks (the key ones larger)
+  g.fillStyle = C.muted;
+  for (const o of STRUCTS){ const q = o.key ? 4 : 2.4; g.fillRect(mX(o.x) - q/2, mY(o.y) - q/2, q, q); }
+  // orbs still out there, the gate (a bar across the pass) and the bridge: dark while shut, gold once open
+  g.fillStyle = C.orb;
+  for (const o of orbs) if (!o.got){ g.beginPath(); g.arc(mX(o.x), mY(o.y), 2, 0, Math.PI*2); g.fill(); }
+  g.lineWidth = 3; g.lineCap = 'butt';
+  g.strokeStyle = gateOpen ? C.orb : C.ink;
+  g.beginPath(); g.moveTo(mX(GATE.x), mY(GATE.y - PASS_HW)); g.lineTo(mX(GATE.x), mY(GATE.y + PASS_HW)); g.stroke();
+  g.strokeStyle = bridgeWanted ? C.orb : C.ink;
+  g.beginPath(); g.moveTo(mX(BRIDGE.x), mY(BRIDGE.yN)); g.lineTo(mX(BRIDGE.x), mY(BRIDGE.yS)); g.stroke();
+  g.strokeStyle = C.ink; g.beginPath(); g.moveTo(mX(BRIDGE2.x), mY(BRIDGE2.yN)); g.lineTo(mX(BRIDGE2.x), mY(BRIDGE2.yS)); g.stroke();
+  g.strokeStyle = gate2Open ? C.orb : C.ink;
+  g.beginPath(); g.moveTo(mX(SADDLE.x - 5), mY(SADDLE.y)); g.lineTo(mX(SADDLE.x + 5), mY(SADDLE.y)); g.stroke();
+  g.restore();
+  return { mX, mY };
+}
 function drawMinimap(){
   const MAP = MAP_BOX[zoneAt(S.x, S.y)];
   const size = W < 520 ? 104 : 150, pad = 16;
@@ -3616,55 +3785,33 @@ function drawMinimap(){
   if (!devView) $('playLeft').style.left = (pad + mw + 26) + 'px';
   ctx.fillStyle = C.mapbg; ctx.strokeStyle = C.line; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.roundRect ? ctx.roundRect(mx - 6, my - 6, mw + 12, mh + 12, 6) : ctx.rect(mx - 6, my - 6, mw + 12, mh + 12); ctx.fill(); ctx.stroke();
-  const mX = x => mx + (x - MAP.x0)*sc, mY = y => my + (y - MAP.y0)*sc;
-  ctx.save(); ctx.beginPath(); ctx.rect(mx - 6, my - 6, mw + 12, mh + 12); ctx.clip();
-  // mountains (drawn as a band along their crest, plus the spur) and the river
-  ctx.globalAlpha = 0.35; ctx.strokeStyle = C.rock; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  ctx.lineWidth = Math.max(3, 50 * sc);
-  ctx.beginPath();
-  for (let k = 0; k <= 96; k++){ const th = k/96*2*Math.PI, r = ringCrest(th), x = mX(RING.x + r*Math.cos(th)), y = mY(RING.y + r*Math.sin(th)); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
-  ctx.stroke();
-  ctx.lineWidth = Math.max(3, SPUR.hw*2*sc); ctx.beginPath(); ctx.moveTo(mX(SPUR.x1), mY(SPUR.y1)); ctx.lineTo(mX(SPUR.x2), mY(SPUR.y2)); ctx.stroke();
-  ctx.globalAlpha = 0.8; ctx.strokeStyle = C.water; ctx.lineWidth = Math.max(1.5, RIVER_HW*2*sc);
-  ctx.beginPath(); for (let x = WORLD.x0; x <= WORLD.x1; x += 6){ x === WORLD.x0 ? ctx.moveTo(mX(x), mY(riverY(x))) : ctx.lineTo(mX(x), mY(riverY(x))); } ctx.stroke();
-  ctx.globalAlpha = 0.9; ctx.fillStyle = C.lake; ctx.beginPath();
-  for (let k = 0; k <= 48; k++){ const th = k/48*2*Math.PI; let lo = 0, hi = 2; for (let it = 0; it < 12; it++){ const m = (lo + hi)/2; lakeQ(LAKE.x + Math.cos(th)*m*LAKE.rx, LAKE.y + Math.sin(th)*m*LAKE.ry) < 1 ? lo = m : hi = m; } const x = mX(LAKE.x + Math.cos(th)*lo*LAKE.rx), y = mY(LAKE.y + Math.sin(th)*lo*LAKE.ry); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  for (const t of TRAILS){
-    ctx.strokeStyle = C[t.diff]; ctx.beginPath();
-    ctx.moveTo(mX(t.s[0]), mY(t.s[1]));
-    for (let i = 2; i < t.s.length; i += 2) ctx.lineTo(mX(t.s[i]), mY(t.s[i+1]));
-    ctx.stroke();
-  }
-  // the divide (a rock band) with the crystal gate, and the crystals once they're out (purple diamonds)
-  ctx.globalAlpha = 0.35; ctx.strokeStyle = C.rock; ctx.lineWidth = Math.max(3, DIVIDE_BAND*2*sc);
-  ctx.beginPath(); for (let x = WORLD.x0; x <= WORLD.x1; x += 8){ x === WORLD.x0 ? ctx.moveTo(mX(x), mY(divideY(x))) : ctx.lineTo(mX(x), mY(divideY(x))); } ctx.stroke();
-  ctx.globalAlpha = 1; ctx.lineWidth = 3; ctx.strokeStyle = gate4Open ? '#a45ae6' : C.ink;
-  ctx.beginPath(); ctx.moveTo(mX(G4.x - G4.hw), mY(G4.y)); ctx.lineTo(mX(G4.x + G4.hw), mY(G4.y)); ctx.stroke();
-  if (crystalsActive){ ctx.fillStyle = '#a45ae6'; for (const c of crystals) if (!c.got){ const X = mX(c.x), Y = mY(c.y); ctx.beginPath(); ctx.moveTo(X, Y - 4); ctx.lineTo(X + 3, Y); ctx.lineTo(X, Y + 4); ctx.lineTo(X - 3, Y); ctx.fill(); } }
-  // the moose, as purple dots
-  ctx.fillStyle = '#8e4fbf';
-  for (const m of MOOSE){ ctx.beginPath(); ctx.arc(mX(m.x), mY(m.y), 2.2, 0, Math.PI*2); ctx.fill(); }
-  // buildings, as small grey blocks (the key ones larger)
-  ctx.fillStyle = C.muted;
-  for (const o of STRUCTS){ const q = o.key ? 4 : 2.4; ctx.fillRect(mX(o.x) - q/2, mY(o.y) - q/2, q, q); }
-  // orbs still out there, the gate (a bar across the pass) and the bridge: dark while shut, gold once open
-  ctx.fillStyle = C.orb;
-  for (const o of orbs) if (!o.got){ ctx.beginPath(); ctx.arc(mX(o.x), mY(o.y), 2, 0, Math.PI*2); ctx.fill(); }
-  ctx.lineWidth = 3; ctx.lineCap = 'butt';
-  ctx.strokeStyle = gateOpen ? C.orb : C.ink;
-  ctx.beginPath(); ctx.moveTo(mX(GATE.x), mY(GATE.y - PASS_HW)); ctx.lineTo(mX(GATE.x), mY(GATE.y + PASS_HW)); ctx.stroke();
-  ctx.strokeStyle = bridgeWanted ? C.orb : C.ink;
-  ctx.beginPath(); ctx.moveTo(mX(BRIDGE.x), mY(BRIDGE.yN)); ctx.lineTo(mX(BRIDGE.x), mY(BRIDGE.yS)); ctx.stroke();
-  ctx.strokeStyle = C.ink; ctx.beginPath(); ctx.moveTo(mX(BRIDGE2.x), mY(BRIDGE2.yN)); ctx.lineTo(mX(BRIDGE2.x), mY(BRIDGE2.yS)); ctx.stroke();
-  ctx.strokeStyle = gate2Open ? C.orb : C.ink;
-  ctx.beginPath(); ctx.moveTo(mX(SADDLE.x - 5), mY(SADDLE.y)); ctx.lineTo(mX(SADDLE.x + 5), mY(SADDLE.y)); ctx.stroke();
-  ctx.restore();
+  const { mX, mY } = renderMapLayers(ctx, MAP, mx, my, mw, mh, sc);
   const px = Math.min(mx + mw, Math.max(mx, mX(S.x))), py = Math.min(my + mh, Math.max(my, mY(S.y)));
   ctx.fillStyle = C.skier; ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI*2); ctx.fill();
   ctx.strokeStyle = C.skier; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.sin(camTarget())*9, py - Math.cos(camTarget())*9); ctx.stroke();
+}
+// the full-screen map (phones): the whole reachable world, fitted to the screen, redrawn while it's open
+let mapOpen = false;
+const bigCv = $('bigMapCv'), bigCtx = bigCv.getContext('2d');
+function setMapOpen(on){ mapOpen = on; $('bigMap').classList.toggle('on', on); if (on) drawBigMap(); }
+for (const [id, on] of [['mapBtn', true], ['mapClose', false]]) $(id).addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); setMapOpen(on); });
+$('bigMap').addEventListener('pointerdown', e => { if (e.target === bigCv) setMapOpen(false); });
+function drawBigMap(){
+  const w = innerWidth, h = innerHeight, r = Math.min(devicePixelRatio || 1, 2);
+  if (bigCv.width !== Math.round(w*r) || bigCv.height !== Math.round(h*r)){ bigCv.width = Math.round(w*r); bigCv.height = Math.round(h*r); }
+  bigCtx.setTransform(r, 0, 0, r, 0, 0); bigCtx.clearRect(0, 0, w, h);
+  const M = { x0: WORLD.x0 + EDGE_WALL - 8, x1: WORLD.x1 - EDGE_WALL + 8, y0: WORLD.y0 + EDGE_WALL - 8, y1: WORLD.y1 - EDGE_WALL + 8 };
+  const top = 72, pad = 16, sc = Math.min((w - 2*pad) / (M.x1 - M.x0), (h - top - pad) / (M.y1 - M.y0));
+  const mw = (M.x1 - M.x0)*sc, mh = (M.y1 - M.y0)*sc, mx = (w - mw)/2, my = top + (h - top - pad - mh)/2;
+  bigCtx.fillStyle = C.mapbg; bigCtx.fillRect(mx - 6, my - 6, mw + 12, mh + 12);
+  const { mX, mY } = renderMapLayers(bigCtx, M, mx, my, mw, mh, sc);
+  // zone numbers, faint, in the middle of each zone
+  bigCtx.fillStyle = C.muted; bigCtx.globalAlpha = 0.5; bigCtx.font = '700 22px ' + getComputedStyle(document.body).fontFamily; bigCtx.textAlign = 'center'; bigCtx.textBaseline = 'middle';
+  for (const [n, x, y] of [[1, RING.x, RING.y - 30], [2, 360, -60], [3, 175, 250], [4, 200, 640]]) bigCtx.fillText(n, mX(x), mY(y));
+  bigCtx.globalAlpha = 1;
+  const px = mX(S.x), py = mY(S.y), th = camTarget();
+  bigCtx.fillStyle = C.skier; bigCtx.beginPath(); bigCtx.arc(px, py, 5, 0, Math.PI*2); bigCtx.fill();
+  bigCtx.strokeStyle = C.skier; bigCtx.lineWidth = 2; bigCtx.beginPath(); bigCtx.moveTo(px, py); bigCtx.lineTo(px + Math.sin(th)*14, py - Math.cos(th)*14); bigCtx.stroke();
 }
 
 
@@ -3857,7 +4004,7 @@ function camTarget(){
 }
 function loop(t){
   const dt = Math.min(0.05, (t-last)/1000); last = t; pollPad(); step(dt);
-  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt);
+  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt);
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through
   const w = 3 / Math.max(0.05, P.cam);
@@ -3866,10 +4013,11 @@ function loop(t){
     camVel += (w*w*(camTarget() - camTh) - 2*w*camVel) * h;
     camTh += camVel * h;
   }
-  draw(); hud(); requestAnimationFrame(loop);
+  draw(); hud(); if (mapOpen) drawBigMap(); requestAnimationFrame(loop);
 }
+loadProgress();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

@@ -27,7 +27,15 @@ The keyboard and both controller schemes share one layout. Choose the controller
   - Flick a stick from centre to the edge for a passive step (other foot) or a kick turn (same foot).
   - In classic, swap one stick up and one down to kick.
 - **Animation:** trigger and key kicks animate as V1 (offset), and stick strokes as V2.
-- **Touch screens:** tap the labelled **Left kick** / **Right kick** pads at the bottom of the screen. Between them sits the only other control, a toggle: **\/** means skate and **||** means classic. A speaker button in the top-left corner mutes the music on any device. Double-tap and pinch zoom, text selection and the long-press Copy/Share menu are all disabled so fast kicking doesn't disturb the page on iOS.
+- **Touch screens:** the orb counter shows at the top. Tap the labelled **Left kick** / **Right kick** pads at the bottom of the screen. Between them sits the only other control, a toggle: **\/** means skate and **||** means classic. A speaker button in the top-left corner mutes the music on any device. Double-tap and pinch zoom, text selection and the long-press Copy/Share menu are all disabled so fast kicking doesn't disturb the page on iOS.
+
+## Levels
+
+The map is four times its old area and split into zones, each locked until you clear the one before it. Progress isn't saved yet, and **Reset skier** in dev view puts the orbs and gate back.
+
+- **Zone 1 (north-west):** the original trail network, enclosed by a ring of impassable mountains. 20 glowing orbs sit along its trails. Collect them all to open the **East Gate** in the mountain pass. The counter at the top of the screen tracks them, and the map shows the orbs that are left.
+- **Zone 2 (north-east):** past the gate. Its terrain, trails and 30 orbs come in the next update, along with the bridge over the river.
+- **Zone 3 (the southern half):** across a river that spans the whole map. A frozen lake, switchbacks back up to zone 1, and 50 orbs are still to come.
 
 ## Interface
 
@@ -45,7 +53,8 @@ The keyboard and both controller schemes share one layout. Choose the controller
 - **Ski tracks:** marks are straight, the way a ski is, and are reset when you drift off a ski's line. Kick turns leave a herringbone pattern.
 - **Terrain and trails:**
   - Rolling terrain with a ridge and a valley, and gravity acts along the skis.
-  - Six groomed trails with green, blue and black ratings, plus scattered trees.
+  - Six groomed trails with green, blue and black ratings, plus the East Gate trail and scattered trees.
+  - Mountains, the river and the map edge stop you. The ground loads in tiles as you ski, and a coarse mesh carries the distant skyline.
   - Ungroomed snow is slower, except in classic. Double poles keep their full push off the trail.
 - **Trail assist:** gently steers your stride toward the trail ahead. It lets go when you lean, kick-turn or steer away.
 - **Skier:** V2 for stick strokes (load tall, push and compress, recover) and V1 offset poling for trigger and key kicks, with tuck, snow plow and classic poses.

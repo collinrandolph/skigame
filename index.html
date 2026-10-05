@@ -10,15 +10,15 @@
 /* Layout: full-bleed 2.5D chase view of the snowfield, skier ahead of the camera, slim HUD top-left, tuning drawer bottom-right, touch pads on phones */
 :root{
   --snow:#dfe7ee; --grid:#c4d1dd; --grid-major:#a9bccd; --ink:#1d2a36; --muted:#5d7083;
-  --skier:#d2462e; --track:#8fa6ba; --shade:#5b7a96; --contour:#9a8466; --groomed:#fbfdff; --cord:#eef3f8; --sky:#d3dee8; --trail-edge:#b9c8d6; --d-green:#2f8a4f; --d-blue:#2563b8; --d-black:#1d2a36; --map-bg:rgba(255,255,255,.88); --up:#b5532a; --down:#2f7a5a; --panel:rgba(255,255,255,.86); --line:#d3dde6;
+  --skier:#d2462e; --track:#8fa6ba; --shade:#5b7a96; --contour:#9a8466; --groomed:#fbfdff; --cord:#eef3f8; --sky:#d3dee8; --trail-edge:#b9c8d6; --d-green:#2f8a4f; --d-blue:#2563b8; --d-black:#1d2a36; --map-bg:rgba(255,255,255,.88); --up:#b5532a; --down:#2f7a5a; --panel:rgba(255,255,255,.86); --line:#d3dde6; --rock:#6f7f8e; --water:#5f8fb0; --water2:#4a7a9e; --ice:#c9dceb; --orb:#f5b324;
   --display:"Barlow Condensed","Arial Narrow",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --snow:#0b1218; --grid:#1d2a37; --grid-major:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4;
-  --skier:#ff6a4d; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; color-scheme:dark}}
+  --skier:#ff6a4d; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; --rock:#3a4652; --water:#1d3b52; --water2:#163045; --ice:#2a4256; --orb:#ffc64a; color-scheme:dark}}
 :root[data-theme="dark"]{
   --snow:#0b1218; --grid:#1d2a37; --grid-major:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4;
-  --skier:#ff6a4d; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; color-scheme:dark}
+  --skier:#ff6a4d; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; --rock:#3a4652; --water:#1d3b52; --water2:#163045; --ice:#2a4256; --orb:#ffc64a; color-scheme:dark}
 html,body{height:100%;touch-action:manipulation;-webkit-text-size-adjust:100%}
 *{-webkit-tap-highlight-color:transparent}
 body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -142,6 +142,18 @@ summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid
 .musicbtn[aria-pressed="false"]{color:var(--muted)}
 .musicbtn:focus-visible{outline:2px solid var(--skier);outline-offset:2px}
 body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
+
+/* ---- orb counter (top centre) and the one-line notices under it; shown in every view and on phones ---- */
+.orbhud{white-space:nowrap;position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);left:50%;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:10px;height:40px;padding:0 14px 0 10px;box-sizing:border-box;background:var(--panel);border:1px solid var(--line);border-radius:20px;backdrop-filter:blur(6px);pointer-events:none;color:var(--ink);font-family:var(--display)}
+.orbhud .gem{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 50% 50%,#fffbe8 0 22%,var(--orb) 52%,transparent 74%);box-shadow:0 0 10px var(--orb)}
+.orbhud b{font:700 20px/1 var(--display);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.orbhud span{font:600 12px/1 var(--display);color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+.orbhud.bump .gem{animation:orbbump .4s ease-out}
+@keyframes orbbump{0%{transform:scale(1)}40%{transform:scale(1.6)}100%{transform:scale(1)}}
+.orbhud[data-done="1"] b{color:var(--orb)}
+.toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 66px);left:50%;transform:translate(-50%,-6px);z-index:6;max-width:calc(100vw - 32px);box-sizing:border-box;padding:9px 14px;border-radius:6px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(6px);color:var(--ink);font:600 13px/1.3 var(--display);letter-spacing:.06em;text-align:center;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){.orbhud.bump .gem{animation:none}.toast{transition:none}}
 </style>
 </head>
 <body>
@@ -149,6 +161,8 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 <canvas id="c"></canvas>
 
 <button class="musicbtn" id="musicBtn" type="button" aria-pressed="true" aria-label="Music on/off" title="Music (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" fill-opacity=".15"/><g class="ic-on"><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/></g><g class="ic-off"><path d="M16 9.5l5 5M21 9.5l-5 5"/></g></svg></button>
+<div class="orbhud" id="orbHud" aria-live="polite"><i class="gem" aria-hidden="true"></i><b id="orbN">0 / 20</b><span id="orbZone">Orbs</span></div>
+<div class="toast" id="toast" role="status"></div>
 <div class="topbar">
   <button id="padBtn" class="iconbtn" type="button" aria-expanded="false" aria-controls="padPanel" title="Controller layout"><svg viewBox="0 0 32 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h14c4 0 6.5 3 7 8l.6 5.5c.3 3-2.6 4.6-4.7 2.6L22.5 17h-13L6.1 20.1C4 22.1 1.1 20.5 1.4 17.5L2 12c.5-5 3-8 7-8z"/><path d="M8.5 9.5v5M6 12h5"/><circle cx="21.5" cy="10.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="24.5" cy="13.5" r="1.1" fill="currentColor" stroke="none"/></svg></button>
   <button id="devBtn" class="iconbtn" type="button" aria-pressed="false" title="Dev mode: full HUD, tuning and debug tools (`)">Dev</button>
@@ -307,8 +321,37 @@ let skis = [];            // every ski mark: { x, y, dx, dy, bx, by, len, live }
 let showTracks = true, kicks = [], lastLeg = null, lastSki = { L:null, R:null };
 const legFlash = { L:0, R:0 };
 
+// ---- world layout (metres, y points south). four quadrants' worth of ground:
+//   zone 1 (north-west): the original trail network, ringed by impassable mountains, with a gate in the east pass
+//   zone 2 (north-east): reached through that gate
+//   a river runs west to east across the whole map; zone 3 is the southern half beyond it
+const WORLD = { x0:-170, x1:490, y0:-230, y1:450 };
+const RING = { x:-6, y:-58.5, rin:118, crest:145, rout:172, half:34 };   // mountain ring around zone 1: barrier from rin to rout
+const GATE = { x:139, y:-58.5, hw:4 };                                    // the gate sits in the east pass, on the crest line
+const EDGE_WALL = 25;                                                     // the outer mountains stop you this far from the map edge
+function riverY(x){ return 150 + 10*Math.sin(x/47) + 6*Math.sin(x/23 + 1); }
+const RIVER_HW = 7, RIVER_BANK = 9.5;                                     // water half-width; you're stopped at the bank
+const smooth01 = (a, b, v) => { const t = Math.max(0, Math.min(1, (v - a)/(b - a))); return t*t*(3 - 2*t); };
+
 // ---- terrain: gentle rolling hills, heights in metres (about ±3 m over 20–60 m wavelengths)
 const FLAT_GROUND = false;  // true makes the whole map level (no hills, no gravity pull), for testing
+function ringHeight(x, y){
+  const dx = x - RING.x, dy = y - RING.y, r = Math.hypot(dx, dy);
+  const th = Math.atan2(dy, dx);
+  const crest = RING.crest + 6*Math.sin(5*th + 0.4);
+  const u = (r - crest) / RING.half; if (Math.abs(u) >= 1) return 0;
+  const amp = 36 + 11*Math.sin(3*th + 1) + 7*Math.sin(7*th + 2) + 4*Math.sin(13*th) + 2.5*Math.sin(29*th + r/9);
+  let h = amp * 0.5*(1 + Math.cos(Math.PI*u));
+  if (dx > 0){ const lat = Math.abs(y - GATE.y); h *= 1 - Math.exp(-((lat/12)**2)); }      // the east pass, cut down to the valley floor
+  return h;
+}
+function edgeHeight(x, y){
+  const e = Math.min(x - WORLD.x0, WORLD.x1 - x, y - WORLD.y0, WORLD.y1 - y);
+  if (e >= 55) return 0;
+  const k = 1 - e/55;
+  return k*k*(48 + 9*Math.sin(x/17 + y/23) + 6*Math.sin((x - y)/11));
+}
+function riverCut(x, y){ return -2.6 * (1 - smooth01(RIVER_HW - 1, RIVER_BANK + 4, Math.abs(y - riverY(x)))); }
 function height(x, y){
   if (FLAT_GROUND) return 0;
   const roll = 1.5*Math.sin(x/23 + .7)*Math.cos(y/31)
@@ -318,7 +361,34 @@ function height(x, y){
   const ridge  =  8 * Math.exp(-((x-58)**2 + (y+92)**2) / (2*32*32));   // the ridge in the north-east
   const valley = -6 * Math.exp(-((x+68)**2 + (y+68)**2) / (2*28*28));   // the valley in the west
   const flat = 1 - 0.8*Math.exp(-(x*x + (y-5)**2) / (2*18*18));          // stadium is nearly level
-  return roll*flat + ridge + valley;
+  return roll*flat + ridge + valley + ringHeight(x, y) + edgeHeight(x, y) + riverCut(x, y);
+}
+// what can't be crossed, as a signed distance in metres: negative inside an obstacle
+let gateOpen = false;
+function obstacleSD(x, y){
+  // mountain ring, with the east pass carved through it
+  const r = Math.hypot(x - RING.x, y - RING.y);
+  let ring = Math.max(RING.rin - r, r - RING.rout);
+  const pass = Math.max(Math.abs(y - GATE.y) - GATE.hw, Math.abs(x - (RING.x + RING.crest)) - 45);
+  ring = Math.max(ring, -pass);
+  let d = ring;
+  if (!gateOpen) d = Math.min(d, Math.max(Math.abs(x - GATE.x) - 0.35, Math.abs(y - GATE.y) - GATE.hw - 1));
+  d = Math.min(d, Math.abs(y - riverY(x)) - RIVER_BANK);
+  d = Math.min(d, x - WORLD.x0 - EDGE_WALL, WORLD.x1 - EDGE_WALL - x, y - WORLD.y0 - EDGE_WALL, WORLD.y1 - EDGE_WALL - y);
+  return d;
+}
+const BODY_R = 0.35;
+function collide(){
+  // push the skier back out of anything solid and take away the part of their speed heading into it
+  for (let it = 0; it < 3; it++){
+    const d = obstacleSD(S.x, S.y) - BODY_R; if (d >= 0) return;
+    const e = 0.05;
+    let nx = obstacleSD(S.x + e, S.y) - obstacleSD(S.x - e, S.y), ny = obstacleSD(S.x, S.y + e) - obstacleSD(S.x, S.y - e);
+    const L = Math.hypot(nx, ny) || 1; nx /= L; ny /= L;
+    S.x -= nx * d; S.y -= ny * d;
+    const vn = S.vx*nx + S.vy*ny;
+    if (vn < 0){ S.vx -= vn*nx; S.vy -= vn*ny; S.vx *= 0.92; S.vy *= 0.92; }
+  }
 }
 
 // ---- groomed trail network. control points in metres; north is up (negative y).
@@ -331,9 +401,11 @@ const TRAILS = [
   { name:'Valley Run',       diff:'blue',  pts:[[5,-135],[-30,-125],[-62,-95],[-80,-62],[-78,-30]] },
   { name:'Cutoff',           diff:'green', pts:[[0,-40],[-35,-45],[-78,-30]] },
   { name:'Home Stretch',     diff:'green', pts:[[-78,-30],[-60,0],[-30,18],[0,0]] },
+  { name:'East Gate',        diff:'blue',  zone:0, pts:[[50,-62],[78,-56],[108,-58.5],[139,-58.5],[172,-58.5],[205,-64],[232,-75]] },
 ];
+for (const t of TRAILS) if (t.zone === undefined) t.zone = 1;   // zone 1 trails carry its orbs; zone 0 = connectors
 const JUNCTIONS = [
-  { name:'Stadium', x:0, y:0 }, { name:'North Jct', x:0, y:-40 }, { name:'Summit Jct', x:5, y:-135 }, { name:'Valley Jct', x:-78, y:-30 },
+  { name:'Stadium', x:0, y:0 }, { name:'North Jct', x:0, y:-40 }, { name:'Summit Jct', x:5, y:-135 }, { name:'Valley Jct', x:-78, y:-30 }, { name:'East Jct', x:50, y:-62 },
 ];
 // smooth each trail through its control points (Catmull-Rom), sampled about every metre
 for (const t of TRAILS){
@@ -355,6 +427,7 @@ for (const t of TRAILS){
     const dh = height(out[i],out[i+1]) - height(out[i-2],out[i-1]); if (dh > 0) climb += dh;
   }
   t.len = len; t.climb = climb;
+  { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; for (let i = 0; i < out.length; i += 2){ a = Math.min(a, out[i]); b = Math.min(b, out[i+1]); c = Math.max(c, out[i]); d = Math.max(d, out[i+1]); } t.bx = [a - TRAIL_W, b - TRAIL_W, c + TRAIL_W, d + TRAIL_W]; }
   const m = (out.length/4|0)*2; t.mid = [out[m], out[m+1]];
 }
 // distance from a point to the nearest groomed centre line
@@ -1088,10 +1161,24 @@ const music = (() => {
   addEventListener('keydown', e => { if ((e.key === 'm' || e.key === 'M') && !e.repeat && !e.target.closest?.('input,textarea,select')) set(!on); });
   setInterval(() => { if (!on || (ctx && ctx.state === 'running' && src)) return;
     for (const g of (navigator.getGamepads ? navigator.getGamepads() : [])) if (g && g.buttons.some(b => b.pressed)) { start(); break; } }, 300);
-  return { set, get on(){ return on; } };
+  // a soft bell for each orb, climbing a pentatonic scale as the count goes up; a little arpeggio when a gate opens
+  function chime(frac, big = false){
+    if (!on || !ctx || ctx.state !== 'running') return;
+    const scale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24], base = 659.25;   // from E5
+    const notes = big ? [0, 4, 7, 12].map(n => base * 2**(n/12)) : [base * 2**(scale[Math.min(scale.length - 1, Math.round(frac * (scale.length - 1)))]/12)];
+    notes.forEach((f, i) => {
+      const t0 = ctx.currentTime + i * 0.09, o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = f; o2.type = 'sine'; o2.frequency.value = f * 2.01;
+      g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(big ? 0.16 : 0.12, t0 + 0.012); g.gain.exponentialRampToValueAtTime(0.0008, t0 + (big ? 1.4 : 0.7));
+      const g2 = ctx.createGain(); g2.gain.value = 0.25;
+      o.connect(g); o2.connect(g2); g2.connect(g); g.connect(ctx.destination);
+      o.start(t0); o2.start(t0); o.stop(t0 + 1.5); o2.stop(t0 + 1.5);
+    });
+  }
+  return { set, chime, get on(){ return on; } };
 })();
 $('mToggle').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleClassic(); });
-$('reset').addEventListener('click', () => { glideLeg=null; Object.assign(S,{x:0,y:0,vx:0,vy:0,th:0,thv:0,tgt:0,vis:0,visv:0,travel:0,dist:0,grade:0,off:0,trail:null}); camTh=0; camVel=0; camH=null; clearTracks(); skis=[]; kicks=[]; lastTurn=null; lastLeg=null; streak=0; lastSki={L:null,R:null}; lastKickAt=0; kickDrive=null; vState=0; vChangedAt=-99; strokeNo=0; weightLeg=null; camPending=0; mode=null; focus=null; });
+$('reset').addEventListener('click', () => { glideLeg=null; Object.assign(S,{x:0,y:0,vx:0,vy:0,th:0,thv:0,tgt:0,vis:0,visv:0,travel:0,dist:0,grade:0,off:0,trail:null}); camTh=0; camVel=0; camH=null; clearTracks(); skis=[]; kicks=[]; lastTurn=null; lastLeg=null; streak=0; lastSki={L:null,R:null}; lastKickAt=0; kickDrive=null; vState=0; vChangedAt=-99; strokeNo=0; weightLeg=null; camPending=0; mode=null; focus=null; resetOrbs(); });
 $('tracks').addEventListener('click', e => { showTracks = !showTracks; e.target.textContent = 'Tracks: ' + (showTracks?'on':'off'); });
 
 function moveDir(){
@@ -1178,6 +1265,7 @@ function step(dt){
   S.vx = fx*fwd + (-fy)*lat; S.vy = fy*fwd + fx*lat;
   const mvx = S.vx*dt, mvy = S.vy*dt;
   S.x += mvx; S.y += mvy;
+  collide();
   S.dist += Math.hypot(mvx, mvy);
 
   // planted skis: the mark grows straight along the ski as far as the body has travelled that way
@@ -1207,7 +1295,7 @@ function step(dt){
 }
 
 function css(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
-let C = {}; function readColors(){ C = { snow:css('--snow'), grid:css('--grid'), major:css('--grid-major'), skier:css('--skier'), track:css('--track'), contour:css('--contour'), groomed:css('--groomed'), edge:css('--trail-edge'), green:css('--d-green'), blue:css('--d-blue'), black:css('--d-black'), mapbg:css('--map-bg'), muted:css('--muted'), line:css('--line'), ink:css('--ink'), shade:css('--shade'), up:css('--up'), down:css('--down'), sky:css('--sky'), cord:css('--cord') }; }
+let C = {}; function readColors(){ C = { snow:css('--snow'), grid:css('--grid'), major:css('--grid-major'), skier:css('--skier'), track:css('--track'), contour:css('--contour'), groomed:css('--groomed'), edge:css('--trail-edge'), green:css('--d-green'), blue:css('--d-blue'), black:css('--d-black'), mapbg:css('--map-bg'), muted:css('--muted'), line:css('--line'), ink:css('--ink'), shade:css('--shade'), up:css('--up'), down:css('--down'), sky:css('--sky'), cord:css('--cord'), rock:css('--rock'), water:css('--water'), water2:css('--water2'), ice:css('--ice'), orb:css('--orb') }; }
 readColors();
 
 let camTh = 0;     // camera heading, eases after the skier's heading
@@ -1217,97 +1305,208 @@ let camTh = 0;     // camera heading, eases after the skier's heading
 const glc = document.getElementById('gl');
 const renderer = new THREE.WebGLRenderer({ canvas: glc, antialias: true });
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(55, 1, 0.3, 400);
-scene.fog = new THREE.Fog(0xffffff, 45, 170);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.3, 600);
+scene.fog = new THREE.Fog(0xffffff, 55, 270);
 const hemi = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.75); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 0.65); sun.position.set(-60, 80, -50); scene.add(sun);
 
-// the terrain covers a fixed region around the trail network; its surface is one baked texture
-const REG = { x0:-170, x1:160, y0:-230, y1:110 };
+// the terrain is cut into tiles, each a 1 m mesh with its own baked texture. only the tiles near the skier exist at
+// any time: new ones are built (at most one per frame) as you approach and far ones are thrown away, so the big map
+// costs about what the old single field did.
+const TILE_W = 110, TILE_H = 85;
+const TILES_X = Math.round((WORLD.x1 - WORLD.x0) / TILE_W), TILES_Y = Math.round((WORLD.y1 - WORLD.y0) / TILE_H);
 const TEX_PPM = 5;   // texture pixels per metre
-const texCv = document.createElement('canvas');
-texCv.width = (REG.x1 - REG.x0) * TEX_PPM; texCv.height = (REG.y1 - REG.y0) * TEX_PPM;
-const tctx = texCv.getContext('2d');
-const tex = new THREE.CanvasTexture(texCv);
-tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-tex.minFilter = THREE.LinearMipmapLinearFilter;
-
-function bakeTexture(){
-  const tw = texCv.width, th = texCv.height;
-  const TX = x => (x - REG.x0) * TEX_PPM, TY = y => (y - REG.y0) * TEX_PPM;
-  tctx.fillStyle = C.snow; tctx.fillRect(0, 0, tw, th);
+const TILE_LOAD = 160, TILE_DROP = 215;   // build tiles within this distance of the skier, drop them past this one
+const UP_AXIS = new THREE.Vector3(0, 1, 0);
+const tiles = new Map();                  // "i,j" -> { mesh, tex, cv, x0, y0, baked }
+const rockRGB = () => C.rock || '#7d8a96';
+// a tile is built in small slices spread over several frames (generators that yield between slices), so loading
+// new ground as you ski never stalls a frame
+const TILE_R = 0.5, TILE_NX = Math.round(TILE_W/TILE_R), TILE_NY = Math.round(TILE_H/TILE_R);
+function* bakeTile(t){
+  const cv = t.cv, tc = cv.getContext('2d');
+  const tw = cv.width, th = cv.height, X0 = t.x0, Y0 = t.y0, X1 = X0 + TILE_W, Y1 = Y0 + TILE_H;
+  const TX = x => (x - X0) * TEX_PPM, TY = y => (y - Y0) * TEX_PPM;
+  const R = TILE_R, nx = TILE_NX, ny = TILE_NY, hs = t.hs;
+  const H = (i, j) => hs[j*(nx+1)+i];
+  tc.fillStyle = C.snow; tc.fillRect(0, 0, tw, th);
   // grid: 1 m cells, a stronger line every 5 m
   for (let pass = 0; pass < 2; pass++){
-    tctx.strokeStyle = pass ? C.major : C.grid; tctx.lineWidth = pass ? 2 : 1; tctx.beginPath();
-    for (let x = Math.ceil(REG.x0); x <= REG.x1; x++){ if ((x%5===0) !== !!pass) continue; tctx.moveTo(TX(x)+.5, 0); tctx.lineTo(TX(x)+.5, th); }
-    for (let y = Math.ceil(REG.y0); y <= REG.y1; y++){ if ((y%5===0) !== !!pass) continue; tctx.moveTo(0, TY(y)+.5); tctx.lineTo(tw, TY(y)+.5); }
-    tctx.stroke();
+    tc.strokeStyle = pass ? C.major : C.grid; tc.lineWidth = pass ? 2 : 1; tc.beginPath();
+    for (let x = Math.ceil(X0); x <= X1; x++){ if ((x%5===0) !== !!pass) continue; tc.moveTo(TX(x)+.5, 0); tc.lineTo(TX(x)+.5, th); }
+    for (let y = Math.ceil(Y0); y <= Y1; y++){ if ((y%5===0) !== !!pass) continue; tc.moveTo(0, TY(y)+.5); tc.lineTo(tw, TY(y)+.5); }
+    tc.stroke();
+  }
+  // mountain sides: the grid gives way to plain snow, with rock showing through where it's steepest
+  const PX = R*TEX_PPM;
+  yield;
+  for (let j = 0; j < ny; j++){ if (j % 24 === 23) yield; for (let i = 0; i < nx; i++){
+    const ii = Math.min(nx - 2, i), jj = Math.min(ny - 2, j);
+    const gx = (H(ii+2, jj) - H(ii, jj)), gy = (H(ii, jj+2) - H(ii, jj)), sl = Math.hypot(gx, gy);
+    if (sl < 0.28) continue;
+    const k = smooth01(0.28, 0.55, sl);
+    tc.globalAlpha = k; tc.fillStyle = C.snow; tc.fillRect(i*PX, j*PX, PX + 0.6, PX + 0.6);
+    const x = X0 + i*R, y = Y0 + j*R;
+    const streak = 0.5 + 0.5*Math.sin(x*0.9 + Math.sin(y*0.31)*3) * Math.sin(y*0.7 - x*0.13);   // strata and gullies
+    const rk = smooth01(0.7, 1.4, sl) * (0.35 + 0.65*streak);
+    if (rk > 0.04){ tc.globalAlpha = Math.min(0.85, rk); tc.fillStyle = C.rock; tc.fillRect(i*PX, j*PX, PX + 0.6, PX + 0.6); }
+  }}
+  tc.globalAlpha = 1;
+  // river: water down the middle, ice along the edges
+  if (Y1 > riverY(X0) - 30 && Y0 < riverY(X0) + 30){
+    const band = (hw, col) => {
+      tc.fillStyle = col; tc.beginPath();
+      for (let x = X0 - 2; x <= X1 + 2; x += 2) tc.lineTo(TX(x), TY(riverY(x) - hw));
+      for (let x = X1 + 2; x >= X0 - 2; x -= 2) tc.lineTo(TX(x), TY(riverY(x) + hw));
+      tc.closePath(); tc.fill();
+    };
+    band(RIVER_HW + 1.2, C.ice); band(RIVER_HW, C.water); band(RIVER_HW * 0.45, C.water2);
   }
   // groomed trails: edge, packed surface, then corduroy stripes running along the trail
-  const path = t => { const p = t.s; tctx.moveTo(TX(p[0]), TY(p[1])); for (let i = 2; i < p.length; i += 2) tctx.lineTo(TX(p[i]), TY(p[i+1])); };
-  tctx.lineCap = 'round'; tctx.lineJoin = 'round';
-  tctx.strokeStyle = C.edge; tctx.lineWidth = TRAIL_W*TEX_PPM + 4; tctx.beginPath(); TRAILS.forEach(path); tctx.stroke();
-  const cord = TRAIL_W*TEX_PPM;
-  for (let w = cord, k = 0; w > 1; w -= 2, k++){
-    tctx.strokeStyle = k % 2 ? C.cord : C.groomed; tctx.lineWidth = w; tctx.beginPath(); TRAILS.forEach(path); tctx.stroke();
+  const path = tr => { const p = tr.s; tc.moveTo(TX(p[0]), TY(p[1])); for (let i = 2; i < p.length; i += 2) tc.lineTo(TX(p[i]), TY(p[i+1])); };
+  tc.lineCap = 'round'; tc.lineJoin = 'round';
+  const near = TRAILS.filter(tr => tr.bx[0] < X1 + 5 && tr.bx[2] > X0 - 5 && tr.bx[1] < Y1 + 5 && tr.bx[3] > Y0 - 5);
+  if (near.length){
+    tc.strokeStyle = C.edge; tc.lineWidth = TRAIL_W*TEX_PPM + 4; tc.beginPath(); near.forEach(path); tc.stroke();
+    const cord = TRAIL_W*TEX_PPM;
+    for (let w = cord, k = 0; w > 1; w -= 2, k++){ tc.strokeStyle = k % 2 ? C.cord : C.groomed; tc.lineWidth = w; tc.beginPath(); near.forEach(path); tc.stroke(); }
   }
-  // contour lines every 0.5 m, stronger every 2 m
-  const R = 0.5, nx = Math.ceil((REG.x1-REG.x0)/R), ny = Math.ceil((REG.y1-REG.y0)/R);
-  const hs = new Float32Array((nx+1)*(ny+1));
-  for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) hs[j*(nx+1)+i] = height(REG.x0 + i*R, REG.y0 + j*R);
-  for (let pass = 0; pass < 2; pass++){
-    tctx.strokeStyle = C.contour; tctx.lineWidth = pass ? 2 : 1; tctx.globalAlpha = pass ? .7 : .45; tctx.beginPath();
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++){
-      const a = hs[j*(nx+1)+i], b = hs[j*(nx+1)+i+1], c = hs[(j+1)*(nx+1)+i+1], d = hs[(j+1)*(nx+1)+i];
+  yield;
+  // contour lines: every 0.5 m (stronger every 2 m) on skiable ground; on the steep mountain sides only every 5 m
+  for (let pass = 0; pass < 3; pass++){
+    tc.strokeStyle = C.contour; tc.lineWidth = pass ? 2 : 1; tc.globalAlpha = pass ? .7 : .45; tc.beginPath();
+    for (let j = 0; j < ny; j++){ if (j % 40 === 39){ tc.stroke(); yield; tc.strokeStyle = C.contour; tc.lineWidth = pass ? 2 : 1; tc.globalAlpha = pass ? .7 : .45; tc.beginPath(); } for (let i = 0; i < nx; i++){
+      const a = H(i,j), b = H(i+1,j), c = H(i+1,j+1), d = H(i,j+1);
       const lo = Math.min(a,b,c,d), hi = Math.max(a,b,c,d);
-      for (let lv = Math.ceil(lo/0.5)*0.5; lv <= hi; lv += 0.5){
-        const major = Math.abs(lv/2 - Math.round(lv/2)) < 1e-6;
-        if (major !== !!pass) continue;
-        const X = REG.x0 + i*R, Y = REG.y0 + j*R, q = [];
+      const steep = hi - lo > 0.3;              // > ~60% grade across a half-metre cell
+      if (steep !== (pass === 2)) continue;
+      const step = steep ? 5 : 0.5;
+      for (let lv = Math.ceil(lo/step)*step; lv <= hi; lv += step){
+        if (!steep){ const major = Math.abs(lv/2 - Math.round(lv/2)) < 1e-6; if (major !== (pass === 1)) continue; }
+        const X = X0 + i*R, Y = Y0 + j*R, q = [];
         if ((a < lv) !== (b < lv)) q.push(X + R*(lv-a)/(b-a), Y);
         if ((b < lv) !== (c < lv)) q.push(X + R, Y + R*(lv-b)/(c-b));
         if ((d < lv) !== (c < lv)) q.push(X + R*(lv-d)/(c-d), Y + R);
         if ((a < lv) !== (d < lv)) q.push(X, Y + R*(lv-a)/(d-a));
-        for (let k = 0; k + 3 < q.length; k += 4){ tctx.moveTo(TX(q[k]), TY(q[k+1])); tctx.lineTo(TX(q[k+2]), TY(q[k+3])); }
+        for (let k = 0; k + 3 < q.length; k += 4){ tc.moveTo(TX(q[k]), TY(q[k+1])); tc.lineTo(TX(q[k+2]), TY(q[k+3])); }
       }
-    }
-    tctx.stroke();
+    }}
+    tc.stroke();
   }
-  tctx.globalAlpha = 1;
-  tex.needsUpdate = true;
+  tc.globalAlpha = 1;
+  t.tex.needsUpdate = true; t.baked = true; t.job = null;
 }
-
-// terrain mesh, 1 m resolution
-const terrainGeo = (() => {
-  const wx = REG.x1 - REG.x0, wy = REG.y1 - REG.y0;
-  const g = new THREE.PlaneGeometry(wx, wy, wx, wy);
-  g.rotateX(-Math.PI/2);   // plane now lies in X-Z, with +Z = south
-  const pos = g.attributes.position;
-  for (let i = 0; i < pos.count; i++){
-    const x = pos.getX(i) + (REG.x0 + REG.x1)/2, z = pos.getZ(i) + (REG.y0 + REG.y1)/2;
-    pos.setXYZ(i, x, height(x, z), z);
+function* buildTile(i, j){
+  const x0 = WORLD.x0 + i*TILE_W, y0 = WORLD.y0 + j*TILE_H, nx = TILE_NX, ny = TILE_NY, R = TILE_R;
+  // heights on a half-metre grid: the mesh uses every other sample, the texture uses all of them
+  const hs = new Float32Array((nx+1)*(ny+1));
+  for (let jj = 0; jj <= ny; jj++){ for (let ii = 0; ii <= nx; ii++) hs[jj*(nx+1)+ii] = height(x0 + ii*R, y0 + jj*R); if (jj % 30 === 29) yield; }
+  const g = new THREE.PlaneGeometry(TILE_W, TILE_H, TILE_W, TILE_H);
+  g.rotateX(-Math.PI/2);   // plane now lies in X-Z, with +Z = south; vertices run row by row from the north-west corner
+  const pos = g.attributes.position, nrm = g.attributes.normal, H = (a, b) => hs[b*(nx+1)+a];
+  for (let k = 0; k < pos.count; k++){
+    const ci = k % (TILE_W + 1), cj = (k / (TILE_W + 1)) | 0, a = ci*2, b = cj*2;
+    const x = x0 + ci, z = y0 + cj;
+    pos.setXYZ(k, x, H(a, b), z);
+    // normals from the height field itself (one-sided at the tile's rim), so neighbouring tiles light identically
+    const hx = a > 0 && a < nx ? (H(a+1, b) - H(a-1, b))/(2*R) : a === 0 ? (H(1, b) - H(0, b))/R : (H(nx, b) - H(nx-1, b))/R;
+    const hz = b > 0 && b < ny ? (H(a, b+1) - H(a, b-1))/(2*R) : b === 0 ? (H(a, 1) - H(a, 0))/R : (H(a, ny) - H(a, ny-1))/R;
+    const L = Math.hypot(hx, 1, hz); nrm.setXYZ(k, -hx/L, 1/L, -hz/L);
   }
+  g.computeBoundingSphere();
+  yield;
   // uv v = 1 is the north edge, which is the top row of the canvas texture (three flips canvases on upload)
-  g.computeVertexNormals();
-  return g;
+  const cv = document.createElement('canvas'); cv.width = TILE_W * TEX_PPM; cv.height = TILE_H * TEX_PPM;
+  const tex = new THREE.CanvasTexture(cv);
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy(); tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  const t = { mesh: null, tex, cv, x0, y0, hs, baked: false };
+  yield* bakeTile(t);
+  t.mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: tex }));
+  scene.add(t.mesh);
+  tiles.set(i + ',' + j, t);
+}
+function dropTile(key){
+  const t = tiles.get(key); if (!t) return;
+  scene.remove(t.mesh); t.mesh.geometry.dispose(); t.mesh.material.dispose(); t.tex.dispose(); tiles.delete(key);
+}
+function tileDist(i, j, x, y){
+  const x0 = WORLD.x0 + i*TILE_W, y0 = WORLD.y0 + j*TILE_H;
+  return Math.hypot(Math.max(x0 - x, 0, x - x0 - TILE_W), Math.max(y0 - y, 0, y - y0 - TILE_H));
+}
+// the far field: the whole map as one coarse mesh (5 m), sunk a little below the real ground and coloured by slope.
+// the detailed tiles cover it near you; beyond them it carries the mountain skyline out into the haze, and it fills
+// in any ground whose tile hasn't been built yet.
+const farGround = (() => {
+  const wx = WORLD.x1 - WORLD.x0, wy = WORLD.y1 - WORLD.y0, st = 5;
+  const g = new THREE.PlaneGeometry(wx, wy, wx/st, wy/st); g.rotateX(-Math.PI/2);
+  const pos = g.attributes.position, nrm = g.attributes.normal, col = new Float32Array(pos.count*3), slope = new Float32Array(pos.count);
+  for (let k = 0; k < pos.count; k++){
+    const x = pos.getX(k) + (WORLD.x0 + WORLD.x1)/2, z = pos.getZ(k) + (WORLD.y0 + WORLD.y1)/2;
+    pos.setXYZ(k, x, height(x, z) - 1.2, z);
+    const e = 1, hx = (height(x+e, z) - height(x-e, z))/(2*e), hz = (height(x, z+e) - height(x, z-e))/(2*e);
+    const L = Math.hypot(hx, 1, hz); nrm.setXYZ(k, -hx/L, 1/L, -hz/L); slope[k] = Math.hypot(hx, hz);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
+  scene.add(mesh);
+  return { mesh, col, slope, g };
 })();
-const terrainMat = new THREE.MeshLambertMaterial({ map: tex });
-const UP_AXIS = new THREE.Vector3(0, 1, 0);
-scene.add(new THREE.Mesh(terrainGeo, terrainMat));
+function colorFarGround(){
+  const a = new THREE.Color(C.snow), b = new THREE.Color(C.rock), w = new THREE.Color(C.water), c = new THREE.Color();
+  const pos = farGround.g.attributes.position;
+  for (let k = 0; k < pos.count; k++){
+    const x = pos.getX(k), z = pos.getZ(k);
+    if (Math.abs(z - riverY(x)) < RIVER_HW) c.copy(w);
+    else c.copy(a).lerp(b, smooth01(0.7, 1.4, farGround.slope[k]) * 0.6);
+    farGround.col.set([c.r, c.g, c.b], k*3);
+  }
+  farGround.g.attributes.color.needsUpdate = true;
+}
+let tileJob = null, tileJobKey = null;
+const run = (job, ms) => { const end = performance.now() + ms; while (performance.now() < end) if (job.next().done) return true; return false; };
+function updateTiles(all = false){
+  // drop far tiles; build the nearest missing one a slice at a time (all of them at once at start-up)
+  let best = null, bd = Infinity;
+  for (let j = 0; j < TILES_Y; j++) for (let i = 0; i < TILES_X; i++){
+    const key = i + ',' + j, d = tileDist(i, j, S.x, S.y);
+    if (tiles.has(key)){ if (d > TILE_DROP) dropTile(key); continue; }
+    if (d > TILE_LOAD || key === tileJobKey) continue;
+    if (all && d < 70){ run(buildTile(i, j), 1e9); continue; }   // start-up: just the ground right around you; the rest streams in
+    if (d < bd){ bd = d; best = [i, j]; }
+  }
+  const budget = all ? 1e9 : 6;   // milliseconds of tile work per frame
+  if (!tileJob && best){ tileJob = buildTile(best[0], best[1]); tileJobKey = best.join(','); }
+  if (tileJob && run(tileJob, budget)){ tileJob = null; tileJobKey = null; }
+  // after a theme change, re-bake loaded tiles in the same slices
+  for (const t of tiles.values()) if (!t.baked){ if (!t.job) t.job = bakeTile(t); run(t.job, 8); break; }
+}
+function bakeTexture(){ colorFarGround(); for (const t of tiles.values()){ t.baked = false; t.job = null; } }
 
 // ---- trees: simple spruces (a trunk and two cone tiers) scattered in patches, kept off the trails and the start.
 // placement is seeded so the forest is the same every time. drawn as instanced meshes, so hundreds cost little.
 const trees = (() => {
   let seed = 1337; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const dens = (x, y) => Math.sin(x/37) + Math.sin(y/29 + 1.3) + Math.sin((x + y)/53 + 0.4) + 0.6*Math.sin((x - y)/17);   // patchy: woods and clearings
-  const out = [];
-  for (let i = 0; i < 6000 && out.length < 900; i++){
-    const x = REG.x0 + 8 + rnd() * (REG.x1 - REG.x0 - 16), y = REG.y0 + 8 + rnd() * (REG.y1 - REG.y0 - 16);
+  const out = [], grid = new Map(), cell = k => (Math.floor(k.x/4)) + ',' + (Math.floor(k.y/4));
+  const crowded = (x, y) => {
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++){
+      const g = grid.get((Math.floor(x/4) + a) + ',' + (Math.floor(y/4) + b));
+      if (g && g.some(t => Math.hypot(t.x - x, t.y - y) < 2.2)) return true;
+    }
+    return false;
+  };
+  for (let i = 0; i < 30000 && out.length < 3400; i++){
+    const x = WORLD.x0 + 8 + rnd() * (WORLD.x1 - WORLD.x0 - 16), y = WORLD.y0 + 8 + rnd() * (WORLD.y1 - WORLD.y0 - 16);
     if (rnd() * 3.2 > dens(x, y) + 1.2) continue;                     // thin out away from the patches
+    if (ringHeight(x, y) + edgeHeight(x, y) > 14 + rnd()*6) continue;  // timberline on the mountains
+    if (Math.abs(y - riverY(x)) < RIVER_BANK + 1.5) continue;          // nothing in the river
+    if (x > RING.x + 90 && x < RING.x + 205 && Math.abs(y - GATE.y) < 9) continue;   // the pass stays clear
     if (nearestTrail(x, y).d < TRAIL_W/2 + 3 + rnd()*3) continue;     // a clear corridor either side of every trail
     if (Math.hypot(x, y) < 14) continue;                              // open stadium
-    if (out.some(t => Math.hypot(t.x - x, t.y - y) < 2.2)) continue;  // no two trunks on top of each other
-    out.push({ x, y, s: 0.7 + rnd()*0.7, r: rnd()*Math.PI*2 });
+    if (crowded(x, y)) continue;                                      // no two trunks on top of each other
+    const t = { x, y, s: 0.7 + rnd()*0.7, r: rnd()*Math.PI*2 };
+    out.push(t); const c = cell(t); if (!grid.has(c)) grid.set(c, []); grid.get(c).push(t);
   }
   return out;
 })();
@@ -1330,9 +1529,106 @@ const treeMats = {
       pos.set(t.x, height(t.x, t.y) - 0.1 + part.y * t.s, t.y);
       mesh.setMatrixAt(i, m4.compose(pos, q, sc));
     });
-    mesh.instanceMatrix.needsUpdate = true;
+    mesh.instanceMatrix.needsUpdate = true; mesh.frustumCulled = false;   // instances span the whole map
     scene.add(mesh);
   }
+}
+
+// ---- orbs: glowing collectables strung along zone 1's trails. collect every one and the east gate opens.
+const ORB_COUNT_Z1 = 20, ORB_R = 1.7;
+const orbs = (() => {
+  const zt = TRAILS.filter(t => t.zone === 1), total = zt.reduce((a, t) => a + t.len, 0);
+  const sides = [0, 1.6, 0, -1.6, 0.8, -0.8];
+  const out = [];
+  for (let k = 0; k < ORB_COUNT_Z1; k++){
+    let at = (k + 0.5) / ORB_COUNT_Z1 * total, t = zt[0];
+    for (const tr of zt){ if (at <= tr.len){ t = tr; break; } at -= tr.len; }
+    // walk along the trail's samples to that distance, then step off to the side a little
+    const p = t.s; let x = p[0], y = p[1], dx = 0, dy = -1;
+    for (let i = 2; i < p.length; i += 2){
+      const L = Math.hypot(p[i] - p[i-2], p[i+1] - p[i-1]);
+      if (L > 0){ dx = (p[i] - p[i-2])/L; dy = (p[i+1] - p[i-1])/L; }
+      if (at <= L){ x = p[i-2] + dx*at; y = p[i-1] + dy*at; break; }
+      at -= L; x = p[i]; y = p[i+1];
+    }
+    const sd = sides[k % sides.length];
+    out.push({ x: x - dy*sd, y: y + dx*sd, zone: 1, got: false, fade: 0, ph: k*1.7 });
+  }
+  return out;
+})();
+const orbGlowTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.18, 'rgba(255,236,170,.95)'); r.addColorStop(0.45, 'rgba(255,190,60,.38)'); r.addColorStop(1, 'rgba(255,170,40,0)');
+  g.fillStyle = r; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+})();
+const orbCoreGeo = new THREE.SphereGeometry(0.2, 16, 12);
+const orbCoreMat = new THREE.MeshBasicMaterial({ color: 0xfff1c4, fog: false });
+for (const o of orbs){
+  o.g = new THREE.Group();
+  o.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: orbGlowTex, color: 0xffffff, transparent: true, depthWrite: false, fog: false }));
+  o.halo.scale.set(1.5, 1.5, 1);
+  o.core = new THREE.Mesh(orbCoreGeo, orbCoreMat);
+  o.g.add(o.halo, o.core); o.g.position.set(o.x, height(o.x, o.y) + 1.1, o.y);
+  scene.add(o.g);
+}
+const zoneOrbs = z => orbs.filter(o => o.zone === z);
+const orbsGot = z => zoneOrbs(z).filter(o => o.got).length;
+function inZone1(x, y){ return Math.hypot(x - RING.x, y - RING.y) < RING.crest; }
+
+// the east gate: two stone posts with a beam across, and two timber doors that swing out once zone 1's orbs are in
+const gate = (() => {
+  const g = new THREE.Group(), h0 = height(GATE.x, GATE.y);
+  g.position.set(GATE.x, h0, GATE.y);
+  const stone = new THREE.MeshLambertMaterial({ color: 0x8b939b }), wood = new THREE.MeshLambertMaterial({ color: 0x7a5236 }), dark = new THREE.MeshLambertMaterial({ color: 0x4a3322 });
+  const post = z => { const m = new THREE.Mesh(new THREE.BoxGeometry(1.0, 4.2, 1.0), stone); m.position.set(0, 2.1, z); g.add(m); };
+  post(-(GATE.hw + 0.5)); post(GATE.hw + 0.5);
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 2*GATE.hw + 2.2), wood); beam.position.set(0, 4.2, 0); g.add(beam);
+  const doors = [];
+  for (const side of [-1, 1]){
+    // each door hinges on its post and spans half the opening; planks plus a cross brace
+    const hinge = new THREE.Group(); hinge.position.set(0, 0, side*GATE.hw); g.add(hinge);
+    for (let k = 0; k < 4; k++){
+      const pl = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.3, GATE.hw/4 - 0.06), wood);
+      pl.position.set(0, 1.35, -side*(k + 0.5)*GATE.hw/4); hinge.add(pl);
+    }
+    for (const yb of [0.65, 2.05]){ const br = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.22, GATE.hw - 0.1), dark); br.position.set(0.05, yb, -side*GATE.hw/2); hinge.add(br); }
+    doors.push({ hinge, side });
+  }
+  scene.add(g);
+  return { g, doors, open: 0 };
+})();
+function setGateOpen(on){ gateOpen = on; }
+function animateGate(dt){
+  const target = gateOpen ? 1 : 0;
+  gate.open += Math.sign(target - gate.open) * Math.min(Math.abs(target - gate.open), dt / 2.2);
+  const e = gate.open*gate.open*(3 - 2*gate.open);
+  // swing outward, toward zone 2 (+x)
+  for (const d of gate.doors) d.hinge.rotation.y = -d.side * e * 1.75;
+}
+let toastT = 0;
+function toast(msg){ const el = $('toast'); el.textContent = msg; el.classList.add('on'); toastT = performance.now() + 3200; }
+function updateOrbs(dt){
+  const now = performance.now();
+  for (const o of orbs){
+    if (o.got){
+      if (o.fade < 1){ o.fade = Math.min(1, o.fade + dt/0.45); const k = 1 + o.fade*1.6; o.g.scale.set(k, k, k); o.halo.material.opacity = 1 - o.fade; o.core.visible = o.fade < 0.3; o.g.position.y += dt*2; }
+      else o.g.visible = false;
+      continue;
+    }
+    const bob = Math.sin(now/600 + o.ph) * 0.12, pulse = 1.45 + Math.sin(now/380 + o.ph) * 0.12;
+    o.g.position.y = height(o.x, o.y) + 1.1 + bob; o.halo.scale.set(pulse, pulse, 1);
+    if (Math.hypot(S.x - o.x, S.y - o.y) < ORB_R){
+      o.got = true; o.fade = 0; music.chime(orbsGot(o.zone) / zoneOrbs(o.zone).length);
+      if (o.zone === 1 && orbsGot(1) === ORB_COUNT_Z1 && !gateOpen){ setGateOpen(true); toast('All orbs found. The east gate is open.'); music.chime(1, true); }
+    }
+  }
+  if (toastT && now > toastT){ $('toast').classList.remove('on'); toastT = 0; }
+}
+function resetOrbs(){
+  for (const o of orbs){ o.got = false; o.fade = 0; o.g.visible = true; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; }
+  setGateOpen(false); gate.open = 0; animateGate(0);
 }
 
 // skier: a simple jointed figure built from boxes and cylinders, posed every frame from the game state. the pose is
@@ -1669,6 +1965,15 @@ function draw(){
     ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(p[0], p[1] + 8, 3, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = C.ink; ctx.fillText(j.name.toUpperCase(), p[0], p[1] - 4);
   }
+  {
+    const d = Math.hypot(GATE.x - S.x, GATE.y - S.y);
+    const p = d < 140 && project(GATE.x, GATE.y, height(GATE.x, GATE.y) + 5.6);
+    if (p){
+      ctx.globalAlpha = Math.min(1, (140 - d) / 40);
+      ctx.fillStyle = gateOpen ? C.orb : C.ink;
+      ctx.fillText('EAST GATE · ' + (gateOpen ? 'OPEN' : orbsGot(1) + ' / ' + ORB_COUNT_Z1 + ' ORBS'), p[0], p[1]);
+    }
+  }
   ctx.globalAlpha = 1;
   drawMinimap();
   if (devView){ if (P.scheme === 1) drawSticks(); }
@@ -1899,13 +2204,11 @@ function drawDiff(d, x, y, r){
   ctx.fill();
 }
 
-// overview map of the whole network, top-right
-const MAP = (() => {
-  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-  for (const t of TRAILS) for (let i = 0; i < t.s.length; i += 2){ x0 = Math.min(x0, t.s[i]); x1 = Math.max(x1, t.s[i]); y0 = Math.min(y0, t.s[i+1]); y1 = Math.max(y1, t.s[i+1]); }
-  return { x0: x0 - 8, x1: x1 + 8, y0: y0 - 8, y1: y1 + 8 };
-})();
+// overview map: inside the ring it frames zone 1; beyond the gate it shows the whole map
+const MAP_Z1 = { x0: RING.x - RING.rin - 6, x1: RING.x + RING.rin + 6, y0: RING.y - RING.rin - 6, y1: RING.y + RING.rin + 6 };
+const MAP_ALL = { x0: WORLD.x0, x1: WORLD.x1, y0: WORLD.y0, y1: WORLD.y1 };
 function drawMinimap(){
+  const MAP = inZone1(S.x, S.y) ? MAP_Z1 : MAP_ALL;
   const size = W < 520 ? 104 : 150, pad = 16;
   const sc = size / Math.max(MAP.x1 - MAP.x0, MAP.y1 - MAP.y0);
   const mw = (MAP.x1 - MAP.x0)*sc, mh = (MAP.y1 - MAP.y0)*sc;
@@ -1917,6 +2220,13 @@ function drawMinimap(){
   ctx.fillStyle = C.mapbg; ctx.strokeStyle = C.line; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.roundRect ? ctx.roundRect(mx - 6, my - 6, mw + 12, mh + 12, 6) : ctx.rect(mx - 6, my - 6, mw + 12, mh + 12); ctx.fill(); ctx.stroke();
   const mX = x => mx + (x - MAP.x0)*sc, mY = y => my + (y - MAP.y0)*sc;
+  ctx.save(); ctx.beginPath(); ctx.rect(mx - 6, my - 6, mw + 12, mh + 12); ctx.clip();
+  // mountains (the ring, drawn as a band) and the river
+  ctx.globalAlpha = 0.35; ctx.strokeStyle = C.rock; ctx.lineWidth = Math.max(3, (RING.rout - RING.rin) * sc * 0.7);
+  ctx.beginPath(); ctx.arc(mX(RING.x), mY(RING.y), RING.crest * sc, 0, Math.PI*2); ctx.stroke();
+  ctx.globalAlpha = 0.8; ctx.strokeStyle = C.water; ctx.lineWidth = Math.max(1.5, RIVER_HW*2*sc);
+  ctx.beginPath(); for (let x = WORLD.x0; x <= WORLD.x1; x += 6){ x === WORLD.x0 ? ctx.moveTo(mX(x), mY(riverY(x))) : ctx.lineTo(mX(x), mY(riverY(x))); } ctx.stroke();
+  ctx.globalAlpha = 1;
   ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   for (const t of TRAILS){
     ctx.strokeStyle = C[t.diff]; ctx.beginPath();
@@ -1924,6 +2234,12 @@ function drawMinimap(){
     for (let i = 2; i < t.s.length; i += 2) ctx.lineTo(mX(t.s[i]), mY(t.s[i+1]));
     ctx.stroke();
   }
+  // orbs still out there, and the gate (a bar across the pass: dark while shut, gold once open)
+  ctx.fillStyle = C.orb;
+  for (const o of orbs) if (!o.got){ ctx.beginPath(); ctx.arc(mX(o.x), mY(o.y), 2, 0, Math.PI*2); ctx.fill(); }
+  ctx.strokeStyle = gateOpen ? C.orb : C.ink; ctx.lineWidth = 3; ctx.lineCap = 'butt';
+  ctx.beginPath(); ctx.moveTo(mX(GATE.x), mY(GATE.y - GATE.hw - 2)); ctx.lineTo(mX(GATE.x), mY(GATE.y + GATE.hw + 2)); ctx.stroke();
+  ctx.restore();
   const px = Math.min(mx + mw, Math.max(mx, mX(S.x))), py = Math.min(my + mh, Math.max(my, mY(S.y)));
   ctx.fillStyle = C.skier; ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI*2); ctx.fill();
   ctx.strokeStyle = C.skier; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.sin(camTarget())*9, py - Math.cos(camTarget())*9); ctx.stroke();
@@ -2018,6 +2334,13 @@ addEventListener('mousemove', e => {
 const isTouchUI = matchMedia('(hover: none) and (pointer: coarse)').matches;
 
 function hud(){
+  {
+    const z = inZone1(S.x, S.y) || !gateOpen ? 1 : 0, n = orbsGot(1);
+    const txt = z === 1 ? n + ' / ' + ORB_COUNT_Z1 : 'Zone 2';
+    const el = $('orbN'); if (el.textContent !== txt){ if (z === 1 && n > 0) { const h = $('orbHud'); h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); } el.textContent = txt; }
+    $('orbHud').dataset.done = n === ORB_COUNT_Z1 ? '1' : '';
+    $('orbZone').textContent = z === 1 ? (gateOpen ? 'Gate open' : 'Orbs') : 'Coming soon';
+  }
   $('mToggle').dataset.mode = inClassic() ? 'classic' : 'skate';
   if (!devView){
     const gp = S.grade*100, flat = Math.abs(gp) < 0.5;
@@ -2101,6 +2424,7 @@ function camTarget(){
 }
 function loop(t){
   const dt = Math.min(0.05, (t-last)/1000); last = t; pollPad(); step(dt);
+  updateTiles(); updateOrbs(dt); animateGate(dt);
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through
   const w = 3 / Math.max(0.05, P.cam);
@@ -2111,7 +2435,8 @@ function loop(t){
   }
   draw(); hud(); requestAnimationFrame(loop);
 }
-applyTheme(); resize();
+applyTheme(); updateTiles(true); resize();
+if (/[?&]debug\b/.test(location.search)) window.__g = { step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

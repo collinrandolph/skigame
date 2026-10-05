@@ -225,6 +225,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tTmin">Shortest throw (stick units)<output id="oTmin"></output><input id="tTmin" type="range" min="0.3" max="1.4" step="0.05" value="0.7"></label>
     <label for="tFedge">Flick needs (share of stick range)<output id="oFedge"></output><input id="tFedge" type="range" min="0.6" max="1" step="0.01" value="0.92"></label>
     <label for="tV1side">V1 hang side (triggers)<output id="oV1side"></output><input id="tV1side" type="range" min="0" max="1" step="1" value="1"></label>
+    <label for="tRumble">Controller vibration (%)<output id="oRumble"></output><input id="tRumble" type="range" min="0" max="100" step="5" value="50"></label>
     <h4>Touch</h4>
     <label for="tSwait">Swipe wait before a tap kicks (ms)<output id="oSwait"></output><input id="tSwait" type="range" min="0" max="200" step="10" value="90"></label>
     <label for="tSpull">Slingshot pull (px)<output id="oSpull"></output><input id="tSpull" type="range" min="10" max="80" step="2" value="26"></label>
@@ -258,6 +259,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tGcut">Glide friction cut (%)<output id="oGcut"></output><input id="tGcut" type="range" min="0" max="100" step="5" value="95"></label>
     <label for="tMax">Top speed (km/h)<output id="oMax"></output><span class="sl"><input id="tMax" type="range" min="10" max="60" step="1" value="32"><i class="ghost" id="tMaxG"></i></span></label>
     <p class="note">Markers show the live value: friction changes off the trail and while gliding, skate angle with speed.</p>
+    <label for="tMarks">Ski mark strength (%)<output id="oMarks"></output><input id="tMarks" type="range" min="10" max="100" step="5" value="70"></label>
     <h4>Classic, poling and braking</h4>
     <label for="tClassic">Classic kick (m/s)<output id="oClassic"></output><input id="tClassic" type="range" min="0.2" max="2.5" step="0.05" value="1"></label>
     <label for="tPole">Double-pole push (m/s)<output id="oPole"></output><input id="tPole" type="range" min="0.2" max="2" step="0.05" value="0.8"></label>
@@ -318,7 +320,7 @@ addEventListener('resize', resize);
 
 const $ = id => document.getElementById(id);
 const P = {};
-const tune = [['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tSwait','oSwait','swait',v=>v.toFixed(0)],['tSpull','oSpull','spull',v=>v.toFixed(0)],['tSthrow','oSthrow','sthrow',v=>v.toFixed(0)],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tBsnap','oBsnap','bsnap',v=>v ? v.toFixed(0) : 'off'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKfloor','oKfloor','kfloor',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
+const tune = [['tRumble','oRumble','rumble',v=>v ? v.toFixed(0)+'%' : 'off'],['tMarks','oMarks','marks',v=>v.toFixed(0)+'%'],['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tSwait','oSwait','swait',v=>v.toFixed(0)],['tSpull','oSpull','spull',v=>v.toFixed(0)],['tSthrow','oSthrow','sthrow',v=>v.toFixed(0)],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tBsnap','oBsnap','bsnap',v=>v ? v.toFixed(0) : 'off'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKfloor','oKfloor','kfloor',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
   ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tOffglide','oOffglide','offglide',v=>v.toFixed(0)+'%'],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -332,7 +334,7 @@ tune.forEach(([i,o,k,f]) => {
   const el = $(i);
   if (saved[i] !== undefined) el.value = saved[i];
   const upd = () => { P[k] = +el.value; $(o).textContent = f(+el.value); };
-  el.addEventListener('input', () => { upd(); saveTuning(); }); upd();
+  el.addEventListener('input', () => { upd(); saveTuning(); if (k === 'marks' && typeof recolourTracks === 'function') recolourTracks(); }); upd();
 });
 $('dbgToggle').addEventListener('click', e => {
   DBG.on = !DBG.on; e.target.textContent = 'Stick debug: ' + (DBG.on ? 'on' : 'off'); $('dbgBox').hidden = !DBG.on; dbgRender();
@@ -1008,7 +1010,7 @@ function classicPush(mult = 1){
   S.vx += Math.sin(S.th) * P.classic * eff * mult; S.vy += -Math.cos(S.th) * P.classic * eff * mult;
   const now = performance.now(); kicks.push(now); kicks = kicks.filter(t => now - t < 4000); lastKickAt = now;
   legFlash[classic.pos === 'A' ? 'R' : 'L'] = 1;
-  rumble(classic.pos === 'A' ? 'R' : 'L');
+  rumble(classic.pos === 'A' ? 'R' : 'L', kickBuzz(1));
 }   // both skis stay down until your next stroke
 function polePush(dir = S.th){
   poleT = 1;
@@ -1177,7 +1179,13 @@ const held = { L:false, R:false };
 let glideLeg = null, glideStart = 0;
 // which arm animation the last skating kick uses: trigger/key kicks are V1, stick strokes are V2
 let strideStyle = 'v2';
-function press(leg, boost = 1, src = null, startT){ strideStyle = 'v1'; mode = null; held[leg] = true; kick(leg, { boost, src, startT }); glideLeg = leg; glideStart = performance.now(); rumble(leg); }
+function press(leg, boost = 1, src = null, startT){ strideStyle = 'v1'; mode = null; held[leg] = true; kick(leg, { boost, src, startT }); glideLeg = leg; glideStart = performance.now(); rumble(leg, kickBuzz(boost)); }
+// how hard a kick buzzes: a loaded stroke fully, a plain kick less; fainter the faster you're already going (a push at
+// speed is a light touch), a little firmer in a kick turn, and never quite the same twice
+function kickBuzz(boost){
+  const v = Math.hypot(S.vx, S.vy) * 3.6, fast = Math.min(1, v / Math.max(1, P.max));
+  return (boost > 1 ? 1 : 0.65) * (1 - 0.55*fast) * (1 + 0.08*Math.min(3, streak - 1)) * (0.85 + 0.3*Math.random());
+}
 
 // ---- Xbox-style controller (standard mapping): LT = left kick, RT = right kick.
 // pulling a trigger past halfway kicks; keep it pulled to hold the glide; it releases below 30%.
@@ -1383,14 +1391,16 @@ function throwStroke(stickLeg, loaded = false, startT){
   if (loaded) strideStyle = 'v2';                       // a loaded stroke animates as V2 poling; a flick, like a trigger, as V1
 }
 
-function rumble(leg){
-  // a short buzz on the side that kicked, where the controller supports it
+function rumble(leg, k = 1){
+  // a short buzz on the side that kicked, where the controller supports it. k scales it for the stroke (see press),
+  // and the vibration slider scales everything (0 = off)
+  k *= P.rumble / 100; if (k <= 0.01) return;
   const gp = padIndex !== null && navigator.getGamepads ? (() => { try { return navigator.getGamepads()[padIndex]; } catch(e){ return null; } })() : null;
   const act = gp && gp.vibrationActuator; if (!act || !act.playEffect) return;
   const effect = (act.effects && act.effects.includes && act.effects.includes('trigger-rumble')) ? 'trigger-rumble' : 'dual-rumble';
   const params = effect === 'trigger-rumble'
-    ? { duration: 70, leftTrigger: leg === 'L' ? 0.6 : 0, rightTrigger: leg === 'R' ? 0.6 : 0 }
-    : { duration: 60, strongMagnitude: 0.25, weakMagnitude: 0.5 };
+    ? { duration: Math.round(45 + 35*k), leftTrigger: leg === 'L' ? Math.min(1, 1.0*k) : 0, rightTrigger: leg === 'R' ? Math.min(1, 1.0*k) : 0 }
+    : { duration: Math.round(40 + 30*k), strongMagnitude: Math.min(1, 0.4*k), weakMagnitude: Math.min(1, 0.8*k) };
   act.playEffect(effect, params).catch(() => {});
 }
 function release(leg){ held[leg] = false; }
@@ -3661,7 +3671,8 @@ trackGeo.setIndex(new THREE.BufferAttribute(trackIdx, 1));
 trackGeo.setDrawRange(0, 0);
 // old marks fade into the snow as new ones are laid. each mark's colour is mixed from the track colour toward the
 // snow under it (groomed, open snow or lake ice), so marks stay solid and overlapping ones never darken each other.
-// by how many marks are newer: 0-49 full, 50-59 90%, 60-69 70%, 70-79 40%, 80 and older 15%
+// by how many marks are newer: 0-49 full, 50-59 90%, 60-69 70%, 70-79 40%, 80 and older 15%, all scaled by the
+// mark strength slider (70% by default: 70, 63, 49, 28, 10.5%)
 const trackCol = new Float32Array(TRACK_CAP * 4 * 3);
 trackGeo.setAttribute('color', new THREE.BufferAttribute(trackCol, 3));
 const trackSeq = new Int32Array(TRACK_CAP), trackSurf = new Uint8Array(TRACK_CAP);
@@ -3680,7 +3691,7 @@ function trackColours(){
 function surfaceAt(x, y){ return onLake(x, y) ? 2 : (nearestTrail(x, y).d < TRAIL_W/2 || lawnSD(x, y) < 0) ? 1 : 0; }
 function colourTrack(slot){
   if (!trackRGB) trackColours();
-  const o = trackFade(trackN - 1 - trackSeq[slot]), t = trackRGB.track, b = trackRGB.surf[trackSurf[slot]], i = slot * 12;
+  const o = trackFade(trackN - 1 - trackSeq[slot]) * (P.marks/100), t = trackRGB.track, b = trackRGB.surf[trackSurf[slot]], i = slot * 12;
   for (let k = 0; k < 4; k++) for (let c = 0; c < 3; c++) trackCol[i + k*3 + c] = b[c] + (t[c] - b[c])*o;
 }
 function recolourTracks(){

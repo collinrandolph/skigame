@@ -101,6 +101,9 @@ body.dev .play-only { display:none !important }
   .pad span{position:relative;font:700 16px/1 var(--display);letter-spacing:.14em;text-transform:uppercase}
   .pad.l span{margin-right:36px}.pad.r span{margin-left:36px}
   .pad.on::before{background:var(--skier);opacity:.35}
+  .pad.pull::before{opacity:.5}
+  .pad.armed::before{background:var(--skier);opacity:.7;transform:translateY(6px)}
+  .pads .pad,#gl{touch-action:none}
   .mtoggle{display:flex;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 24px);z-index:6;
     width:64px;height:64px;border-radius:50%;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);
     border:1px solid var(--line);backdrop-filter:blur(6px);touch-action:manipulation;box-sizing:border-box}
@@ -222,6 +225,10 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tTmin">Shortest throw (stick units)<output id="oTmin"></output><input id="tTmin" type="range" min="0.3" max="1.4" step="0.05" value="0.7"></label>
     <label for="tFedge">Flick needs (share of stick range)<output id="oFedge"></output><input id="tFedge" type="range" min="0.6" max="1" step="0.01" value="0.92"></label>
     <label for="tV1side">V1 hang side (triggers)<output id="oV1side"></output><input id="tV1side" type="range" min="0" max="1" step="1" value="1"></label>
+    <h4>Touch</h4>
+    <label for="tSwait">Swipe wait before a tap kicks (ms)<output id="oSwait"></output><input id="tSwait" type="range" min="0" max="200" step="10" value="90"></label>
+    <label for="tSpull">Slingshot pull (px)<output id="oSpull"></output><input id="tSpull" type="range" min="10" max="80" step="2" value="26"></label>
+    <label for="tSthrow">Slingshot throw (px)<output id="oSthrow"></output><input id="tSthrow" type="range" min="10" max="100" step="2" value="34"></label>
     <div class="btns"><button id="dbgToggle" type="button">Stick debug: off</button></div>
     <h4>Kicks and strides</h4>
     <label for="tPush">Push per kick (m/s)<output id="oPush"></output><input id="tPush" type="range" min="0.2" max="2.5" step="0.05" value="2.5"></label>
@@ -309,7 +316,7 @@ addEventListener('resize', resize);
 
 const $ = id => document.getElementById(id);
 const P = {};
-const tune = [['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
+const tune = [['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tSwait','oSwait','swait',v=>v.toFixed(0)],['tSpull','oSpull','spull',v=>v.toFixed(0)],['tSthrow','oSthrow','sthrow',v=>v.toFixed(0)],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
   ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tOffglide','oOffglide','offglide',v=>v.toFixed(0)+'%'],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -1363,10 +1370,59 @@ addEventListener('keyup', e => {
   const leg = keyLeg(k); if (leg){ keyKickHeld[leg] = false; release(leg); }
 });
 addEventListener('blur', () => { held.L = held.R = false; });
+// touch pads, slingshot style. a tap is a normal kick. pull your thumb down the pad (load) and swipe it back up (throw)
+// for a loaded stroke: the same kick with the loaded boost, exactly like a loaded stick throw. letting go while pulled
+// back also fires it. so a tap isn't mistaken for the start of a pull, a tap's kick waits up to "swipe wait" ms for a
+// downward pull; lifting your thumb or moving any other way fires it straight away.
+const padTouch = { L: null, R: null };
+function padKick(leg, t){ if (t.timer){ clearTimeout(t.timer); t.timer = null; } if (t.state === 'wait'){ t.state = 'done'; kickInput(leg); } }
+function padLoaded(leg, t){
+  t.state = 'done';
+  if (inClassic()){ kickInput(leg); return; }         // classic has no loaded stroke: a plain stride kick
+  press(leg, P.lboost); strideStyle = 'v2';
+}
 for (const [id, leg] of [['padL','L'],['padR','R']]){
   const el = $(id);
-  el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture?.(e.pointerId); el.classList.add('on'); kickInput(leg); });
-  for (const ev of ['pointerup','pointercancel']) el.addEventListener(ev, () => { el.classList.remove('on'); release(leg); });
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch(_){} el.classList.add('on'); anyInputAt = performance.now();
+    const old = padTouch[leg]; if (old) padKick(leg, old);
+    const t = padTouch[leg] = { id: e.pointerId, x0: e.clientX, y0: e.clientY, low: e.clientY, state: 'wait', timer: null };
+    if (P.swait > 0) t.timer = setTimeout(() => padKick(leg, t), P.swait); else padKick(leg, t);
+  });
+  el.addEventListener('pointermove', e => {
+    const t = padTouch[leg]; if (!t || t.id !== e.pointerId) return;
+    const dx = e.clientX - t.x0, dy = e.clientY - t.y0;
+    if (t.state === 'wait'){
+      if (dy > 8 && dy > Math.abs(dx)*0.7){ clearTimeout(t.timer); t.timer = null; t.state = 'pull'; el.classList.add('pull'); }
+      else if (Math.hypot(dx, dy) > 12) padKick(leg, t);   // a slide that isn't a pull: just the kick
+    }
+    if (t.state === 'pull' || t.state === 'armed'){
+      t.low = Math.max(t.low, e.clientY);
+      if (t.low - t.y0 >= P.spull){ t.state = 'armed'; el.classList.add('armed'); }
+      if (t.state === 'armed' && t.low - e.clientY >= P.sthrow){ el.classList.remove('pull','armed'); padLoaded(leg, t); }
+    }
+  });
+  for (const ev of ['pointerup','pointercancel']) el.addEventListener(ev, e => {
+    const t = padTouch[leg];
+    if (t && t.id === e.pointerId){
+      if (t.state === 'armed' && ev === 'pointerup'){ padLoaded(leg, t); held[leg] = false; }   // let go of the pulled slingshot
+      else if (t.state === 'pull') { t.state = 'wait'; padKick(leg, t); }                       // a short pull: an ordinary kick
+      else padKick(leg, t);
+      padTouch[leg] = null;
+    }
+    el.classList.remove('on','pull','armed'); release(leg);
+  });
+}
+// snow plow on touch: press and hold anywhere on the scene above the pads; let go to stop
+{
+  const gl = $('gl'); let plowPtr = null;
+  gl.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' || plowPtr !== null) return;
+    e.preventDefault(); try { gl.setPointerCapture(e.pointerId); } catch(_){} plowPtr = e.pointerId; anyInputAt = performance.now(); setPlow(true, 'touch');
+  });
+  for (const ev of ['pointerup','pointercancel']) gl.addEventListener(ev, e => {
+    if (e.pointerId !== plowPtr) return; plowPtr = null; setPlow(false, 'touch');
+  });
 }
 // iOS Safari: no double-tap zoom or pinch zoom while playing (fast kicks would otherwise zoom the page)
 {
@@ -1375,7 +1431,7 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
   const editable = t => t && t.closest && t.closest('input,textarea,select,[contenteditable]');
   document.addEventListener('selectstart', e => { if (!editable(e.target)) e.preventDefault(); });
   document.addEventListener('contextmenu', e => { if (!editable(e.target)) e.preventDefault(); });
-  for (const el of document.querySelectorAll('.pad,.mtoggle')) el.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+  for (const el of document.querySelectorAll('.pad,.mtoggle,#gl')) el.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
   document.addEventListener('touchend', e => { const n = Date.now(); if (n - lastTouchEnd < 350) e.preventDefault(); lastTouchEnd = n; }, { passive: false });
   for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
   document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
@@ -4023,7 +4079,7 @@ function loop(t){
 }
 loadProgress();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

@@ -26,7 +26,10 @@ The keyboard, controller and touch screen share one layout. On a controller the 
   - Flick a stick up and out from rest and it's exactly a trigger press for the other leg. Pull it down and in first (load), then throw it up and out, and it's the same kick with a bigger push (Loaded stroke boost, 1.4× by default), skated at a slightly narrower angle so the extra push goes forward rather than side to side. The stroke's angle and length don't change anything.
   - In classic, swap one stick up and one down to kick.
 - **Animation:** trigger and key kicks animate as V1 (offset), and stick strokes as V2.
-- **Touch screens:** the orb counter shows at the top, and a map button in the top-right corner opens a full-screen map of all four zones. Tap the labelled **Left kick** / **Right kick** pads at the bottom of the screen. Between them sits the only other control, a toggle: **\/** means skate and **||** means classic. A speaker button in the top-left corner mutes the music on any device. Double-tap and pinch zoom, text selection and the long-press Copy/Share menu are all disabled so fast kicking doesn't disturb the page on iOS.
+- **Touch screens:** the orb counter shows at the top, and a map button in the top-right corner opens a full-screen map of all four zones. Tap the labelled **Left kick** / **Right kick** pads at the bottom of the screen for a kick (hold the pad to ride the glide).
+  - **Slingshot (loaded stroke):** pull your thumb down the pad, then swipe it back up. That's the same kick with the loaded boost, animated as V2, exactly like a loaded stick throw. Letting go while it's pulled back fires it too. A tap waits up to 90 ms for a pull before it kicks (lifting or sliding sideways kicks at once). The wait, pull and throw distances are sliders in the Touch group.
+  - **Snow plow:** press and hold anywhere on the scene above the pads; let go to stop.
+  - Between the pads sits the only other control, a toggle: **\/** means skate and **||** means classic. A speaker button in the top-left corner mutes the music on any device. Double-tap and pinch zoom, text selection and the long-press Copy/Share menu are all disabled so fast kicking doesn't disturb the page on iOS.
 
 ## Levels
 
@@ -64,7 +67,7 @@ The map is four times its old area and split into zones, each locked until you c
   - Ungroomed snow is slower, except in classic. Double poles keep their full push off the trail.
 - **Trail assist:** gently steers your stride toward the trail ahead. It aims across the centre line at the mirror of your offset (the **centring** slider sets how far), so drifting to one edge pulls you back through the middle instead of letting you settle off to the side. Centring fades out near junctions and trail ends, and after switching trails the assist (and its centring) eases back in over the trail-switch time, so changing trails never yanks you sideways. It lets go when you lean, kick-turn or steer away.
 - **Skier:** V2 for stick strokes (load tall, push and compress, recover) and V1 offset poling for trigger and key kicks, with tuck, snow plow and classic poses.
-- **Tuning:** every setting is a slider in the Tuning panel, grouped into Controller, Kicks and strides, Skate angle, Snow and glide, Classic/poling/braking, Trail assist, Camera and Testing. Only sliders you've moved are remembered in your browser; the rest follow the current defaults. Physics runs in fixed steps of at most 1/60 s, so it behaves the same at any frame rate. The stick debug recorder logs your stick input so you can tune the input thresholds.
+- **Tuning:** every setting is a slider in the Tuning panel, grouped into Controller, Touch, Kicks and strides, Skate angle, Snow and glide, Classic/poling/braking, Trail assist, Camera and Testing. Only sliders you've moved are remembered in your browser; the rest follow the current defaults. Physics runs in fixed steps of at most 1/60 s, so it behaves the same at any frame rate. The stick debug recorder logs your stick input so you can tune the input thresholds.
 
 ## Files
 

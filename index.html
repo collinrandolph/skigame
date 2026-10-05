@@ -151,6 +151,8 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 .orbhud.bump .gem{animation:orbbump .4s ease-out}
 @keyframes orbbump{0%{transform:scale(1)}40%{transform:scale(1.6)}100%{transform:scale(1)}}
 .orbhud[data-done="1"] b{color:var(--orb)}
+.orbhud[data-kind="crystal"] .gem{border-radius:2px;transform:rotate(45deg) scale(.8);background:radial-gradient(circle,#f0dcff 0 20%,#a45ae6 55%,#6d2fb0 100%);box-shadow:0 0 10px #a45ae6}
+.orbhud[data-kind="crystal"][data-done="1"] b{color:#a45ae6}
 .toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 66px);left:50%;transform:translate(-50%,-6px);z-index:6;max-width:calc(100vw - 32px);box-sizing:border-box;padding:9px 14px;border-radius:6px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(6px);color:var(--ink);font:600 13px/1.3 var(--display);letter-spacing:.06em;text-align:center;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){.orbhud.bump .gem{animation:none}.toast{transition:none}}
@@ -251,6 +253,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tOrb1">Zone 1 orbs collected<output id="oOrb1"></output><input id="tOrb1" type="range" min="0" max="20" step="1" value="0"></label>
     <label for="tOrb2">Zone 2 orbs collected<output id="oOrb2"></output><input id="tOrb2" type="range" min="0" max="30" step="1" value="0"></label>
     <label for="tOrb3">Zone 3 orbs collected<output id="oOrb3"></output><input id="tOrb3" type="range" min="0" max="50" step="1" value="0"></label>
+    <label for="tCry">Crystals collected<output id="oCry"></output><input id="tCry" type="range" min="0" max="20" step="1" value="0"></label>
     <p class="note">For testing: sets how many of a zone's orbs count as collected. All of them opens that zone's gate or lowers its bridge. Not saved.</p>
   </div>
 </details>
@@ -330,7 +333,11 @@ const legFlash = { L:0, R:0 };
 //   zone 2 (north-east): through that gate; hillier, with winding trails, bounded by the river and a spur ridge
 //   a river runs west to east across the whole map; zone 3 is the southern half beyond it. a spur ridge runs from
 //   zone 1's mountains down to the river, so the strip between them can only be reached from across the river.
-const WORLD = { x0:-170, x1:490, y0:-230, y1:450 };
+const WORLD = { x0:-170, x1:490, y0:-230, y1:790 };
+// the divide: a mountain wall across the whole map between zone 3 and zone 4 (further south, the same size again).
+// one notch through it, south of the broken circle, holds the great crystal gate
+function divideY(x){ return 470 + 8*Math.sin(x/53) + 5*Math.sin(x/23 + 1); }
+const DIVIDE_BAND = 22, G4 = { x: 100, hw: 9 };      // barrier half-width; the gate's opening half-width
 const RING = { x:-6, y:-58.5 };                                           // centre of zone 1's mountains
 const EDGE_WALL = 25;                                                     // the outer mountains stop you this far from the map edge
 function riverY(x){ return 150 + 10*Math.sin(x/47) + 6*Math.sin(x/23 + 1); }
@@ -367,6 +374,7 @@ const onLake = (x, y) => lakeQ(x, y) < 1;
 // the saddle: a notch in the south side of zone 1's mountains, reached by switchbacks from the river below. the south
 // gate sits in it, opened by zone 3's orbs
 const SADDLE = { x: RING.x, y: RING.y + ringCrest(Math.PI/2), h: 18 };
+G4.y = divideY(G4.x);
 let bridgeDown = 0;       // 0 raised .. 1 lowered (animated)
 
 // ---- terrain: gentle rolling hills, heights in metres (about ±3 m over 20–60 m wavelengths)
@@ -416,6 +424,18 @@ function zone3Height(x, y){
               + 9*Math.exp(-((x-30)**2 + (y-300)**2) / (2*45*45)) + 6*Math.exp(-((x-370)**2 + (y-320)**2) / (2*40*40));
   return m*hills;
 }
+function divideHeight(x, y){
+  const u = (y - divideY(x)) / 32; if (Math.abs(u) >= 1) return 0;
+  const amp = 40 + 9*Math.sin(x/19 + 0.7) + 6*Math.sin(x/7.3) + 4*Math.sin(x/3.1 + y/9);
+  let h = amp * 0.5*(1 + Math.cos(Math.PI*u)) * (1 + 0.12*Math.sin(x/9 + Math.sin(y/6)));
+  h *= smooth01(G4.hw + 3, G4.hw + 26, Math.abs(x - G4.x));                          // the notch, cut down to a flat floor
+  return h;
+}
+// zone 4: broad open snowfields beyond the divide, long gentle swells
+function zone4Height(x, y){
+  const m = smooth01(20, 70, y - divideY(x)); if (m <= 0) return 0;
+  return m * (5*Math.sin(x/61 + 0.4)*Math.cos(y/47) + 2.5*Math.sin((x - y)/33) + 7*Math.exp(-((x-330)**2 + (y-640)**2)/(2*55*55)));
+}
 function riverCut(x, y){ return -2.6 * (1 - smooth01(RIVER_HW - 1, RIVER_BANK + 4, Math.abs(y - riverY(x)))); }
 function heightNat(x, y){
   if (FLAT_GROUND) return 0;
@@ -426,7 +446,7 @@ function heightNat(x, y){
   const ridge  =  8 * Math.exp(-((x-58)**2 + (y+92)**2) / (2*32*32));   // the ridge in the north-east
   const valley = -6 * Math.exp(-((x+68)**2 + (y+68)**2) / (2*28*28));   // the valley in the west
   const flat = 1 - 0.8*Math.exp(-(x*x + (y-5)**2) / (2*18*18));          // stadium is nearly level
-  let h = roll*flat + ridge + valley + ringHeight(x, y) + spurHeight(x, y) + edgeHeight(x, y) + zone2Height(x, y) + zone3Height(x, y) + riverCut(x, y);
+  let h = roll*flat + ridge + valley + ringHeight(x, y) + spurHeight(x, y) + edgeHeight(x, y) + zone2Height(x, y) + zone3Height(x, y) + divideHeight(x, y) + zone4Height(x, y) + riverCut(x, y);
   // the lake: flattened to an ice sheet, the shore easing down to it
   const q = lakeQ(x, y);
   if (q < 1.35) h += (LAKE.h - h) * (1 - smooth01(0.98, 1.35, q));
@@ -472,7 +492,7 @@ function ground(x, y){
   return bridgeOpen(B) ? deckLevel(B) : height(x, y);
 }
 // what can't be crossed, as a signed distance in metres: negative inside an obstacle
-let gateOpen = false, gate2Open = false;
+let gateOpen = false, gate2Open = false, gate4Open = false;
 let SOLIDS = [];           // round footprints of the outpost's buildings (filled in once they're placed)
 let MOOSE = [];            // the tentacle moose wandering zones 2 and 3 (they're solid too)
 let NPCS = [];             // people and natives, standing or walking loops (solid, small)
@@ -491,6 +511,11 @@ function obstacleSD(x, y){
   const gx = Math.abs(x - GATE.x);
   d = Math.min(d, Math.max(gx - 0.6, lat - (PASS_HW + 2), (DOOR_HW + 0.6) - lat));
   if (!gateOpen) d = Math.min(d, Math.max(gx - 0.35, lat - (DOOR_HW + 0.6)));
+  // the divide between zones 3 and 4, open only through the notch, and the crystal gate in it
+  { const dv = Math.abs(y - divideY(x)) - DIVIDE_BAND; d = Math.min(d, Math.max(dv, G4.hw + 0.3 - Math.abs(x - G4.x))); }
+  { const gx = Math.abs(x - G4.x), gy = Math.abs(y - G4.y);
+    d = Math.min(d, Math.hypot(gx - (G4.hw + 1.4), gy) - 1.4);                       // the two pylons
+    if (!gate4Open) d = Math.min(d, Math.max(gy - 0.7, gx - G4.hw - 0.5)); }
   // the spur ridge down to the river
   d = Math.min(d, segDist(x, y, SPUR.x1, SPUR.y1, SPUR.x2, SPUR.y2) - SPUR.hw);
   // the river, with the bridge across it once it's lowered
@@ -526,6 +551,7 @@ function collide(){
 function zoneAt(x, y){
   const dx = x - RING.x, dy = y - RING.y;
   if (Math.hypot(dx, dy) < ringCrest(Math.atan2(dy, dx))) return 1;
+  if (y > divideY(x)) return 4;
   if (y > riverY(x)) return 3;
   return x > SPUR.x1 ? 2 : 3;      // the strip west of the spur belongs to zone 3's way back
 }
@@ -559,13 +585,16 @@ const TRAILS = [
   { name:'Watcher Climb',    diff:'black',  zone:3, pts:[[100,212],[70,240],[40,272],[33,318],[52,350],[81,300]] },
   { name:'Ribs Traverse',    diff:'blue',   zone:3, pts:[[250,205],[300,232],[333,270],[340,318],[305,350],[264.5,325.2]] },
   { name:'Far Shore',        diff:'green',  zone:3, pts:[[175,364],[228,396],[290,398],[322,378],[305,350]] },
+  // through the divide: from the south shore past the broken circle to the crystal gate, and on into zone 4
+  { name:'Crystal Gate',     diff:'blue',   zone:0, pts:[[175,364],[150,392],[124,420],[104,446],[G4.x,G4.y],[G4.x,G4.y + 30]] },
+  { name:'Frost Road',       diff:'green',  zone:4, pts:[[G4.x,G4.y + 30],[140,540],[205,562],[262,604],[236,652],[166,682],[96,656],[62,594],[G4.x,G4.y + 30]] },
 ];
 for (const t of TRAILS) if (t.zone === undefined) t.zone = 1;   // trails carry their zone's orbs; zone 0 = connectors
 const JUNCTIONS = [
   { name:'Stadium', x:0, y:0 }, { name:'North Jct', x:0, y:-40 }, { name:'Summit Jct', x:5, y:-135 }, { name:'Valley Jct', x:-78, y:-30 }, { name:'East Jct', x:50, y:-62 },
   { name:'Pass Jct', x:248, y:-75 }, { name:'Crown Jct', x:380, y:-150 }, { name:'Rim Jct', x:400, y:-10 }, { name:'Bridge', x:BRIDGE.x, y:BRIDGE.yN - 1 },
   { name:'Saddle', x:SADDLE.x, y:SADDLE.y }, { name:'Lower Bridge', x:BRIDGE2.x, y:BRIDGE2.yS + 1 }, { name:'Watcher Jct', x:100, y:212 }, { name:'Ribs Jct', x:250, y:205 },
-  { name:'North Shore', x:175, y:236 }, { name:'South Shore', x:175, y:364 }, { name:'West Shore', x:81, y:300 }, { name:'East Shore', x:264.5, y:325.2 }, { name:'Far Jct', x:305, y:350 },
+  { name:'North Shore', x:175, y:236 }, { name:'South Shore', x:175, y:364 }, { name:'West Shore', x:81, y:300 }, { name:'East Shore', x:264.5, y:325.2 }, { name:'Far Jct', x:305, y:350 }, { name:'Crystal Gate', x:G4.x, y:G4.y }, { name:'Frost Jct', x:G4.x, y:G4.y + 30 },
 ];
 // smooth each trail through its control points (Catmull-Rom), sampled about every metre
 for (const t of TRAILS){
@@ -1807,6 +1836,8 @@ const trees = (() => {
     if (ringHeight(x, y) + spurHeight(x, y) + edgeHeight(x, y) > 14 + rnd()*6) continue;  // timberline on the mountains
     if (Math.abs(y - riverY(x)) < RIVER_BANK + 1.5) continue;          // nothing in the river
     if (Math.abs(x - GATE.x) < 70 && Math.abs(y - GATE.y) < PASS_FLAT + 4) continue;   // the pass stays clear
+    if (Math.abs(x - G4.x) < G4.hw + 6 && Math.abs(y - G4.y) < 40) continue;          // and the divide's notch
+    if (divideHeight(x, y) > 14 + rnd()*6) continue;
     if (BRIDGES.some(B => Math.abs(x - B.x) < 8 && Math.abs(y - riverY(x)) < B.OUT + 6)) continue;  // and the bridge ramps
     if (lakeQ(x, y) < 1.12) continue;                                  // and the lake
     if (y > riverY(x) + 12 && rnd() < 0.72) continue;                 // across the river it's open tundra, trees only here and there
@@ -2012,7 +2043,7 @@ function updateOrbs(dt){
       o.got = true; o.fade = 0; music.chime(orbsGot(o.zone) / zoneOrbs(o.zone).length);
       if (o.zone === 1 && orbsGot(1) === ORB_COUNT[1] && !gateOpen){ setGateOpen(true); toast('All orbs found. The east gate is open.'); music.chime(1, true); }
       if (o.zone === 2 && orbsGot(2) === ORB_COUNT[2] && !bridgeWanted){ bridgeWanted = true; toast('All orbs found. The bridge is coming down.'); music.chime(1, true); }
-      if (o.zone === 3 && orbsGot(3) === ORB_COUNT[3] && !gate2Open){ gate2Open = true; toast('All orbs found. The south gate above the switchbacks is open.'); music.chime(1, true); }
+      if (o.zone === 3 && orbsGot(3) === ORB_COUNT[3] && !gate2Open){ gate2Open = true; setCrystalsActive(true); toast('All orbs found. The south gate is open, and purple crystals have appeared across the map.'); music.chime(1, true); }
     }
   }
   if (toastT && now > toastT){ $('toast').classList.remove('on'); toastT = 0; }
@@ -2025,15 +2056,16 @@ function setOrbsCollected(zone, n){
   });
   if (zone === 1) setGateOpen(n === ORB_COUNT[1]);
   if (zone === 2) bridgeWanted = n === ORB_COUNT[2];
-  if (zone === 3) gate2Open = n === ORB_COUNT[3];
+  if (zone === 3){ gate2Open = n === ORB_COUNT[3]; setCrystalsActive(gate2Open); }
 }
+{ const el = $('tCry'); el.addEventListener('input', () => { if (!crystalsActive) setCrystalsActive(true); setCrystalsCollected(+el.value); $('oCry').textContent = el.value + ' / ' + CRYSTAL_TOTAL; }); }
 for (const z of [1, 2, 3]){
   const el = $('tOrb' + z);
   el.addEventListener('input', () => { setOrbsCollected(z, +el.value); $('oOrb' + z).textContent = el.value + ' / ' + ORB_COUNT[z]; });
 }
 function resetOrbs(){
   for (const o of orbs){ o.got = false; o.fade = 0; o.g.visible = true; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; }
-  setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; bridgeWanted = false; bridgeDown = 0; animateGate(0);
+  setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; setCrystalsCollected(0); setCrystalsActive(false); gate4Open = false; gate4.open = 0; bridgeWanted = false; bridgeDown = 0; animateGate(0);
 }
 
 // ---- structure models: low-poly sci-fi outpost kit in the frost palette (slate, steel blue, pale grey, an orange
@@ -2777,6 +2809,107 @@ function updateNPCs(dt){
   }
 }
 
+// ---- purple crystals: they appear once zone 3's orbs are all in. each sits beside an off-trail landmark (a building,
+// a ruin, a camp) and sends up a column of purple light you can spot from far away. collect all twenty (5 in zone 1,
+// 5 in zone 2, 10 in zone 3) and the crystal gate in the divide opens onto zone 4.
+const CRYSTAL_COUNT = { 1: 5, 2: 5, 3: 10 }, CRYSTAL_TOTAL = 20;
+let crystalsActive = false;
+const CRYSTAL_MAT = {
+  gem: new THREE.MeshLambertMaterial({ color: 0x9a4ce0, emissive: 0x4a1680, flatShading: true }),
+  gem2: new THREE.MeshLambertMaterial({ color: 0xc58cff, emissive: 0x6a2aa8, flatShading: true }),
+  beam: new THREE.MeshBasicMaterial({ color: 0xb36cff, transparent: true, opacity: 0.32, depthWrite: false, fog: false, side: THREE.DoubleSide }),
+  core: new THREE.MeshBasicMaterial({ color: 0xe6c8ff, transparent: true, opacity: 0.55, depthWrite: false, fog: false }),
+};
+const crystals = (() => {
+  let seed = 8080; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const out = [];
+  for (const z of [1, 2, 3]){
+    // landmarks in this zone that aren't on a trail, key ones and ruins first, then the rest, shuffled within each
+    const cands = STRUCTS.filter(s => s.zone === z && !s.over).map(s => ({ s, k: (s.key || RUINS.has(s.kind) ? 0 : 1) + rnd()*0.9 })).sort((a, b) => a.k - b.k).map(c => c.s);
+    let n = 0;
+    for (const s of cands){
+      if (n >= CRYSTAL_COUNT[z]) break;
+      const R = (s.solids ? 4 : s.r*0.72) + 2.6;
+      for (let k = 0; k < 16; k++){
+        const a = rnd()*Math.PI*2, x = s.x + Math.cos(a)*R, y = s.y + Math.sin(a)*R;
+        if (obstacleSD(x, y) < 1.4 || nearestTrail(x, y).d < 8 || zoneAt(x, y) !== z) continue;
+        if (out.some(c => Math.hypot(c.x - x, c.y - y) < 25)) continue;
+        out.push({ x, y, zone: z, got: false, fade: 0, ph: rnd()*6, by: s.kind }); n++; break;
+      }
+    }
+  }
+  for (const c of out){
+    const g = new THREE.Group(); g.position.set(c.x, height(c.x, c.y), c.y); g.visible = false;
+    // a cluster of long faceted crystals leaning out of the snow
+    for (let k = 0; k < 5; k++){
+      const h = k ? 0.8 + ((k*37) % 7)/7 : 1.8, m = new THREE.Mesh(new THREE.OctahedronGeometry(0.35, 0), k % 2 ? CRYSTAL_MAT.gem2 : CRYSTAL_MAT.gem);
+      m.scale.set(k ? 0.6 : 0.8, h*1.6, k ? 0.6 : 0.8); const a = k*1.3;
+      m.position.set(k ? Math.cos(a)*0.45 : 0, h*0.45, k ? Math.sin(a)*0.45 : 0); m.rotation.set(k ? Math.sin(a)*0.5 : 0, a, k ? Math.cos(a)*0.5 : 0); g.add(m);
+    }
+    // the column of light: a soft outer beam and a brighter thread up its middle, 10 m tall
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 1.05, 10, 16, 1, true), CRYSTAL_MAT.beam); beam.position.y = 5; g.add(beam);
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 10, 8, 1, true), CRYSTAL_MAT.core); core.position.y = 5; g.add(core);
+    c.g = g; c.beam = beam; scene.add(g);
+  }
+  return out;
+})();
+const crystalsGot = () => crystals.filter(c => c.got).length;
+function setCrystalsActive(on){ crystalsActive = on; for (const c of crystals) c.g.visible = on && !c.got; }
+function updateCrystals(dt){
+  if (!crystalsActive) return;
+  const now = performance.now()/1000;
+  CRYSTAL_MAT.beam.opacity = 0.26 + 0.08*Math.sin(now*2.1);
+  for (const c of crystals){
+    if (c.got){
+      if (c.fade < 1){ c.fade = Math.min(1, c.fade + dt/0.6); c.g.scale.set(1 + c.fade, 1 - c.fade*0.9, 1 + c.fade); if (c.fade >= 1) c.g.visible = false; }
+      continue;
+    }
+    c.g.rotation.y = now*0.3 + c.ph;
+    c.beam.scale.set(1 + 0.08*Math.sin(now*3 + c.ph), 1, 1 + 0.08*Math.sin(now*3 + c.ph));
+    if (Math.hypot(S.x - c.x, S.y - c.y) < 2.4){
+      c.got = true; c.fade = 0; music.chime(crystalsGot()/CRYSTAL_TOTAL, crystalsGot() === CRYSTAL_TOTAL);
+      if (crystalsGot() === CRYSTAL_TOTAL && !gate4Open){ gate4Open = true; toast('All crystals found. The crystal gate in the southern divide is opening.'); }
+      else toast('Crystal ' + crystalsGot() + ' of ' + CRYSTAL_TOTAL);
+    }
+  }
+}
+function setCrystalsCollected(n){
+  crystals.forEach((c, k) => { c.got = k < n; c.fade = c.got ? 1 : 0; c.g.scale.set(1, 1, 1); c.g.visible = crystalsActive && !c.got; });
+  gate4Open = n === CRYSTAL_TOTAL;
+}
+// the crystal gate: two tall pale pylons grown like the ruins, a lintel at 15 m, and two great doors seamed with purple
+// light that swing inward (south) once every crystal is in
+const gate4 = (() => {
+  const g = new THREE.Group(), h0 = height(G4.x, G4.y); g.position.set(G4.x, h0, G4.y); scene.add(g);
+  const W = G4.hw, H = 15;
+  for (const sx of [-1, 1]){
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.6, H + 3, 9), SM.bone); p.position.set(sx*(W + 1.4), (H + 3)/2 - 0.5, 0); g.add(p);
+    for (let k = 0; k < 4; k++){ const r = new THREE.Mesh(new THREE.TorusGeometry(1.45 - k*0.1, 0.18, 6, 14), SM.bone2); r.rotation.x = Math.PI/2; r.position.set(sx*(W + 1.4), 3 + k*3.6, 0); g.add(r); }
+    const sp = new THREE.Mesh(new THREE.ConeGeometry(0.7, 4, 7), SM.bone2); sp.position.set(sx*(W + 1.4), H + 4, 0); g.add(sp);
+  }
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(2*W + 6, 1.6, 2.2), SM.bone); lintel.position.set(0, H + 0.6, 0); g.add(lintel);
+  const glowBar = new THREE.Mesh(new THREE.BoxGeometry(2*W, 0.3, 2.3), CRYSTAL_MAT.core); glowBar.position.set(0, H - 0.4, 0); g.add(glowBar);
+  const gemTop = new THREE.Mesh(new THREE.OctahedronGeometry(1.4, 0), CRYSTAL_MAT.gem); gemTop.scale.set(1, 1.6, 1); gemTop.position.set(0, H + 3.2, 0); g.add(gemTop);
+  const doors = [];
+  for (const sx of [-1, 1]){
+    // each door hinges on its pylon and reaches the middle; a slab with ribs and a glowing seam
+    const hinge = new THREE.Group(); hinge.position.set(sx*W, 0, 0); g.add(hinge);
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(W, H - 0.4, 0.7), SM.bone); slab.position.set(-sx*W/2, (H - 0.4)/2, 0); hinge.add(slab);
+    for (let k = 0; k < 5; k++){ const rib = new THREE.Mesh(new THREE.BoxGeometry(W - 0.6, 0.35, 0.95), SM.bone2); rib.position.set(-sx*W/2, 1.6 + k*2.8, 0); hinge.add(rib); }
+    const seam = new THREE.Mesh(new THREE.BoxGeometry(0.25, H - 1, 0.8), CRYSTAL_MAT.core); seam.position.set(-sx*(W - 0.2), (H - 0.4)/2, 0); hinge.add(seam);
+    const glyph = new THREE.Mesh(new THREE.OctahedronGeometry(0.9, 0), CRYSTAL_MAT.gem2); glyph.scale.set(0.6, 1.4, 0.4); glyph.position.set(-sx*W*0.55, H*0.55, -0.45); hinge.add(glyph);
+    doors.push({ hinge, sx });
+  }
+  return { g, doors, open: 0, gemTop };
+})();
+function animateGate4(dt){
+  const target = gate4Open ? 1 : 0;
+  gate4.open += Math.sign(target - gate4.open) * Math.min(Math.abs(target - gate4.open), dt / 5);   // slow and heavy
+  const e = gate4.open*gate4.open*(3 - 2*gate4.open);
+  for (const d of gate4.doors) d.hinge.rotation.y = d.sx * e * 1.6;         // swing in toward zone 4 (+y)
+  gate4.gemTop.rotation.y += dt*0.5;
+}
+
 // skier: a simple jointed figure built from boxes and cylinders, posed every frame from the game state. the pose is
 // for looks only and never feeds back into movement. the heading arrow sits on the snow in front.
 const skier = new THREE.Group(); scene.add(skier);              // holds the heading arrow (camera direction)
@@ -3139,6 +3272,15 @@ function draw(){
       ctx.fillText('SOUTH GATE · ' + (gate2Open ? 'OPEN' : orbsGot(3) + ' / ' + ORB_COUNT[3] + ' ORBS'), p[0], p[1]);
     }
   }
+  {
+    const d = Math.hypot(G4.x - S.x, G4.y - S.y);
+    const p = d < 170 && project(G4.x, G4.y, height(G4.x, G4.y) + 21);
+    if (p){
+      ctx.globalAlpha = Math.min(1, (170 - d) / 40);
+      ctx.fillStyle = gate4Open ? '#a45ae6' : C.ink;
+      ctx.fillText('CRYSTAL GATE · ' + (gate4Open ? 'OPEN' : crystalsGot() + ' / ' + CRYSTAL_TOTAL + ' CRYSTALS'), p[0], p[1]);
+    }
+  }
   ctx.globalAlpha = 1;
   drawMinimap();
   if (devView){ if (P.scheme === 1) drawSticks(); }
@@ -3372,10 +3514,10 @@ function drawDiff(d, x, y, r){
 // overview map: inside the ring it frames zone 1; beyond the gate it shows the whole map
 const mapBox = zone => {
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-  for (const t of TRAILS) if (t.zone === zone || (zone === 3 && t.name === 'Switchbacks')) for (let i = 0; i < t.s.length; i += 2){ x0 = Math.min(x0, t.s[i]); x1 = Math.max(x1, t.s[i]); y0 = Math.min(y0, t.s[i+1]); y1 = Math.max(y1, t.s[i+1]); }
+  for (const t of TRAILS) if (t.zone === zone || (zone === 3 && (t.name === 'Switchbacks' || t.name === 'Crystal Gate')) || (zone === 4 && t.name === 'Crystal Gate')) for (let i = 0; i < t.s.length; i += 2){ x0 = Math.min(x0, t.s[i]); x1 = Math.max(x1, t.s[i]); y0 = Math.min(y0, t.s[i+1]); y1 = Math.max(y1, t.s[i+1]); }
   return { x0: x0 - 30, x1: x1 + 30, y0: y0 - 30, y1: y1 + 30 };
 };
-const MAP_BOX = { 1: mapBox(1), 2: mapBox(2), 3: mapBox(3) };
+const MAP_BOX = { 1: mapBox(1), 2: mapBox(2), 3: mapBox(3), 4: mapBox(4) };
 function drawMinimap(){
   const MAP = MAP_BOX[zoneAt(S.x, S.y)];
   const size = W < 520 ? 104 : 150, pad = 16;
@@ -3410,6 +3552,12 @@ function drawMinimap(){
     for (let i = 2; i < t.s.length; i += 2) ctx.lineTo(mX(t.s[i]), mY(t.s[i+1]));
     ctx.stroke();
   }
+  // the divide (a rock band) with the crystal gate, and the crystals once they're out (purple diamonds)
+  ctx.globalAlpha = 0.35; ctx.strokeStyle = C.rock; ctx.lineWidth = Math.max(3, DIVIDE_BAND*2*sc);
+  ctx.beginPath(); for (let x = WORLD.x0; x <= WORLD.x1; x += 8){ x === WORLD.x0 ? ctx.moveTo(mX(x), mY(divideY(x))) : ctx.lineTo(mX(x), mY(divideY(x))); } ctx.stroke();
+  ctx.globalAlpha = 1; ctx.lineWidth = 3; ctx.strokeStyle = gate4Open ? '#a45ae6' : C.ink;
+  ctx.beginPath(); ctx.moveTo(mX(G4.x - G4.hw), mY(G4.y)); ctx.lineTo(mX(G4.x + G4.hw), mY(G4.y)); ctx.stroke();
+  if (crystalsActive){ ctx.fillStyle = '#a45ae6'; for (const c of crystals) if (!c.got){ const X = mX(c.x), Y = mY(c.y); ctx.beginPath(); ctx.moveTo(X, Y - 4); ctx.lineTo(X + 3, Y); ctx.lineTo(X, Y + 4); ctx.lineTo(X - 3, Y); ctx.fill(); } }
   // the moose, as purple dots
   ctx.fillStyle = '#8e4fbf';
   for (const m of MOOSE){ ctx.beginPath(); ctx.arc(mX(m.x), mY(m.y), 2.2, 0, Math.PI*2); ctx.fill(); }
@@ -3524,13 +3672,18 @@ const isTouchUI = matchMedia('(hover: none) and (pointer: coarse)').matches;
 function hud(){
   {
     // the counter follows the zone you're in: its orbs, and whether its way onward is open yet
-    const z = zoneAt(S.x, S.y), tot = ORB_COUNT[z], n = tot ? orbsGot(z) : 0;
-    const txt = n + ' / ' + tot;
+    // once the crystals are out the counter tracks them instead (zone 4 has nothing to collect yet)
+    const z = zoneAt(S.x, S.y), cry = crystalsActive && z !== 4;
+    const tot = cry ? CRYSTAL_TOTAL : ORB_COUNT[z], n = cry ? crystalsGot() : tot ? orbsGot(z) : 0;
+    const txt = z === 4 ? 'Zone 4' : n + ' / ' + tot;
+    $('orbHud').dataset.kind = cry ? 'crystal' : '';
     const el = $('orbN'); if (el.textContent !== txt){ if (tot && n > 0) { const h = $('orbHud'); h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); } el.textContent = txt; }
     $('orbHud').dataset.done = tot && n === tot ? '1' : '';
-    $('orbZone').textContent = z === 1 ? (gateOpen ? 'Gate open' : 'Orbs') : z === 2 ? (bridgeWanted ? 'Bridge down' : 'Orbs') : (gate2Open ? 'South gate open' : 'Orbs');
+    $('orbZone').textContent = z === 4 ? 'Beyond the divide' : cry ? (gate4Open ? 'Crystal gate open' : 'Crystals')
+      : z === 1 ? (gateOpen ? 'Gate open' : 'Orbs') : z === 2 ? (bridgeWanted ? 'Bridge down' : 'Orbs') : (gate2Open ? 'South gate open' : 'Orbs');
   }
   $('mToggle').dataset.mode = inClassic() ? 'classic' : 'skate';
+  if (devView){ const el = $('tCry'), n = crystalsGot(); if (document.activeElement !== el && +el.value !== n) el.value = n; $('oCry').textContent = n + ' / ' + CRYSTAL_TOTAL; }
   if (devView) for (const z of [1, 2, 3]){           // keep the orb sliders in step with what's actually been collected
     const el = $('tOrb' + z), n = orbsGot(z);
     if (document.activeElement !== el && +el.value !== n) el.value = n;
@@ -3618,7 +3771,7 @@ function camTarget(){
 }
 function loop(t){
   const dt = Math.min(0.05, (t-last)/1000); last = t; pollPad(); step(dt);
-  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt);
+  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt);
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through
   const w = 3 / Math.max(0.05, P.cam);
@@ -3630,7 +3783,7 @@ function loop(t){
   draw(); hud(); requestAnimationFrame(loop);
 }
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

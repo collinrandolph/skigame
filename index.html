@@ -262,6 +262,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tAssist">Trail assist strength<output id="oAssist"></output><input id="tAssist" type="range" min="0" max="1" step="0.05" value="0.5"></label>
     <label for="tAcap">Trail assist reach (°)<output id="oAcap"></output><input id="tAcap" type="range" min="5" max="60" step="1" value="25"></label>
     <label for="tAlook">Trail assist look-ahead (s)<output id="oAlook"></output><input id="tAlook" type="range" min="0.3" max="3" step="0.1" value="1.2"></label>
+    <label for="tAcenter">Trail assist centring (× your offset)<output id="oAcenter"></output><input id="tAcenter" type="range" min="0" max="2" step="0.1" value="1"></label>
     <label for="tAramp">Trail assist ease-in (ms)<output id="oAramp"></output><input id="tAramp" type="range" min="0" max="4000" step="100" value="1500"></label>
     <h4>Camera</h4>
     <label for="tCamd">Camera distance (m)<output id="oCamd"></output><input id="tCamd" type="range" min="4" max="24" step="0.5" value="10"></label>
@@ -307,7 +308,7 @@ addEventListener('resize', resize);
 
 const $ = id => document.getElementById(id);
 const P = {};
-const tune = [['tScheme','oScheme','scheme',v=>v ? 'Twin-stick (experimental)' : 'Triggers'],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tSboost','oSboost','sboost',v=>v.toFixed(2)+'×'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tVstep','oVstep','vstep',v=>v.toFixed(0)],['tVslow','oVslow','vslow',v=>v.toFixed(0)],['tVfast','oVfast','vfast',v=>v.toFixed(0)],['tVhill','oVhill','vhill',v=>v.toFixed(1)],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tSa0','oSa0','sa0',v=>v.toFixed(0)],['tSa45','oSa45','sa45',v=>v.toFixed(0)],['tSa90','oSa90','sa90',v=>v.toFixed(0)],['tSlen','oSlen','slen',v=>v.toFixed(2)],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tBuild','oBuild','build',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
+const tune = [['tScheme','oScheme','scheme',v=>v ? 'Twin-stick (experimental)' : 'Triggers'],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tSboost','oSboost','sboost',v=>v.toFixed(2)+'×'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tVstep','oVstep','vstep',v=>v.toFixed(0)],['tVslow','oVslow','vslow',v=>v.toFixed(0)],['tVfast','oVfast','vfast',v=>v.toFixed(0)],['tVhill','oVhill','vhill',v=>v.toFixed(1)],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tSa0','oSa0','sa0',v=>v.toFixed(0)],['tSa45','oSa45','sa45',v=>v.toFixed(0)],['tSa90','oSa90','sa90',v=>v.toFixed(0)],['tSlen','oSlen','slen',v=>v.toFixed(2)],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tBuild','oBuild','build',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
   ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -740,7 +741,14 @@ function trailAssistTarget(x, y, heading, ahead, prefer){
         look = Math.max(3, look * 0.35 / bend);
       }
       if (Math.hypot(tx - x, ty - y) < 1) continue;                     // ran off the end of this trail
-      const off = wrap(bearing(x, y, tx, ty) - heading);
+      // centring: aim not at the centre line but across it, at the mirror of your own offset (scaled by the
+      // centring slider and kept on the trail). ride the left edge and the target sits right of centre, so you're
+      // drawn back through the middle rather than settling alongside it.
+      const tl = Math.hypot(nx - cx, ny - cy), nrx = -(ny - cy)/tl, nry = (nx - cx)/tl;
+      const lat = (x - cx)*nrx + (y - cy)*nry;
+      const shift = Math.max(-TRAIL_W/2, Math.min(TRAIL_W/2, -lat * P.acenter));
+      const ax = tx + nrx*shift, ay = ty + nry*shift;
+      const off = wrap(bearing(x, y, ax, ay) - heading);
       // how far you are from lined up: judged against both the trail's direction where you are and the look-ahead
       // bearing, whichever is closer. on a curve you're often pointed along the trail here but well away from the
       // point ahead, and that should still count as following the trail.

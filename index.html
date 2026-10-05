@@ -270,6 +270,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tAlook">Trail assist look-ahead (s)<output id="oAlook"></output><input id="tAlook" type="range" min="0.3" max="3" step="0.1" value="1.2"></label>
     <label for="tAcenter">Trail assist centring (× your offset)<output id="oAcenter"></output><input id="tAcenter" type="range" min="0" max="2" step="0.1" value="1.5"></label>
     <label for="tAjunc">Centring off near junctions (m)<output id="oAjunc"></output><input id="tAjunc" type="range" min="0" max="40" step="1" value="18"></label>
+    <label for="tBsnap">Kick turns snap to trails within (m of a junction)<output id="oBsnap"></output><input id="tBsnap" type="range" min="0" max="40" step="1" value="20"></label>
     <label for="tAswitch">Trail switch ease-in (ms)<output id="oAswitch"></output><input id="tAswitch" type="range" min="0" max="4000" step="100" value="1500"></label>
     <label for="tAramp">Trail assist ease-in (ms)<output id="oAramp"></output><input id="tAramp" type="range" min="0" max="4000" step="100" value="1500"></label>
     <h4>Camera</h4>
@@ -316,7 +317,7 @@ addEventListener('resize', resize);
 
 const $ = id => document.getElementById(id);
 const P = {};
-const tune = [['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tSwait','oSwait','swait',v=>v.toFixed(0)],['tSpull','oSpull','spull',v=>v.toFixed(0)],['tSthrow','oSthrow','sthrow',v=>v.toFixed(0)],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
+const tune = [['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tSwait','oSwait','swait',v=>v.toFixed(0)],['tSpull','oSpull','spull',v=>v.toFixed(0)],['tSthrow','oSthrow','sthrow',v=>v.toFixed(0)],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tBsnap','oBsnap','bsnap',v=>v ? v.toFixed(0) : 'off'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
   ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tOffglide','oOffglide','offglide',v=>v.toFixed(0)+'%'],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -691,6 +692,38 @@ const JUNCTION_PTS = (() => {
   return out;
 })();
 const nearestJunction = (x, y) => JUNCTION_PTS.reduce((m, q) => Math.min(m, Math.hypot(q[0] - x, q[1] - y)), Infinity);
+// the ways out of each junction: for every trail through it (or ending at it), the bearing 10 m along the trail in each
+// direction. this includes the way you came in, so a kick turn round can stop pointing back down your own trail.
+// bearings use the skier's convention: 0 = north (-y), increasing clockwise
+const JUNCTION_BRANCHES = JUNCTION_PTS.map(([jx, jy]) => {
+  const out = [];
+  for (const t of TRAILS){
+    const p = t.s, n = p.length/2; let bi = -1, bd = 4;
+    for (let i = 0; i < n; i++){ const d = Math.hypot(p[i*2] - jx, p[i*2+1] - jy); if (d < bd){ bd = d; bi = i; } }
+    if (bi < 0) continue;
+    for (const dir of [-1, 1]){
+      let i = bi; while (i + dir >= 0 && i + dir < n && Math.hypot(p[i*2] - jx, p[i*2+1] - jy) < 10) i += dir;
+      if (i === bi || Math.hypot(p[i*2] - jx, p[i*2+1] - jy) < 5) continue;   // the trail ends here
+      const b = Math.atan2(p[i*2] - jx, -(p[i*2+1] - jy));
+      if (!out.some(q => Math.abs(Math.atan2(Math.sin(q - b), Math.cos(q - b))) < 8*Math.PI/180)) out.push(b);
+    }
+  }
+  return { x: jx, y: jy, b: out };
+});
+// near a junction, a kick turn that would swing past (or end just short of) one of its trails stops lined up with it.
+// returns the turn to use instead, in radians (signed like side), or null to turn as normal
+function branchSnap(heading, side, stepDeg){
+  if (!(P.bsnap > 0)) return null;
+  let J = null, jd = P.bsnap;
+  for (const j of JUNCTION_BRANCHES){ const d = Math.hypot(j.x - S.x, j.y - S.y); if (d < jd){ jd = d; J = j; } }
+  if (!J) return null;
+  let best = null;
+  for (const b of J.b){
+    let r = (b - heading) * side; r = Math.atan2(Math.sin(r), Math.cos(r)) * 180/Math.PI;   // how far round, in the turn's direction
+    if (r > 1.5 && r <= stepDeg + 4 && (best === null || r < best)) best = r;
+  }
+  return best === null ? null : side * best * Math.PI/180;
+}
 // distance from a point to the nearest groomed centre line
 function nearestTrail(x, y){
   let best = Infinity, bt = null;
@@ -814,7 +847,10 @@ function trailAssist(dt){
   // the slow ease-in is for picking up again right after you steered yourself (a lean or kick turn); changing from one
   // trail to another eases in over the trail-switch time; otherwise, like drifting wide on a bend, it takes hold
   // within a few tenths of a second
-  const rampMs = (assistSince - assistQuietUntil < 1500) ? P.aramp : assistSwitch ? P.aswitch : 300;
+  // after a kick turn at a junction, if you've ended up within the assist's reach of a trail, it settles you onto it
+  // quickly instead of the usual slow ease-in, catching small over- or under-shoots
+  const settle = now - junctionTurnAt < 2500;
+  const rampMs = settle ? 300 : (assistSince - assistQuietUntil < 1500) ? P.aramp : assistSwitch ? P.aswitch : 300;
   const ramp = Math.min(1, (now - assistSince) / Math.max(1, rampMs));
   const fade = 1 - (a / cap)**2;                                    // full pull when nearly lined up, none at the edge
   // and it fades out toward the trail's edge, so arriving from off the trail is gentle too
@@ -991,7 +1027,7 @@ function polePush(dir = S.th){
 // 5, 5, 15, 33.3, 51.7, 70), shrinking to 90° at a normal skating speed or above (5, 5, 15, 18.3, 21.7, 25), so the
 // same quick kicks give a tight turn while moving rather than spinning you round. the speed you start the run at
 // decides which (the kicks themselves speed you up, and that shouldn't shrink a turn you began from a standstill). no single kick turns more than 90°.
-let kickPrevT = -1e9, streakKmh = 0, streakTrig = false;
+let kickPrevT = -1e9, streakKmh = 0, streakTrig = false, snapSkip = 0, junctionTurnAt = -1e9;
 function fullTurnDeg(speedKmh = Math.hypot(S.vx, S.vy) * 3.6, p = P){
   return p.tfStop + (p.tfMove - p.tfStop) * smooth01(p.tfVlo, p.tfVhi, speedKmh);
 }
@@ -1029,7 +1065,7 @@ function kick(leg, opt = {}){
   const tNow = performance.now(), quick = (opt.startT !== undefined ? Math.min(opt.startT, tNow) : tNow) - kickPrevT <= P.kwin;
   streak = sameSide && quick ? streak + 1 : 1;
   kickPrevT = tNow;
-  if (streak === 1){ streakKmh = Math.hypot(S.vx, S.vy) * 3.6; streakTrig = opt.src === 'trigger'; }   // the speed (and input) a run starts with decides how far it can turn
+  if (streak === 1){ streakKmh = Math.hypot(S.vx, S.vy) * 3.6; streakTrig = opt.src === 'trigger'; snapSkip = 0; }   // the speed (and input) a run starts with decides how far it can turn
   const thPre = S.tgt;
 
   // 1. print the push before any rotation: the kicking ski's own line carries straight on, same direction
@@ -1065,11 +1101,21 @@ function kick(leg, opt = {}){
     // stick strokes. a kick on the same leg as the last one turns from your current heading (a kick turn: steps add
     // up and the camera follows one step behind). a kick on the other leg is measured from the camera heading, so it
     // swings back across and undoes the last kick's rotation instead of stacking on top of it.
-    lastTurnDeg = sameSideTurn(streak);
-    const a = side * lastTurnDeg * Math.PI/180;
+    // a kick that snaps onto a trail at a junction doesn't use up a step of the build: the next one carries on with
+    // the step this one would have had (15, 25, line up, 40, 60 rather than 15, 25, 40, 60)
+    lastTurnDeg = sameSideTurn(streak - snapSkip);
+    let a = side * lastTurnDeg * Math.PI/180;
     let camRef = S.tgt - camPending;
     const prev = S.tgt;
-    if (sameSide){ S.tgt = prev + a; camRef = prev; assistQuietUntil = performance.now() + 800; }
+    if (sameSide){
+      const sn = branchSnap(prev, side, lastTurnDeg);
+      if (sn !== null){ a = sn; lastTurnDeg = Math.abs(sn) * 180/Math.PI; snapSkip++; }
+      S.tgt = prev + a; camRef = prev;
+      // near a junction the assist is back as soon as the kick-turn window closes, to settle you onto the trail
+      const nearJ = P.bsnap > 0 && nearestJunction(S.x, S.y) < P.bsnap;
+      if (nearJ) junctionTurnAt = performance.now();
+      assistQuietUntil = performance.now() + (nearJ ? P.kwin : 800);
+    }
     else S.tgt = camRef + a;
     camPending = S.tgt - camRef;
     d = S.tgt - prev;

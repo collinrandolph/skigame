@@ -496,7 +496,7 @@ let gateOpen = false, gate2Open = false, gate4Open = false;
 let SOLIDS = [];           // round footprints of the outpost's buildings (filled in once they're placed)
 let MOOSE = [];            // the tentacle moose wandering zones 2 and 3 (they're solid too)
 let NPCS = [];             // people and natives, standing or walking loops (solid, small)
-function obstacleSD(x, y){
+function obstacleSD(x, y, terrainOnly = false){
   // zone 1's mountains, with the east pass carved through them
   const dx = x - RING.x, dy = y - RING.y, r = Math.hypot(dx, dy), th = Math.atan2(dy, dx);
   let ring = Math.max(ringIn(th) - r, r - ringOut(th));
@@ -529,6 +529,7 @@ function obstacleSD(x, y){
   }
   d = Math.min(d, river);
   d = Math.min(d, x - WORLD.x0 - EDGE_WALL, WORLD.x1 - EDGE_WALL - x, y - WORLD.y0 - EDGE_WALL, WORLD.y1 - EDGE_WALL - y);
+  if (terrainOnly) return d;
   // buildings and equipment
   for (const o of SOLIDS){ const q = Math.hypot(x - o.x, y - o.y) - o.r; if (q < d) d = q; }
   for (const m of MOOSE){ const q = Math.hypot(x - m.x, y - m.y) - 1.4; if (q < d) d = q; }
@@ -1572,7 +1573,7 @@ function* bakeTile(t){
   // mountain sides: the grid gives way to plain snow, with rock showing through where it's steepest
   const PX = R*TEX_PPM;
   yield;
-  for (let j = 0; j < ny; j++){ if (j % 24 === 23) yield; for (let i = 0; i < nx; i++){
+  for (let j = 0; j < ny; j++){ if (j % 12 === 11) yield; for (let i = 0; i < nx; i++){
     const ii = Math.min(nx - 2, i), jj = Math.min(ny - 2, j);
     const gx = (H(ii+2, jj) - H(ii, jj)), gy = (H(ii, jj+2) - H(ii, jj)), sl = Math.hypot(gx, gy);
     if (sl < 0.28) continue;
@@ -1611,20 +1612,17 @@ function* bakeTile(t){
     for (const cr of LAKE_CRACKS){ tc.moveTo(TX(cr[0]), TY(cr[1])); for (let i = 2; i < cr.length; i += 2) tc.lineTo(TX(cr[i]), TY(cr[i+1])); }
     tc.stroke();
   }
-  // lawns round the landmarks and the narrow paths in to them, groomed like the trails but finer
-  {
-    const lawns = LAWNS.filter(L => L.x + L.R > X0 - 2 && L.x - L.R < X1 + 2 && L.y + L.R > Y0 - 2 && L.y - L.R < Y1 + 2);
-    const spurs = SPURS.filter(sp => sp.bx[0] < X1 + 3 && sp.bx[2] > X0 - 3 && sp.bx[1] < Y1 + 3 && sp.bx[3] > Y0 - 3);
-    if (lawns.length || spurs.length){
-      const sp = p => { tc.moveTo(TX(p.s[0]), TY(p.s[1])); for (let i = 2; i < p.s.length; i += 2) tc.lineTo(TX(p.s[i]), TY(p.s[i+1])); };
-      tc.lineCap = 'round'; tc.lineJoin = 'round';
-      tc.strokeStyle = C.edge; tc.lineWidth = SPUR_W*TEX_PPM + 3; tc.beginPath(); spurs.forEach(sp); tc.stroke();
-      tc.fillStyle = C.edge; for (const L of lawns){ tc.beginPath(); tc.arc(TX(L.x), TY(L.y), (L.R + 0.3)*TEX_PPM, 0, Math.PI*2); tc.fill(); }
-      tc.fillStyle = C.groomed; for (const L of lawns){ tc.beginPath(); tc.arc(TX(L.x), TY(L.y), L.R*TEX_PPM, 0, Math.PI*2); tc.fill(); }
-      tc.strokeStyle = C.cord; tc.lineWidth = 2; tc.beginPath();
-      for (const L of lawns) for (let r = L.R - 1; r > 1; r -= 1.2){ tc.moveTo(TX(L.x) + r*TEX_PPM, TY(L.y)); tc.arc(TX(L.x), TY(L.y), r*TEX_PPM, 0, Math.PI*2); }
-      tc.stroke();
-      for (let w = SPUR_W*TEX_PPM, k = 0; w > 1; w -= 2, k++){ tc.strokeStyle = k % 2 ? C.cord : C.groomed; tc.lineWidth = w; tc.beginPath(); spurs.forEach(sp); tc.stroke(); }
+  // lawns round the landmarks: groomed snow with a fine diagonal corduroy and the trails' edge colour at the rim
+  if (LAWN_PARTS.some(p => p.bx[0] < X1 + 8 && p.bx[2] > X0 - 8 && p.bx[1] < Y1 + 8 && p.bx[3] > Y0 - 8)){
+    const PXl = R*TEX_PPM;
+    for (let j = 0; j < ny; j++){
+      if (j % 6 === 5) yield;
+      for (let i = 0; i < nx; i++){
+        const x = X0 + (i + 0.5)*R, y = Y0 + (j + 0.5)*R, e = lawnSD(x, y);
+        if (e > 0.25) continue;
+        tc.fillStyle = e > -0.45 ? C.edge : (Math.floor((x + y)/1.1) % 2 ? C.cord : C.groomed);
+        tc.fillRect(i*PXl, j*PXl, PXl + 0.5, PXl + 0.5);
+      }
     }
   }
   // groomed trails: edge, packed surface, then corduroy stripes running along the trail
@@ -1640,7 +1638,7 @@ function* bakeTile(t){
   // contour lines: every 0.5 m (stronger every 2 m) on skiable ground; on the steep mountain sides only every 5 m
   for (let pass = 0; pass < 3; pass++){
     tc.strokeStyle = C.contour; tc.lineWidth = pass ? 2 : 1; tc.globalAlpha = pass ? .7 : .45; tc.beginPath();
-    for (let j = 0; j < ny; j++){ if (j % 40 === 39){ tc.stroke(); yield; tc.strokeStyle = C.contour; tc.lineWidth = pass ? 2 : 1; tc.globalAlpha = pass ? .7 : .45; tc.beginPath(); } for (let i = 0; i < nx; i++){
+    for (let j = 0; j < ny; j++){ if (j % 16 === 15){ tc.stroke(); yield; tc.strokeStyle = C.contour; tc.lineWidth = pass ? 2 : 1; tc.globalAlpha = pass ? .7 : .45; tc.beginPath(); } for (let i = 0; i < nx; i++){
       const a = H(i,j), b = H(i+1,j), c = H(i+1,j+1), d = H(i,j+1);
       const lo = Math.min(a,b,c,d), hi = Math.max(a,b,c,d);
       const steep = hi - lo > 0.3;              // > ~60% grade across a half-metre cell
@@ -1834,46 +1832,75 @@ SOLIDS = STRUCTS.flatMap(s => s.solids
   ? s.solids.map(([lx, lz, r]) => ({ x: s.x + lx*Math.cos(s.rot) + lz*Math.sin(s.rot), y: s.y - lx*Math.sin(s.rot) + lz*Math.cos(s.rot), r }))
   : [{ x: s.x, y: s.y, r: s.r * (RUINS.has(s.kind) ? 0.55 : 0.72) }]);
 
-// ---- lawns and side paths: every landmark off the trails gets a groomed apron round it, and a narrow groomed path
-// in from the nearest trail. they ski like trail but aren't trails: no signs, no orbs, not on the map.
-const SPUR_W = 2.6;
-const LAWNS = STRUCTS.filter(s => !s.over).map(s => ({ x: s.x, y: s.y, R: s.r*0.85 + 3 }));
-const SPURS = (() => {
-  const out = [];
-  for (const L of LAWNS){
-    // the trail samples nearest this lawn, tried in order until one gives a clear straight run in
+// ---- lawns: every landmark off the trails sits on a broad groomed lawn, joined to the nearest trail by a groomed
+// tongue about as wide as the lawn itself, curving a little and swelling and narrowing as it goes. lawn outlines
+// wander, and lawns (and tongues) that come close melt into one shape. they ski like trail but aren't trails: no signs,
+// no orbs, not on the map. the shape is a smooth union of distance fields: negative inside, metres.
+const LAWN_K = 5;     // how softly neighbouring shapes melt together (m)
+const LAWN_PARTS = (() => {
+  let seed = 515; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const parts = [];
+  for (const s of STRUCTS){
+    if (s.over) continue;
+    const R = (s.r*0.85 + 3) * (1.5 + rnd()*0.3);                     // 150-180% of the old lawn's reach
+    const ph = [rnd()*6.3, rnd()*6.3, rnd()*6.3], wob = [0.1 + rnd()*0.06, 0.05 + rnd()*0.04, 0.03];
+    parts.push({ kind: 'lawn', x: s.x, y: s.y, R, ph, wob, bx: [s.x - R*1.25, s.y - R*1.25, s.x + R*1.25, s.y + R*1.25] });
+    // the tongue: from the lawn's middle to the nearest trail point that can be reached without crossing water or rock
     const cands = [];
-    for (const t of TRAILS) for (let i = 0; i < t.s.length; i += 2){ const d = Math.hypot(t.s[i] - L.x, t.s[i+1] - L.y); if (d < L.R + 70) cands.push([d, t.s[i], t.s[i+1]]); }
+    for (const t of TRAILS) for (let i = 0; i < t.s.length; i += 4){ const d = Math.hypot(t.s[i] - s.x, t.s[i+1] - s.y); if (d < R + 80) cands.push([d, t.s[i], t.s[i+1]]); }
     cands.sort((a, b) => a[0] - b[0]);
-    for (const [d, tx, ty] of cands.slice(0, 40)){
-      if (d <= L.R + 0.5) break;                                   // the lawn already reaches the trail
-      const ux = (L.x - tx)/d, uy = (L.y - ty)/d, end = d - L.R + 1.5, pts = [];
-      let clear = true;
-      for (let k = 0; k <= Math.ceil(end); k++){
-        const q = Math.min(k, end), x = tx + ux*q, y = ty + uy*q;
-        if (q > 2 && q < end - 1 && obstacleSD(x, y) < SPUR_W/2 + 0.6) { clear = false; break; }
+    for (const [d, tx, ty] of cands.slice(0, 30)){
+      if (d < R*0.7) break;                                            // the lawn already runs into the trail
+      const bend = (rnd() - 0.5) * 0.7 * d, nx = -(ty - s.y)/d, ny = (tx - s.x)/d;
+      const cx = (s.x + tx)/2 + nx*bend, cy = (s.y + ty)/2 + ny*bend;
+      const pts = []; let ok = true;
+      for (let k = 0; k <= 16; k++){
+        const u = k/16, x = (1-u)*(1-u)*s.x + 2*(1-u)*u*cx + u*u*tx, y = (1-u)*(1-u)*s.y + 2*(1-u)*u*cy + u*u*ty;
+        if (u > 0.15 && u < 0.9 && obstacleSD(x, y, true) < 1) { ok = false; break; }
         pts.push(x, y);
       }
-      if (!clear) continue;
-      const bx = [Infinity, Infinity, -Infinity, -Infinity];
-      for (let i = 0; i < pts.length; i += 2){ bx[0] = Math.min(bx[0], pts[i]); bx[1] = Math.min(bx[1], pts[i+1]); bx[2] = Math.max(bx[2], pts[i]); bx[3] = Math.max(bx[3], pts[i+1]); }
-      out.push({ s: pts, bx }); break;
+      if (!ok) continue;
+      const w = 2*R * (0.8 + rnd()*0.4), wph = rnd()*6.3;              // a little narrower or wider than the lawn
+      let bx = [Infinity, Infinity, -Infinity, -Infinity];
+      for (let i = 0; i < pts.length; i += 2){ bx = [Math.min(bx[0], pts[i]), Math.min(bx[1], pts[i+1]), Math.max(bx[2], pts[i]), Math.max(bx[3], pts[i+1])]; }
+      bx = [bx[0] - w*0.6, bx[1] - w*0.6, bx[2] + w*0.6, bx[3] + w*0.6];
+      parts.push({ kind: 'tongue', pts, w, wph, bx });
+      break;
     }
   }
-  return out;
+  return parts;
 })();
-// how groomed the snow is here from the lawns and side paths: 0 groomed, 1 ungroomed, with the same soft edge as trails
-function apronOff(x, y){
-  let best = 1;
-  for (const L of LAWNS){ const e = Math.hypot(x - L.x, y - L.y) - L.R; if (e < 0.5) best = Math.min(best, e <= -0.5 ? 0 : (e + 0.5)); }
-  for (const sp of SPURS){
-    const b = sp.bx; if (x < b[0] - 3 || x > b[2] + 3 || y < b[1] - 3 || y > b[3] + 3) continue;
-    const p = sp.s; let d = Infinity;
-    for (let i = 0; i < p.length - 2; i += 2) d = Math.min(d, segDist(x, y, p[i], p[i+1], p[i+2], p[i+3]));
-    const e = d - SPUR_W/2; if (e < 0.5) best = Math.min(best, e <= -0.5 ? 0 : (e + 0.5));
+function partSD(p, x, y){
+  if (p.kind === 'lawn'){
+    const dx = x - p.x, dy = y - p.y, th = Math.atan2(dy, dx);
+    const R = p.R * (1 + p.wob[0]*Math.sin(3*th + p.ph[0]) + p.wob[1]*Math.sin(5*th + p.ph[1]) + p.wob[2]*Math.sin(8*th + p.ph[2]));
+    return Math.hypot(dx, dy) - R;
   }
-  return best;
+  // tongue: distance to the curve, less a half-width that tapers toward the trail and swells along the way
+  const q = p.pts, n = q.length/2 - 1; let best = Infinity, bu = 0;
+  for (let i = 0; i < n; i++){
+    const ax = q[i*2], ay = q[i*2+1], ex = q[i*2+2] - ax, ey = q[i*2+3] - ay, L2 = ex*ex + ey*ey;
+    const u = L2 ? Math.max(0, Math.min(1, ((x-ax)*ex + (y-ay)*ey)/L2)) : 0, d = Math.hypot(x - ax - u*ex, y - ay - u*ey);
+    if (d < best){ best = d; bu = (i + u)/n; }
+  }
+  const hw = p.w/2 * (1 - 0.45*bu) * (1 + 0.14*Math.sin(bu*Math.PI*2.5 + p.wph));
+  return best - hw;
 }
+function lawnSD(x, y){
+  // smooth union of every lawn and tongue near this point; cut back where the ground is water, rock or wall
+  let acc = 0, any = false;
+  for (const p of LAWN_PARTS){
+    const b = p.bx; if (x < b[0] - LAWN_K || x > b[2] + LAWN_K || y < b[1] - LAWN_K || y > b[3] + LAWN_K) continue;
+    const d = partSD(p, x, y); if (d > 3*LAWN_K) continue;
+    acc += Math.exp(-d / LAWN_K); any = true;
+  }
+  if (!any) return 99;
+  let d = -LAWN_K * Math.log(acc);
+  if (d < 0.6) d = Math.max(d, 0.6 - obstacleSD(x, y, true));
+  return d;
+}
+// how groomed the snow is from the lawns: 0 groomed, 1 ungroomed, with the same soft edge as trails
+function apronOff(x, y){ const e = lawnSD(x, y); return e <= -0.5 ? 0 : e >= 0 ? 1 : (e + 0.5)/0.5; }
 
 // ---- trees: simple spruces (a trunk and two cone tiers) scattered in patches, kept off the trails and the start.
 // placement is seeded so the forest is the same every time. drawn as instanced meshes, so hundreds cost little.
@@ -1902,7 +1929,7 @@ const trees = (() => {
     if (nearestTrail(x, y).d < TRAIL_W/2 + 3 + rnd()*3) continue;     // a clear corridor either side of every trail
     if (Math.hypot(x, y) < 14) continue;                              // open stadium
     if (STRUCTS.some(o => Math.hypot(o.x - x, o.y - y) < o.r + 1.5)) continue;   // nor in the buildings
-    if (apronOff(x, y) < 1 || LAWNS.some(L => Math.hypot(L.x - x, L.y - y) < L.R + 2.5)) continue;   // nor on their lawns and paths
+    if (lawnSD(x, y) < 2.5) continue;                                 // nor on their lawns
     if (crowded(x, y)) continue;                                      // no two trunks on top of each other
     const t = { x, y, s: 0.7 + rnd()*0.7, r: rnd()*Math.PI*2 };
     out.push(t); const c = cell(t); if (!grid.has(c)) grid.set(c, []); grid.get(c).push(t);
@@ -3842,7 +3869,7 @@ function loop(t){
   draw(); hud(); requestAnimationFrame(loop);
 }
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { LAWNS, SPURS, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

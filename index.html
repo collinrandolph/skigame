@@ -10,15 +10,15 @@
 /* Layout: full-bleed 2.5D chase view of the snowfield, skier ahead of the camera, slim HUD top-left, tuning drawer bottom-right, touch pads on phones */
 :root{
   --snow:#dfe7ee; --grid:#c4d1dd; --grid-major:#a9bccd; --ink:#1d2a36; --muted:#5d7083;
-  --skier:#d2462e; --track:#8fa6ba; --shade:#5b7a96; --contour:#9a8466; --groomed:#fbfdff; --cord:#eef3f8; --sky:#d3dee8; --trail-edge:#b9c8d6; --d-green:#2f8a4f; --d-blue:#2563b8; --d-black:#1d2a36; --map-bg:rgba(255,255,255,.88); --up:#b5532a; --down:#2f7a5a; --panel:rgba(255,255,255,.86); --line:#d3dde6; --rock:#6f7f8e; --water:#5f8fb0; --water2:#4a7a9e; --ice:#c9dceb; --orb:#f5b324; --lake:#b4cfe3; --lake2:#9cbdd6;
+  --skier:#b5523b; --track:#8fa6ba; --shade:#5b7a96; --contour:#9a8466; --groomed:#fbfdff; --cord:#eef3f8; --sky:#d3dee8; --trail-edge:#b9c8d6; --d-green:#2f8a4f; --d-blue:#2563b8; --d-black:#1d2a36; --map-bg:rgba(255,255,255,.88); --up:#b5532a; --down:#2f7a5a; --panel:rgba(255,255,255,.86); --line:#d3dde6; --rock:#6f7f8e; --water:#5f8fb0; --water2:#4a7a9e; --ice:#c9dceb; --orb:#f5b324; --lake:#b4cfe3; --lake2:#9cbdd6;
   --display:"Barlow Condensed","Arial Narrow",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --snow:#0b1218; --grid:#1d2a37; --grid-major:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4;
-  --skier:#ff6a4d; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; --rock:#3a4652; --water:#1d3b52; --water2:#163045; --ice:#2a4256; --orb:#ffc64a; --lake:#24394c; --lake2:#1d3142; color-scheme:dark}}
+  --skier:#d9785c; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; --rock:#3a4652; --water:#1d3b52; --water2:#163045; --ice:#2a4256; --orb:#ffc64a; --lake:#24394c; --lake2:#1d3142; color-scheme:dark}}
 :root[data-theme="dark"]{
   --snow:#0b1218; --grid:#1d2a37; --grid-major:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4;
-  --skier:#ff6a4d; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; --rock:#3a4652; --water:#1d3b52; --water2:#163045; --ice:#2a4256; --orb:#ffc64a; --lake:#24394c; --lake2:#1d3142; color-scheme:dark}
+  --skier:#d9785c; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; --rock:#3a4652; --water:#1d3b52; --water2:#163045; --ice:#2a4256; --orb:#ffc64a; --lake:#24394c; --lake2:#1d3142; color-scheme:dark}
 html,body{height:100%;touch-action:manipulation;-webkit-text-size-adjust:100%}
 *{-webkit-tap-highlight-color:transparent}
 body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -156,8 +156,8 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 .orbhud.bump .gem{animation:orbbump .4s ease-out}
 @keyframes orbbump{0%{transform:scale(1)}40%{transform:scale(1.6)}100%{transform:scale(1)}}
 .orbhud[data-done="1"] b{color:var(--orb)}
-.orbhud[data-kind="crystal"] .gem{border-radius:2px;transform:rotate(45deg) scale(.8);background:radial-gradient(circle,#f0dcff 0 20%,#a45ae6 55%,#6d2fb0 100%);box-shadow:0 0 10px #a45ae6}
-.orbhud[data-kind="crystal"][data-done="1"] b{color:#a45ae6}
+.orbhud[data-kind="crystal"] .gem{border-radius:2px;transform:rotate(45deg) scale(.8);background:radial-gradient(circle,#ece6f6 0 20%,#a993d6 55%,#5a4a80 100%);box-shadow:0 0 10px #8e7cb0}
+.orbhud[data-kind="crystal"][data-done="1"] b{color:#8e7cb0}
 .toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 66px);left:50%;transform:translate(-50%,-6px);z-index:6;max-width:calc(100vw - 32px);box-sizing:border-box;padding:9px 14px;border-radius:6px;background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(6px);color:var(--ink);font:600 13px/1.3 var(--display);letter-spacing:.06em;text-align:center;opacity:0;transition:opacity .3s,transform .3s;pointer-events:none}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){.orbhud.bump .gem{animation:none}.toast{transition:none}}
@@ -1617,7 +1617,7 @@ const renderer = new THREE.WebGLRenderer({ canvas: glc, antialias: true });
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, 1, 0.3, 600);
 scene.fog = new THREE.Fog(0xffffff, 55, 270);
-const hemi = new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.75); scene.add(hemi);
+const hemi = new THREE.HemisphereLight(0xffffff, 0x8a9bb0, 0.75); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 0.65); sun.position.set(-60, 80, -50); scene.add(sun);
 
 // the terrain is cut into tiles, each a 1 m mesh with its own baked texture. only the tiles near the skier exist at
@@ -1646,6 +1646,50 @@ const rockRGB = () => C.rock || '#7d8a96';
 // a tile is built in small slices spread over several frames (generators that yield between slices), so loading
 // new ground as you ski never stalls a frame
 const TILE_R = 0.5, TILE_NX = Math.round(TILE_W/TILE_R), TILE_NY = Math.round(TILE_H/TILE_R);
+// ---- snow texture: tileable patterns built once per colour theme. a: wind ripples (sastrugi) about 2 m apart, a
+// bright crest and a blue lee shadow, appearing in patches and fading out between them, plus a fine grain.
+// b: soft, broad drifts. their sizes (64 m and 46 m) don't divide evenly, so the two never line up into an obvious repeat
+const snowPat = { key: null };
+function periodicNoise(cells, seed){
+  const g = new Float32Array(cells*cells); let sd = seed;
+  for (let i = 0; i < g.length; i++){ sd = (sd * 16807) % 2147483647; g[i] = sd / 2147483647; }
+  const G = (i, j) => g[(((j % cells) + cells) % cells)*cells + (((i % cells) + cells) % cells)];
+  return (u, v) => {     // u, v in 0..1 across the pattern
+    const fx = u*cells, fy = v*cells, i = Math.floor(fx), j = Math.floor(fy), a = fx - i, b = fy - j, sa = a*a*(3 - 2*a), sb = b*b*(3 - 2*b);
+    return (G(i, j)*(1 - sa) + G(i+1, j)*sa)*(1 - sb) + (G(i, j+1)*(1 - sa) + G(i+1, j+1)*sa)*sb;
+  };
+}
+function snowPatterns(){
+  const key = C.snow + C.grid + C.groomed; if (snowPat.key === key) return snowPat;
+  const rgb = c => { const k = new THREE.Color(c); return [k.r*255, k.g*255, k.b*255]; };
+  // shadows lean toward the theme's shade colour on light snow (toward the grid colour on dark snow, which is lighter)
+  const base = rgb(C.snow), light = base[0] + base[1] + base[2] > 384;
+  const lo = light ? rgb(C.shade).map((c, i) => base[i] + (c - base[i])*0.5) : rgb(C.grid), hi = rgb(C.groomed);
+  const make = (N, fn) => {
+    const cv = document.createElement('canvas'); cv.width = cv.height = N;
+    const cx = cv.getContext('2d'), im = cx.createImageData(N, N), d = im.data;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++){
+      const [sh, br] = fn(x/N, y/N), o = (y*N + x)*4;
+      for (let c = 0; c < 3; c++) d[o+c] = base[c] + (lo[c] - base[c])*sh + (hi[c] - base[c])*br;
+      d[o+3] = 255;
+    }
+    cx.putImageData(im, 0, 0); return cv;
+  };
+  const warp = periodicNoise(5, 11), warp2 = periodicNoise(13, 23), patch = periodicNoise(4, 37), patch2 = periodicNoise(9, 41);
+  let gs = 99; const grain = () => (gs = (gs * 16807) % 2147483647) / 2147483647;
+  snowPat.a = make(320, (u, v) => {
+    const ph = v*21 + u*4 + warp(u, v)*2.2 + warp2(u, v)*0.6, r = ph - Math.floor(ph);
+    const m = 0.3 + 0.7*smooth01(0.3, 0.66, 0.65*patch(u, v) + 0.35*patch2(u, v));
+    const lee = r < 0.4 ? Math.pow(1 - r/0.4, 1.5) : 0, crest = r > 0.8 ? (r - 0.8)/0.2 : 0, gr = grain();
+    return [m*lee*1.1 + (gr > 0.93 ? 0.15 : 0), m*crest + (gr < 0.05 ? 0.6 : 0)];
+  });
+  const drift = periodicNoise(5, 53), drift2 = periodicNoise(11, 59);
+  snowPat.b = make(230, (u, v) => {
+    const n = 0.65*drift(u, v) + 0.35*drift2(u, v);
+    return [smooth01(0.5, 0.78, n)*0.7, smooth01(0.48, 0.22, n)*0.5];
+  });
+  snowPat.key = key; return snowPat;
+}
 function* bakeTile(t){
   const cv = t.cv, tc = cv.getContext('2d');
   const tw = cv.width, th = cv.height, X0 = t.x0, Y0 = t.y0, X1 = X0 + TILE_W, Y1 = Y0 + TILE_H;
@@ -1653,14 +1697,14 @@ function* bakeTile(t){
   const R = TILE_R, nx = TILE_NX, ny = TILE_NY, hs = t.hs;
   const H = (i, j) => hs[j*(nx+1)+i];
   tc.fillStyle = C.snow; tc.fillRect(0, 0, tw, th);
-  // grid: 1 m cells, a stronger line every 5 m
-  for (let pass = 0; pass < 2; pass++){
-    tc.strokeStyle = pass ? C.major : C.grid; tc.lineWidth = pass ? 2 : 1; tc.beginPath();
-    for (let x = Math.ceil(X0); x <= X1; x++){ if ((x%5===0) !== !!pass) continue; tc.moveTo(TX(x)+.5, 0); tc.lineTo(TX(x)+.5, th); }
-    for (let y = Math.ceil(Y0); y <= Y1; y++){ if ((y%5===0) !== !!pass) continue; tc.moveTo(0, TY(y)+.5); tc.lineTo(tw, TY(y)+.5); }
-    tc.stroke();
+  // snow surface: wind ripples in drifting patches, with soft drifts over them (two patterns of different sizes,
+  // pinned to the world so they run on seamlessly from tile to tile)
+  const pats = snowPatterns();
+  for (const [cvp, a] of [[pats.a, 1], [pats.b, 0.7]]){
+    const N = cvp.width, ox = ((X0*TEX_PPM) % N + N) % N, oy = ((Y0*TEX_PPM) % N + N) % N;
+    tc.save(); tc.globalAlpha = a; tc.translate(-ox, -oy); tc.fillStyle = tc.createPattern(cvp, 'repeat'); tc.fillRect(0, 0, tw + N, th + N); tc.restore();
   }
-  // mountain sides: the grid gives way to plain snow, with rock showing through where it's steepest
+  // mountain sides: the ripples give way to plain snow, with rock showing through where it's steepest
   const PX = R*TEX_PPM;
   yield;
   for (let j = 0; j < ny; j++){ if (j % 12 === 11) yield; for (let i = 0; i < nx; i++){
@@ -1725,27 +1769,6 @@ function* bakeTile(t){
     for (let w = cord, k = 0; w > 1; w -= 2, k++){ tc.strokeStyle = k % 2 ? C.cord : C.groomed; tc.lineWidth = w; tc.beginPath(); near.forEach(path); tc.stroke(); }
   }
   yield;
-  // contour lines: every 0.5 m (stronger every 2 m) on skiable ground; on the steep mountain sides only every 5 m
-  for (let pass = 0; pass < 3; pass++){
-    tc.strokeStyle = C.contour; tc.lineWidth = pass ? 2 : 1; tc.globalAlpha = pass ? .7 : .45; tc.beginPath();
-    for (let j = 0; j < ny; j++){ if (j % 16 === 15){ tc.stroke(); yield; tc.strokeStyle = C.contour; tc.lineWidth = pass ? 2 : 1; tc.globalAlpha = pass ? .7 : .45; tc.beginPath(); } for (let i = 0; i < nx; i++){
-      const a = H(i,j), b = H(i+1,j), c = H(i+1,j+1), d = H(i,j+1);
-      const lo = Math.min(a,b,c,d), hi = Math.max(a,b,c,d);
-      const steep = hi - lo > 0.3;              // > ~60% grade across a half-metre cell
-      if (steep !== (pass === 2)) continue;
-      const step = steep ? 5 : 0.5;
-      for (let lv = Math.ceil(lo/step)*step; lv <= hi; lv += step){
-        if (!steep){ const major = Math.abs(lv/2 - Math.round(lv/2)) < 1e-6; if (major !== (pass === 1)) continue; }
-        const X = X0 + i*R, Y = Y0 + j*R, q = [];
-        if ((a < lv) !== (b < lv)) q.push(X + R*(lv-a)/(b-a), Y);
-        if ((b < lv) !== (c < lv)) q.push(X + R, Y + R*(lv-b)/(c-b));
-        if ((d < lv) !== (c < lv)) q.push(X + R*(lv-d)/(c-d), Y + R);
-        if ((a < lv) !== (d < lv)) q.push(X, Y + R*(lv-a)/(d-a));
-        for (let k = 0; k + 3 < q.length; k += 4){ tc.moveTo(TX(q[k]), TY(q[k+1])); tc.lineTo(TX(q[k+2]), TY(q[k+3])); }
-      }
-    }}
-    tc.stroke();
-  }
   tc.globalAlpha = 1;
   t.tex.needsUpdate = true; t.baked = true; t.job = null;
 }
@@ -2027,11 +2050,13 @@ const trees = (() => {
   for (let i = 0; i < 30000 && out.length < 3400; i++){
     const x = WORLD.x0 + 8 + rnd() * (WORLD.x1 - WORLD.x0 - 16), y = WORLD.y0 + 8 + rnd() * (WORLD.y1 - WORLD.y0 - 16);
     if (rnd() * 3.2 > dens(x, y) + 1.2) continue;                     // thin out away from the patches
-    if (ringHeight(x, y) + spurHeight(x, y) + edgeHeight(x, y) > 14 + rnd()*6) continue;  // timberline on the mountains
+    if (ringHeight(x, y) + spurHeight(x, y) + edgeHeight(x, y) > 3 + rnd()*3) continue;   // timberline: only the mountains' lower skirts
+    { const gx = height(x + 1, y) - height(x - 1, y), gy = height(x, y + 1) - height(x, y - 1);
+      if (Math.hypot(gx, gy)/2 > 0.3 + rnd()*0.1) continue; }                    // nor on steep ground (no trees clinging to cliffs)
     if (Math.abs(y - riverY(x)) < RIVER_BANK + 1.5) continue;          // nothing in the river
     if (Math.abs(x - GATE.x) < 70 && Math.abs(y - GATE.y) < PASS_FLAT + 4) continue;   // the pass stays clear
     if (Math.abs(x - G4.x) < G4.hw + 6 && Math.abs(y - G4.y) < 40) continue;          // and the divide's notch
-    if (divideHeight(x, y) > 14 + rnd()*6) continue;
+    if (divideHeight(x, y) > 3 + rnd()*3) continue;
     if (BRIDGES.some(B => Math.abs(x - B.x) < 8 && Math.abs(y - riverY(x)) < B.OUT + 6)) continue;  // and the bridge ramps
     if (lakeQ(x, y) < 1.12) continue;                                  // and the lake
     if (y > riverY(x) + 12 && rnd() < 0.72) continue;                 // across the river it's open tundra, trees only here and there
@@ -2047,9 +2072,9 @@ const trees = (() => {
   return out;
 })();
 const treeMats = {
-  trunk: new THREE.MeshLambertMaterial({ color: 0x5a4031 }),
-  low: new THREE.MeshLambertMaterial({ color: 0x2c5240 }),
-  high: new THREE.MeshLambertMaterial({ color: 0x386650 }),
+  trunk: new THREE.MeshLambertMaterial({ color: 0x4d3f35 }),
+  low: new THREE.MeshLambertMaterial({ color: 0x2f4a43 }),
+  high: new THREE.MeshLambertMaterial({ color: 0x3e5c53 }),
 };
 {
   const parts = [
@@ -2115,7 +2140,7 @@ for (const o of orbs){
 const zoneOrbs = z => orbs.filter(o => o.zone === z);
 const orbsGot = z => zoneOrbs(z).filter(o => o.got).length;
 
-const stoneMat = new THREE.MeshLambertMaterial({ color: 0x8b939b }), woodMat = new THREE.MeshLambertMaterial({ color: 0x7a5236 }), darkWoodMat = new THREE.MeshLambertMaterial({ color: 0x4a3322 });
+const stoneMat = new THREE.MeshLambertMaterial({ color: 0x8a939c }), woodMat = new THREE.MeshLambertMaterial({ color: 0x7a6250 }), darkWoodMat = new THREE.MeshLambertMaterial({ color: 0x4d3f35 });
 // the east gate: stone posts and walls across the pass, a beam over the doorway, and two timber doors that swing
 // out once zone 1's orbs are in
 function buildGate(gx, gy, rotY, reach){
@@ -2175,7 +2200,7 @@ function buildBridge(B){
     side.push(BX - W/2, D, yi, BX + W/2, D, yi, BX - W/2, bot, yi, BX + W/2, D, yi, BX + W/2, bot, yi, BX - W/2, bot, yi);
   }
   const mk = (arr, mat) => { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.material.side = THREE.DoubleSide; g.add(m); return m; };
-  mk(surf, new THREE.MeshLambertMaterial({ color: 0x8a6a4e })); mk(side, new THREE.MeshLambertMaterial({ color: 0x8b939b, side: THREE.DoubleSide }));
+  mk(surf, new THREE.MeshLambertMaterial({ color: 0x7f6b58 })); mk(side, new THREE.MeshLambertMaterial({ color: 0x8a939c, side: THREE.DoubleSide }));
   // stone posts where the leaf lands
   for (const dir of [-1, 1]) for (const sx of [-1, 1]){
     const p = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.3, 0.7), stoneMat); p.position.set(BX + sx*(W/2 + 0.45), D + 0.3, yc + dir*(IN + 0.5)); g.add(p);
@@ -2193,7 +2218,7 @@ function buildBridge(B){
     for (let z = 0.4; z < L; z += 2.5){ const p = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.12), darkWoodMat); p.position.set(sx*(W/2 - 0.06), 0.5, -z); leaf.add(p); }
   }
   // chains from the beam to the leaf's far end, redrawn as it moves
-  const chainMat = new THREE.LineBasicMaterial({ color: 0x2b3138 });
+  const chainMat = new THREE.LineBasicMaterial({ color: 0x2f3b48 });
   const chains = (B.gated ? [-1, 1] : []).map(sx => { const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]); const l = new THREE.Line(geo, chainMat); hinge.add(l); return { l, sx }; });
   return { g, leaf, chains, L, W };
 }
@@ -2270,12 +2295,12 @@ function resetOrbs(){
 // of draw calls. origin at ground level in the middle of the footprint.
 const lam = c => new THREE.MeshLambertMaterial({ color: c });
 const SM = {
-  hull: lam(0xdfe5ec), steel: lam(0x9aa7b4), slate: lam(0x5d6b80), blue: lam(0x4d7aa6), blue2: lam(0x6f93b8),
-  dark: lam(0x2f3a46), orange: lam(0xe8862a), green: lam(0x4f8a4a), ice: lam(0xc4dcec),
-  glass: new THREE.MeshLambertMaterial({ color: 0xa9c9e2, transparent: true, opacity: 0.36, depthWrite: false, side: THREE.DoubleSide }),
-  lamp: new THREE.MeshBasicMaterial({ color: 0xffa340 }),
-  window: new THREE.MeshBasicMaterial({ color: 0xffdc96 }),
-  line: new THREE.LineBasicMaterial({ color: 0x6d7c8c }),
+  hull: lam(0xe3e8ec), steel: lam(0x9fb0c1), slate: lam(0x4f6276), blue: lam(0x4f6f8f), blue2: lam(0x7c97b0),
+  dark: lam(0x2f3b48), orange: lam(0xc98a3e), green: lam(0x5d7a68), ice: lam(0xc3d4e0),
+  glass: new THREE.MeshLambertMaterial({ color: 0xa9c4d8, transparent: true, opacity: 0.36, depthWrite: false, side: THREE.DoubleSide }),
+  lamp: new THREE.MeshBasicMaterial({ color: 0xf0b867 }),
+  window: new THREE.MeshBasicMaterial({ color: 0xf3d9a4 }),
+  line: new THREE.LineBasicMaterial({ color: 0x6f849a }),
 };
 for (const k of ['hull', 'steel', 'slate', 'blue', 'blue2', 'dark', 'ice']) SM[k].flatShading = true;
 const bx = (w, h, d) => new THREE.BoxGeometry(w, h, d);
@@ -2519,9 +2544,9 @@ const BUILD = {
 // ---- zone 3: the ruins (organic, bone-pale, grown rather than built) and the camps around them (scrap timber,
 // tarpaulin, rope and lantern light)
 Object.assign(SM, {
-  bone: lam(0xe1e7ee), bone2: lam(0xc4d0dc), hole: new THREE.MeshBasicMaterial({ color: 0x22374c }), glow: new THREE.MeshBasicMaterial({ color: 0x8cc4f0 }),
-  timber: lam(0x6b4f3a), timber2: lam(0x4a3526), tarp: lam(0xd5652a), tarpRed: lam(0xae3b2b), rust: lam(0x8f5a3a), scrap: lam(0x7a8088),
-  flag: new THREE.MeshLambertMaterial({ color: 0xc8452c, side: THREE.DoubleSide }),
+  bone: lam(0xe4e6e2), bone2: lam(0xc8ccc8), hole: new THREE.MeshBasicMaterial({ color: 0x2c3a49 }), glow: new THREE.MeshBasicMaterial({ color: 0xa9c4d8 }),
+  timber: lam(0x6e5a4a), timber2: lam(0x4d3f35), tarp: lam(0xb8703f), tarpRed: lam(0x9b4a3e), rust: lam(0x8a5c45), scrap: lam(0x7d868f),
+  flag: new THREE.MeshLambertMaterial({ color: 0xb5523b, side: THREE.DoubleSide }),
 });
 for (const k of ['bone', 'bone2', 'timber', 'timber2', 'tarp', 'tarpRed', 'rust', 'scrap']) SM[k].flatShading = true;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -2737,8 +2762,8 @@ function mergeModel(src){
 // little way off a trail, turning round at the ends. one roams zone 2, ten roam zone 3. they're solid, so you have
 // to go round them, and they're only animated while you're near enough to see them.
 const MOOSE_MAT = {
-  hide: lam(0x7b3fa3), dark: lam(0x562a73), belly: lam(0x9a63c2), tent: lam(0xa868d0), tip: lam(0xd7a8f0),
-  antler: lam(0x4c335f), eye: new THREE.MeshBasicMaterial({ color: 0xf6e27a }),
+  hide: lam(0x6c5a8e), dark: lam(0x4a3d66), belly: lam(0x8e7cb0), tent: lam(0x9a86bf), tip: lam(0xc3b5dc),
+  antler: lam(0x3f3550), eye: new THREE.MeshBasicMaterial({ color: 0xe8d38a }),
 };
 for (const k of ['hide', 'dark', 'belly', 'tent', 'tip', 'antler']) MOOSE_MAT[k].flatShading = true;
 const MG = {
@@ -2871,11 +2896,11 @@ function updateMoose(dt){
 // long ears and trailing robes. some stand about near buildings, ruins and camps; others walk slow loops around them.
 // like the moose they're solid, and only drawn and animated near you.
 const NPC_MAT = {
-  skin: lam(0xe2b79c), skin2: lam(0xa9785b), pants: lam(0x2b3340), boot: lam(0x1d2229), pack: lam(0x5d6b80),
-  parka: [0xe8862a, 0x4d7aa6, 0xc8452c, 0x6f93b8, 0x8a9a5b, 0xd6dde5, 0x7b5a3c].map(c => lam(c)),
-  hat: [0x2f3a46, 0xe8862a, 0xc8452c, 0xdfe5ec].map(c => lam(c)),
-  alien: lam(0x4f86c9), alien2: lam(0x3b6ea8), robe: lam(0x6b4a2e), robe2: lam(0x553a23), sash: lam(0xb08a4a),
-  eye: new THREE.MeshBasicMaterial({ color: 0x0f1d2b }),
+  skin: lam(0xd9b8a0), skin2: lam(0xa38068), pants: lam(0x2f3b48), boot: lam(0x222a33), pack: lam(0x4f6276),
+  parka: [0xc98a3e, 0x4f6f8f, 0xb5523b, 0x7c97b0, 0x6f7f63, 0xd6dde4, 0x7a6250].map(c => lam(c)),
+  hat: [0x2f3b48, 0xc98a3e, 0xb5523b, 0xe3e8ec].map(c => lam(c)),
+  alien: lam(0x5f86a8), alien2: lam(0x4a6d8c), robe: lam(0x6e5a4a), robe2: lam(0x4d3f35), sash: lam(0xa88c5c),
+  eye: new THREE.MeshBasicMaterial({ color: 0x1e2a36 }),
 };
 for (const k of ['robe', 'robe2', 'alien', 'alien2']) NPC_MAT[k].flatShading = true;
 const NG = {
@@ -3012,10 +3037,10 @@ function updateNPCs(dt){
 const CRYSTAL_COUNT = { 1: 5, 2: 5, 3: 10 }, CRYSTAL_TOTAL = 20;
 let crystalsActive = false;
 const CRYSTAL_MAT = {
-  gem: new THREE.MeshLambertMaterial({ color: 0x9a4ce0, emissive: 0x4a1680, flatShading: true }),
-  gem2: new THREE.MeshLambertMaterial({ color: 0xc58cff, emissive: 0x6a2aa8, flatShading: true }),
-  beam: new THREE.MeshBasicMaterial({ color: 0xb36cff, transparent: true, opacity: 0.32, depthWrite: false, fog: false, side: THREE.DoubleSide }),
-  core: new THREE.MeshBasicMaterial({ color: 0xe6c8ff, transparent: true, opacity: 0.55, depthWrite: false, fog: false }),
+  gem: new THREE.MeshLambertMaterial({ color: 0x7e66b4, emissive: 0x352659, flatShading: true }),
+  gem2: new THREE.MeshLambertMaterial({ color: 0xa993d6, emissive: 0x4a3a7a, flatShading: true }),
+  beam: new THREE.MeshBasicMaterial({ color: 0xa993d6, transparent: true, opacity: 0.32, depthWrite: false, fog: false, side: THREE.DoubleSide }),
+  core: new THREE.MeshBasicMaterial({ color: 0xddd3f0, transparent: true, opacity: 0.55, depthWrite: false, fog: false }),
 };
 const crystals = (() => {
   let seed = 8080; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -3109,7 +3134,7 @@ function animateGate4(dt){
 
 // outcrop meshes: a cluster of long faceted crystals leaning out of the snow, merged into one mesh each
 {
-  const m1 = lam(0x7d45b8), m2 = lam(0xa679d6), m3 = lam(0x5b3290);
+  const m1 = lam(0x6c5a8e), m2 = lam(0x9a86bf), m3 = lam(0x4a3d66);
   for (const k of [m1, m2, m3]) k.flatShading = true;
   for (const o of OUTCROPS){
     let seed = o.seed || 1; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -3195,10 +3220,10 @@ function loadProgress(){
 // for looks only and never feeds back into movement. the heading arrow sits on the snow in front.
 const skier = new THREE.Group(); scene.add(skier);              // holds the heading arrow (camera direction)
 const skierMat = new THREE.MeshLambertMaterial({ color: 0xd2462e });   // jacket and hat, the theme's skier colour
-const pantsMat = new THREE.MeshLambertMaterial({ color: 0x27313d });
-const skinMat = new THREE.MeshLambertMaterial({ color: 0xe8c4a2 });
-const skiMat = new THREE.MeshLambertMaterial({ color: 0x1f2a36 });
-const poleMat = new THREE.MeshLambertMaterial({ color: 0x8a96a3 });
+const pantsMat = new THREE.MeshLambertMaterial({ color: 0x2f3b48 });
+const skinMat = new THREE.MeshLambertMaterial({ color: 0xd9b8a0 });
+const skiMat = new THREE.MeshLambertMaterial({ color: 0x2c3a49 });
+const poleMat = new THREE.MeshLambertMaterial({ color: 0x8a939c });
 const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 12), skierMat);
 arrow.rotation.x = -Math.PI/2; arrow.position.set(0, 0.06, -1.3); skier.add(arrow);
 const rig = new THREE.Group(); scene.add(rig);                  // the body, turned to the torso's heading
@@ -3266,7 +3291,7 @@ function applyTheme(){
   skierMat.color.set(C.skier); trackMat.color.set(C.track);
   const dark = sky.getHSL({}).l < 0.3;
   hemi.intensity = dark ? 0.55 : 0.75; sun.intensity = dark ? 0.45 : 0.65;
-  const tc = dark ? [0x2a1f19, 0x18301f, 0x1f3b29] : [0x5a4031, 0x2c5240, 0x386650];
+  const tc = dark ? [0x2a231e, 0x1a2a26, 0x22352f] : [0x4d3f35, 0x2f4a43, 0x3e5c53];
   treeMats.trunk.color.setHex(tc[0]); treeMats.low.color.setHex(tc[1]); treeMats.high.color.setHex(tc[2]);
   bakeTexture();
 }
@@ -3558,7 +3583,7 @@ function draw(){
     const p = d < 170 && project(G4.x, G4.y, height(G4.x, G4.y) + 21);
     if (p){
       ctx.globalAlpha = Math.min(1, (170 - d) / 40);
-      ctx.fillStyle = gate4Open ? '#a45ae6' : C.ink;
+      ctx.fillStyle = gate4Open ? '#8e7cb0' : C.ink;
       ctx.fillText('CRYSTAL GATE · ' + (gate4Open ? 'OPEN' : crystalsGot() + ' / ' + CRYSTAL_TOTAL + ' CRYSTALS'), p[0], p[1]);
     }
   }
@@ -3817,9 +3842,9 @@ function renderMapLayers(g, MAP, mx, my, mw, mh, sc){
   // the divide (a rock band) with the crystal gate, and the crystals once they're out (purple diamonds)
   g.globalAlpha = 0.35; g.strokeStyle = C.rock; g.lineWidth = Math.max(3, DIVIDE_BAND*2*sc);
   g.beginPath(); for (let x = WORLD.x0; x <= WORLD.x1; x += 8){ x === WORLD.x0 ? g.moveTo(mX(x), mY(divideY(x))) : g.lineTo(mX(x), mY(divideY(x))); } g.stroke();
-  g.globalAlpha = 1; g.lineWidth = 3; g.strokeStyle = gate4Open ? '#a45ae6' : C.ink;
+  g.globalAlpha = 1; g.lineWidth = 3; g.strokeStyle = gate4Open ? '#8e7cb0' : C.ink;
   g.beginPath(); g.moveTo(mX(G4.x - G4.hw), mY(G4.y)); g.lineTo(mX(G4.x + G4.hw), mY(G4.y)); g.stroke();
-  if (crystalsActive){ g.fillStyle = '#a45ae6'; for (const c of crystals) if (!c.got){ const X = mX(c.x), Y = mY(c.y); g.beginPath(); g.moveTo(X, Y - 4); g.lineTo(X + 3, Y); g.lineTo(X, Y + 4); g.lineTo(X - 3, Y); g.fill(); } }
+  if (crystalsActive){ g.fillStyle = '#8e7cb0'; for (const c of crystals) if (!c.got){ const X = mX(c.x), Y = mY(c.y); g.beginPath(); g.moveTo(X, Y - 4); g.lineTo(X + 3, Y); g.lineTo(X, Y + 4); g.lineTo(X - 3, Y); g.fill(); } }
   // buildings, as small grey blocks (the key ones larger)
   g.fillStyle = C.muted;
   for (const o of STRUCTS){ const q = o.key ? 4 : 2.4; g.fillRect(mX(o.x) - q/2, mY(o.y) - q/2, q, q); }

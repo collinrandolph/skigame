@@ -117,6 +117,8 @@ details{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 
 summary{cursor:pointer;font-family:var(--display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:14px}
 summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--skier);outline-offset:2px}
 .tune{display:grid;gap:8px;margin-top:10px}
+.tune h4{margin:10px 0 0;padding-top:8px;border-top:1px solid var(--line);font:700 11px/1 var(--display);letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
+.tune h4:first-child{margin-top:0;padding-top:0;border-top:0}
 .tune label{display:grid;grid-template-columns:1fr auto;gap:2px 8px;color:var(--muted)}
 .tune input{grid-column:1/-1;width:100%;accent-color:var(--skier)}
 .tune output{color:var(--ink);font-variant-numeric:tabular-nums}
@@ -214,60 +216,67 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 <details id="tuneBox">
   <summary>Tuning</summary>
   <div class="tune">
+    <h4>Controller</h4>
     <label for="tScheme">Controller scheme<output id="oScheme"></output><input id="tScheme" type="range" min="0" max="1" step="1" value="0"></label>
-    <label for="tRest">Load hold at centre (ms)<output id="oRest"></output><input id="tRest" type="range" min="0" max="800" step="20" value="250"></label>
-    <div class="btns"><button id="dbgToggle" type="button">Stick debug: off</button></div>
+    <label for="tRest">Load hold at centre (ms)<output id="oRest"></output><input id="tRest" type="range" min="0" max="800" step="10" value="250"></label>
     <label for="tTmin">Shortest throw (stick units)<output id="oTmin"></output><input id="tTmin" type="range" min="0.3" max="1.4" step="0.05" value="0.7"></label>
-    <label for="tV1side">V1 hang side (triggers)<output id="oV1side"></output><input id="tV1side" type="range" min="0" max="1" step="1" value="1"></label>
-    <label for="tSboost">Stick stroke boost (×)<output id="oSboost"></output><input id="tSboost" type="range" min="1" max="3" step="0.05" value="1.5"></label>
     <label for="tFedge">Flick needs (share of stick range)<output id="oFedge"></output><input id="tFedge" type="range" min="0.6" max="1" step="0.01" value="0.92"></label>
-    <label for="tVstep">Skate V step (°)<output id="oVstep"></output><input id="tVstep" type="range" min="0" max="20" step="1" value="10"></label>
-    <label for="tVslow">Wider V below (km/h)<output id="oVslow"></output><input id="tVslow" type="range" min="0" max="30" step="1" value="10"></label>
-    <label for="tVfast">Narrower V above (km/h)<output id="oVfast"></output><input id="tVfast" type="range" min="10" max="50" step="1" value="22"></label>
-    <label for="tVhill">Hill grade for V change (%)<output id="oVhill"></output><input id="tVhill" type="range" min="1" max="15" step="0.5" value="4"></label>
-    <label for="tAssist">Trail assist strength<output id="oAssist"></output><input id="tAssist" type="range" min="0" max="1" step="0.05" value="0.5"></label>
-    <label for="tAcap">Trail assist reach (°)<output id="oAcap"></output><input id="tAcap" type="range" min="5" max="60" step="1" value="25"></label>
-    <label for="tAlook">Trail assist look-ahead (s)<output id="oAlook"></output><input id="tAlook" type="range" min="0.3" max="3" step="0.1" value="1.2"></label>
-    <label for="tAramp">Trail assist ease-in (ms)<output id="oAramp"></output><input id="tAramp" type="range" min="0" max="4000" step="100" value="1500"></label>
-    <label for="tAhug">Camera hugs trail (%)<output id="oAhug"></output><input id="tAhug" type="range" min="0" max="1" step="0.05" value="0.35"></label>
-    <label for="tSa0">Ski angle, stroke straight up (°)<output id="oSa0"></output><input id="tSa0" type="range" min="0" max="60" step="1" value="10"></label>
-    <label for="tSa45">Ski angle, stroke at 45° (°)<output id="oSa45"></output><input id="tSa45" type="range" min="0" max="60" step="1" value="20"></label>
-    <label for="tSa90">Ski angle, stroke flat out (°)<output id="oSa90"></output><input id="tSa90" type="range" min="0" max="90" step="1" value="50"></label>
     <label for="tSlen">Full stroke length (stick units)<output id="oSlen"></output><input id="tSlen" type="range" min="0.6" max="2" step="0.05" value="1.5"></label>
+    <label for="tSboost">Stick stroke boost (×)<output id="oSboost"></output><input id="tSboost" type="range" min="1" max="3" step="0.05" value="1.5"></label>
+    <label for="tV1side">V1 hang side (triggers)<output id="oV1side"></output><input id="tV1side" type="range" min="0" max="1" step="1" value="1"></label>
+    <div class="btns"><button id="dbgToggle" type="button">Stick debug: off</button></div>
+    <h4>Kicks and strides</h4>
     <label for="tPush">Push per kick (m/s)<output id="oPush"></output><input id="tPush" type="range" min="0.2" max="2.5" step="0.05" value="2.5"></label>
     <label for="tTap">Tap power (% of a full kick)<output id="oTap"></output><input id="tTap" type="range" min="10" max="100" step="5" value="40"></label>
     <label for="tKlen">Full kick length (ms)<output id="oKlen"></output><input id="tKlen" type="range" min="50" max="800" step="10" value="350"></label>
     <label for="tTurn">Turn per kick (°)<output id="oTurn"></output><input id="tTurn" type="range" min="0" max="30" step="0.5" value="3"></label>
     <label for="tBuild">Same-leg build (% per kick)<output id="oBuild"></output><input id="tBuild" type="range" min="0" max="50" step="1" value="48"></label>
     <label for="tDecay">Same-leg push loss (% per kick)<output id="oDecay"></output><input id="tDecay" type="range" min="0" max="60" step="5" value="30"></label>
+    <label for="tSnap">Ski set time (ms)<output id="oSnap"></output><input id="tSnap" type="range" min="0" max="400" step="10" value="160"></label>
+    <h4>Skate angle</h4>
     <label for="tSplay">Skate angle (°)<output id="oSplay"></output><span class="sl"><input id="tSplay" type="range" min="0" max="60" step="1" value="11"><i class="ghost" id="tSplayG"></i></span></label>
-    <label for="tGwin">Glide window (ms)<output id="oGwin"></output><input id="tGwin" type="range" min="0" max="2000" step="50" value="900"></label>
-    <label for="tGcut">Glide friction cut (%)<output id="oGcut"></output><input id="tGcut" type="range" min="0" max="100" step="5" value="85"></label>
-    <label for="tPlow">Snow plow brake (m/s²)<output id="oPlow"></output><input id="tPlow" type="range" min="0.5" max="6" step="0.1" value="2.5"></label>
-    <label for="tPole">Double-pole push (m/s)<output id="oPole"></output><input id="tPole" type="range" min="0.2" max="2" step="0.05" value="0.8"></label>
-    <label for="tLean">Lean turn rate (°/s)<output id="oLean"></output><input id="tLean" type="range" min="5" max="90" step="1" value="30"></label>
-    <label for="tCexit">Leave classic at (° from vertical)<output id="oCexit"></output><input id="tCexit" type="range" min="15" max="60" step="1" value="30"></label>
-    <label for="tClassic">Classic kick (m/s)<output id="oClassic"></output><input id="tClassic" type="range" min="0.2" max="2.5" step="0.05" value="1"></label>
-    <label for="tPlowhold">Snow plow hold (ms)<output id="oPlowhold"></output><input id="tPlowhold" type="range" min="50" max="600" step="10" value="200"></label>
-    <label for="tTuck">Tuck drag cut (%)<output id="oTuck"></output><input id="tTuck" type="range" min="0" max="90" step="5" value="50"></label>
+    <label for="tVstep">Skate V step (°)<output id="oVstep"></output><input id="tVstep" type="range" min="0" max="20" step="1" value="10"></label>
+    <label for="tVslow">Wider V below (km/h)<output id="oVslow"></output><input id="tVslow" type="range" min="0" max="30" step="1" value="10"></label>
+    <label for="tVfast">Narrower V above (km/h)<output id="oVfast"></output><input id="tVfast" type="range" min="10" max="50" step="1" value="22"></label>
+    <label for="tVhill">Hill grade for V change (%)<output id="oVhill"></output><input id="tVhill" type="range" min="1" max="15" step="0.5" value="4"></label>
+    <label for="tSa0">Ski angle, stroke straight up (°)<output id="oSa0"></output><input id="tSa0" type="range" min="0" max="60" step="1" value="10"></label>
+    <label for="tSa45">Ski angle, stroke at 45° (°)<output id="oSa45"></output><input id="tSa45" type="range" min="0" max="60" step="1" value="20"></label>
+    <label for="tSa90">Ski angle, stroke flat out (°)<output id="oSa90"></output><input id="tSa90" type="range" min="0" max="90" step="1" value="50"></label>
+    <h4>Snow and glide</h4>
     <label for="tFric">Snow friction (m/s²)<output id="oFric"></output><span class="sl"><input id="tFric" type="range" min="0" max="2" step="0.05" value="0.6"><i class="ghost" id="tFricG"></i></span></label>
     <label for="tGlide">Speed drag<output id="oGlide"></output><input id="tGlide" type="range" min="0.01" max="1" step="0.01" value="0.25"></label>
     <label for="tOff">Ungroomed snow (× friction)<output id="oOff"></output><input id="tOff" type="range" min="1" max="12" step="0.5" value="3.5"></label>
     <label for="tGrip">Edge grip<output id="oGrip"></output><input id="tGrip" type="range" min="0.5" max="25" step="0.5" value="12"></label>
-    <label for="tSnap">Ski set time (ms)<output id="oSnap"></output><input id="tSnap" type="range" min="0" max="400" step="10" value="160"></label>
+    <label for="tGwin">Glide window (ms)<output id="oGwin"></output><input id="tGwin" type="range" min="0" max="2000" step="50" value="900"></label>
+    <label for="tGcut">Glide friction cut (%)<output id="oGcut"></output><input id="tGcut" type="range" min="0" max="100" step="5" value="85"></label>
+    <label for="tMax">Top speed (km/h)<output id="oMax"></output><span class="sl"><input id="tMax" type="range" min="10" max="60" step="1" value="32"><i class="ghost" id="tMaxG"></i></span></label>
+    <p class="note">Markers show the live value: friction changes off the trail and while gliding, skate angle with speed.</p>
+    <h4>Classic, poling and braking</h4>
+    <label for="tClassic">Classic kick (m/s)<output id="oClassic"></output><input id="tClassic" type="range" min="0.2" max="2.5" step="0.05" value="1"></label>
+    <label for="tPole">Double-pole push (m/s)<output id="oPole"></output><input id="tPole" type="range" min="0.2" max="2" step="0.05" value="0.8"></label>
+    <label for="tPlow">Snow plow brake (m/s²)<output id="oPlow"></output><input id="tPlow" type="range" min="0.5" max="6" step="0.1" value="2.5"></label>
+    <label for="tPlowhold">Snow plow hold (ms)<output id="oPlowhold"></output><input id="tPlowhold" type="range" min="50" max="600" step="10" value="200"></label>
+    <label for="tTuck">Tuck drag cut (%)<output id="oTuck"></output><input id="tTuck" type="range" min="0" max="90" step="5" value="50"></label>
+    <label for="tLean">Lean turn rate (°/s)<output id="oLean"></output><input id="tLean" type="range" min="5" max="90" step="1" value="30"></label>
+    <h4>Trail assist</h4>
+    <label for="tAssist">Trail assist strength<output id="oAssist"></output><input id="tAssist" type="range" min="0" max="1" step="0.05" value="0.5"></label>
+    <label for="tAcap">Trail assist reach (°)<output id="oAcap"></output><input id="tAcap" type="range" min="5" max="60" step="1" value="25"></label>
+    <label for="tAlook">Trail assist look-ahead (s)<output id="oAlook"></output><input id="tAlook" type="range" min="0.3" max="3" step="0.1" value="1.2"></label>
+    <label for="tAramp">Trail assist ease-in (ms)<output id="oAramp"></output><input id="tAramp" type="range" min="0" max="4000" step="100" value="1500"></label>
+    <h4>Camera</h4>
     <label for="tCamd">Camera distance (m)<output id="oCamd"></output><input id="tCamd" type="range" min="4" max="24" step="0.5" value="10"></label>
     <label for="tSway">Camera side-follow (s)<output id="oSway"></output><input id="tSway" type="range" min="0.1" max="2" step="0.05" value="0.8"></label>
     <label for="tCam">Camera smoothing (s)<output id="oCam"></output><input id="tCam" type="range" min="0.1" max="1.5" step="0.05" value="0.6"></label>
-    <label for="tMax">Top speed (km/h)<output id="oMax"></output><span class="sl"><input id="tMax" type="range" min="10" max="60" step="1" value="32"><i class="ghost" id="tMaxG"></i></span></label>
-    <p class="note">Markers show the live value: friction changes off the trail and while gliding, skate angle with speed.</p>
+    <label for="tAhug">Camera hugs trail (%)<output id="oAhug"></output><input id="tAhug" type="range" min="0" max="1" step="0.05" value="0.35"></label>
     <div class="btns"><button id="copySet" type="button">Copy settings</button><button id="defSet" type="button">Restore defaults</button></div>
     <p class="note" id="setNote">Your slider changes are kept in this browser.</p>
+    <h4>Testing</h4>
     <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button></div>
     <label for="tOrb1">Zone 1 orbs collected<output id="oOrb1"></output><input id="tOrb1" type="range" min="0" max="20" step="1" value="0"></label>
     <label for="tOrb2">Zone 2 orbs collected<output id="oOrb2"></output><input id="tOrb2" type="range" min="0" max="30" step="1" value="0"></label>
     <label for="tOrb3">Zone 3 orbs collected<output id="oOrb3"></output><input id="tOrb3" type="range" min="0" max="50" step="1" value="0"></label>
     <label for="tCry">Crystals collected<output id="oCry"></output><input id="tCry" type="range" min="0" max="20" step="1" value="0"></label>
-    <p class="note">For testing: sets how many of a zone's orbs count as collected. All of them opens that zone's gate or lowers its bridge. Not saved.</p>
+    <p class="note">Sets how many of each collectable count as collected. Maxing a zone opens its gate or lowers its bridge.</p>
   </div>
 </details>
 
@@ -299,7 +308,7 @@ addEventListener('resize', resize);
 const $ = id => document.getElementById(id);
 const P = {};
 const tune = [['tScheme','oScheme','scheme',v=>v ? 'Twin-stick (experimental)' : 'Triggers'],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tSboost','oSboost','sboost',v=>v.toFixed(2)+'×'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tVstep','oVstep','vstep',v=>v.toFixed(0)],['tVslow','oVslow','vslow',v=>v.toFixed(0)],['tVfast','oVfast','vfast',v=>v.toFixed(0)],['tVhill','oVhill','vhill',v=>v.toFixed(1)],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tSa0','oSa0','sa0',v=>v.toFixed(0)],['tSa45','oSa45','sa45',v=>v.toFixed(0)],['tSa90','oSa90','sa90',v=>v.toFixed(0)],['tSlen','oSlen','slen',v=>v.toFixed(2)],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tBuild','oBuild','build',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
-  ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tCexit','oCexit','cexit',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
+  ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
 // only sliders you've actually moved are remembered, so everything else follows the current defaults. (the old format

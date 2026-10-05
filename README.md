@@ -65,7 +65,7 @@ The map is four times its old area and split into zones, each locked until you c
   - Ungroomed snow is slower, except in classic. Double poles keep their full push off the trail.
 - **Trail assist:** gently steers your stride toward the trail ahead. It lets go when you lean, kick-turn or steer away.
 - **Skier:** V2 for stick strokes (load tall, push and compress, recover) and V1 offset poling for trigger and key kicks, with tuck, snow plow and classic poses.
-- **Tuning:** every setting is a slider in the Tuning panel. Only sliders you've moved are remembered in your browser; the rest follow the current defaults. Physics runs in fixed steps of at most 1/60 s, so it behaves the same at any frame rate. The stick debug recorder logs your stick input so you can tune the input thresholds.
+- **Tuning:** every setting is a slider in the Tuning panel, grouped into Controller, Kicks and strides, Skate angle, Snow and glide, Classic/poling/braking, Trail assist, Camera and Testing. Only sliders you've moved are remembered in your browser; the rest follow the current defaults. Physics runs in fixed steps of at most 1/60 s, so it behaves the same at any frame rate. The stick debug recorder logs your stick input so you can tune the input thresholds.
 
 ## Files
 

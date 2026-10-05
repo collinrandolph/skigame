@@ -1053,7 +1053,7 @@ function polePush(dir = S.th){
 // 5, 5, 15, 33.3, 51.7, 70), shrinking to 90° at a normal skating speed or above (5, 5, 15, 18.3, 21.7, 25), so the
 // same quick kicks give a tight turn while moving rather than spinning you round. the speed you start the run at
 // decides which (the kicks themselves speed you up, and that shouldn't shrink a turn you began from a standstill). no single kick turns more than 90°.
-let kickPrevT = -1e9, streakKmh = 0, streakTrig = false, snapSkip = 0, junctionTurnAt = -1e9, sideRun = 0;
+let kickPrevT = -1e9, streakKmh = 0, streakTrig = false, snapSkip = 0, junctionTurnAt = -1e9, sideRun = 0, runTurn = 0, turnRestart = false;
 function fullTurnDeg(speedKmh = Math.hypot(S.vx, S.vy) * 3.6, p = P){
   return p.tfStop + (p.tfMove - p.tfStop) * smooth01(p.tfVlo, p.tfVhi, speedKmh);
 }
@@ -1134,19 +1134,25 @@ function kick(leg, opt = {}){
     // from the third same-side kick in a row, a pause restarts the build but never drops below the floor (15°):
     // 5, 5, pause, 15, pause, 15 ... instead of falling back to 5
     if (sameSide && sideRun >= 3) lastTurnDeg = Math.max(lastTurnDeg, P.kfloor);
+    // once a run of same-side kicks has made a full turn (180° from a standstill, 90° at speed), the build starts again:
+    // the next kick is the floor (15°) and they grow from there, instead of spinning faster and faster
+    if (!sameSide || sideRun === 1){ runTurn = 0; turnRestart = false; }
+    if (sameSide && turnRestart){ lastTurnDeg = P.kfloor; turnRestart = false; }
     let a = side * lastTurnDeg * Math.PI/180;
     let camRef = S.tgt - camPending;
     const prev = S.tgt;
     if (sameSide){
       const sn = branchSnap(prev, side, lastTurnDeg);
       if (sn !== null){ a = sn; lastTurnDeg = Math.abs(sn) * 180/Math.PI; snapSkip++; }
+      runTurn += lastTurnDeg;
+      if (runTurn >= fullTurnDeg(streakKmh) - 0.5){ runTurn = 0; turnRestart = true; snapSkip = streak - 2; }   // next kick: the floor, then the 4th step on
       S.tgt = prev + a; camRef = prev;
       // near a junction the assist is back as soon as the kick-turn window closes, to settle you onto the trail
       const nearJ = P.bsnap > 0 && nearestJunction(S.x, S.y) < P.bsnap;
       if (nearJ) junctionTurnAt = performance.now();
       assistQuietUntil = performance.now() + (nearJ ? P.kwin : 800);
     }
-    else S.tgt = camRef + a;
+    else { S.tgt = camRef + a; runTurn = lastTurnDeg; }        // the first kick of a run counts toward its full turn
     camPending = S.tgt - camRef;
     d = S.tgt - prev;
   }

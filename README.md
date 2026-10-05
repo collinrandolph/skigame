@@ -60,7 +60,7 @@ The map is four times its old area and split into zones, each locked until you c
 
 - **Skating:** your body rides the ski you're on, so your path weaves around the line between your skis. The skate V widens or narrows in fixed steps with speed and slope, so both sides stay even.
 - **Camera:** it follows the line between your skis, so alternating strides cancel out and only real turns move the view.
-- **Ski tracks:** marks are straight, the way a ski is, and are reset when you drift off a ski's line. Kick turns leave a herringbone pattern.
+- **Ski tracks:** marks are straight, the way a ski is, and are reset when you drift off a ski's line. Kick turns leave a herringbone pattern. Older marks fade into the snow as new ones are laid: the newest 50 are full strength, then 90%, 70% and 40% for the next three groups of 10, and anything older than 80 marks back stays at 15%. Fading mixes each mark's colour toward the snow it lies on (groomed, open snow or lake ice) rather than making it see-through, so crossing marks never darken each other. Skis lie along the slope under them, tilted from tip to tail and side to side, and always sit on top of their marks.
 - **Terrain and trails:**
   - Rolling terrain with a ridge and a valley, and gravity acts along the skis.
   - Groomed trails with green, blue and black ratings, and scattered trees: six in zone 1, the East Gate connector, and five in zone 2.

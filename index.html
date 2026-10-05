@@ -3618,7 +3618,7 @@ const skier = new THREE.Group(); scene.add(skier);              // holds the hea
 const skierMat = new THREE.MeshLambertMaterial({ color: 0xd2462e });   // jacket and hat, the theme's skier colour
 const pantsMat = new THREE.MeshLambertMaterial({ color: 0x2f3b48 });
 const skinMat = new THREE.MeshLambertMaterial({ color: 0xd9b8a0 });
-const skiMat = new THREE.MeshLambertMaterial({ color: 0x2c3a49 });
+const skiMat = new THREE.MeshLambertMaterial({ color: 0x2c3a49, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -6 });   // always in front of the marks
 const poleMat = new THREE.MeshLambertMaterial({ color: 0x8a939c });
 const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 12), skierMat);
 arrow.rotation.x = -Math.PI/2; arrow.position.set(0, 0.06, -1.3); skier.add(arrow);
@@ -3654,9 +3654,35 @@ const trackGeo = new THREE.BufferGeometry();
 trackGeo.setAttribute('position', new THREE.BufferAttribute(trackPos, 3));
 trackGeo.setIndex(new THREE.BufferAttribute(trackIdx, 1));
 trackGeo.setDrawRange(0, 0);
-const trackMat = new THREE.MeshBasicMaterial({ color: 0x8fa6ba, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide });
+// old marks fade into the snow as new ones are laid. each mark's colour is mixed from the track colour toward the
+// snow under it (groomed, open snow or lake ice), so marks stay solid and overlapping ones never darken each other.
+// by how many marks are newer: 0-49 full, 50-59 90%, 60-69 70%, 70-79 40%, 80 and older 15%
+const trackCol = new Float32Array(TRACK_CAP * 4 * 3);
+trackGeo.setAttribute('color', new THREE.BufferAttribute(trackCol, 3));
+const trackSeq = new Int32Array(TRACK_CAP), trackSurf = new Uint8Array(TRACK_CAP);
+const TRACK_FADE = [[50, 1], [60, 0.9], [70, 0.7], [80, 0.4], [Infinity, 0.15]];
+const trackFade = rank => TRACK_FADE.find(([n]) => rank < n)[1];
+const trackMat = new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide });
 const trackMesh = new THREE.Mesh(trackGeo, trackMat); trackMesh.frustumCulled = false; scene.add(trackMesh);
-let trackN = 0;
+let trackN = 0, trackRGB = null;
+function trackColours(){
+  // the track colour, and the snow colours as they actually show on screen once lit (unlit marks have to match them)
+  const sunY = sun.position.clone().normalize().y, flat = hemi.intensity + sun.intensity*Math.max(0, sunY);
+  const lit = c => { const k = new THREE.Color(c); return [Math.min(1, k.r*flat), Math.min(1, k.g*flat), Math.min(1, k.b*flat)]; };
+  const sn = snowRGB(), snow = sn.scaled.map(v => Math.min(1, v/255*flat));
+  trackRGB = { track: (() => { const k = new THREE.Color(C.track); return [k.r, k.g, k.b]; })(), surf: [snow, lit(C.groomed), lit(C.lake)] };
+}
+function surfaceAt(x, y){ return onLake(x, y) ? 2 : (nearestTrail(x, y).d < TRAIL_W/2 || lawnSD(x, y) < 0) ? 1 : 0; }
+function colourTrack(slot){
+  if (!trackRGB) trackColours();
+  const o = trackFade(trackN - 1 - trackSeq[slot]), t = trackRGB.track, b = trackRGB.surf[trackSurf[slot]], i = slot * 12;
+  for (let k = 0; k < 4; k++) for (let c = 0; c < 3; c++) trackCol[i + k*3 + c] = b[c] + (t[c] - b[c])*o;
+}
+function recolourTracks(){
+  trackColours();
+  for (let n = Math.max(0, trackN - TRACK_CAP); n < trackN; n++) colourTrack(n % TRACK_CAP);
+  trackGeo.attributes.color.needsUpdate = true;
+}
 function writeTrack(slot, ax, ay, bx, by, tw = TRACK_W){
   // one straight quad per ski imprint; gentle terrain, so a straight quad sits on the snow
   const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1;
@@ -3672,7 +3698,13 @@ function syncTracks(){
   let changed = false;
   for (const k of skis){
     if (!k.dirty || k.len <= 0.01) continue;
-    if (k.slot < 0){ k.slot = trackN % TRACK_CAP; trackN++; }
+    if (k.slot < 0){
+      k.slot = trackN % TRACK_CAP; trackSeq[k.slot] = trackN; trackSurf[k.slot] = surfaceAt(k.ax, k.ay); trackN++;
+      colourTrack(k.slot);
+      // the marks this one pushed over a fade step take their new shade (no other mark changes)
+      for (const [n] of TRACK_FADE){ const q = trackN - 1 - n; if (n < Infinity && q >= 0 && q > trackN - 1 - TRACK_CAP) colourTrack(q % TRACK_CAP); }
+      trackGeo.attributes.color.needsUpdate = true;
+    }
     writeTrack(k.slot, k.ax, k.ay, k.ax + k.dx*k.len, k.ay + k.dy*k.len, k.w);
     k.dirty = false; changed = true;
   }
@@ -3684,12 +3716,12 @@ function applyTheme(){
   readColors();
   const sky = new THREE.Color(C.sky);
   renderer.setClearColor(sky); scene.fog.color.copy(sky);
-  skierMat.color.set(C.skier); trackMat.color.set(C.track);
+  skierMat.color.set(C.skier);
   const dark = sky.getHSL({}).l < 0.3;
   hemi.intensity = dark ? 0.55 : 0.75; sun.intensity = dark ? 0.45 : 0.65;
   const tc = dark ? [0x2a231e, 0x1a2a26, 0x22352f] : [0x4d3f35, 0x2f4a43, 0x3e5c53];
   treeMats.trunk.color.setHex(tc[0]); treeMats.low.color.setHex(tc[1]); treeMats.high.color.setHex(tc[2]);
-  bakeTexture();
+  bakeTexture(); recolourTracks();
 }
 
 // 2D overlay canvas (id c) carries the signs and the overview map
@@ -3791,6 +3823,10 @@ function poseSkier(h0, arrowTh){
       const w = ease(loadW);
       fx = fx + (gx + sd*0.16 - fx) * w; fy = fy + (0.05 - fy) * w; fz = fz * (1 - w);
     }
+    // the snow under this foot can sit higher or lower than under the body on a slope: lift or drop the foot to it
+    const cT = Math.cos(th), sT = Math.sin(th), wx = S.x + fx*cT - fz*sT, wy = S.y + fx*sT + fz*cT;
+    const gB = ground(wx, wy);
+    fy += gB - h0;
     feet[k] = [fx, fy, fz];
     // ski: planted skis point exactly along their tracks; a plow turns the tips in; lifted skis follow the body
     let yaw = 0;
@@ -3798,8 +3834,19 @@ function poseSkier(h0, arrowTh){
     else if (sk && sk.live){ let r = Math.atan2(sk.dx, -sk.dy) - th; r -= Math.round(r/(2*Math.PI))*2*Math.PI; yaw = -r; }
     else if (ext > 0) yaw = sd * 0.35 * ext;                              // pushing ski angled out as it leaves
     const ski = body.ski[k];
-    ski.position.set(fx, fy - 0.005, fz);   // sits just above its track ribbon so the track never shows through
-    ski.rotation.set(down ? 0 : -0.12, yaw, 0);
+    // a ski on the snow lies along the slope under it: pitched to the ground at tip and tail, rolled to the ground
+    // either side, its base a little above its own track so the mark never shows through it
+    let pitch = -0.12, roll = 0;
+    if (down){
+      const ph = yaw - th, fwx = -Math.sin(ph), fwy = -Math.cos(ph), rx = Math.cos(ph), ry = -Math.sin(ph);
+      const tip = ground(wx + fwx*1.0, wy + fwy*1.0), tail = ground(wx - fwx*0.72, wy - fwy*0.72);
+      pitch = Math.atan2(tip - tail, 1.72);
+      roll = Math.atan2(ground(wx + rx*0.2, wy + ry*0.2) - ground(wx - rx*0.2, wy - ry*0.2), 0.4);
+      fy = gB - h0 + 0.05;
+    }
+    ski.rotation.order = 'YXZ';
+    ski.position.set(fx, fy - (down ? 0 : 0.005), fz);
+    ski.rotation.set(pitch, yaw, roll);
     // leg: hip to knee to foot, the knee pushed forward more the deeper the crouch
     const hp = [hip[0] + sd*0.1, hip[1], hip[2]];
     const kb = 0.06 + crouch*0.45;
@@ -4500,7 +4547,7 @@ function loop(t){
 }
 loadProgress();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, orbsGot, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

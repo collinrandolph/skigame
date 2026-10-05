@@ -1232,11 +1232,12 @@ function pollPad(){
   if (padAxes.some(v => Math.abs(v) > 0.15) || gp.buttons.some(b => b && (b.pressed || b.value > 0.1))){ anyInputAt = performance.now(); lastDevice = 'pad'; }
   if (promptCtx){ promptPad(trig); return; }
   // after a prompt, the buttons that answered it are ignored until they're let go (A would toggle classic)
-  if (padHold){ if ([0, 1, 6, 7].some(i => trig(i) > 0.3)) return; padHold = false; both.rtDown = false; }
+  if (padHold){ if ([0, 1, 2].some(i => trig(i) > 0.3)) return; padHold = false; both.rtDown = false; }
   pollTwin(gp);
 }
 // ---- stop at a kiosk or the altar: a full-screen prompt that takes all input until it's answered.
-// keyboard Space (or Enter) to go ahead, X (or Esc) to cancel; controller A to go ahead, B, LT or RT to cancel;
+// keyboard Space (or Enter) to go ahead, X (or Esc) to cancel; controller A to go ahead, X (or B) to cancel (not the
+// triggers: you'd squeeze them skiing up);
 // touch the buttons. an info-only prompt has one button and any of these close it
 let promptCtx = null, promptPrev = null, padHold = false;
 function openPrompt(c){
@@ -1254,10 +1255,10 @@ function closePrompt(go){
   if (go && c.onGo) c.onGo();
 }
 function promptPad(trig){
-  const st = [0, 1, 6, 7].map(i => trig(i) > 0.5);
+  const st = [0, 1, 2].map(i => trig(i) > 0.5);         // A, B, X
   if (!promptPrev){ promptPrev = st; return; }          // buttons already held when it opened don't count
   if (st[0] && !promptPrev[0]) closePrompt(true);
-  else if ([1, 2, 3].some(k => st[k] && !promptPrev[k])) closePrompt(false);
+  else if ([1, 2].some(k => st[k] && !promptPrev[k])) closePrompt(false);
   promptPrev = st;
 }
 $('pGo').addEventListener('click', () => closePrompt(true));
@@ -1284,10 +1285,12 @@ function altarPrompt(){
   if (n < CRYSTAL_TOTAL) return { title: 'Altar', body: n + ' of 20 crystals collected. Bring them all back here to open the crystal gate.', go: 'OK' };
   return { title: 'Altar', body: 'All 20 crystals. Open the crystal gate?', go: 'Open', onGo: finishAltar };
 }
-// come to a stop beside one and its prompt opens; it won't open again until you've moved away and come back
+// come to a stop beside one and its prompt opens; it won't open again until you've moved away and come back.
+// a running kiosk whose 10 orbs are all in powers on by itself as soon as you get back to it, no stop or prompt
 function checkInteract(){
   if (promptCtx) return;
   const v = Math.hypot(S.vx, S.vy);
+  for (const K of KIOSKS) if (K.state === 'active' && kioskGot(K) === ORBS_PER_KIOSK && Math.hypot(S.x - K.x, S.y - K.y) < 7){ powerKiosk(K); K.dismissed = true; }
   const spots = [...KIOSKS.map(K => [K, 6, () => kioskPrompt(K)]), [altar, 7, altarPrompt]];
   for (const [it, r, fn] of spots){
     const d = Math.hypot(S.x - it.x, S.y - it.y);
@@ -2656,7 +2659,7 @@ function updateOrbs(dt){
     if (Math.hypot(S.x - o.x, S.y - o.y) < ORB_R){
       const K = o.kiosk; o.got = true; o.fade = 0; const n = kioskGot(K);
       music.chime(n / ORBS_PER_KIOSK); saveProgress(); updateKioskLook(K);
-      toast(n === ORBS_PER_KIOSK ? 'All 10 orbs. Head back to the kiosk to power it on.' : 'Orb ' + n + ' of 10');
+      toast(n === ORBS_PER_KIOSK ? 'All 10 orbs. Ski back to the kiosk and it will power on.' : 'Orb ' + n + ' of 10');
     }
   }
   if (toastT && now > toastT){ $('toast').classList.remove('on'); toastT = 0; }

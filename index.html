@@ -583,6 +583,7 @@ let SOLIDS = [];           // round footprints of the outpost's buildings (fille
 let MOOSE = [];            // the tentacle moose wandering zones 2 and 3 (they're solid too)
 let NPCS = [];             // people and natives, standing or walking loops (solid, small)
 let HERD = [];             // the moose herd at the far end of zone 4
+const z5Calves = [];       // calves that have joined the crowned trio in zone 5 (they stay there for good)
 function obstacleSD(x, y, terrainOnly = false){
   if (y > WORLD.y1){
     // zone 5: the plateau between its side walls, the mountain band behind and the cliff edge in front
@@ -1290,14 +1291,15 @@ function openPrompt(c){
   held.L = held.R = false; keyKickHeld.L = keyKickHeld.R = false;
   for (const src of ['key', 'twin', 'touch']){ setPlow(false, src); setTuck(false, src); }
   $('pTitle').textContent = c.title; $('pBody').textContent = c.body;
-  $('pGo').textContent = c.go; $('pNo').hidden = !c.onGo;
-  $('pHint').textContent = c.onGo ? 'Space or A to ' + c.go.toLowerCase() + ' · X or B to cancel' : 'Space or A to close';
+  $('pGo').textContent = c.go; $('pNo').hidden = !c.onGo; $('pNo').textContent = c.no || 'Cancel';
+  $('pHint').textContent = c.onGo ? 'Space or A: ' + c.go.toLowerCase() + ' · X or B: ' + (c.no || 'cancel').toLowerCase() : 'Space or A to close';
   $('prompt').hidden = false;
 }
 function closePrompt(go){
   const c = promptCtx; if (!c) return;
   promptCtx = null; padHold = true; $('prompt').hidden = true;
   if (go && c.onGo) c.onGo();
+  else if (!go && c.onNo) c.onNo();
 }
 function promptPad(trig){
   const st = [0, 1, 2].map(i => trig(i) > 0.5);         // A, B, X
@@ -2916,7 +2918,7 @@ for (const z of [1, 2, 3]){
 function resetOrbs(){
   for (const K of KIOSKS){ K.state = 'dormant'; K.dismissed = false; for (const o of K.orbs){ o.got = false; o.fade = 0; o.g.visible = false; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; } updateKioskLook(K); }
   if (trial.K){ const K = trial.K; trial.K = null; updateKioskLook(K); }
-  releasePet(); sleepGiant(); checkpoint = null; pet.lastDismissed = -1;
+  releasePet(); returnZ5Calves(); sleepGiant(); checkpoint = null; pet.lastDismissed = -1; SKY_ON = null; bhShown = false;
   setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; altar.state = 0; altar.dismissed = false; setCrystalsCollected(0); setCrystalsActive(false); updateAltarLook(); gate4Open = false; gate4.open = 0; bridgeWanted = false; bridgeDown = 0; animateGate(0);
   saveProgress();
 }
@@ -4212,6 +4214,7 @@ function updatePet(dt){
   }
   let d = th0 - pet.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; pet.th += d*Math.min(1, dt*6);
   h.x = x; h.y = y;
+  if (pz === null && !pet.join && zoneAt(x, y) === 5 && y > Z5.y0 + 14){ h.th = pet.th; calfToTrio(h); return; }
   r.root.position.set(x, pz !== null ? pz : ground(x, y), y); r.root.rotation.y = -pet.th;
   // gait: a walk that quickens to a bounding run, longer strides at speed
   const stride = 0.75 + vc*0.09;
@@ -4353,7 +4356,8 @@ const SKY = (() => {
     g5: { ground: true, hidden: true, ...(() => { const v = new THREE.Vector3(); giant.rig.body.getWorldPosition(v); return { x: v.x, y: v.z }; })() },
     z5: { ground: true, hidden: true, x: 150, y: 853 },
     // the Starway: out from the cliff into space, through the planet, and back to the cliff
-    s1: { ground: true, hidden: true, x: 165, y: 892 }, s2: { ground: true, hidden: true, x: 335, y: 892 },
+    s1: { ground: true, hidden: true, x: 165, y: 892 },
+    bh: { blackhole: true, hidden: true, ...(() => { const a = (-90 + 24*30)*Math.PI/180; return { x: 250 + Math.cos(a)*8, y: 1250 + Math.sin(a)*8, h: 10 }; })() },
   };
   for (const k in N){ const n = N[k]; n.id = k; if (n.ground) n.h = height(n.x, n.y) + 0.05; }
   // decks: node to node through control points [x, y, h] (h is a target; clearance over the terrain is added below)
@@ -4377,8 +4381,10 @@ const SKY = (() => {
       [362, 818, 52], [322, 830, 40], [278, 840, 28], [232, 847, 18], [188, 851, 9]] },
     // the Starway: off the cliff's lip and out over the void, a long climb straight through the planet's heart, out
     // the far side, round past its rings and back in to the cliff east of the observatory. no pylons out here
-    { name: 'Starway', a: 's1', b: 's2', hidden: true, space: true, pts: [[168, 912, 19], [180, 975, 26], [205, 1050, 35], [230, 1130, 46], [246, 1195, 55],
-      [250, 1250, 60], [254, 1305, 58], [275, 1365, 52], [320, 1400, 46], [375, 1385, 40], [412, 1320, 35], [420, 1230, 31], [405, 1130, 27], [375, 1030, 23], [350, 960, 20], [338, 915, 18]] },
+    // the Starway, the last bridge: off the cliff's lip, over the void, into the planet, then round and down a funnel
+    // of light in two narrowing turns to the black hole at the bottom
+    { name: 'Starway', a: 's1', b: 'bh', hidden: true, space: true, final: true, pts: [[168, 912, 19], [180, 975, 26], [205, 1050, 35], [230, 1130, 46], [246, 1195, 55],
+      ...Array.from({ length: 23 }, (_, k) => { const t = (k + 1)/24, a = (-90 + (k + 1)*30)*Math.PI/180, r = 50 - 42*t; return [250 + Math.cos(a)*r, 1250 + Math.sin(a)*r, 55 - 45*t]; })] },
   ];
   // sample each deck: a centripetal-ish Catmull-Rom through its control points, every ~2 m
   // the ground under a deck and a little way either side, so a deck crossing a ridge rides over it rather than through a cut
@@ -4432,14 +4438,16 @@ const SKY = (() => {
 const skyActive = () => gate4Open || P.sky >= 1;
 // nearest point on a deck to (x, y): sample index, distance along it (negative or past the end beyond its ends),
 // lateral offset (+ to the left of travel), the deck's height there, and its direction
-function deckProj(d, x, y, hint){
+function deckProj(d, x, y, hint, zRef){
   let lo = 0, hi = d.n - 2;
   if (hint !== undefined && hint !== null){ lo = Math.max(0, hint - 40); hi = Math.min(d.n - 2, hint + 40); }
   let bi = lo, bu = 0, bd = Infinity;
   for (let i = lo; i <= hi; i++){
     const ax = d.X[i], ay = d.Y[i], ex = d.X[i+1] - ax, ey = d.Y[i+1] - ay, L2 = ex*ex + ey*ey || 1e-6;
     const u = ((x - ax)*ex + (y - ay)*ey)/L2, uc = Math.max(0, Math.min(1, u)), px = ax + ex*uc - x, py = ay + ey*uc - y, dd = px*px + py*py;
-    if (dd < bd){ bd = dd; bi = i; bu = u; }
+    const dz = zRef === undefined ? 0 : (d.H[i] + (d.H[i+1] - d.H[i])*uc - zRef);   // on a spiral, the turn at your height
+    const sc = dd + dz*dz*0.5;
+    if (sc < bd){ bd = sc; bi = i; bu = u; }
   }
   const ex = d.X[bi+1] - d.X[bi], ey = d.Y[bi+1] - d.Y[bi], L = Math.hypot(ex, ey) || 1e-6, tx = ex/L, ty = ey/L;
   const uc = Math.max(0, Math.min(1, bu)), lat = (x - d.X[bi])*(-ty) + (y - d.Y[bi])*tx;
@@ -4448,7 +4456,7 @@ function deckProj(d, x, y, hint){
 }
 // the deck height under (x, y) while you're riding (the deck you're on, or one joining it at a junction close by)
 function skyGround(x, y){
-  const o = SKY_ON, d = o.d, pr = deckProj(d, x, y, o.i);
+  const o = SKY_ON, d = o.d, pr = deckProj(d, x, y, o.i, o.h);
   if (Math.abs(pr.lat) <= d.w/2 + 0.6 && pr.s >= -0.6 && pr.s <= d.len + 0.6) return pr.h;
   const end = pr.s < 12 ? d.A : pr.s > d.len - 12 ? d.B : null;
   if (end && !end.ground) for (const d2 of end.decks){ if (d2 === d) continue;
@@ -4462,12 +4470,13 @@ function skyStep(){
     if (!skyActive()) return;
     for (const d of SKY.decks) for (const end of [d.A, d.B]){
       if (!end.ground || (d.hidden && !giant.up)) continue;
+      if (d.final && diamondsLit() < DIAMONDS){ starwayHint(d, end); continue; }
       const pr = deckProj(d, S.x, S.y, end === d.A ? 0 : d.n - 2), sIn = end === d.A ? pr.s : d.len - pr.s;
-      if (sIn > -0.5 && sIn < 5 && Math.abs(pr.lat) < d.w/2 - 0.3){ SKY_ON = { d, i: pr.i }; skyEnterAt = performance.now(); return; }
+      if (sIn > -0.5 && sIn < 5 && Math.abs(pr.lat) < d.w/2 - 0.3){ SKY_ON = { d, i: pr.i, h: pr.h }; skyEnterAt = performance.now(); if (d.final && pet.h) calfToTrio(pet.h); return; }
     }
     return;
   }
-  const o = SKY_ON; let d = o.d, pr = deckProj(d, S.x, S.y, o.i);
+  const o = SKY_ON; let d = o.d, pr = deckProj(d, S.x, S.y, o.i, o.h);
   if (Math.abs(pr.lat) > d.w*1.5){ SKY_ON = null; return; }         // moved off it some other way (a reset): back on the ground
   // near a junction, ride whichever deck there you're on and heading along
   const end = pr.s < 4 ? d.A : pr.s > d.len - 4 ? d.B : null;
@@ -4482,7 +4491,13 @@ function skyStep(){
     }
     if (best && best[0] !== d){ d = best[0]; pr = best[1]; o.d = d; }
   }
-  o.i = pr.i;
+  o.i = pr.i; o.h = pr.h;
+  // the end of the line: the edge of the black hole holds you, and asks what you'd like to do
+  if (d.B.blackhole && pr.s > d.len - 8){
+    S.vx *= 0.92; S.vy *= 0.92;
+    if (pr.s > d.len - 2){ const back = pr.s - (d.len - 2); S.x -= pr.tx*back; S.y -= pr.ty*back; S.vx = S.vy = 0; }
+    if (!promptCtx && !bhShown){ bhShown = true; blackHolePrompt(); }
+  }
   // off at the foot of a ramp
   if ((d.A.ground && pr.s < -0.3) || (d.B.ground && pr.s > d.len + 0.3)){ SKY_ON = null; return; }
   // the railings: kept inside the deck, and the end of a deck (past a junction) holds you too
@@ -4580,7 +4595,7 @@ const skyPortals = SKY.nodes.filter(n => n.ground).map(n => {
 });
 function updateSky(dt){
   const act = skyActive(), now = performance.now()/1000;
-  for (const p of skyPortals){ const on = act && (!p.n.hidden || giant.up); for (const m of p.lit) m.visible = on; p.pad.material.opacity = on ? 0.25 + 0.1*Math.sin(now*2) : 0; }
+  for (const p of skyPortals){ const on = act && (!p.n.hidden || giant.up) && (!p.n.decks[0].final || diamondsLit() >= DIAMONDS); for (const m of p.lit) m.visible = on; p.pad.material.opacity = on ? 0.25 + 0.1*Math.sin(now*2) : 0; }
   // which decks show: the one you're on, and near its end the ones you can carry on to (or have just come from)
   const o = SKY_ON, show = new Set();
   if (o){
@@ -4638,7 +4653,7 @@ const zone5 = (() => {
   for (let k = 0; k < 900 && placed.length < 110; k++){
     const x = Z5.x0 + 16 + rnd()*(Z5.x1 - Z5.x0 - 32), y = Z5.y0 + 8 + rnd()*(Z5.cliff - Z5.y0 - 6);
     const size = 0.5 + rnd()*rnd()*2.4;
-    if (Math.hypot(x - Z5_TEMPLE.x, y - Z5_TEMPLE.y) < 19 + size || Math.hypot(x - 150, y - 853) < 9) continue;
+    if (Math.hypot(x - Z5_TEMPLE.x, y - Z5_TEMPLE.y) < 19 + size || Math.hypot(x - 150, y - 853) < 9 || Math.hypot(x - 324, y - 858) < 22 + size) continue;
     if (placed.some(p => Math.hypot(p.x - x, p.y - y) < 4 + (p.size + size)*1.2)) continue;
     placed.push({ x, y, size });
     const c = new THREE.Group(); c.position.set(x, height(x, y) - 0.2, y); c.rotation.y = rnd()*6.3; src.add(c);
@@ -4677,6 +4692,216 @@ const MUSICIANS = (() => {
     return { rig, kind, ph: rnd()*6, x, y };
   });
 })();
+// ---- the crowned trio: three small grown moose in ceremonial drapes and gold crowns keep court on the plateau's east
+// side, beside a ring of six diamond insignias set in the snow. bring a calf onto the plateau and it leaves you for
+// the first open diamond, which lights under it; two robed attendants hurry over and dress it in a drape and crown
+// of its own, and there it stays for good. once all six diamonds glow the Starway wakes. calves past the sixth join
+// the court too, standing behind the trio
+const TRIO = { x: 338, y: 848 }, RING6 = { x: 318, y: 867, r: 6.5 }, DIAMONDS = 6;
+const GOLD = lam(0xe6bf4f); GOLD.flatShading = true;
+const DRAPES = [0xd9468f, 0x2bb3a3, 0xf0a83a, 0x8a5ce6, 0xe0533d, 0x3f8fe0].map(c => { const m = lam(c); m.flatShading = true; return m; });
+const DG = {
+  drape: new THREE.SphereGeometry(1, 20, 8, 0, Math.PI*2, 0, Math.PI*0.56), hem: new THREE.TorusGeometry(1, 0.045, 5, 32),
+  band: cy(0.3, 0.27, 0.2, 12, true), spike: new THREE.ConeGeometry(0.055, 0.24, 5), knob: new THREE.SphereGeometry(0.04, 6, 5),
+  emblem: new THREE.OctahedronGeometry(1, 0), tassel: new THREE.SphereGeometry(0.07, 6, 5),
+};
+function dressMoose(rig, k){
+  // a drape over the barrel with a gold hem, a gold diamond on each flank and tassels at the corners; a gold crown
+  // of spikes with a crystal at its brow. built hidden at zero size so it can be popped on
+  const drape = new THREE.Group(); drape.position.set(0, 2.1, 0.1); rig.body.add(drape);
+  drape.add(new THREE.Mesh(DG.drape, DRAPES[k % DRAPES.length])).scale.set(0.93, 0.88, 1.73);
+  const hem = new THREE.Mesh(DG.hem, GOLD); hem.position.y = -0.88*0.187; hem.rotation.x = Math.PI/2; hem.scale.set(0.93*0.982, 1.73*0.982, 1); drape.add(hem);
+  for (const sx of [-1, 1]){
+    const e = new THREE.Mesh(DG.emblem, GOLD); e.position.set(sx*0.9, 0.28, 0); e.scale.set(0.05, 0.3, 0.22); drape.add(e);
+    for (const sz of [-1, 1]){ const t = new THREE.Mesh(DG.tassel, GOLD); t.position.set(sx*0.62, -0.32, sz*1.15); drape.add(t); }
+  }
+  const crown = new THREE.Group(); crown.position.set(0, 0.56, -0.92); rig.head.add(crown);
+  crown.add(new THREE.Mesh(DG.band, GOLD)).position.y = 0.1;
+  for (let i = 0; i < 6; i++){
+    const a = i/6*Math.PI*2, s = new THREE.Mesh(DG.spike, GOLD); s.position.set(Math.sin(a)*0.27, 0.3, -Math.cos(a)*0.27); crown.add(s);
+    const kb = new THREE.Mesh(DG.knob, GOLD); kb.position.set(Math.sin(a)*0.27, 0.43, -Math.cos(a)*0.27); crown.add(kb);
+  }
+  const gem = new THREE.Mesh(DG.emblem, CRYSTAL_MAT.gem); gem.position.set(0, 0.13, -0.3); gem.scale.set(0.08, 0.12, 0.05); crown.add(gem);
+  return { drape, crown };
+}
+const facingTo = (x, y, tx, ty) => Math.atan2(tx - x, -(ty - y));
+// where each calf stands: the six diamonds round the ring, then rows behind the trio
+function slotPos(k){
+  if (k < DIAMONDS){ const a = k/DIAMONDS*Math.PI*2 - Math.PI/2; return [RING6.x + Math.cos(a)*RING6.r, RING6.y + Math.sin(a)*RING6.r]; }
+  const j = k - DIAMONDS; return [TRIO.x - 8 + (j % 6)*3.2, TRIO.y - 7 - Math.floor(j/6)*3.4];
+}
+const court = (() => {
+  const g = new THREE.Group(); scene.add(g);
+  // the ring: a faint line joining six diamonds, each a dark inlay round a pale stone that lights when a calf stands on it
+  const hAt = (x, y) => Math.max(...[[0, 0], [1.4, 0], [-1.4, 0], [0, 1.4], [0, -1.4]].map(([a, b]) => height(x + a, y + b)));
+  const rhomb = (L, W) => { const sh = new THREE.Shape(); sh.moveTo(0, L); sh.lineTo(W, 0); sh.lineTo(0, -L); sh.lineTo(-W, 0); sh.closePath(); const geo = new THREE.ShapeGeometry(sh); geo.rotateX(-Math.PI/2); return geo; };
+  const off = m => { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; return m; };
+  const inlay = off(new THREE.MeshLambertMaterial({ color: 0x3a3052 }));
+  const diamonds = [];
+  for (let k = 0; k < DIAMONDS; k++){
+    const [x, y] = slotPos(k), y0 = hAt(x, y) + 0.04, a = Math.atan2(RING6.x - x, RING6.y - y);
+    const base = new THREE.Mesh(rhomb(1.9, 1.15), inlay); base.position.set(x, y0, y); base.rotation.y = a; g.add(base);
+    const mat = off(new THREE.MeshBasicMaterial({ color: 0x6c5a8e })); mat.polygonOffsetFactor = -3;
+    const stone = new THREE.Mesh(rhomb(1.35, 0.78), mat); stone.position.set(x, y0 + 0.01, y); stone.rotation.y = a; g.add(stone);
+    diamonds.push({ mat, lit: 0 });
+  }
+  { const pts = []; for (let i = 0; i <= 72; i++){ const a = i/72*Math.PI*2, x = RING6.x + Math.cos(a)*RING6.r, y = RING6.y + Math.sin(a)*RING6.r; pts.push(new THREE.Vector3(x, height(x, y) + 0.06, y)); }
+    g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xb8a35a }))); }
+  // the trio: a little smaller than the herd's grown moose, each in its own colour, facing out over the ring
+  const trio = [[-3.6, 1.2, 0], [0, -1.4, 3], [3.6, 1.2, 1]].map(([dx, dy, k], i) => {
+    const rig = buildMoose(false), x = TRIO.x + dx, y = TRIO.y + dy; rig.root.scale.setScalar(0.85);
+    const th = facingTo(x, y, RING6.x, RING6.y);
+    rig.root.position.set(x, height(x, y), y); rig.root.rotation.y = -th;
+    const d = dressMoose(rig, k); if (i === 1) d.crown.scale.setScalar(1.25);
+    SOLIDS.push({ x, y, r: 1.5 });
+    return { rig, ph: i*1.7 };
+  });
+  return { g, diamonds, trio };
+})();
+// the two attendants: robed in white and gold, waiting between the trio and the ring
+const ATTEND = (() => {
+  let seed = 4040; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const white = lam(0xf1ece0), white2 = lam(0xd4ccba); white.flatShading = white2.flatShading = true;
+  return [[328.5, 856.5], [332, 861.5]].map(([x, y], i) => {
+    const rig = buildAlien(rnd);
+    rig.root.traverse(o => { if (!o.isMesh) return; if (o.material === NPC_MAT.robe) o.material = white; else if (o.material === NPC_MAT.robe2) o.material = white2; else if (o.material === NPC_MAT.sash) o.material = GOLD; });
+    pt(rig.arms[i], cy(0.02, 0.02, 1.5, 6), GOLD, 0, -0.5, 0);                // a slim gold staff
+    pt(rig.arms[i], new THREE.OctahedronGeometry(0.08, 0), CRYSTAL_MAT.gem, 0, 0.27, 0).scale.set(1, 1.8, 1);
+    const th = facingTo(x, y, RING6.x, RING6.y);
+    rig.root.position.set(x, height(x, y), y); rig.root.rotation.y = -th;
+    return { rig, hx: x, hy: y, x, y, th, side: i ? 1 : -1, task: null, gait: 0 };
+  });
+})();
+function diamondsLit(){ let n = 0; for (const c of z5Calves) if (c.slot < DIAMONDS && c.phase === 'dressed') n++; return n; }
+function calfToTrio(h, slot){
+  // a calf joins the court. with a slot (a saved game) it's already there and dressed; otherwise it walks over
+  if (!h || z5Calves.some(c => c.h === h)) return;
+  const instant = slot !== undefined;
+  if (pet.h === h){ pet.h = null; $('calfBtn').hidden = true; }
+  HERD = HERD.filter(q => q !== h);
+  if (!instant){ const taken = new Set(z5Calves.map(c => c.slot)); slot = 0; while (taken.has(slot)) slot++; }
+  const [sx, sy] = slotPos(slot), dress = dressMoose(h.rig, slot + 2);
+  const c = { h, slot, sx, sy, phase: instant ? 'dressed' : 'walk', t: 0, pop: instant ? 1 : 0, dress, gait: 0, step: 0, side: 0, served: instant };
+  // keep clear of the observatory on the way
+  if (!instant && segDist(Z5_TEMPLE.x, Z5_TEMPLE.y, h.x, h.y, sx, sy) < 26) c.via = [252, 842];
+  h.sleep = false; h.returning = false;
+  if (instant){ h.x = sx; h.y = sy; h.th = facingTo(sx, sy, TRIO.x, TRIO.y); }
+  for (const o of [dress.drape, dress.crown]){ o.visible = instant; o.scale.setScalar(instant ? 1 : 0.01); }
+  z5Calves.push(c);
+  if (!instant){ toast(slot < DIAMONDS ? 'Your calf leaves you for the crowned trio.' : 'Your calf joins the crowned court.'); music.chime(0.5); saveProgress(); }
+}
+function segDist(px, py, ax, ay, bx, by){
+  const dx = bx - ax, dy = by - ay, u = Math.max(0, Math.min(1, ((px - ax)*dx + (py - ay)*dy) / Math.max(1e-6, dx*dx + dy*dy)));
+  return Math.hypot(ax + dx*u - px, ay + dy*u - py);
+}
+function returnZ5Calves(){
+  // a full reset: every calf goes home to its herd, undressed, the diamonds go dark and the attendants go back
+  for (const c of z5Calves){
+    const h = c.h; c.dress.drape.parent.remove(c.dress.drape); c.dress.crown.parent.remove(c.dress.crown);
+    h.x = h.hx; h.y = h.hy; h.sleep = h.role.includes('sleep'); h.returning = false; HERD.push(h);
+  }
+  z5Calves.length = 0;
+  for (const d of court.diamonds){ d.lit = 0; d.mat.color.setHex(0x6c5a8e); }
+  for (const A of ATTEND){ A.task = null; A.x = A.hx; A.y = A.hy; }
+}
+function walkMoose(r, gait, amp){
+  const ph = gait*Math.PI*2;
+  for (const L of r.legs){ const q = ph + (L.set ? Math.PI : 0); L.hip.rotation.x = amp*Math.sin(q); L.knee.rotation.x = -Math.max(0, Math.cos(q))*amp*1.5; }
+  r.body.position.y = amp ? Math.abs(Math.sin(ph))*0.06 : 0;
+}
+function idleMoose(r, now, ph, bow){
+  walkMoose(r, 0, 0); r.body.scale.y = 1 + 0.015*Math.sin(now*1.1 + ph);
+  r.head.rotation.x = 0.05*Math.sin(now*0.6 + ph) + bow; r.head.rotation.y = 0.25*Math.sin(now*0.3 + ph);
+  for (const T of r.tentacles) T.segs.forEach((g, k) => { g.rotation.x = 0.12 + 0.18*Math.sin(now*1.5 + T.phase + k*0.7); g.rotation.z = 0.15*Math.sin(now*1.1 + T.phase + k*0.5); });
+}
+let starwayHintAt = 0;
+function starwayHint(d, end){
+  // skiing onto the Starway's dark ramp: say what it's waiting for
+  if (Math.hypot(S.x - end.x, S.y - end.y) > 7 || performance.now() - starwayHintAt < 9000) return;
+  starwayHintAt = performance.now();
+  const n = diamondsLit(); toast(n ? n + ' of 6 diamonds by the crowned trio glow. The Starway is dark until all six do.' : 'The Starway is dark. Six diamonds lie unlit beside the crowned trio.');
+}
+function updateCourt(dt){
+  const near = S.y > WORLD.y1 - 120;
+  court.g.visible = near;
+  for (const t of court.trio) t.rig.root.visible = near;
+  for (const A of ATTEND) A.rig.root.visible = near;
+  for (const c of z5Calves) c.h.rig.root.visible = near;
+  if (!near) return;
+  const now = performance.now()/1000;
+  // the trio, idle, bowing one after another every so often
+  court.trio.forEach((t, i) => { const w = (now*0.12 + i*0.08) % 1, bow = w < 0.08 ? 0.5*Math.sin(w/0.08*Math.PI) : 0; idleMoose(t.rig, now, t.ph, bow); });
+  // the calves: walk to their spot, wait to be dressed, then stay
+  for (const c of z5Calves){
+    const h = c.h, r = h.rig;
+    if (c.phase === 'walk'){
+      const [tx, ty] = c.via || [c.sx, c.sy], dx = tx - h.x, dy = ty - h.y, dist = Math.hypot(dx, dy), sp = 4;
+      if (dist < 0.3){ if (c.via) c.via = null; else { c.phase = 'wait'; h.x = c.sx; h.y = c.sy; music.chime(0.6); } }
+      else {
+        const st = Math.min(dist, sp*dt); h.x += dx/dist*st; h.y += dy/dist*st;
+        let d = Math.atan2(dx, -dy) - h.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; h.th += d*Math.min(1, dt*5);
+        c.gait += sp*dt/1.1; walkMoose(r, c.gait, 0.45);
+        c.step += sp*dt; if (c.step > 0.55){ c.step = 0; c.side ^= 1; const co = Math.cos(h.th), sn = Math.sin(h.th);
+          for (const [lz, lxs] of [[-0.95, 1], [0.1, -1], [1.1, 1]]){ const lx = (c.side ? lxs : -lxs)*0.55*h.scale, z = lz*h.scale; hoofPrint(h.x + lx*co - z*sn, h.y + lx*sn + z*co, h.th); } }
+      }
+    } else {
+      // on its spot: turn to face the trio and stand
+      let d = facingTo(h.x, h.y, TRIO.x, TRIO.y) - h.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; h.th += d*Math.min(1, dt*3);
+      idleMoose(r, now, h.ph || 0, 0);
+    }
+    if (c.phase === 'wait' && c.served){
+      // both attendants beside it: a moment, then the drape and crown appear; a moment more and they go back
+      c.t += dt;
+      if (c.t > 0.7 && !c.dress.drape.visible){
+        c.dress.drape.visible = c.dress.crown.visible = true;
+        const n = diamondsLit() + (c.slot < DIAMONDS ? 1 : 0);
+        c.phase = 'dressed';
+        if (c.slot < DIAMONDS && n === DIAMONDS){ toast('All six diamonds glow. Out past the cliff, the Starway lights.'); music.chime(1, true); }
+        else if (c.slot < DIAMONDS){ toast(n + ' of 6 diamonds glow.'); music.chime(n/DIAMONDS); }
+        else { toast('Another calf is crowned.'); music.chime(0.8); }
+        saveProgress();
+      }
+    }
+    if (c.dress.drape.visible && c.pop < 1){
+      c.pop = Math.min(1, c.pop + dt/0.5);
+      const u = c.pop, k = 1 + 2.2*Math.pow(u - 1, 3) + 1.2*Math.pow(u - 1, 2);   // ease out with a little overshoot
+      c.dress.drape.scale.setScalar(Math.max(0.01, k)); c.dress.crown.scale.setScalar(Math.max(0.01, k));
+    }
+    r.root.position.set(h.x, height(h.x, h.y), h.y); r.root.rotation.y = -h.th;
+  }
+  // the diamonds light under a calf standing on them, with a slow shared pulse
+  court.diamonds.forEach((D, k) => {
+    const c = z5Calves.find(q => q.slot === k), want = c && c.phase !== 'walk' ? (c.phase === 'dressed' ? 1 : 0.6) : 0;
+    D.lit += (want - D.lit)*Math.min(1, dt*2);
+    const p = D.lit*(0.85 + 0.15*Math.sin(now*2 + k));
+    D.mat.color.setRGB(0.42 + (0.78 - 0.42)*p, 0.35 + (0.52 - 0.35)*p, 0.56 + (1 - 0.56)*p);
+  });
+  // the attendants: when a calf is waiting on its spot, both hurry to stand either side of it, raise their arms
+  // over it while it's dressed, then walk back
+  if (!ATTEND[0].task && !ATTEND[1].task){ const c = z5Calves.find(q => q.phase === 'wait' && !q.served && !q.claimed); if (c){ c.claimed = true; for (const A of ATTEND) A.task = c; } }
+  let both = true;
+  for (const A of ATTEND){
+    const r = A.rig, c = A.task;
+    let tx = A.hx, ty = A.hy, sp = 1.4;
+    if (c){ const co = Math.cos(c.h.th), sn = Math.sin(c.h.th); tx = c.h.x + co*A.side*2.1 - sn*0.3; ty = c.h.y + sn*A.side*2.1 + co*0.3; sp = 4.5; }
+    const dx = tx - A.x, dy = ty - A.y, dist = Math.hypot(dx, dy);
+    const there = dist < 0.15;
+    if (!there){ const st = Math.min(dist, sp*dt); A.x += dx/dist*st; A.y += dy/dist*st; A.gait += sp*dt; }
+    if (c && !there) both = false;
+    const face = there ? (c ? facingTo(A.x, A.y, c.h.x, c.h.y) : facingTo(A.x, A.y, RING6.x, RING6.y)) : Math.atan2(dx, -dy);
+    let d = face - A.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; A.th += d*Math.min(1, dt*6);
+    r.root.position.set(A.x, height(A.x, A.y), A.y); r.root.rotation.y = -A.th;
+    const ph = A.gait*Math.PI*1.6;
+    r.body.position.y = there ? 0 : 0.04*Math.abs(Math.sin(ph)); r.body.rotation.x = there ? 0 : -0.12*Math.min(1, sp/4);
+    if (r.train) r.train.rotation.y = 0.12*Math.sin(ph*0.5);
+    const raise = c && there ? 1 : 0, [aL, aR] = r.arms;
+    aL.rotation.x += ((raise ? -2.4 : there ? 0 : 0.4*Math.sin(ph)) - aL.rotation.x)*Math.min(1, dt*5);
+    aR.rotation.x += ((raise ? -2.4 : there ? 0 : -0.4*Math.sin(ph)) - aR.rotation.x)*Math.min(1, dt*5);
+    r.head.rotation.x = raise ? -0.2 : 0.05*Math.sin(now*0.7 + A.side);
+  }
+  const c = ATTEND[0].task;
+  if (c){ if (both) c.served = true; if (c.phase === 'dressed' && c.t > 2.2) for (const A of ATTEND) A.task = null; else if (c.phase === 'dressed') c.t += dt; }
+}
 function updateZone5(dt){
   const near = S.y > WORLD.y1 - 120;
   for (const m of MUSICIANS) m.rig.root.visible = near;
@@ -4719,6 +4944,68 @@ const space = (() => {
   for (const o of g.children) o.renderOrder = -1;
   return { g, world, mats: [[stars.material, 1], [pm, 1], [rm, 0.55], [moonM, 1], [inner.material, 0.35]], k: 0, deep: new THREE.Color(0x05060f), tmp: new THREE.Color() };
 })();
+// ---- inside the planet: the Starway spirals down a glowing funnel into a black hole at its throat. a dark sphere in
+// a white-violet accretion disk and halo, the funnel's stripes streaming inward
+const blackHole = (() => {
+  const C0 = { x: 250, y: 4.5, z: 1250 };
+  const canvasTex = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); return t; };
+  // the funnel: a lathe just under the spiral deck (which drops ~1.07 m for every metre it closes in)
+  const prof = []; for (let k = 0; k <= 26; k++){ const r = 3.2 + k*2.05; prof.push(new THREE.Vector2(r, 1.43 + 1.0714*r - 3.4 - 2.6*Math.exp(-r/5))); }
+  const stripes = canvasTex(256, 128, (x, w, h) => {
+    x.fillStyle = 'rgba(92,70,150,0.35)'; x.fillRect(0, 0, w, h);
+    for (let i = 0; i < 10; i++){ const x0 = i/10*w; x.strokeStyle = i % 2 ? 'rgba(52,36,104,0.9)' : 'rgba(255,255,255,0.8)'; x.lineWidth = i % 2 ? 12 : 4;
+      for (const o of [-w, 0, w]){ x.beginPath(); x.moveTo(x0 + o, 0); x.lineTo(x0 + o + w*0.35, h); x.stroke(); } }
+  });
+  stripes.wrapS = stripes.wrapT = THREE.RepeatWrapping; stripes.repeat.set(4, 3);
+  const fm = new THREE.MeshBasicMaterial({ map: stripes, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, fog: false });
+  const funnel = new THREE.Mesh(new THREE.LatheGeometry(prof, 64), fm); funnel.position.set(C0.x, 0, C0.z); space.world.add(funnel);
+  // the hole, its disk and its glow
+  const hole = new THREE.Mesh(new THREE.SphereGeometry(3, 28, 18), new THREE.MeshBasicMaterial({ color: 0x000000, fog: false })); hole.position.set(C0.x, C0.y, C0.z); space.world.add(hole);
+  const diskTex = canvasTex(256, 256, (x, w) => {
+    const g = x.createRadialGradient(w/2, w/2, w*0.2, w/2, w/2, w/2);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.15, 'rgba(236,226,255,0.95)'); g.addColorStop(0.45, 'rgba(169,147,214,0.55)'); g.addColorStop(1, 'rgba(90,74,142,0)');
+    x.fillStyle = g; x.fillRect(0, 0, w, w);
+    x.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 9; i++){ x.strokeStyle = 'rgba(0,0,0,0.45)'; x.lineWidth = 3 + (i % 3)*2; x.beginPath(); x.arc(w/2, w/2, w*(0.24 + i*0.028), i, i + 2.4); x.stroke(); }
+  });
+  const dm = new THREE.MeshBasicMaterial({ map: diskTex, transparent: true, opacity: 0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  const disk = new THREE.Mesh(new THREE.RingGeometry(3.4, 10, 64, 1), dm); disk.position.set(C0.x, C0.y, C0.z); disk.rotation.x = -Math.PI/2 + 0.22; space.world.add(disk);
+  const haloTex = canvasTex(128, 128, (x, w) => { const g = x.createRadialGradient(w/2, w/2, w*0.18, w/2, w/2, w/2); g.addColorStop(0, 'rgba(240,232,255,0.9)'); g.addColorStop(0.3, 'rgba(169,147,214,0.35)'); g.addColorStop(1, 'rgba(169,147,214,0)'); x.fillStyle = g; x.fillRect(0, 0, w, w); });
+  const hm = new THREE.SpriteMaterial({ map: haloTex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  const halo = new THREE.Sprite(hm); halo.position.set(C0.x, C0.y, C0.z); halo.scale.set(17, 17, 1); space.world.add(halo);
+  space.mats.push([fm, 0.9], [dm, 1], [hm, 0.8]);
+  // drawn over the planet's shell, so only shown from inside it
+  funnel.renderOrder = 1; disk.renderOrder = 2; halo.renderOrder = 2;
+  return { funnel, stripes, disk, halo, centre: new THREE.Vector3(250, 60, 1250) };
+})();
+function updateBlackHole(dt){
+  if (!space.world.visible) return;
+  const inside = camera.position.distanceTo(blackHole.centre) < 69;
+  blackHole.funnel.visible = blackHole.disk.visible = blackHole.halo.visible = inside; if (!inside) return;
+  blackHole.stripes.offset.x += dt*0.05; blackHole.stripes.offset.y -= dt*0.35;      // streaming down and round
+  blackHole.disk.rotation.z += dt*0.8;
+}
+// ---- the end of the Starway: go back to the observatory, or give everything back and start again
+let bhShown = false;
+function blackHolePrompt(){
+  openPrompt({ title: 'The black hole', body: 'The Starway ends here, at the edge of everything. Go back to the observatory and carry on, or let the black hole take it all and begin again?',
+    go: 'Return to the observatory', onGo: returnToObservatory, no: 'Reset all progress', onNo: confirmReset });
+}
+function confirmReset(){
+  openPrompt({ title: 'Reset all progress?', body: 'Every terminal, orb, crystal, gate, bridge, time trial and crowned calf goes back to how it was. This cannot be undone.',
+    go: 'Erase it all', onGo: resetAll, no: 'Go back', onNo: blackHolePrompt });
+}
+function returnToObservatory(){
+  SKY_ON = null; bhShown = false;
+  spawnAt(252, 845, Math.PI);                                      // on the plateau, facing the observatory's gateway
+  toast('You are back at the observatory.');
+}
+function resetAll(){
+  SKY_ON = null; bhShown = false;
+  trialTimes = {}; try { localStorage.removeItem(TRIAL_KEY); } catch (e) {}
+  $('reset').click();                                              // back to the start, everything reset and saved
+  toast('Everything begins again.');
+}
 function updateSpace(dt){
   const want = S.y > WORLD.y1 + 18 ? 1 : 0;
   space.k += (want - space.k) * Math.min(1, dt*1.2);
@@ -4756,7 +5043,7 @@ function saveProgress(){
   // v2: each kiosk's state and orbs, the altar's state, and the crystals
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ v: 2,
     kiosks: KIOSKS.map(K => K.state[0]).join(''), korbs: orbs.map(o => o.got ? 1 : 0).join(''),
-    altar: altar.state, crystals: crystals.map(c => c.got ? 1 : 0).join(''), open: [gateOpen, bridgeWanted, gate2Open].map(b => b ? 1 : 0).join(''), pet: pet.h ? pet.h.id : -1, pd: pet.lastDismissed, giant: giant.up ? 1 : 0, cp: checkpoint })); } catch (e) {}
+    altar: altar.state, crystals: crystals.map(c => c.got ? 1 : 0).join(''), open: [gateOpen, bridgeWanted, gate2Open].map(b => b ? 1 : 0).join(''), pet: pet.h ? pet.h.id : -1, pd: pet.lastDismissed, giant: giant.up ? 1 : 0, cp: checkpoint, z5: z5Calves.map(c => [c.h.id, c.slot]) })); } catch (e) {}
 }
 function loadProgress(){
   let p = null; try { p = JSON.parse(localStorage.getItem(PROGRESS_KEY) || 'null'); } catch (e) {}
@@ -4786,6 +5073,7 @@ function loadProgress(){
   if (altar.state === 2){ gate4Open = true; gate4.open = 1; }
   for (const K of KIOSKS) updateKioskLook(K);
   if (p.v === 2 && typeof p.pd === 'number') pet.lastDismissed = p.pd;
+  if (p.v === 2 && Array.isArray(p.z5)) for (const [id, slot] of p.z5){ const h = HERD.find(q => q.id === id); if (h) calfToTrio(h, slot); }
   if (p.v === 2 && p.pet >= 0){ adoptPet(HERD.find(h => h.id === p.pet), true); petArrive(); }
   if (p.v === 2 && p.giant) wakeGiant(true);
   if (p.v === 2 && p.cp){ checkpoint = p.cp; spawnAtCheckpoint(); }
@@ -5734,7 +6022,7 @@ function loop(t){
   const dt = Math.min(0.1, (t-last)/1000); last = t; pollPad();
   // a prompt interrupts the game: the skier holds still (keeping their speed) until it's answered
   if (!promptCtx){ const n = Math.max(1, Math.ceil(dt * 60 - 1e-6)); for (let k = 0; k < n; k++) step(dt/n); }
-  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updatePet(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract(); updateSky(dt); updateSpace(dt); updateZone5(dt);
+  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updatePet(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract(); updateSky(dt); updateSpace(dt); updateZone5(dt); updateCourt(dt); updateBlackHole(dt);
   if (trial.K && !promptCtx) trial.t += dt;
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through
@@ -5748,11 +6036,12 @@ function loop(t){
 }
 loadProgress();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);
 })();
 </script>
+
 </body>
 </html>

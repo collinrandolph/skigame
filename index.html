@@ -399,6 +399,10 @@ const legFlash = { L:0, R:0 };
 //   a river runs west to east across the whole map; zone 3 is the southern half beyond it. a spur ridge runs from
 //   zone 1's mountains down to the river, so the strip between them can only be reached from across the river.
 const WORLD = { x0:-170, x1:490, y0:-230, y1:790 };
+// zone 5: hidden beyond the map's south mountains, reached only by a hidden energy bridge. a small plateau with the
+// alien observatory, ending at a sheer cliff over open space. the ground tiles reach this far south to cover it
+const Z5 = { x0: 80, x1: 400, y0: 812, cliff: 905, h: 16 };
+const TILE_WORLD = { x0: WORLD.x0, x1: WORLD.x1, y0: WORLD.y0, y1: 960 };
 // the divide: a mountain wall across the whole map between zone 3 and zone 4 (further south, the same size again).
 // one notch through it, south of the broken circle, holds the great crystal gate
 function divideY(x){ return 470 + 8*Math.sin(x/53) + 5*Math.sin(x/23 + 1); }
@@ -502,8 +506,20 @@ function zone4Height(x, y){
   return m * (5*Math.sin(x/61 + 0.4)*Math.cos(y/47) + 1.5*Math.sin((x - y)/33) + 7*Math.exp(-((x-330)**2 + (y-640)**2)/(2*55*55)));
 }
 function riverCut(x, y){ return -2.6 * (1 - smooth01(RIVER_HW - 1, RIVER_BANK + 4, Math.abs(y - riverY(x)))); }
+// zone 5's ground: the south mountain band carries on past the map's edge and comes down onto the plateau, walled in
+// at the sides; the plateau ends at the cliff, which drops away hundreds of metres
+function zone5Height(x, y){
+  const ridge = 48 + 9*Math.sin(x/17 + y/23) + 6*Math.sin((x - y)/11);
+  const t = smooth01(WORLD.y1, Z5.y0 + 12, y);
+  const side = 1 - smooth01(Z5.x0 - 10, Z5.x0 + 30, x) * smooth01(Z5.x1 + 10, Z5.x1 - 30, x);
+  const plateau = Z5.h + 1.6*Math.sin(x/19)*Math.cos(y/13) + 0.8*Math.sin((x + y)/9);
+  let h = ridge*(1 - t) + plateau*t;
+  h += (ridge + 12 - h) * side;
+  return h - smooth01(Z5.cliff - 3, Z5.cliff + 16, y) * 360;
+}
 function heightNat(x, y){
   if (FLAT_GROUND) return 0;
+  if (y > WORLD.y1) return zone5Height(x, y);
   const roll = 1.5*Math.sin(x/23 + .7)*Math.cos(y/31)
              + 1.1*Math.sin((x + y)/41)
              + 0.6*Math.cos((x - 2*y)/19)
@@ -565,6 +581,12 @@ let MOOSE = [];            // the tentacle moose wandering zones 2 and 3 (they'r
 let NPCS = [];             // people and natives, standing or walking loops (solid, small)
 let HERD = [];             // the moose herd at the far end of zone 4
 function obstacleSD(x, y, terrainOnly = false){
+  if (y > WORLD.y1){
+    // zone 5: the plateau between its side walls, the mountain band behind and the cliff edge in front
+    let d = Math.min(x - Z5.x0 - 14, Z5.x1 - 14 - x, Z5.cliff - 3 - y, y - Z5.y0 - 6);
+    if (!terrainOnly) for (const o of SOLIDS){ if (o.y < WORLD.y1) continue; const q = o.foot ? footSD(o.foot, x, y) : Math.hypot(x - o.x, y - o.y) - o.r; if (q < d) d = q; }
+    return d;
+  }
   // zone 1's mountains, with the east pass carved through them
   const dx = x - RING.x, dy = y - RING.y, r = Math.hypot(dx, dy), th = Math.atan2(dy, dx);
   let ring = Math.max(ringIn(th) - r, r - ringOut(th));
@@ -620,6 +642,7 @@ function collide(){
   }
 }
 function zoneAt(x, y){
+  if (y > WORLD.y1) return 5;
   const dx = x - RING.x, dy = y - RING.y;
   if (Math.hypot(dx, dy) < ringCrest(Math.atan2(dy, dx))) return 1;
   if (y > divideY(x)) return 4;
@@ -1848,7 +1871,7 @@ const LAKE_CRACKS = (() => {
   return out;
 })();
 const TILE_W = 110, TILE_H = 85;
-const TILES_X = Math.round((WORLD.x1 - WORLD.x0) / TILE_W), TILES_Y = Math.round((WORLD.y1 - WORLD.y0) / TILE_H);
+const TILES_X = Math.round((TILE_WORLD.x1 - TILE_WORLD.x0) / TILE_W), TILES_Y = Math.round((TILE_WORLD.y1 - TILE_WORLD.y0) / TILE_H);
 const TEX_PPM = 5;   // texture pixels per metre
 const TILE_LOAD = 160, TILE_DROP = 215;   // build tiles within this distance of the skier, drop them past this one
 const UP_AXIS = new THREE.Vector3(0, 1, 0);
@@ -2047,7 +2070,7 @@ function* bakeTile(t){
   t.tex.needsUpdate = true; t.baked = true; t.job = null;
 }
 function* buildTile(i, j){
-  const x0 = WORLD.x0 + i*TILE_W, y0 = WORLD.y0 + j*TILE_H, nx = TILE_NX, ny = TILE_NY, R = TILE_R;
+  const x0 = TILE_WORLD.x0 + i*TILE_W, y0 = TILE_WORLD.y0 + j*TILE_H, nx = TILE_NX, ny = TILE_NY, R = TILE_R;
   // heights on a half-metre grid: the mesh uses every other sample, the texture uses all of them
   const hs = new Float32Array((nx+1)*(ny+1));
   for (let jj = 0; jj <= ny; jj++){ for (let ii = 0; ii <= nx; ii++) hs[jj*(nx+1)+ii] = height(x0 + ii*R, y0 + jj*R); if (jj % 30 === 29) yield; }
@@ -2084,7 +2107,7 @@ function dropTile(key){
   farGround.chunks.get(key).mesh.visible = true;
 }
 function tileDist(i, j, x, y){
-  const x0 = WORLD.x0 + i*TILE_W, y0 = WORLD.y0 + j*TILE_H;
+  const x0 = TILE_WORLD.x0 + i*TILE_W, y0 = TILE_WORLD.y0 + j*TILE_H;
   return Math.hypot(Math.max(x0 - x, 0, x - x0 - TILE_W), Math.max(y0 - y, 0, y - y0 - TILE_H));
 }
 // the far field: the whole map as one coarse mesh (5 m), sunk a little below the real ground and coloured by slope.
@@ -2095,7 +2118,7 @@ const farGround = (() => {
   // coarse surface pokes up through the real one in steep, concave spots like the pass)
   const st = 5, chunks = new Map(), mat = new THREE.MeshLambertMaterial({ vertexColors: true });
   for (let j = 0; j < TILES_Y; j++) for (let i = 0; i < TILES_X; i++){
-    const x0 = WORLD.x0 + i*TILE_W, y0 = WORLD.y0 + j*TILE_H;
+    const x0 = TILE_WORLD.x0 + i*TILE_W, y0 = TILE_WORLD.y0 + j*TILE_H;
     const g = new THREE.PlaneGeometry(TILE_W, TILE_H, Math.round(TILE_W/st), Math.round(TILE_H/st)); g.rotateX(-Math.PI/2);
     const pos = g.attributes.position, nrm = g.attributes.normal, col = new Float32Array(pos.count*3), slope = new Float32Array(pos.count);
     for (let k = 0; k < pos.count; k++){
@@ -2346,6 +2369,7 @@ const trees = (() => {
   for (let i = 0; i < 30000 && out.length < 3400; i++){
     const x = WORLD.x0 + 8 + rnd() * (WORLD.x1 - WORLD.x0 - 16), y = WORLD.y0 + 8 + rnd() * (WORLD.y1 - WORLD.y0 - 16);
     if (rnd() * 3.2 > dens(x, y) + 1.2) continue;                     // thin out away from the patches
+    if (y > WORLD.y1 - 20) continue;
     if (ringHeight(x, y) + spurHeight(x, y) + edgeHeight(x, y) > 3 + rnd()*3) continue;   // timberline: only the mountains' lower skirts
     { const gx = height(x + 1, y) - height(x - 1, y), gy = height(x, y + 1) - height(x, y - 1);
       if (Math.hypot(gx, gy)/2 > 0.3 + rnd()*0.1) continue; }                    // nor on steep ground (no trees clinging to cliffs)
@@ -2417,6 +2441,7 @@ const BOULDERS = (() => {
     mesh.instanceMatrix.needsUpdate = true; mesh.frustumCulled = false; scene.add(mesh);
   }
 }
+const treeMeshes = [];
 const treeMats = {
   trunk: new THREE.MeshLambertMaterial({ color: 0x4d3f35 }),
   low: new THREE.MeshLambertMaterial({ color: 0x2f4a43 }),
@@ -2430,7 +2455,7 @@ const treeMats = {
   ];
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
   for (const part of parts){
-    const mesh = new THREE.InstancedMesh(part.geo, part.mat, trees.length);
+    const mesh = new THREE.InstancedMesh(part.geo, part.mat, trees.length); treeMeshes.push(mesh);
     trees.forEach((t, i) => {
       q.setFromAxisAngle(UP_AXIS, t.r); sc.set(t.s, t.s, t.s);
       pos.set(t.x, height(t.x, t.y) - 0.1 + part.y * t.s, t.y);
@@ -4318,9 +4343,12 @@ const SKY = (() => {
   // nodes: ground ends (on-ramp feet) and junctions
   const N = {
     z1: { ground: true, ...(() => { const [x, y] = rpt(272, t => ringIn(t) - 7); return { x, y }; })() },
-    J1: { x: -118, y: 300, h: 30 }, z4: { ground: true, x: 268, y: 512 },
+    J1: { x: -118, y: 250, h: 30 }, z4: { ground: true, x: 268, y: 512 },
     J2: { x: ring(160)[0], y: ring(160)[1], h: 26 }, J3: { x: ring(320)[0], y: ring(320)[1], h: 26 }, J4: { x: ring(40)[0], y: ring(40)[1], h: 26 },
     z2: { ground: true, x: 430, y: -52 }, z3: { ground: true, x: 430, y: 430 },
+    // the hidden way: from under the standing giant's belly, south over the mountains to zone 5
+    g5: { ground: true, hidden: true, ...(() => { const v = new THREE.Vector3(); giant.rig.body.getWorldPosition(v); return { x: v.x, y: v.z }; })() },
+    z5: { ground: true, hidden: true, x: 150, y: 853 },
   };
   for (const k in N){ const n = N[k]; n.id = k; if (n.ground) n.h = height(n.x, n.y) + 0.05; }
   // decks: node to node through control points [x, y, h] (h is a target; clearance over the terrain is added below)
@@ -4328,27 +4356,41 @@ const SKY = (() => {
   const z1ramp = []; for (let a = 262; a >= 140; a -= 8){ const [x, y] = rpt(a, t => ringIn(t) - 6); z1ramp.push([x, y, 2 + (262 - a)/122*46]); }
   const ringPts = (a0, a1) => { const out = []; const st = a1 > a0 ? 15 : -15; for (let a = a0 + st; st > 0 ? a < a1 : a > a1; a += st){ const [x, y] = ring(a); out.push([x, y, 26]); } return out; };
   const decks = [
-    { name: 'Spine north', a: 'z1', b: 'J1', pts: [...z1ramp, [...rpt(130, t => ringCrest(t)), 50], [...rpt(125, t => ringOut(t) + 14), 44], [-118, 140, 34], [-120, 220, 31]] },
+    { name: 'Spine north', a: 'z1', b: 'J1', pts: [...z1ramp, [...rpt(130, t => ringCrest(t)), 50], [...rpt(125, t => ringOut(t) + 14), 44], [-118, 140, 34], [-120, 200, 31]] },
     // over the divide, then a long descent east along its south flank into zone 4
-    { name: 'Spine south', a: 'J1', b: 'z4', pts: [[-116, 380, 38], [-110, 432, 49], [-105, 468, 54], [-88, 500, 50], [-45, 514, 44], [15, 519, 35], [75, 521, 26], [135, 516, 18], [190, 511, 10], [235, 510, 4]] },
-    { name: 'Connector', a: 'J1', b: 'J2', pts: [[-112, 318, 30], [-90, 332, 29], [-30, 338, 28], [30, 334, 27]] },
+    { name: 'Spine south', a: 'J1', b: 'z4', pts: [[-117, 320, 36], [-114, 390, 45], [-108, 440, 51], [-105, 468, 54], [-88, 500, 50], [-45, 514, 44], [15, 519, 35], [75, 521, 26], [135, 516, 18], [190, 511, 10], [235, 510, 4]] },
+    { name: 'Connector', a: 'J1', b: 'J2', pts: [[-112, 268, 30], [-90, 290, 29], [-30, 314, 28], [30, 326, 27]] },
     { name: 'Lake Ring north', a: 'J2', b: 'J3', pts: ringPts(160, 320) },
     { name: 'Lake Ring east', a: 'J3', b: 'J4', pts: ringPts(320, 400) },
     { name: 'Lake Ring south', a: 'J4', b: 'J2', pts: ringPts(40, 160) },
     // the East Arc: over the river, then down along the foot of the east edge's mountains into zone 2
     { name: 'East Arc', a: 'J3', b: 'z2', pts: [[300, 215, 28], [350, 190, 30], [405, 150, 29], [430, 95, 22], [434, 35, 13], [433, -15, 5]] },
-    { name: 'Zone 3 ramp', a: 'J4', b: 'z3', pts: [[300, 385, 22], [345, 402, 15], [390, 414, 8]] },
+    { name: 'Zone 3 ramp', a: 'J4', b: 'z3', pts: [[300, 385, 21], [340, 398, 14], [380, 410, 7], [410, 422, 2]] },
+    // the hidden way: out between the giant's legs toward its head, round and up along the south mountains' flank,
+    // over the ridge, and down onto the plateau
+    { name: 'Hidden way', a: 'g5', b: 'z5', hidden: true, pts: [[134, 616, 1], [124, 640, 4], [140, 680, 10], [200, 722, 22], [270, 738, 33], [330, 748, 44], [372, 766, 55], [386, 796, 64],
+      [362, 818, 52], [322, 830, 40], [278, 840, 28], [232, 847, 18], [188, 851, 9]] },
   ];
   // sample each deck: a centripetal-ish Catmull-Rom through its control points, every ~2 m
   // the ground under a deck and a little way either side, so a deck crossing a ridge rides over it rather than through a cut
   const terr = (x, y, tx, ty, wide) => { let m = height(x, y); for (const o of wide ? [3, 6, 9] : [3]) m = Math.max(m, height(x - ty*o, y + tx*o) - (o > 3 ? (o - 3)*0.5 : 0), height(x + ty*o, y - tx*o) - (o > 3 ? (o - 3)*0.5 : 0)); return m; };
   for (const d of decks){
     const A = N[d.a], B = N[d.b], P0 = [[A.x, A.y, A.h], ...d.pts, [B.x, B.y, B.h]];
-    const curve = new THREE.CatmullRomCurve3(P0.map(p => new THREE.Vector3(p[0], p[2], p[1])), false, 'centripetal');
+    // the route is laid out flat (so the samples are evenly spaced along the ground) and the heights blended in along it
+    const curve = new THREE.CatmullRomCurve3(P0.map(p => new THREE.Vector3(p[0], 0, p[1])), false, 'centripetal');
     const L0 = curve.getLength(), n = Math.max(8, Math.ceil(L0 / 2)) + 1, pts = curve.getSpacedPoints(n - 1);
-    const X = new Float32Array(n), Y = new Float32Array(n), H = new Float32Array(n), T = new Float32Array(n);
-    pts.forEach((v, i) => { X[i] = v.x; Y[i] = v.z; H[i] = v.y; });
+    const X = new Float32Array(n), Y = new Float32Array(n), H = new Float32Array(n);
+    pts.forEach((v, i) => { X[i] = v.x; Y[i] = v.z; });
     const cum = new Float32Array(n); for (let i = 1; i < n; i++) cum[i] = cum[i-1] + Math.hypot(X[i] - X[i-1], Y[i] - Y[i-1]);
+    {
+      // each control point's place along the route, then heights in between by smooth interpolation
+      const cs = P0.map(p => { let bi = 0, bd = Infinity; for (let i = 0; i < n; i++){ const d = Math.hypot(X[i] - p[0], Y[i] - p[1]); if (d < bd){ bd = d; bi = i; } } return cum[bi]; });
+      for (let i = 0; i < n; i++){
+        let k = 0; while (k < cs.length - 2 && cs[k+1] < cum[i]) k++;
+        const u = Math.max(0, Math.min(1, (cum[i] - cs[k]) / Math.max(1e-6, cs[k+1] - cs[k]))), e = u*u*(3 - 2*u);
+        H[i] = P0[k][2] + (P0[k+1][2] - P0[k][2])*e;
+      }
+    }
     // keep clear of the ground (ramps meet it flush at their feet), smoothing the profile; the ends stay pinned
     const req = new Float32Array(n);
     for (let i = 0; i < n; i++){
@@ -4356,11 +4398,20 @@ const SKY = (() => {
       const gEnd = Math.min(A.ground ? cum[i] : 1e9, B.ground ? cum[n-1] - cum[i] : 1e9);
       req[i] = terr(X[i], Y[i], tx/l, ty/l, gEnd > 90) + (gEnd < 4 ? 0.05 : gEnd < 30 ? 0.05 + (gEnd - 4)/26*3.4 : 3.5);
     }
-    for (let it = 0; it < 6; it++){
-      for (let i = 3; i < n - 3; i++) H[i] = Math.max(H[i], req[i]);
-      const Hs = H.slice(); for (let i = 3; i < n - 3; i++){ let a = 0, c = 0; for (let k = -6; k <= 6; k++){ const j = Math.min(n - 1, Math.max(0, i + k)); a += Hs[j]; c++; } H[i] = a/c; }
+    // raise to clear the ground, then smooth, over and over: the profile settles into a smooth curve resting on the
+    // ground's high points instead of kinking up over each one
+    // each peak widened a little (the highest ground within 16 m along), so the smoothing rests over it, not into it
+    const reqD = req.map((_, i) => { let m = -Infinity; for (let k = -8; k <= 8; k++){ const j = i + k; if (j >= 0 && j < n) m = Math.max(m, req[j]); } return m; });
+    for (let it = 0; it < 24; it++){
+      for (let i = 3; i < n - 3; i++) H[i] = Math.max(H[i], (it < 20 ? reqD[i] + 0.6 : req[i]));
+      const Hs = H.slice(), W = it < 16 ? 10 : 5; for (let i = 3; i < n - 3; i++){ let a = 0, c = 0; for (let k = -W; k <= W; k++){ const j = Math.min(n - 1, Math.max(0, i + k)); a += Hs[j]; c++; } H[i] = a/c; }
     }
     for (let i = 3; i < n - 3; i++) H[i] = Math.max(H[i], req[i]);
+    // level at the junctions: the last 14 m into a junction is flat at its height, easing in over the 20 m before
+    for (let i = 0; i < n; i++) for (const [nd, dist] of [[A, cum[i]], [B, cum[n-1] - cum[i]]]){
+      if (nd.ground || dist >= 34) continue;
+      const k = dist < 14 ? 0 : (dist - 14)/20, e = k*k*(3 - 2*k); H[i] = Math.max(req[i], nd.h + (H[i] - nd.h)*e);
+    }
     H[0] = A.h; H[n-1] = B.h;
     for (let i = 1; i < 3; i++){ H[i] = H[0] + (H[3] - H[0])*i/3; H[n-1-i] = H[n-1] + (H[n-4] - H[n-1])*i/3; }   // ease into the pinned ends
     Object.assign(d, { A, B, n, X, Y, H, cum, len: cum[n-1], w: SKY_W, op: 0 });
@@ -4401,7 +4452,7 @@ function skyStep(){
   if (!SKY_ON){
     if (!skyActive()) return;
     for (const d of SKY.decks) for (const end of [d.A, d.B]){
-      if (!end.ground) continue;
+      if (!end.ground || (d.hidden && !giant.up)) continue;
       const pr = deckProj(d, S.x, S.y, end === d.A ? 0 : d.n - 2), sIn = end === d.A ? pr.s : d.len - pr.s;
       if (sIn > -0.5 && sIn < 5 && Math.abs(pr.lat) < d.w/2 - 0.3){ SKY_ON = { d, i: pr.i }; skyEnterAt = performance.now(); return; }
     }
@@ -4435,6 +4486,20 @@ function skyStep(){
   }
 }
 let skyEnterAt = 0;
+// trees a bridge would pass through are taken out (a bridge only shows while you ride it, but you'd ski into them)
+{
+  const cell = 8, grid = new Map(), key = (a, b) => a + ',' + b;
+  for (const d of SKY.decks) for (let i = 0; i < d.n; i += 2){ const k = key(Math.floor(d.X[i]/cell), Math.floor(d.Y[i]/cell)); if (!grid.has(k)) grid.set(k, []); grid.get(k).push([d, i]); }
+  const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  trees.forEach((t, ti) => {
+    const cx = Math.floor(t.x/cell), cy = Math.floor(t.y/cell); let hit = false;
+    for (let a = -2; a <= 2 && !hit; a++) for (let b = -2; b <= 2 && !hit; b++){
+      const L = grid.get(key(cx + a, cy + b)); if (!L) continue;
+      for (const [d, i] of L) if (Math.hypot(d.X[i] - t.x, d.Y[i] - t.y) < d.w/2 + 1.6*t.s + 0.6 && d.H[i] - 1.2 < height(t.x, t.y) + 5.9*t.s){ hit = true; break; }
+    }
+    if (hit){ t.cut = true; for (const m of treeMeshes){ m.setMatrixAt(ti, zero); m.instanceMatrix.needsUpdate = true; } }
+  });
+}
 // ---- the bridges' look: a pale glowing deck with a dark edge, railings of light with pulses running along them, and
 // a few slender white pylons where the deck is high over open ground (where it runs close over a mountain, the
 // mountain carries it). each deck fades in and out with its own materials
@@ -4493,19 +4558,20 @@ for (const d of SKY.decks){
 const skyPortals = SKY.nodes.filter(n => n.ground).map(n => {
   const d = n.decks[0], i = d.A === n ? 3 : d.n - 4, tx = d.X[i] - n.x, ty = d.Y[i] - n.y, l = Math.hypot(tx, ty) || 1;
   const g = new THREE.Group(); g.position.set(n.x, n.h - 0.05, n.y); g.rotation.y = Math.atan2(tx/l, ty/l); scene.add(g);
-  const post = new THREE.MeshLambertMaterial({ color: 0xe3e8ec }), lite = new THREE.MeshBasicMaterial({ color: 0x4a4458 });
+  // before the network is lit they're just two plain white poles; lit, a cap of light tops each and an arch spans them
+  const post = new THREE.MeshLambertMaterial({ color: 0xe3e8ec }), lite = new THREE.MeshBasicMaterial({ color: 0xc9b8ee }), lit = [];
   for (const sx of [-1, 1]){ const p = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 6.5, 8), post); p.position.set(sx*(SKY_W/2 + 0.6), 3.25, 0); g.add(p);
-    const c = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), lite); c.position.set(sx*(SKY_W/2 + 0.6), 6.7, 0); g.add(c); }
-  const arch = new THREE.Mesh(new THREE.TorusGeometry(SKY_W/2 + 0.6, 0.12, 6, 24, Math.PI), lite); arch.position.set(0, 6.5, 0); g.add(arch);
+    const c = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), lite); c.position.set(sx*(SKY_W/2 + 0.6), 6.7, 0); g.add(c); lit.push(c); }
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(SKY_W/2 + 0.6, 0.12, 6, 24, Math.PI), lite); arch.position.set(0, 6.5, 0); g.add(arch); lit.push(arch);
   const pad = new THREE.Mesh(new THREE.CircleGeometry(SKY_W/2 + 1, 24), new THREE.MeshBasicMaterial({ color: 0xa993d6, transparent: true, opacity: 0, depthWrite: false }));
   pad.rotation.x = -Math.PI/2; pad.position.y = 0.06; g.add(pad);
   SOLIDS.push({ x: n.x - Math.cos(g.rotation.y)*(SKY_W/2 + 0.6), y: n.y + Math.sin(g.rotation.y)*(SKY_W/2 + 0.6), r: 0.4 });
   SOLIDS.push({ x: n.x + Math.cos(g.rotation.y)*(SKY_W/2 + 0.6), y: n.y - Math.sin(g.rotation.y)*(SKY_W/2 + 0.6), r: 0.4 });
-  return { n, g, lite, pad };
+  return { n, g, lite, pad, lit };
 });
 function updateSky(dt){
   const act = skyActive(), now = performance.now()/1000;
-  for (const p of skyPortals){ p.lite.color.setHex(act ? 0xc9b8ee : 0x4a4458); p.pad.material.opacity = act ? 0.25 + 0.1*Math.sin(now*2) : 0; }
+  for (const p of skyPortals){ const on = act && (!p.n.hidden || giant.up); for (const m of p.lit) m.visible = on; p.pad.material.opacity = on ? 0.25 + 0.1*Math.sin(now*2) : 0; }
   // which decks show: the one you're on, and near its end the ones you can carry on to (or have just come from)
   const o = SKY_ON, show = new Set();
   if (o){
@@ -4520,6 +4586,137 @@ function updateSky(dt){
     for (const [m, k] of d.look.mats) m.opacity = d.op * k;
     d.look.railMat.map.offset.x = -now*1.2;
   }
+}
+// ---- zone 5: the observatory. a stepped bone platform at the cliff's edge, a ring of columns capped with glowing
+// crystal, a domed hall with a lit slit, and a great ribbed telescope of bone pointing out over the cliff into space,
+// a crystal lens at its mouth. purple crystal grows everywhere on the plateau, and the natives here, in bright robes,
+// play music: drums, long horns, harps and crystal chimes. no people from the outpost have ever come this far
+const Z5_TEMPLE = { x: 252, y: 876 };
+const zone5 = (() => {
+  const T = Z5_TEMPLE, h0 = height(T.x, T.y);
+  const g = new THREE.Group(); g.position.set(T.x, h0 - 0.6, T.y); scene.add(g);
+  const gem = CRYSTAL_MAT.gem, gem2 = CRYSTAL_MAT.gem2;
+  pt(g, cy(16, 17, 1.2, 28), SM.bone2, 0, 0.6, 0); pt(g, cy(12.5, 13.5, 1.2, 28), SM.bone, 0, 1.8, 0); pt(g, cy(9.5, 10.5, 1.2, 28), SM.bone2, 0, 3.0, 0);
+  for (let k = 0; k < 10; k++){
+    const a = k/10*Math.PI*2 + 0.3, x = Math.cos(a)*14.4, z = Math.sin(a)*14.4, hgt = 8 + (k % 3)*1.5;
+    pt(g, cy(0.55, 0.85, hgt, 9), SM.bone, x, 1.2 + hgt/2, z);
+    pt(g, new THREE.TorusGeometry(0.9, 0.16, 6, 14), SM.bone2, x, 1.2 + hgt*0.35, z, Math.PI/2);
+    const c = pt(g, new THREE.OctahedronGeometry(0.75, 0), k % 2 ? gem : gem2, x, 1.2 + hgt + 0.9, z); c.scale.set(1, 1.7, 1);
+  }
+  pt(g, cy(7.6, 8, 3.2, 28), SM.bone, 0, 5.2, 0);
+  pt(g, dome(7.6, 28, 12), SM.bone2, 0, 6.8, 0);
+  pt(g, bx(0.7, 6.5, 0.4), SM.glow, 0, 9.6, 7.35, -0.45);                    // the dome's lit slit, facing the cliff
+  // the telescope: out of the dome toward the south, tilted up at the sky
+  const tel = new THREE.Group(); tel.position.set(0, 11.5, 2); tel.rotation.x = 0.62; g.add(tel);   // +z is south (over the cliff)
+  const tubeM = pt(tel, cy(2.6, 1.6, 18, 18), SM.bone, 0, 0, 0, Math.PI/2); tubeM.position.z = 8;
+  for (let k = 0; k < 5; k++) pt(tel, new THREE.TorusGeometry(2.05 + (4 - k)*0.2, 0.28, 8, 20), SM.bone2, 0, 0, 1 + k*3.6);
+  const lens = pt(tel, new THREE.OctahedronGeometry(2.4, 0), gem2, 0, 0, 17.6); lens.scale.set(1, 1, 0.45);
+  pt(tel, new THREE.SphereGeometry(1.3, 14, 10), SM.glow, 0, 0, 17.9);
+  pt(g, cy(1.4, 2, 6, 10), SM.bone2, 0, 8, 6.5, 0.6);                        // the mount under the tube
+  // the gateway on the plateau side
+  for (const sx of [-1, 1]) pt(g, cy(0.7, 1, 9, 9), SM.bone, sx*4.5, 4.5, -17);
+  tube(g, [[-4.5, 9, -17], [-2.5, 12, -17.3], [0, 13, -17.4], [2.5, 12, -17.3], [4.5, 9, -17]], 0.55, SM.bone2, 20, 7);
+  pt(g, new THREE.OctahedronGeometry(0.9, 0), gem, 0, 13.4, -17.4).scale.set(1, 1.6, 1);
+  const model = { model: g };
+  SOLIDS.push({ x: T.x, y: T.y, r: 0, foot: buildFootprint(model) });
+  return { g, tel };
+})();
+// crystals everywhere: clusters across the plateau and along the cliff's lip, merged into a handful of meshes
+{
+  let seed = 5151; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const mats = [0x6c5a8e, 0x9a86bf, 0x4a3d66].map(c => { const m = lam(c); m.flatShading = true; return m; });
+  const src = new THREE.Group(), placed = [];
+  for (let k = 0; k < 900 && placed.length < 110; k++){
+    const x = Z5.x0 + 16 + rnd()*(Z5.x1 - Z5.x0 - 32), y = Z5.y0 + 8 + rnd()*(Z5.cliff - Z5.y0 - 6);
+    const size = 0.5 + rnd()*rnd()*2.4;
+    if (Math.hypot(x - Z5_TEMPLE.x, y - Z5_TEMPLE.y) < 19 + size || Math.hypot(x - 150, y - 853) < 9) continue;
+    if (placed.some(p => Math.hypot(p.x - x, p.y - y) < 4 + (p.size + size)*1.2)) continue;
+    placed.push({ x, y, size });
+    const c = new THREE.Group(); c.position.set(x, height(x, y) - 0.2, y); c.rotation.y = rnd()*6.3; src.add(c);
+    const n = 3 + (rnd()*5 | 0), glow = rnd() < 0.18;
+    for (let i = 0; i < n; i++){
+      const hgt = (i ? 0.5 + rnd()*1.1 : 1.5) * size, w = (0.22 + rnd()*0.2)*size, a = rnd()*Math.PI*2, d = i ? (0.25 + rnd()*0.7)*size : 0;
+      const m = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), glow && i === 0 ? CRYSTAL_MAT.gem : mats[i % 3]);
+      m.scale.set(w, hgt, w); m.position.set(Math.cos(a)*d, hgt*0.55, Math.sin(a)*d); m.rotation.set((rnd() - 0.5)*0.8, rnd()*3, (rnd() - 0.5)*0.8); c.add(m);
+    }
+  }
+  scene.add(mergeModel(src));
+}
+// the musicians: natives of the observatory in bright robes, playing together in small groups round the platform and
+// out at the cliff's edge, swaying to a shared beat
+const MUSICIANS = (() => {
+  let seed = 777; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const robes = [[0xd9468f, 0x9e2f66], [0x2bb3a3, 0x1d7d72], [0xf0a83a, 0xb87a22], [0x8a5ce6, 0x5f3ea8], [0xe0533d, 0xa3392a], [0x3f8fe0, 0x2a63a0]].map(([a, b]) => [lam(a), lam(b)]);
+  const sash = lam(0xf2d36b), brass = lam(0xd4a64a), hide = lam(0xe9dcc0), wood = lam(0x7a5236);
+  for (const r of robes) for (const m of r) m.flatShading = true;
+  const T = Z5_TEMPLE, spots = [
+    [T.x - 21, T.y - 8, 'drum'], [T.x - 23, T.y - 4, 'horn'], [T.x - 19, T.y - 2, 'harp'],
+    [T.x + 21, T.y - 9, 'chimes'], [T.x + 23, T.y - 4, 'drum'], [T.x + 19, T.y - 1, 'horn'],
+    [T.x - 6, T.y - 22, 'harp'], [T.x + 6, T.y - 22, 'chimes'],
+    [T.x - 45, Z5.cliff - 7, 'horn'], [T.x - 40, Z5.cliff - 6, 'drum'], [T.x + 42, Z5.cliff - 7, 'harp'],
+  ];
+  return spots.map(([x, y, kind], i) => {
+    const rig = buildAlien(rnd), [ra, rb] = robes[i % robes.length];
+    rig.root.traverse(o => { if (!o.isMesh) return; if (o.material === NPC_MAT.robe) o.material = ra; else if (o.material === NPC_MAT.robe2) o.material = rb; else if (o.material === NPC_MAT.sash) o.material = sash; });
+    const face = Math.atan2(T.x - x, -(T.y - y)) + (y > Z5.cliff - 10 ? Math.PI : 0) + (rnd() - 0.5)*0.6;   // toward the temple, or out to space at the cliff
+    rig.root.position.set(x, height(x, y), y); rig.root.rotation.y = -face;
+    const b = rig.body, inst = new THREE.Group(); b.add(inst);
+    if (kind === 'drum'){ pt(inst, cy(0.24, 0.2, 0.42, 14), wood, 0, 0.62, -0.32); pt(inst, cy(0.245, 0.245, 0.02, 14), hide, 0, 0.84, -0.32); }
+    if (kind === 'horn'){ const hg = new THREE.Group(); hg.position.set(0, 1.12, -0.18); hg.rotation.x = -1.15; b.add(hg); pt(hg, new THREE.ConeGeometry(0.16, 1.6, 12, 1, true), brass, 0, 0.85, 0).material.side = THREE.DoubleSide; pt(hg, cy(0.03, 0.03, 0.3, 6), brass, 0, 0.0, 0); }
+    if (kind === 'harp'){ pt(inst, new THREE.TorusGeometry(0.32, 0.03, 6, 18, Math.PI*1.2), wood, 0, 0.95, -0.3, 0, 0, 0.4); for (let k = 0; k < 5; k++) pt(inst, cy(0.006, 0.006, 0.45 - k*0.05, 4), hide, -0.15 + k*0.07, 0.95, -0.3); }
+    if (kind === 'chimes'){ pt(inst, cy(0.02, 0.02, 1.5, 6), wood, 0.25, 1.0, -0.25); for (let k = 0; k < 4; k++){ const c = pt(inst, new THREE.OctahedronGeometry(0.07, 0), CRYSTAL_MAT.gem2, 0.25 + (k - 1.5)*0.09, 1.55, -0.32); c.scale.set(1, 2.2, 1); } pt(inst, cy(0.01, 0.01, 0.3, 4), wood, 0.25, 1.72, -0.32, 0, 0, Math.PI/2); }
+    return { rig, kind, ph: rnd()*6, x, y };
+  });
+})();
+function updateZone5(dt){
+  const near = S.y > WORLD.y1 - 120;
+  for (const m of MUSICIANS) m.rig.root.visible = near;
+  if (!near) return;
+  const now = performance.now()/1000, beat = now * 96/60 * Math.PI;      // a slow shared beat
+  for (const m of MUSICIANS){
+    const r = m.rig, sway = Math.sin(beat*0.5 + m.ph*0.2);
+    r.body.rotation.z = 0.05*sway; r.body.position.y = 0.015*Math.abs(Math.sin(beat));
+    r.head.rotation.y = 0.15*Math.sin(beat*0.25 + m.ph); r.head.rotation.x = 0.06*Math.sin(beat);
+    const [aL, aR] = r.arms;
+    if (m.kind === 'drum'){ aL.rotation.x = -0.6 + 0.35*Math.max(0, Math.sin(beat)); aR.rotation.x = -0.6 + 0.35*Math.max(0, Math.sin(beat + Math.PI)); }
+    else if (m.kind === 'horn'){ aL.rotation.x = -1.1; aR.rotation.x = -1.2 + 0.05*Math.sin(beat*2); r.head.rotation.x = -0.15 + 0.05*Math.sin(beat*0.5); }
+    else if (m.kind === 'harp'){ aL.rotation.x = -0.9; aR.rotation.x = -0.8 + 0.18*Math.sin(beat*2 + m.ph); aR.rotation.z = -0.2 + 0.1*Math.sin(beat*2); }
+    else { aR.rotation.x = -1.3 + 0.25*Math.max(0, Math.sin(beat*0.5)); aL.rotation.x = -0.4; }
+    if (r.train) r.train.rotation.y = 0.05*sway;
+  }
+}
+// ---- zone 5's sky: out on the plateau the fog lifts and the sky opens onto space: a deep blue-black field of stars,
+// a ringed violet planet low over the cliff and two small moons. it eases in as you come down onto the plateau
+const space = (() => {
+  const g = new THREE.Group(); g.visible = false; scene.add(g);
+  const N = 1800, pos = new Float32Array(N*3); let sd = 4242; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < N; i++){ const u = rnd()*2 - 1, a = rnd()*Math.PI*2, r = Math.sqrt(1 - u*u); pos.set([Math.cos(a)*r*470, Math.abs(u)*470*0.98 - 30, Math.sin(a)*r*470], i*3); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const stars = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xf2f0ff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false })); g.add(stars);
+  const planetTex = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 256; const x = c.getContext('2d');
+    const gr = x.createLinearGradient(0, 0, 0, 256); [['#2b2350', 0], ['#5a4a8e', 0.2], ['#8e7cb0', 0.35], ['#c3b5dc', 0.48], ['#6c5a8e', 0.6], ['#a993d6', 0.75], ['#3f3550', 1]].forEach(([c0, k]) => gr.addColorStop(k, c0));
+    x.fillStyle = gr; x.fillRect(0, 0, 64, 256); return new THREE.CanvasTexture(c); })();
+  const pm = new THREE.MeshBasicMaterial({ map: planetTex, transparent: true, opacity: 0, fog: false, depthWrite: false });
+  const planet = new THREE.Mesh(new THREE.SphereGeometry(70, 40, 24), pm); planet.position.set(60, 95, 400); planet.rotation.z = 0.35; g.add(planet);
+  const rm = new THREE.MeshBasicMaterial({ color: 0xd8cff0, transparent: true, opacity: 0, side: THREE.DoubleSide, fog: false, depthWrite: false });
+  const ringM = new THREE.Mesh(new THREE.RingGeometry(92, 128, 64), rm); ringM.position.copy(planet.position); ringM.rotation.set(1.25, 0.15, 0.35); g.add(ringM);
+  const moonM = new THREE.MeshBasicMaterial({ color: 0xe7e3f2, transparent: true, opacity: 0, fog: false, depthWrite: false });
+  for (const [x, y, z, r] of [[-170, 150, 360, 9], [220, 60, 330, 5]]){ const m = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), moonM); m.position.set(x, y, z); g.add(m); }
+  for (const o of g.children) o.renderOrder = -1;
+  return { g, mats: [[stars.material, 1], [pm, 1], [rm, 0.55], [moonM, 1]], k: 0, deep: new THREE.Color(0x05060f), tmp: new THREE.Color() };
+})();
+function updateSpace(dt){
+  const want = S.y > WORLD.y1 + 18 ? 1 : 0;
+  space.k += (want - space.k) * Math.min(1, dt*1.2);
+  if (space.k < 0.002 && !want){ if (space.g.visible){ space.g.visible = false; scene.fog.near = 55; scene.fog.far = 270; applySkyColour(1); } return; }
+  const k = space.k; space.g.visible = true; space.g.position.copy(camera.position);
+  for (const [m, o] of space.mats) m.opacity = k*o;
+  scene.fog.near = 55 + k*2000; scene.fog.far = 270 + k*4000;
+  applySkyColour(1 - k);
+}
+function applySkyColour(w){
+  // the theme's sky, blended toward deep space by (1 - w)
+  space.tmp.set(C.sky).lerp(space.deep, 1 - w); renderer.setClearColor(space.tmp); scene.fog.color.copy(space.tmp);
 }
 // ---- progress: which orbs and crystals you've collected is kept in this browser, so the gates and the bridge stay open
 const PROGRESS_KEY = 'skate-progress';
@@ -5225,7 +5422,7 @@ const mapBox = zone => {
   for (const t of TRAILS) if (t.zone === zone || (zone === 3 && (t.name === 'Switchbacks' || t.name === 'Crystal Gate')) || (zone === 4 && t.name === 'Crystal Gate')) for (let i = 0; i < t.s.length; i += 2){ x0 = Math.min(x0, t.s[i]); x1 = Math.max(x1, t.s[i]); y0 = Math.min(y0, t.s[i+1]); y1 = Math.max(y1, t.s[i+1]); }
   return { x0: x0 - 30, x1: x1 + 30, y0: y0 - 30, y1: y1 + 30 };
 };
-const MAP_BOX = { 1: mapBox(1), 2: mapBox(2), 3: mapBox(3), 4: mapBox(4) };
+const MAP_BOX = { 1: mapBox(1), 2: mapBox(2), 3: mapBox(3), 4: mapBox(4), 5: { x0: Z5.x0, x1: Z5.x1, y0: WORLD.y1 - 20, y1: Z5.cliff + 15 } };
 // the map's contents (terrain features, trails, buildings, orbs, crystals, gates), drawn into any 2D context at any
 // scale: the corner minimap uses it, and so does the full-screen map on phones. people and animals aren't shown.
 function renderMapLayers(g, MAP, mx, my, mw, mh, sc){
@@ -5273,9 +5470,9 @@ function renderMapLayers(g, MAP, mx, my, mw, mh, sc){
   // the energy bridges, once they're lit: thin purple lines, and a ring at each on-ramp portal
   if (typeof skyActive === 'function' && skyActive()){
     g.save(); g.strokeStyle = '#a993d6'; g.globalAlpha = 0.85; g.lineWidth = 1.6; g.setLineDash([5, 3]);
-    for (const d of SKY.decks){ g.beginPath(); for (let i = 0; i < d.n; i += 3) i ? g.lineTo(mX(d.X[i]), mY(d.Y[i])) : g.moveTo(mX(d.X[i]), mY(d.Y[i])); g.lineTo(mX(d.X[d.n-1]), mY(d.Y[d.n-1])); g.stroke(); }
+    for (const d of SKY.decks){ if (d.hidden) continue; g.beginPath(); for (let i = 0; i < d.n; i += 3) i ? g.lineTo(mX(d.X[i]), mY(d.Y[i])) : g.moveTo(mX(d.X[i]), mY(d.Y[i])); g.lineTo(mX(d.X[d.n-1]), mY(d.Y[d.n-1])); g.stroke(); }
     g.setLineDash([]); g.lineWidth = 2; g.globalAlpha = 1;
-    for (const n of SKY.nodes) if (n.ground){ g.beginPath(); g.arc(mX(n.x), mY(n.y), 4, 0, Math.PI*2); g.stroke(); }
+    for (const n of SKY.nodes) if (n.ground && !n.hidden){ g.beginPath(); g.arc(mX(n.x), mY(n.y), 4, 0, Math.PI*2); g.stroke(); }
     g.restore();
   }
   if (zoneDone(3) && altar.state < 2){ const X = mX(altar.x), Y = mY(altar.y); g.fillStyle = '#8e7cb0'; g.beginPath(); g.moveTo(X, Y - 6); g.lineTo(X + 5, Y); g.lineTo(X, Y + 6); g.lineTo(X - 5, Y); g.fill(); }
@@ -5422,12 +5619,12 @@ function hud(){
     let n = 0, tot = 0, label = '';
     if (K){ n = kioskGot(K); tot = ORBS_PER_KIOSK; label = trial.K === K ? fmtTime(trial.t) : n === tot ? 'Back to the terminal' : 'Orbs'; }
     else if (cry){ n = crystalsGot(); tot = CRYSTAL_TOTAL; label = n === tot ? 'Back to the altar' : 'Crystals'; }
-    else if (z !== 4){ n = kiosksPowered(z); tot = KIOSK_COUNT[z]; label = n === tot ? (z === 1 ? (gateOpen ? 'Gate open' : 'Ski to the gate') : z === 2 ? (bridgeWanted ? 'Bridge down' : 'Ski to the bridge') : !gate2Open ? 'Ski to the south gate' : altar.state === 2 ? 'Crystal gate open' : 'South gate open') : 'Terminals'; }
-    const txt = tot ? n + ' / ' + tot : 'Zone 4';
+    else if (z !== 4 && z !== 5){ n = kiosksPowered(z); tot = KIOSK_COUNT[z]; label = n === tot ? (z === 1 ? (gateOpen ? 'Gate open' : 'Ski to the gate') : z === 2 ? (bridgeWanted ? 'Bridge down' : 'Ski to the bridge') : !gate2Open ? 'Ski to the south gate' : altar.state === 2 ? 'Crystal gate open' : 'South gate open') : 'Terminals'; }
+    const txt = tot ? n + ' / ' + tot : 'Zone ' + z;
     $('orbHud').dataset.kind = cry ? 'crystal' : '';
     const el = $('orbN'); if (el.textContent !== txt){ if (tot && n > 0) { const h = $('orbHud'); h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); } el.textContent = txt; }
     $('orbHud').dataset.done = tot && n === tot ? '1' : '';
-    $('orbZone').textContent = tot ? label : 'Beyond the divide';
+    $('orbZone').textContent = tot ? label : z === 5 ? 'The observatory' : 'Beyond the divide';
   }
   $('mToggle').dataset.mode = inClassic() ? 'classic' : 'skate';
   if (devView){ const el = $('tCry'), n = crystalsGot(); if (document.activeElement !== el && +el.value !== n) el.value = n; $('oCry').textContent = n + ' / ' + CRYSTAL_TOTAL; }
@@ -5522,7 +5719,7 @@ function loop(t){
   const dt = Math.min(0.1, (t-last)/1000); last = t; pollPad();
   // a prompt interrupts the game: the skier holds still (keeping their speed) until it's answered
   if (!promptCtx){ const n = Math.max(1, Math.ceil(dt * 60 - 1e-6)); for (let k = 0; k < n; k++) step(dt/n); }
-  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updatePet(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract(); updateSky(dt);
+  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updatePet(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract(); updateSky(dt); updateSpace(dt); updateZone5(dt);
   if (trial.K && !promptCtx) trial.t += dt;
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through
@@ -5536,7 +5733,7 @@ function loop(t){
 }
 loadProgress();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, setSkyOn(d, i){ SKY_ON = { d, i }; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

@@ -191,8 +191,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
   .mapbtn svg{width:22px;height:22px}
 }
 </style>
-</head>
-<body>
+
 <canvas id="gl"></canvas>
 <canvas id="c"></canvas>
 
@@ -215,7 +214,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 <div id="padPanel" class="padpanel" hidden>
   <header><h2>Controller</h2><span id="padScheme"></span></header>
   <div class="padcols" id="padCols"></div>
-  <div class="padkeys">Keyboard: <span class="chip">←</span> <span class="chip">→</span> kick · <span class="chip">Space</span> double pole · <span class="chip">↓</span> snow plow · <span class="chip">↑</span> tuck · <span class="chip">Q</span> <span class="chip">E</span> or mouse steer (click the view; Esc releases) · <span class="chip">C</span> switch skate / classic · <span class="chip">`</span> dev mode</div>
+  <div class="padkeys">Keyboard: <span class="chip">←</span> <span class="chip">→</span> kick · <span class="chip">Space</span> double pole · <span class="chip">↓</span> snow plow · <span class="chip">↑</span> tuck · <span class="chip">Q</span> <span class="chip">E</span> steer · <span class="chip">C</span> switch skate / classic · <span class="chip">`</span> dev mode</div>
 </div>
 <div class="stats-left play-only" id="playLeft"><div class="stat"><span>Distance</span><b id="pDist">0 m</b></div></div>
 <div class="stats-right play-only">
@@ -6050,7 +6049,6 @@ function drawPlayKeys(){
   ctx.beginPath(); ctx.arc(cx + lv * bw/2, by, 5, 0, Math.PI*2); ctx.fill();
   ctx.globalAlpha = 1;
   ctx.font = '600 9.5px "IBM Plex Mono", ui-monospace, monospace'; ctx.fillStyle = C.muted;
-  if (cl) ctx.fillText(document.pointerLockElement === glc ? 'MOUSE STEERS · ESC RELEASES' : 'CLICK VIEW TO STEER WITH MOUSE', cx, by + 13);
   ctx.restore();
 }
 
@@ -6371,18 +6369,8 @@ addEventListener('keydown', e => { lastDevice = 'keys'; keysDown.add(e.key.toLow
 addEventListener('keyup', e => { keysDown.delete(e.key.toLowerCase()); });
 addEventListener('blur', () => keysDown.clear());
 
-// ---- mouse lean: click the view to capture the mouse (Esc releases it); moving it left / right leans you that
-// way in classic and in a tuck, easing back to centre when the mouse is still
+// ---- mouse lean: switched off (the mouse no longer steers; Q / E and the sticks still lean you)
 let mouseLean = 0;
-glc.addEventListener('mousedown', e => {
-  if (e.button !== 0 || document.pointerLockElement === glc) return;
-  try { const r = glc.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) {}
-});
-addEventListener('mousemove', e => {
-  if (document.pointerLockElement !== glc) return;
-  mouseLean = Math.max(-1, Math.min(1, mouseLean + (e.movementX || 0) * 0.006));
-  lastDevice = 'keys'; anyInputAt = performance.now();
-});
 
 // ---- touch: one toggle button, its icon showing the current technique (\/ skate, || classic)
 const isTouchUI = matchMedia('(hover: none) and (pointer: coarse)').matches;

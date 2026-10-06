@@ -157,13 +157,25 @@ The underground is being built in its own copy of the game (`cave/index.html`), 
 - **Map:** the cave's floor plan and the station's decks show as a faint fill with their courses dashed; underground, the corner map switches to the cave.
 - **Testing:** **Cave: the mine**, **Cave: the hub**, **Cave: the station** and **Cave: the crown door** in dev view's Testing group. **Reward outfit (opens the crown door): on/off** is the outfit toggle, and **Reset crown crystals** puts the 30 crystals back. **Checkpoint: village loop** and **Checkpoint: station** set your checkpoint there (kept between visits, so the page starts you there) and put you there. The **Zone 3 terminals powered** slider (max) powers the generators and opens the portals.
 
-### Story plan (logged, not built yet)
+### End game (built in the cave sandbox)
 
-- **The ceremony:** bring 3 calves to the observatory. After the moose enter the circle, the alien attendants in white approach you and give you the purple reward outfit. A crystal altar rises (like the one in zone 3's circle) and asks for 30 crystals to complete the ceremony.
-- **The crown room:** the reward outfit opens the crown door in the village loop (built in the cave sandbox), and inside are 30 collectable crystals up the spiral.
-- **Two ways to spend the 30 crystals:**
-  - **The ship:** at the space station a ship is waiting to leave and needs 30 crystals before it can go. The old mine has been stripped bare and the new one is still being dug, so the crew are stranded without more. Loading it betrays the locals. Launching it is an ending with a choice: give the crystals and leave the planet, or return to the space station. Leaving on the ship restarts you in the standard orange outfit.
-  - **The observatory:** bring the 30 back and complete the ceremony at the altar. That triggers the cosmic moose (you no longer need every calf for them) and lights the Starway. Going into the planet on the Starway keeps the purple reward outfit.
-- **Hidden ending:** crowning all 15 calves still triggers the conga line.
-- The 30 is deliberately more than the crystal altar in zone 3 unlocks, because you're meant to go through the ceremony and the crown door first.
+- **The ceremony:** bring 3 calves to the observatory. Once the elders have taken their places in the ring and you're near it, the two attendants in white walk over, stand either side of you with their arms raised, and dress you in the court's purple (the reward outfit). An altar like zone 3's, but larger, then rises from the snow in the middle of the ring and asks for 30 purple crystals to complete the ceremony. The Starway stays dark until then.
+- **The crown room:** the purple outfit opens the crown door in the village loop, and the 30 crown crystals are up the spiral inside. You carry them until you spend them.
+- **Spending the 30, one of two ways:**
+  - **At the altar:** offer them to complete the ceremony. The altar sinks away, the cosmic moose appear out in space (you no longer need every calf for them) and the Starway lights.
+  - **On the ship:** the ship waits at the station's big east dock. Ski round its nose and the crew ask for the crystals: the old mine is stripped bare and the new one is still being dug, so they're stranded. Give them the crystals and leave the planet, and everything begins again in your own orange. Or stay on the station. Once you've given the crystals to the court, the crew are still stranded.
+- **Starting again:** through the black hole you keep the purple outfit. Leaving on the ship you go back to the standard orange.
+- **Hidden ending:** crowning all 15 calves still brings the conga lines (and the cosmic moose, if they aren't out already).
+- **Saving:** the outfit, the ceremony's stage and the crown crystals (collected and spent) are saved in your browser. The dev **Reset skier** puts the ceremony and the crystals back but leaves the outfit alone.
+- **Testing:** in dev view's Testing group, **Reward outfit** toggles the outfit, and **Ceremony** steps through not yet, altar waiting and complete.
+- **Tested:** the whole run, in order:
+  - the elders reach the ring, the attendants dress you and the altar rises;
+  - with no crystals the altar tells you what it needs;
+  - offering the 30 lights the Starway and brings out the cosmic moose;
+  - the ship then says your crystals went to the court;
+  - the black hole restart keeps the purple;
+  - in a fresh run, leaving on the ship with 30 restarts you in orange.
+
+### Story notes (not built yet)
+
 - In the village loop: abandoned villages inspired by the Mesa Verde cliff dwellings, set in alcoves up the ring's tall outer wall, with broken pottery and artifacts around, and evidence of strip mining (stepped benches cut into the walls, abandoned equipment).

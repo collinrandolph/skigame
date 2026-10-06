@@ -310,7 +310,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <div class="btns"><button id="copySet" type="button">Copy settings</button><button id="defSet" type="button">Restore defaults</button></div>
     <p class="note" id="setNote">Your slider changes are kept in this browser.</p>
     <h4>Testing</h4>
-    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button><button id="arrowBtn" type="button">Heading arrow: off</button><button id="cpAltar" type="button">Checkpoint: altar</button><button id="cpZ5" type="button">Checkpoint: zone 5</button><button id="caveMouth" type="button">Cave: the mine</button><button id="caveHall" type="button">Cave: the hub</button><button id="caveStation" type="button">Cave: the station</button><button id="caveCrown" type="button">Cave: the crown door</button><button id="caveRegalia" type="button">Reward outfit: off</button><button id="crownReset" type="button">Reset crown crystals</button><button id="cpRing" type="button">Checkpoint: village loop</button><button id="cpStation" type="button">Checkpoint: station</button></div>
+    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button><button id="arrowBtn" type="button">Heading arrow: off</button><button id="cpAltar" type="button">Checkpoint: altar</button><button id="cpZ5" type="button">Checkpoint: zone 5</button><button id="caveMouth" type="button">Cave: the mine</button><button id="caveHall" type="button">Cave: the hub</button><button id="caveStation" type="button">Cave: the station</button><button id="caveCrown" type="button">Cave: the crown door</button><button id="caveRegalia" type="button">Reward outfit: off</button><button id="crownReset" type="button">Reset crown crystals</button><button id="ceremonyBtn" type="button">Ceremony: not yet</button><button id="cpRing" type="button">Checkpoint: village loop</button><button id="cpStation" type="button">Checkpoint: station</button></div>
     <label for="tOrb1">Zone 1 terminals powered<output id="oOrb1"></output><input id="tOrb1" type="range" min="0" max="2" step="1" value="0"></label>
     <label for="tOrb2">Zone 2 terminals powered<output id="oOrb2"></output><input id="tOrb2" type="range" min="0" max="3" step="1" value="0"></label>
     <label for="tOrb3">Zone 3 terminals powered<output id="oOrb3"></output><input id="tOrb3" type="range" min="0" max="5" step="1" value="0"></label>
@@ -635,6 +635,13 @@ let HERD = [];             // the moose herd at the far end of zone 4
 const z5Calves = [];       // calves that have joined the crowned trio in zone 5 (they stay there for good)
 const COMPLETIONS_KEY = 'skate-completions';
 let completions = 0; try { completions = +localStorage.getItem(COMPLETIONS_KEY) || 0; } catch (e) {}   // times you've reached the black hole and begun again
+// the end game. outfit: wearing the court's purple (given at the ceremony; kept through the black hole, lost if you
+// leave on the ship). ceremony: 0 not yet, 1 the altar has risen and asks for 30 crystals, 2 complete (the cosmic
+// moose and the Starway). (saves from before: anyone who'd finished keeps the outfit)
+const OUTFIT_KEY = 'skate-outfit', CEREMONY_KEY = 'skate-ceremony';
+let outfit = completions > 0; try { const v = localStorage.getItem(OUTFIT_KEY); if (v !== null) outfit = v === '1'; } catch (e) {}
+let ceremony = 0; try { ceremony = +localStorage.getItem(CEREMONY_KEY) || 0; } catch (e) {}
+const saveEnd = () => { try { localStorage.setItem(OUTFIT_KEY, outfit ? '1' : '0'); localStorage.setItem(CEREMONY_KEY, String(ceremony)); } catch (e) {} };
 function obstacleSD(x, y, terrainOnly = false){
   if (UNDER) return caveSD(x, y);
   if (y > WORLD.y1){
@@ -1040,7 +1047,7 @@ for (const s of SPOKES){
 }
 // the crown door, in the facade on the street. k: how far it has sunk into the floor (0 shut, 1 open)
 const CROWN_GATE = { x: CROWN.fx, y: CROWN.y, tx: 1, ty: 0, open: false, k: 0, hint: -1e9 };
-const wearingRegalia = () => completions > 0;
+const wearingRegalia = () => outfit;
 // ---- lookup grid: each 16 m cell lists the room circles and hall segments near enough to matter there
 const CG = { x0: -800, y0: -40, st: 16, nx: 0, ny: 0, cells: null, reach: 26 };
 {
@@ -1276,19 +1283,21 @@ const CROWN_SPIRAL = (() => {
   return d;
 })();
 const CROWN_KEY = 'skate-crown-crystals';
-let crownGot = []; try { crownGot = JSON.parse(localStorage.getItem(CROWN_KEY) || '[]') || []; } catch (e) {}
+let crownGot = [], crownSpent = ''; try { crownGot = JSON.parse(localStorage.getItem(CROWN_KEY) || '[]') || []; crownSpent = localStorage.getItem(CROWN_KEY + '-spent') || ''; } catch (e) {}
+const saveCrown = () => { try { localStorage.setItem(CROWN_KEY, JSON.stringify(crownGot)); localStorage.setItem(CROWN_KEY + '-spent', crownSpent); } catch (e) {} };
+const crownCarried = () => crownSpent ? 0 : crownGot.length;      // the crown crystals you have with you
 const crownHas = k => crownGot.includes(k);
 function crownCollect(){
   if (!CAVE_DECK || CAVE_DECK.d !== CROWN_SPIRAL) return;
   const p = cityProj(CROWN_SPIRAL, S.x, S.y, CAVE_DECK.i);
   CROWN_SPIRAL.gems.forEach((g, k) => {
     if (crownHas(k) || Math.abs(p.s - g) > 1.8) return;
-    crownGot.push(k); try { localStorage.setItem(CROWN_KEY, JSON.stringify(crownGot)); } catch (e) {}
-    toast(crownGot.length === CROWN.n ? 'All 30 crown crystals! The ship at the station is waiting for them.' : 'Crown crystal ' + crownGot.length + ' of ' + CROWN.n);
+    crownGot.push(k); saveCrown();
+    toast(crownGot.length === CROWN.n ? 'All 30 crown crystals. The altar in the ring asks for them, and so does the ship waiting at the station.' : 'Crown crystal ' + crownGot.length + ' of ' + CROWN.n);
     if (caveDress.crownGems) caveDress.crownGems[k].visible = false;
   });
 }
-function crownReset(){ crownGot = []; try { localStorage.removeItem(CROWN_KEY); } catch (e) {} if (caveDress.crownGems) for (const m of caveDress.crownGems) m.visible = true; }
+function crownReset(){ crownGot = []; crownSpent = ''; saveCrown(); if (caveDress.crownGems) for (const m of caveDress.crownGems) m.visible = true; }
 const inCrownRoom = (x, y) => Math.hypot(x - CROWN.s.x, y - CROWN.s.y) < CROWN.R + 2 || (x > CROWN.fx - 1 && x < CROWN.s.x && Math.abs(y - CROWN.y) < CROWN.dhw + 1);
 // on the floor, the spiral's foot (still low) is in the way at its sides
 function crownFootSD(x, y, floor){
@@ -1993,7 +2002,7 @@ function checkInteract(){
   if (promptCtx || SKY_ON) return;
   for (const K of KIOSKS) if (K.state === 'active' && kioskGot(K) === ORBS_PER_KIOSK && Math.hypot(S.x - K.x, S.y - K.y) < 7){ powerKiosk(K); K.dismissed = true; }
   if (trial.K && kioskGot(trial.K) === ORBS_PER_KIOSK && Math.hypot(S.x - trial.K.x, S.y - trial.K.y) < 7){ trial.K.dismissed = true; endTrial(true); }
-  const spots = [...KIOSKS.map(K => [K, 7, () => kioskPrompt(K)]), [altar, 8, altarPrompt]];
+  const spots = [...KIOSKS.map(K => [K, 7, () => kioskPrompt(K)]), [altar, 8, altarPrompt], ...(ceremony === 1 && OBS_ALTAR.rise > 0.9 ? [[OBS_ALTAR, 8, obsAltarPrompt]] : []), ...(ONSTATION ? [[SHIP_SPOT, 17, shipPrompt]] : [])];
   for (const [it, r, fn] of spots){
     const d = Math.hypot(S.x - it.x, S.y - it.y);
     if (d > r + 6) it.dismissed = false;
@@ -3612,7 +3621,7 @@ $('cpAltar').addEventListener('click', () => { checkpoint = { a: 1 }; altar.dism
 function resetOrbs(){
   for (const K of KIOSKS){ K.state = 'dormant'; K.dismissed = false; for (const o of K.orbs){ o.got = false; o.fade = 0; o.g.visible = false; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; } updateKioskLook(K); }
   if (trial.K){ const K = trial.K; trial.K = null; updateKioskLook(K); }
-  releasePet(); returnZ5Calves(); sleepGiant(); checkpoint = null; pet.lastDismissed = -1; SKY_ON = null; bhShown = false;
+  releasePet(); returnZ5Calves(); sleepGiant(); checkpoint = null; ceremony = 0; saveEnd(); crownReset(); CROWN_GATE.open = false; pet.lastDismissed = -1; SKY_ON = null; bhShown = false;
   setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; altar.state = 0; altar.dismissed = false; setCrystalsCollected(0); setCrystalsActive(false); updateAltarLook(); gate4Open = false; gate4.open = 0; bridgeWanted = bridge2Wanted = false; bridgeDown = bridge2Down = 0; animateGate(0);
   saveProgress();
 }
@@ -4860,7 +4869,7 @@ function dismissPet(){
   $('calfBtn').hidden = true; toast('Your calf heads back to its herd.'); saveProgress();
 }
 function dismissPrompt(){
-  if (!pet.h || promptCtx || !courtOpen()) return;
+  if (!pet.h || promptCtx || !eldersIn()) return;
   openPrompt({ title: 'Your calf', body: 'Send your calf back to its herd? The next calf you come across will follow you instead.', go: 'Send back', onGo: dismissPet });
 }
 $('calfBtn').addEventListener('click', dismissPrompt);
@@ -5607,8 +5616,43 @@ const ATTEND = (() => {
     return { rig, hx: x, hy: y, x, y, th, side: i ? 1 : -1, task: null, gait: 0 };
   });
 })();
+// the ceremony's altar: in the middle of the ring, risen from the snow once you're in the court's purple (like zone
+// 3's, larger). it asks for 30 purple crystals; offered them, it sinks away again and the ceremony is complete
+const OBS_ALTAR = (() => {
+  const x = RING6.x, y = RING6.y, h0 = height(x, y) - 0.3;
+  const g = new THREE.Group(); g.position.set(x, h0 - 6, y); g.scale.setScalar(1.25); g.visible = false; scene.add(g);
+  pt(g, cy(1.5, 1.9, 0.9, 8), SM.bone2, 0, 0.45, 0); pt(g, cy(0.75, 1.05, 1.5, 8), SM.bone, 0, 1.6, 0); pt(g, cy(1.35, 1.0, 0.35, 8), SM.bone2, 0, 2.5, 0);
+  for (let k = 0; k < 4; k++){ const a = k/4*Math.PI*2 + 0.4; pt(g, new THREE.ConeGeometry(0.25, 1.6, 5), SM.bone, Math.cos(a)*1.25, 3.1, Math.sin(a)*1.25, Math.sin(a)*0.35, 0, -Math.cos(a)*0.35); }
+  for (let k = 0; k < 6; k++){ const a = k/6*Math.PI*2; pt(g, new THREE.BoxGeometry(0.16, 0.05, 0.16), GOLD, Math.cos(a)*1.0, 2.69, Math.sin(a)*1.0); }
+  const heart = new THREE.MeshLambertMaterial({ color: 0xa993d6, emissive: 0x4a3a7a, flatShading: true });
+  const gem = pt(g, new THREE.OctahedronGeometry(0.55, 0), heart, 0, 3.5, 0); gem.scale.set(1, 1.8, 1);
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 14, 14, 1, true), CRYSTAL_MAT.beam); beam.position.y = 10; g.add(beam);
+  const sol = { x, y, r: -99 }; SOLIDS.push(sol);
+  return { x, y, g, gem, beam, h0, rise: ceremony === 1 ? 1 : 0, sol, dismissed: false };
+})();
+// you, as the attendants see you when they come to dress you
+const YOU = { h: { get x(){ return S.x; }, get y(){ return S.y; }, get th(){ return S.th; } }, phase: 'wait', you: true, t: 0, served: false };
+function obsAltarPrompt(){
+  const n = crownCarried();
+  if (n >= CROWN.n) return { title: 'The altar', body: 'The altar asks for 30 purple crystals to complete the ceremony. Offer the 30 you carry?', go: 'Offer them', onGo: completeCeremony, no: 'Not yet' };
+  return { title: 'The altar', body: 'The altar asks for 30 purple crystals to complete the ceremony (' + n + ' of 30). Wearing the court\'s purple, you can open the crown door in the mine\'s village loop.' };
+}
+function completeCeremony(){
+  crownSpent = 'altar'; saveCrown(); ceremony = 2; saveEnd(); calfUI(); music.chime(1, true);
+  toast('The altar takes the crystals and sinks away. Out in space the cosmic moose appear, and past the cliff the Starway lights.');
+}
+// the ship waiting at the station's big east dock, for crystals it can't get now the old mine's stripped bare
+const SHIP_SPOT = { x: STATION.loops[0].x, y: STATION.loops[0].y, dismissed: false };
+function shipPrompt(){
+  if (crownSpent === 'altar') return { title: 'The waiting ship', body: 'The crew are still stranded, waiting for crystals. Yours went to the court.' };
+  const n = crownCarried();
+  if (n >= CROWN.n) return { title: 'The waiting ship', body: 'The old mine is stripped bare and the new one is still being dug, so the crew are stranded. Give them your 30 crystals and leave the planet with them? Everything begins again, and you go back to your own orange.',
+    go: 'Give them and leave', onGo: () => { crownSpent = 'ship'; saveCrown(); resetAll(false); }, no: 'Stay on the station' };
+  return { title: 'The waiting ship', body: 'The crew need 30 purple crystals before they can leave: the old mine is stripped bare and the new one is still being dug (' + n + ' of 30).' };
+}
 function diamondsLit(){ let n = 0; for (const c of z5Calves) if (c.slot < DIAMONDS && c.phase === 'dressed') n++; return n; }   // calves crowned on their diamonds
-function courtOpen(){ return diamondsLit() >= DIAMONDS && court.trio.every(t => t.inRing); }          // ...and the elders in the ring: the Starway is lit
+function eldersIn(){ return diamondsLit() >= DIAMONDS && court.trio.every(t => t.inRing); }          // ...and the elders in the ring
+function courtOpen(){ return eldersIn() && ceremony >= 2; }                                         // ...and the ceremony complete: the Starway is lit
 function calfToTrio(h, slot){
   // a calf joins the court. with a slot (a saved game) it's already there and dressed; otherwise it walks over
   if (!h || z5Calves.some(c => c.h === h)) return;
@@ -5644,7 +5688,7 @@ $('tCalf').addEventListener('input', e => setCalvesCrowned(+e.target.value));
 function calfUI(){
   // the slider and readout, and the calf button: you can't send a calf home until every diamond is lit
   $('tCalf').value = z5Calves.length; $('oCalf').textContent = z5Calves.length + ' (' + Math.min(DIAMONDS, diamondsLit()) + ' of ' + DIAMONDS + ' crowned)';
-  $('calfBtn').hidden = !pet.h || !courtOpen();
+  $('calfBtn').hidden = !pet.h || !eldersIn();
 }
 function returnZ5Calves(){
   // a full reset: every calf goes home to its herd, undressed, the diamonds go dark and the attendants go back
@@ -5669,10 +5713,14 @@ function starwayHint(d, end){
   // skiing onto the Starway's dark ramp: say what it's waiting for
   if (Math.hypot(S.x - end.x, S.y - end.y) > 7 || performance.now() - starwayHintAt < 9000) return;
   starwayHintAt = performance.now();
-  const n = diamondsLit(); toast(n >= DIAMONDS ? 'The elders are taking their places. Not long now.' : n ? n + ' of ' + DIAMONDS + ' calves crowned. The Starway is dark until the ring is complete.' : 'The Starway is dark. Bring calves to the crowned elders\' ring.');
+  const n = diamondsLit(); toast(eldersIn() ? (outfit ? 'The Starway is dark until the ceremony is complete. The altar in the ring asks for 30 purple crystals.' : 'The attendants have something for you, by the ring.') : n >= DIAMONDS ? 'The elders are taking their places. Not long now.' : n ? n + ' of ' + DIAMONDS + ' calves crowned. The Starway is dark until the ring is complete.' : 'The Starway is dark. Bring calves to the crowned elders\' ring.');
 }
 function updateCourt(dt){
   const near = S.y > WORLD.y1 - 120;
+  if (ceremony === 0 && outfit && eldersIn() && (!ATTEND[0].task || ATTEND[0].task === YOU)){ ceremony = 1; saveEnd(); regaliaBtn(); if (near){ toast('In the middle of the ring, an altar rises from the snow. It asks for 30 purple crystals.'); music.chime(0.8, true); } }
+  { const A = OBS_ALTAR, want = ceremony === 1 ? 1 : 0; A.rise = near ? A.rise + Math.sign(want - A.rise)*Math.min(Math.abs(want - A.rise), dt/3) : want;
+    const e = A.rise*A.rise*(3 - 2*A.rise), now = performance.now()/1000; A.g.visible = A.rise > 0.001; A.g.position.y = A.h0 - 6*(1 - e); A.sol.r = A.rise > 0.5 ? 2.4 : -99;
+    A.gem.rotation.y = now*0.8; A.gem.position.y = 3.5 + 0.15*Math.sin(now*1.6); A.beam.visible = A.rise > 0.95; }
   court.g.visible = near;
   for (const t of court.trio) t.rig.root.visible = near;
   for (const A of ATTEND) A.rig.root.visible = near;
@@ -5691,7 +5739,7 @@ function updateCourt(dt){
     let face = facingTo(t.x, t.y, RING6.x, RING6.y), moving = false;
     if (called && t.leg < t.path.length){
       const [tx, ty] = t.path[t.leg], dx = tx - t.x, dy = ty - t.y, dist = Math.hypot(dx, dy);
-      if (dist < 0.08){ t.leg++; if (t.leg === t.path.length){ t.inRing = true; music.chime(0.7 + i*0.1); if (court.trio.every(q => q.inRing)){ toast('The elders take their places in the ring. Out past the cliff, the Starway lights.'); music.chime(1, true); calfUI(); } } }
+      if (dist < 0.08){ t.leg++; if (t.leg === t.path.length){ t.inRing = true; music.chime(0.7 + i*0.1); if (court.trio.every(q => q.inRing)){ toast(outfit ? 'The elders take their places in the ring.' : 'The elders take their places in the ring, and the attendants turn to you.'); music.chime(1, true); calfUI(); } } }
       else { const sp = 1.6, st = Math.min(dist, sp*dt); t.x += dx/dist*st; t.y += dy/dist*st; face = Math.atan2(dx, -dy); moving = true; }
     }
     if (moving){ t.gait += 1.6*dt/1.3; walkMoose(t.rig, t.gait, 0.4); t.rig.head.rotation.x = 0; }
@@ -5754,6 +5802,10 @@ function updateCourt(dt){
   // the attendants: when a calf is waiting on its spot, both hurry to stand either side of it, raise their arms
   // over it while it's dressed, then walk back
   if (!ATTEND[0].task && !ATTEND[1].task){ const c = z5Calves.find(q => q.phase === 'wait' && !q.served && !q.claimed); if (c){ c.claimed = true; for (const A of ATTEND) A.task = c; } }
+  // with the elders in the ring, they come to you with the court's purple (while you're near the ring and not on a bridge)
+  const youNear = !SKY_ON && Math.hypot(S.x - RING6.x, S.y - RING6.y) < 40;
+  if (!ATTEND[0].task && !ATTEND[1].task && eldersIn() && !outfit && youNear){ YOU.t = 0; YOU.served = false; for (const A of ATTEND) A.task = YOU; }
+  if (ATTEND[0].task === YOU && !youNear && !outfit) for (const A of ATTEND) A.task = null;
   let both = true;
   for (const A of ATTEND){
     if (A.conga){ both = false; continue; }
@@ -5776,7 +5828,12 @@ function updateCourt(dt){
     r.head.rotation.x = raise ? -0.2 : 0.05*Math.sin(now*0.7 + A.side);
   }
   const c = ATTEND[0].task;
-  if (c){ if (both) c.served = true; if (c.phase === 'dressed' && c.t > 2.2) for (const A of ATTEND) A.task = null; else if (c.phase === 'dressed') c.t += dt; }
+  if (c === YOU){
+    // both beside you, arms raised: a moment, and you're in the court's purple; a moment more and they go back
+    if (both) YOU.t += dt;
+    if (YOU.t > 0.9 && !outfit){ outfit = true; saveEnd(); applyRegalia(); regaliaBtn(); music.chime(1, true); toast('The attendants dress you in the court\'s purple.'); }
+    if (YOU.t > 2.4) for (const A of ATTEND) A.task = null;
+  } else if (c){ if (both) c.served = true; if (c.phase === 'dressed' && c.t > 2.2) for (const A of ATTEND) A.task = null; else if (c.phase === 'dressed') c.t += dt; }
   updateParty(dt);
 }
 // ---- the celebration: once all fifteen calves are crowned, everyone not in the ring (the twelve watching calves, the
@@ -5851,9 +5908,11 @@ function updateParty(dt){
 // the cosmic moose: six of them, translucent and faintly shifting in colour, standing still out in space, three
 // either side of the planet, spread across the sky like a fan and all facing the ring. each stands well apart from
 // the next (about 24 degrees apart as seen from the ring) so they read as six separate figures
+let cosK = 0;
 function updateCosmic(dt){
   const P = PARTY;
-  if (P.k < 0.01 && !P.cosmic) return;
+  cosK += (((ceremony >= 2 && eldersIn()) || P.on ? 1 : 0) - cosK)*Math.min(1, dt*0.4);
+  if (cosK < 0.01 && !P.cosmic) return;
   if (!P.cosmic){
     P.cosmic = [-72, -48, -24, 24, 48, 72].map((deg, i) => {
       const mat = new THREE.MeshBasicMaterial({ color: 0xb8a6ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide });
@@ -5866,13 +5925,13 @@ function updateCosmic(dt){
       return { rig, mat, ph: i*1.3 };
     });
   }
-  const show = space.world.visible && P.k > 0.01 && !insidePlanet, now = performance.now()/1000;
+  const show = space.world.visible && cosK > 0.01 && !insidePlanet, now = performance.now()/1000;
   for (const M of P.cosmic){
     M.rig.root.visible = show; if (!show) continue;
     const r = M.rig;
     r.head.rotation.x = 0.04*Math.sin(now*0.25 + M.ph); r.head.rotation.y = 0.06*Math.sin(now*0.17 + M.ph);
     for (const T of r.tentacles) T.segs.forEach((g, k) => { g.rotation.x = 0.12 + 0.15*Math.sin(now*0.5 + T.phase + k*0.7); g.rotation.z = 0.12*Math.sin(now*0.4 + T.phase + k*0.5); });
-    M.mat.opacity = 0.24*P.k*space.k;
+    M.mat.opacity = 0.24*cosK*space.k;
     M.mat.color.setHSL((0.72 + 0.08*Math.sin(now*0.15 + M.ph)) % 1, 0.7, 0.72);
   }
 }
@@ -6032,22 +6091,24 @@ function blackHolePrompt(){
     go: 'Return to the observatory', onGo: returnToObservatory, no: 'Reset all progress', onNo: confirmReset });
 }
 function confirmReset(){
-  openPrompt({ title: 'Reset all progress?', body: 'Every terminal, orb, crystal, gate, bridge, time trial and crowned calf goes back to how it was. This cannot be undone.',
-    go: 'Erase it all', onGo: resetAll, no: 'Go back', onNo: blackHolePrompt });
+  openPrompt({ title: 'Reset all progress?', body: 'Every terminal, orb, crystal, gate, bridge, time trial and crowned calf goes back to how it was (you keep the court\'s purple). This cannot be undone.',
+    go: 'Erase it all', onGo: () => resetAll(true), no: 'Go back', onNo: blackHolePrompt });
 }
 function returnToObservatory(){
   SKY_ON = null; bhShown = false;
   spawnAt(250, 881, Math.PI);                                      // at the foot of the hidden way, looking down the line
   toast('You are back at the observatory.');
 }
-function resetAll(){
-  SKY_ON = null; bhShown = false;
+// keepOutfit: through the black hole you keep the court's purple; leaving on the ship you go back to your own orange
+function resetAll(keepOutfit = true){
+  SKY_ON = null; bhShown = false; UNDER = false; ONSTATION = false; CAVE_DECK = null;
+  if (!keepOutfit){ outfit = false; saveEnd(); }
   for (const T of TRANSPORT) T.open = false; savePortals();
   trialTimes = {}; try { localStorage.removeItem(TRIAL_KEY); } catch (e) {}
   completions++; try { localStorage.setItem(COMPLETIONS_KEY, String(completions)); } catch (e) {}
   $('reset').click();                                              // back to the start, everything reset and saved
-  applyRegalia();
-  toast(completions === 1 ? 'Everything begins again, but you carry the crown.' : 'Everything begins again. Completions: ' + completions + '.');
+  applyRegalia(); regaliaBtn();
+  toast(!keepOutfit ? 'The ship carries you away from the planet. Everything begins again, back in your own orange.' : outfit ? 'Everything begins again, but you keep the court\'s purple.' : 'Everything begins again. Completions: ' + completions + '.');
 }
 function updateSpace(dt){
   const want = S.y > WORLD.y1 + 18 || (typeof stationK !== 'undefined' && stationK > 0.05) ? 1 : 0;
@@ -6167,7 +6228,7 @@ const regalia = (() => {
   return { crown, belt, emblem };
 })();
 function applyRegalia(){
-  const on = completions > 0; regalia.crown.visible = regalia.belt.visible = regalia.emblem.visible = on;
+  const on = outfit; if (!on) skierMat.color.set(C.skier); regalia.crown.visible = regalia.belt.visible = regalia.emblem.visible = on;
   if (on) skierMat.color.setHex(0x7b3fe0);
 }
 for (const k of ['L','R']) body.ski[k].geometry.translate(0, 0, -0.15);   // binding a little behind the ski's middle
@@ -7898,11 +7959,12 @@ $('crownReset').addEventListener('click', () => { crownReset(); toast('Crown cry
 for (const [id, where, msg] of [['cpRing', 'ring', 'Checkpoint set in the village loop.'], ['cpStation', 'station', 'Checkpoint set on the space station.']])
   $(id).addEventListener('click', () => { checkpoint = { cave: where }; saveProgress(); caveSpawn(where); toast(msg); });
 // testing: put the reward outfit on or off (it's what opens the crown gate)
-const regaliaBtn = () => { $('caveRegalia').textContent = 'Reward outfit (opens the crown door): ' + (completions > 0 ? 'on' : 'off'); };
-$('caveRegalia').addEventListener('click', () => { completions = completions > 0 ? 0 : 1; if (!completions) skierMat.color.set(C.skier); applyRegalia(); regaliaBtn(); });
+const regaliaBtn = () => { $('caveRegalia').textContent = 'Reward outfit (opens the crown door): ' + (outfit ? 'on' : 'off'); $('ceremonyBtn').textContent = 'Ceremony: ' + ['not yet', 'altar waiting', 'complete'][ceremony]; };
+$('caveRegalia').addEventListener('click', () => { outfit = !outfit; saveEnd(); applyRegalia(); regaliaBtn(); });
+$('ceremonyBtn').addEventListener('click', () => { ceremony = (ceremony + 1) % 3; if (ceremony === 2) crownSpent = 'altar'; else if (crownSpent === 'altar') crownSpent = ''; saveCrown(); saveEnd(); calfUI(); regaliaBtn(); });
 regaliaBtn();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { camera, get toastText(){ return document.getElementById("toast").textContent; }, CAVE_BRIDGES, CROWN, CROWN_SPIRAL, get crownGot(){ return crownGot; }, crownReset, inCrownRoom, caveField, caveFloor, caveSD, CAVE_TRAILS, SHAFT, HALLS, ROOMS, SPOKES, STATION, TRANSPORT, PORTAL_X, stationD, cavePowered, get stationK(){ return stationK; }, caveDress, MINE, CAVE_BOX, caveTiles, caveSpawn, mineCut, mineRidge, heightNat, get UNDER(){ return UNDER; }, set UNDER(v){ UNDER = v; }, CITY_DECKS, get CAVE_DECK(){ return CAVE_DECK; }, set CAVE_DECK(v){ CAVE_DECK = v; }, cityStreetSD, ringLocal, stationFloor, get ONSTATION(){ return ONSTATION; }, set ONSTATION(v){ ONSTATION = v; }, CROWN_GATE, STATION_TRAILS, portalView, get caveK(){ return caveK; }, CAVE_SOLIDS, caveMask, pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get bridge2Down(){ return bridge2Down; }, SPUR_PASS, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { get promptCtx(){ return promptCtx; }, updateCourt, OBS_ALTAR, eldersIn, courtOpen, SHIP_SPOT, setCrownAll(){ crownGot = [...Array(CROWN.n).keys()]; crownSpent = ''; saveCrown(); }, get crownSpent(){ return crownSpent; }, get ceremony(){ return ceremony; }, get outfit(){ return outfit; }, set outfit(v){ outfit = v; }, get cosK(){ return cosK; }, camera, get toastText(){ return document.getElementById("toast").textContent; }, CAVE_BRIDGES, CROWN, CROWN_SPIRAL, get crownGot(){ return crownGot; }, crownReset, inCrownRoom, caveField, caveFloor, caveSD, CAVE_TRAILS, SHAFT, HALLS, ROOMS, SPOKES, STATION, TRANSPORT, PORTAL_X, stationD, cavePowered, get stationK(){ return stationK; }, caveDress, MINE, CAVE_BOX, caveTiles, caveSpawn, mineCut, mineRidge, heightNat, get UNDER(){ return UNDER; }, set UNDER(v){ UNDER = v; }, CITY_DECKS, get CAVE_DECK(){ return CAVE_DECK; }, set CAVE_DECK(v){ CAVE_DECK = v; }, cityStreetSD, ringLocal, stationFloor, get ONSTATION(){ return ONSTATION; }, set ONSTATION(v){ ONSTATION = v; }, CROWN_GATE, STATION_TRAILS, portalView, get caveK(){ return caveK; }, CAVE_SOLIDS, caveMask, pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get bridge2Down(){ return bridge2Down; }, SPUR_PASS, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

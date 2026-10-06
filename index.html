@@ -310,7 +310,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <div class="btns"><button id="copySet" type="button">Copy settings</button><button id="defSet" type="button">Restore defaults</button></div>
     <p class="note" id="setNote">Your slider changes are kept in this browser.</p>
     <h4>Testing</h4>
-    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button></div>
+    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button><button id="cpAltar" type="button">Checkpoint: altar</button></div>
     <label for="tOrb1">Zone 1 terminals powered<output id="oOrb1"></output><input id="tOrb1" type="range" min="0" max="2" step="1" value="0"></label>
     <label for="tOrb2">Zone 2 terminals powered<output id="oOrb2"></output><input id="tOrb2" type="range" min="0" max="3" step="1" value="0"></label>
     <label for="tOrb3">Zone 3 terminals powered<output id="oOrb3"></output><input id="tOrb3" type="range" min="0" max="5" step="1" value="0"></label>
@@ -515,6 +515,8 @@ function zone5Height(x, y){
   const plateau = Z5.h + 1.6*Math.sin(x/19)*Math.cos(y/13) + 0.8*Math.sin((x + y)/9);
   let h = ridge*(1 - t) + plateau*t;
   h += (ridge + 12 - h) * side;
+  // the crowned trio's court: dead level round the ring of diamonds, easing back into the plateau
+  { const dc = Math.hypot(x - 250, y - 831); if (dc < 26){ const w = 1 - smooth01(15, 26, dc); h += (Z5.h - h) * w; } }
   // a promontory: past its side walls the ground falls away too, so out in space you see one cliff face, not the map's edge
   const sideK = smooth01(Z5.y0 + 10, Z5.y0 + 40, y);
   const drop = Math.max(smooth01(Z5.cliff - 3, Z5.cliff + 30, y), smooth01(Z5.x0 - 22, Z5.x0 - 55, x)*sideK, smooth01(Z5.x1 + 22, Z5.x1 + 55, x)*sideK);
@@ -955,6 +957,7 @@ let lastKickAt = 0, lastPushAt = 0, weightLeg = null, camPending = 0;
 // the V opening wider than a leg can reach), the ski is lifted and set down again under the skier.
 function newSki(side, ang, ax = S.x, ay = S.y){
   const s = { ax, ay, dx: Math.sin(ang), dy: -Math.cos(ang), len: 0, live: true, side, slot: -1, dirty: true, noTrack: !!SKY_ON };
+  skyMarkNew(s);
   skis.push(s); if (skis.length > 1200) skis.shift();
   return s;
 }
@@ -1311,9 +1314,12 @@ function promptPad(trig){
 $('pGo').addEventListener('click', () => closePrompt(true));
 $('pNo').addEventListener('click', () => closePrompt(false));
 // what stopping at a kiosk or the altar offers, or null for nothing to say
+// time trials are parked for now (the game is story-led): the code stays, the purple antenna glow stays, but
+// powered terminals say nothing
+const TRIALS_ON = false;
 function kioskPrompt(K){
   if (K.state === 'powered'){
-    if (!gate4Open) return null;
+    if (!gate4Open || !TRIALS_ON) return null;
     if (trial.K === K) return kioskGot(K) < ORBS_PER_KIOSK ? { title: 'Time trial', body: 'Abandon this run? ' + fmtTime(trial.t) + ' so far, ' + kioskGot(K) + ' of 10 orbs.', go: 'Abandon', onGo: () => endTrial(false) } : null;
     if (trial.K) return { title: 'Time trial', body: 'A time trial is already running at another terminal.', go: 'OK' };
     const b = bestTimes(K);
@@ -2283,9 +2289,12 @@ const LAWN_PARTS = (() => {
       break;
     }
   }
+  // zone 5: the whole plateau is groomed
+  parts.push({ kind: 'box', x0: Z5.x0 - 40, x1: Z5.x1 + 40, y0: WORLD.y1 + 8, y1: Z5.cliff + 40, bx: [Z5.x0 - 40, WORLD.y1 + 8, Z5.x1 + 40, Z5.cliff + 40] });
   return parts;
 })();
 function partSD(p, x, y){
+  if (p.kind === 'box') return Math.max(p.x0 - x, x - p.x1, p.y0 - y, y - p.y1);
   if (p.kind === 'lawn'){
     const dx = x - p.x, dy = y - p.y, th = Math.atan2(dy, dx);
     const R = p.R * (1 + p.wob[0]*Math.sin(3*th + p.ph[0]) + p.wob[1]*Math.sin(5*th + p.ph[1]) + p.wob[2]*Math.sin(8*th + p.ph[2]));
@@ -2910,11 +2919,12 @@ function setKiosksPowered(zone, n){
   if (zone === 2) bridgeWanted = done;
   if (zone === 3) gate2Open = done;
 }
-{ const el = $('tCry'); el.addEventListener('input', () => { setCrystalsCollected(+el.value); saveProgress(); $('oCry').textContent = el.value + ' / ' + CRYSTAL_TOTAL; }); }
+{ const el = $('tCry'); el.addEventListener('input', () => { setCrystalsCollected(+el.value); checkpoint = { a: 1 }; saveProgress(); $('oCry').textContent = el.value + ' / ' + CRYSTAL_TOTAL; }); }
 for (const z of [1, 2, 3]){
   const el = $('tOrb' + z);
   el.addEventListener('input', () => { setKiosksPowered(z, +el.value); saveProgress(); $('oOrb' + z).textContent = el.value + ' / ' + KIOSK_COUNT[z]; });
 }
+$('cpAltar').addEventListener('click', () => { checkpoint = { a: 1 }; altar.dismissed = true; saveProgress(); spawnAtCheckpoint(); toast('Checkpoint set at the altar.'); });
 function resetOrbs(){
   for (const K of KIOSKS){ K.state = 'dormant'; K.dismissed = false; for (const o of K.orbs){ o.got = false; o.fade = 0; o.g.visible = false; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; } updateKioskLook(K); }
   if (trial.K){ const K = trial.K; trial.K = null; updateKioskLook(K); }
@@ -4356,7 +4366,7 @@ const SKY = (() => {
     g5: { ground: true, hidden: true, ...(() => { const v = new THREE.Vector3(); giant.rig.body.getWorldPosition(v); return { x: v.x, y: v.z }; })() },
     z5: { ground: true, hidden: true, x: 150, y: 853 },
     // the Starway: out from the cliff into space, through the planet, and back to the cliff
-    s1: { ground: true, hidden: true, x: 165, y: 892 },
+    s1: { ground: true, hidden: true, x: 250, y: 843 },
     bh: { blackhole: true, hidden: true, ...(() => { const a = (-90 + 24*30)*Math.PI/180; return { x: 250 + Math.cos(a)*8, y: 1250 + Math.sin(a)*8, h: 10 }; })() },
   };
   for (const k in N){ const n = N[k]; n.id = k; if (n.ground) n.h = height(n.x, n.y) + 0.05; }
@@ -4383,8 +4393,13 @@ const SKY = (() => {
     // the far side, round past its rings and back in to the cliff east of the observatory. no pylons out here
     // the Starway, the last bridge: off the cliff's lip, over the void, into the planet, then round and down a funnel
     // of light in two narrowing turns to the black hole at the bottom
-    { name: 'Starway', a: 's1', b: 'bh', hidden: true, space: true, final: true, pts: [[168, 912, 19], [180, 975, 26], [205, 1050, 35], [230, 1130, 46], [246, 1195, 55],
-      ...Array.from({ length: 23 }, (_, k) => { const t = (k + 1)/24, a = (-90 + (k + 1)*30)*Math.PI/180, r = 50 - 42*t; return [250 + Math.cos(a)*r, 1250 + Math.sin(a)*r, 55 - 45*t]; })] },
+    // the Starway: from a portal just past the ring of diamonds, up over the observatory's tiers, through its hall and
+    // out over the cliff, straight on to the planet and into it, spiralling down to the black hole
+    { name: 'Starway', a: 's1', b: 'bh', hidden: true, space: true, final: true, obs: true, pts: [...(() => { const g0 = height(250, 876) - 0.6; return [[250, 856, g0 + 1.9], [250, 866, g0 + 4.7], [250, 876, g0 + 4.8], [250, 887, g0 + 5.0], [250, 905, g0 + 6.5]]; })(),
+      [250, 960, 24], [249, 1050, 34], [244, 1130, 46], [246, 1195, 55],
+      // the spiral: two turns closing from 50 m to 8 m across, dropping evenly along its length (not per turn, or the
+      // tight inner turns would plunge)
+      ...(() => { const R = t => 50 - 42*t, tot = 24*(50 + 8)/2, out = []; for (let k = 1; k < 24; k++){ const t = k/24, a = (-90 + k*30)*Math.PI/180, done = k*(50 + R(t))/2; out.push([250 + Math.cos(a)*R(t), 1250 + Math.sin(a)*R(t), 55 - 45*done/tot]); } return out; })()] },
   ];
   // sample each deck: a centripetal-ish Catmull-Rom through its control points, every ~2 m
   // the ground under a deck and a little way either side, so a deck crossing a ridge rides over it rather than through a cut
@@ -4402,7 +4417,7 @@ const SKY = (() => {
       const cs = P0.map(p => { let bi = 0, bd = Infinity; for (let i = 0; i < n; i++){ const d = Math.hypot(X[i] - p[0], Y[i] - p[1]); if (d < bd){ bd = d; bi = i; } } return cum[bi]; });
       for (let i = 0; i < n; i++){
         let k = 0; while (k < cs.length - 2 && cs[k+1] < cum[i]) k++;
-        const u = Math.max(0, Math.min(1, (cum[i] - cs[k]) / Math.max(1e-6, cs[k+1] - cs[k]))), e = u*u*(3 - 2*u);
+        const u = Math.max(0, Math.min(1, (cum[i] - cs[k]) / Math.max(1e-6, cs[k+1] - cs[k]))), e = d.obs ? u : u*u*(3 - 2*u);
         H[i] = P0[k][2] + (P0[k+1][2] - P0[k][2])*e;
       }
     }
@@ -4412,11 +4427,12 @@ const SKY = (() => {
       const tx = X[Math.min(n - 1, i + 1)] - X[Math.max(0, i - 1)], ty = Y[Math.min(n - 1, i + 1)] - Y[Math.max(0, i - 1)], l = Math.hypot(tx, ty) || 1;
       const gEnd = Math.min(A.ground ? cum[i] : 1e9, B.ground ? cum[n-1] - cum[i] : 1e9);
       req[i] = terr(X[i], Y[i], tx/l, ty/l, gEnd > 90) + (gEnd < 4 ? 0.05 : gEnd < 30 ? 0.05 + (gEnd - 4)/26*3.4 : 3.5);
+      if (d.obs){ const r = Math.hypot(X[i] - 250, Y[i] - 876); if (r < 18) req[i] = Math.max(req[i], height(250, 876) - 0.6 + (r < 10.5 ? 4.6 : 4.6 - (r - 10.5)/7.5*2.6)); }
     }
     // raise to clear the ground, then smooth, over and over: the profile settles into a smooth curve resting on the
     // ground's high points instead of kinking up over each one
     // each peak widened a little (the highest ground within 16 m along), so the smoothing rests over it, not into it
-    const reqD = req.map((_, i) => { let m = -Infinity; for (let k = -8; k <= 8; k++){ const j = i + k; if (j >= 0 && j < n) m = Math.max(m, req[j]); } return m; });
+    const reqD = d.obs ? req : req.map((_, i) => { let m = -Infinity; for (let k = -8; k <= 8; k++){ const j = i + k; if (j >= 0 && j < n) m = Math.max(m, req[j]); } return m; });
     for (let it = 0; it < 24; it++){
       for (let i = 3; i < n - 3; i++) H[i] = Math.max(H[i], (it < 20 ? reqD[i] + 0.6 : req[i]));
       const Hs = H.slice(), W = it < 16 ? 10 : 5; for (let i = 3; i < n - 3; i++){ let a = 0, c = 0; for (let k = -W; k <= W; k++){ const j = Math.min(n - 1, Math.max(0, i + k)); a += Hs[j]; c++; } H[i] = a/c; }
@@ -4424,7 +4440,7 @@ const SKY = (() => {
     for (let i = 3; i < n - 3; i++) H[i] = Math.max(H[i], req[i]);
     // level at the junctions: the last 14 m into a junction is flat at its height, easing in over the 20 m before
     for (let i = 0; i < n; i++) for (const [nd, dist] of [[A, cum[i]], [B, cum[n-1] - cum[i]]]){
-      if (nd.ground || dist >= 34) continue;
+      if (nd.ground || nd.blackhole || dist >= 34) continue;
       const k = dist < 14 ? 0 : (dist - 14)/20, e = k*k*(3 - 2*k); H[i] = Math.max(req[i], nd.h + (H[i] - nd.h)*e);
     }
     H[0] = A.h; H[n-1] = B.h;
@@ -4615,35 +4631,39 @@ function updateSky(dt){
 // crystal, a domed hall with a lit slit, and a great ribbed telescope of bone pointing out over the cliff into space,
 // a crystal lens at its mouth. purple crystal grows everywhere on the plateau, and the natives here, in bright robes,
 // play music: drums, long horns, harps and crystal chimes. no people from the outpost have ever come this far
-const Z5_TEMPLE = { x: 252, y: 876 };
+const Z5_TEMPLE = { x: 250, y: 876 };
 const zone5 = (() => {
   const T = Z5_TEMPLE, h0 = height(T.x, T.y);
   const g = new THREE.Group(); g.position.set(T.x, h0 - 0.6, T.y); scene.add(g);
   const gem = CRYSTAL_MAT.gem, gem2 = CRYSTAL_MAT.gem2;
   pt(g, cy(16, 17, 1.2, 28), SM.bone2, 0, 0.6, 0); pt(g, cy(12.5, 13.5, 1.2, 28), SM.bone, 0, 1.8, 0); pt(g, cy(9.5, 10.5, 1.2, 28), SM.bone2, 0, 3.0, 0);
   for (let k = 0; k < 10; k++){
-    const a = k/10*Math.PI*2 + 0.3, x = Math.cos(a)*14.4, z = Math.sin(a)*14.4, hgt = 8 + (k % 3)*1.5;
+    const a = k/10*Math.PI*2, x = Math.cos(a)*14.4, z = Math.sin(a)*14.4, hgt = 8 + (k % 3)*1.5;
     pt(g, cy(0.55, 0.85, hgt, 9), SM.bone, x, 1.2 + hgt/2, z);
     pt(g, new THREE.TorusGeometry(0.9, 0.16, 6, 14), SM.bone2, x, 1.2 + hgt*0.35, z, Math.PI/2);
     const c = pt(g, new THREE.OctahedronGeometry(0.75, 0), k % 2 ? gem : gem2, x, 1.2 + hgt + 0.9, z); c.scale.set(1, 1.7, 1);
   }
-  pt(g, cy(7.6, 8, 3.2, 28), SM.bone, 0, 5.2, 0);
-  pt(g, dome(7.6, 28, 12), SM.bone2, 0, 6.8, 0);
-  pt(g, bx(0.7, 6.5, 0.4), SM.glow, 0, 9.6, 7.35, -0.45);                    // the dome's lit slit, facing the cliff
+  // the hall: a tall drum with a wide doorway north and south (the Starway runs straight through), under the dome
+  const hallM = SM.bone.clone(), domeM = SM.bone2.clone(); hallM.side = THREE.DoubleSide; domeM.transparent = true;   // the dome fades while you ride through, so you can see yourself
+  for (const t0 of [Math.PI/6, Math.PI*7/6]) pt(g, new THREE.CylinderGeometry(7.6, 8, 5.4, 14, 1, true, t0, Math.PI*2/3), hallM, 0, 6.3, 0);
+  for (const sz of [-1, 1]) for (const sx of [-1, 1]) pt(g, cy(0.5, 0.6, 5.4, 8), SM.bone2, sx*3.8, 6.3, sz*6.6);      // door jambs
+  pt(g, dome(7.6, 28, 12), domeM, 0, 9.0, 0);
+  pt(g, new THREE.TorusGeometry(7.7, 0.3, 6, 32), SM.bone2, 0, 9.0, 0, Math.PI/2);
+  pt(g, bx(0.7, 6.5, 0.4), SM.glow, 0, 12.6, 6.9, -0.6);                      // the dome's lit slit, facing the cliff
   // the telescope: out of the dome toward the south, tilted up at the sky
-  const tel = new THREE.Group(); tel.position.set(0, 11.5, 2); tel.rotation.x = 0.62; g.add(tel);   // +z is south (over the cliff)
+  const tel = new THREE.Group(); tel.position.set(0, 14.6, 2); tel.rotation.x = 0.62; g.add(tel);   // +z is south (over the cliff)
   const tubeM = pt(tel, cy(2.6, 1.6, 18, 18), SM.bone, 0, 0, 0, Math.PI/2); tubeM.position.z = 8;
   for (let k = 0; k < 5; k++) pt(tel, new THREE.TorusGeometry(2.05 + (4 - k)*0.2, 0.28, 8, 20), SM.bone2, 0, 0, 1 + k*3.6);
   const lens = pt(tel, new THREE.OctahedronGeometry(2.4, 0), gem2, 0, 0, 17.6); lens.scale.set(1, 1, 0.45);
   pt(tel, new THREE.SphereGeometry(1.3, 14, 10), SM.glow, 0, 0, 17.9);
-  pt(g, cy(1.4, 2, 6, 10), SM.bone2, 0, 8, 6.5, 0.6);                        // the mount under the tube
+  for (const sx of [-1, 1]) pt(g, cy(0.5, 0.8, 9, 8), SM.bone2, sx*5.2, 12, 4.5, -0.35, 0, -sx*0.35);   // the mount's two legs, clear of the way through
   // the gateway on the plateau side
   for (const sx of [-1, 1]) pt(g, cy(0.7, 1, 9, 9), SM.bone, sx*4.5, 4.5, -17);
   tube(g, [[-4.5, 9, -17], [-2.5, 12, -17.3], [0, 13, -17.4], [2.5, 12, -17.3], [4.5, 9, -17]], 0.55, SM.bone2, 20, 7);
   pt(g, new THREE.OctahedronGeometry(0.9, 0), gem, 0, 13.4, -17.4).scale.set(1, 1.6, 1);
   const model = { model: g };
   SOLIDS.push({ x: T.x, y: T.y, r: 0, foot: buildFootprint(model) });
-  return { g, tel };
+  return { g, tel, domeM };
 })();
 // crystals everywhere: clusters across the plateau and along the cliff's lip, merged into a handful of meshes
 {
@@ -4653,7 +4673,7 @@ const zone5 = (() => {
   for (let k = 0; k < 900 && placed.length < 110; k++){
     const x = Z5.x0 + 16 + rnd()*(Z5.x1 - Z5.x0 - 32), y = Z5.y0 + 8 + rnd()*(Z5.cliff - Z5.y0 - 6);
     const size = 0.5 + rnd()*rnd()*2.4;
-    if (Math.hypot(x - Z5_TEMPLE.x, y - Z5_TEMPLE.y) < 19 + size || Math.hypot(x - 150, y - 853) < 9 || Math.hypot(x - 324, y - 858) < 22 + size) continue;
+    if (Math.hypot(x - Z5_TEMPLE.x, y - Z5_TEMPLE.y) < 19 + size || Math.hypot(x - 150, y - 853) < 9 || (Math.abs(x - 250) < 14 + size && y < 862) || Math.hypot(x - 260, y - 831) < 16 + size) continue;
     if (placed.some(p => Math.hypot(p.x - x, p.y - y) < 4 + (p.size + size)*1.2)) continue;
     placed.push({ x, y, size });
     const c = new THREE.Group(); c.position.set(x, height(x, y) - 0.2, y); c.rotation.y = rnd()*6.3; src.add(c);
@@ -4676,7 +4696,7 @@ const MUSICIANS = (() => {
   const T = Z5_TEMPLE, spots = [
     [T.x - 21, T.y - 8, 'drum'], [T.x - 23, T.y - 4, 'horn'], [T.x - 19, T.y - 2, 'harp'],
     [T.x + 21, T.y - 9, 'chimes'], [T.x + 23, T.y - 4, 'drum'], [T.x + 19, T.y - 1, 'horn'],
-    [T.x - 6, T.y - 22, 'harp'], [T.x + 6, T.y - 22, 'chimes'],
+    [T.x - 12, T.y - 21, 'harp'], [T.x + 12, T.y - 21, 'chimes'],
     [T.x - 40, Z5.cliff - 8, 'horn'], [T.x - 35, Z5.cliff - 7, 'drum'], [T.x + 38, Z5.cliff - 8, 'harp'],
   ];
   return spots.map(([x, y, kind], i) => {
@@ -4697,7 +4717,7 @@ const MUSICIANS = (() => {
 // the first open diamond, which lights under it; two robed attendants hurry over and dress it in a drape and crown
 // of its own, and there it stays for good. once all six diamonds glow the Starway wakes. calves past the sixth join
 // the court too, standing behind the trio
-const TRIO = { x: 338, y: 848 }, RING6 = { x: 318, y: 867, r: 6.5 }, DIAMONDS = 6;
+const TRIO = { x: 266, y: 831 }, RING6 = { x: 250, y: 831, r: 6.5 }, DIAMONDS = 6;
 const GOLD = lam(0xe6bf4f); GOLD.flatShading = true;
 const DRAPES = [0xd9468f, 0x2bb3a3, 0xf0a83a, 0x8a5ce6, 0xe0533d, 0x3f8fe0].map(c => { const m = lam(c); m.flatShading = true; return m; });
 const DG = {
@@ -4727,8 +4747,8 @@ function dressMoose(rig, k){
 const facingTo = (x, y, tx, ty) => Math.atan2(tx - x, -(ty - y));
 // where each calf stands: the six diamonds round the ring, then rows behind the trio
 function slotPos(k){
-  if (k < DIAMONDS){ const a = k/DIAMONDS*Math.PI*2 - Math.PI/2; return [RING6.x + Math.cos(a)*RING6.r, RING6.y + Math.sin(a)*RING6.r]; }
-  const j = k - DIAMONDS; return [TRIO.x - 8 + (j % 6)*3.2, TRIO.y - 7 - Math.floor(j/6)*3.4];
+  if (k < DIAMONDS){ const a = k/DIAMONDS*Math.PI*2; return [RING6.x + Math.cos(a)*RING6.r, RING6.y + Math.sin(a)*RING6.r]; }
+  const j = k - DIAMONDS; return [TRIO.x + 5 + Math.floor(j/5)*3.4, TRIO.y - 6 + (j % 5)*3];
 }
 const court = (() => {
   const g = new THREE.Group(); scene.add(g);
@@ -4748,7 +4768,7 @@ const court = (() => {
   { const pts = []; for (let i = 0; i <= 72; i++){ const a = i/72*Math.PI*2, x = RING6.x + Math.cos(a)*RING6.r, y = RING6.y + Math.sin(a)*RING6.r; pts.push(new THREE.Vector3(x, height(x, y) + 0.06, y)); }
     g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xb8a35a }))); }
   // the trio: a little smaller than the herd's grown moose, each in its own colour, facing out over the ring
-  const trio = [[-3.6, 1.2, 0], [0, -1.4, 3], [3.6, 1.2, 1]].map(([dx, dy, k], i) => {
+  const trio = [[1.2, -3.6, 0], [-1.4, 0, 3], [1.2, 3.6, 1]].map(([dx, dy, k], i) => {
     const rig = buildMoose(false), x = TRIO.x + dx, y = TRIO.y + dy; rig.root.scale.setScalar(0.85);
     const th = facingTo(x, y, RING6.x, RING6.y);
     rig.root.position.set(x, height(x, y), y); rig.root.rotation.y = -th;
@@ -4762,7 +4782,7 @@ const court = (() => {
 const ATTEND = (() => {
   let seed = 4040; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const white = lam(0xf1ece0), white2 = lam(0xd4ccba); white.flatShading = white2.flatShading = true;
-  return [[328.5, 856.5], [332, 861.5]].map(([x, y], i) => {
+  return [[259.5, 826.5], [259.5, 835.5]].map(([x, y], i) => {
     const rig = buildAlien(rnd);
     rig.root.traverse(o => { if (!o.isMesh) return; if (o.material === NPC_MAT.robe) o.material = white; else if (o.material === NPC_MAT.robe2) o.material = white2; else if (o.material === NPC_MAT.sash) o.material = GOLD; });
     pt(rig.arms[i], cy(0.02, 0.02, 1.5, 6), GOLD, 0, -0.5, 0);                // a slim gold staff
@@ -4783,7 +4803,7 @@ function calfToTrio(h, slot){
   const [sx, sy] = slotPos(slot), dress = dressMoose(h.rig, slot + 2);
   const c = { h, slot, sx, sy, phase: instant ? 'dressed' : 'walk', t: 0, pop: instant ? 1 : 0, dress, gait: 0, step: 0, side: 0, served: instant };
   // keep clear of the observatory on the way
-  if (!instant && segDist(Z5_TEMPLE.x, Z5_TEMPLE.y, h.x, h.y, sx, sy) < 26) c.via = [252, 842];
+  if (!instant && segDist(Z5_TEMPLE.x, Z5_TEMPLE.y, h.x, h.y, sx, sy) < 26) c.via = [Z5_TEMPLE.x - 26, Z5_TEMPLE.y - 30];
   h.sleep = false; h.returning = false;
   if (instant){ h.x = sx; h.y = sy; h.th = facingTo(sx, sy, TRIO.x, TRIO.y); }
   for (const o of [dress.drape, dress.crown]){ o.visible = instant; o.scale.setScalar(instant ? 1 : 0.01); }
@@ -4904,6 +4924,7 @@ function updateCourt(dt){
 }
 function updateZone5(dt){
   const near = S.y > WORLD.y1 - 120;
+  { const M = zone5.domeM, want = SKY_ON && Math.hypot(S.x - Z5_TEMPLE.x, S.y - Z5_TEMPLE.y) < 17 ? 0.1 : 1; M.opacity += (want - M.opacity)*Math.min(1, dt*5); M.depthWrite = M.opacity > 0.98; }
   for (const m of MUSICIANS) m.rig.root.visible = near;
   if (!near) return;
   const now = performance.now()/1000, beat = now * 96/60 * Math.PI;      // a slow shared beat
@@ -4997,7 +5018,7 @@ function confirmReset(){
 }
 function returnToObservatory(){
   SKY_ON = null; bhShown = false;
-  spawnAt(252, 845, Math.PI);                                      // on the plateau, facing the observatory's gateway
+  spawnAt(250, 839.5, 0);                                          // between the portal and the ring, facing the crowned trio's court
   toast('You are back at the observatory.');
 }
 function resetAll(){
@@ -5166,6 +5187,7 @@ function writeTrack(slot, ax, ay, bx, by, tw = TRACK_W){
 function syncTracks(){
   let changed = false;
   for (const k of skis){
+    if (k.sky && k.dirty && k.len > 0.01){ skyMarkWrite(k); k.dirty = false; continue; }
     if (!k.dirty || k.len <= 0.01 || k.noTrack) continue;
     if (k.slot < 0){
       k.slot = trackN % TRACK_CAP; trackSeq[k.slot] = trackN; trackSurf[k.slot] = surfaceAt(k.ax, k.ay); trackN++;
@@ -5180,6 +5202,40 @@ function syncTracks(){
   if (changed){ trackGeo.attributes.position.needsUpdate = true; trackGeo.setDrawRange(0, Math.min(trackN, TRACK_CAP) * 6); }
 }
 function clearTracks(){ trackN = 0; trackGeo.setDrawRange(0, 0); }
+// on the energy bridges your skis leave glowing purple marks instead, and they don't last: the moment you lay the
+// next one, every mark before it starts fading away to nothing
+const SKYMARK_CAP = 40, SKYMARK_FADE = 900;
+const skyMarks = (() => {
+  const pos = new Float32Array(SKYMARK_CAP*4*3), col = new Float32Array(SKYMARK_CAP*4*4), idx = new Uint16Array(SKYMARK_CAP*6);
+  for (let i = 0; i < SKYMARK_CAP; i++){ const v = i*4; idx.set([v, v+1, v+2, v+1, v+3, v+2], i*6); }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 4)); geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, fog: false });
+  const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = 4; scene.add(mesh);
+  return { pos, col, geo, list: [], next: 0, rgb: [0.62, 0.36, 1] };
+})();
+function skyMarkNew(s){
+  const M = skyMarks, now = performance.now();
+  for (const m of M.list) if (m.t0 === null) m.t0 = now;                // the next kick: everything before it fades
+  if (!s.noTrack) return;
+  const m = { slot: M.next, t0: null }; M.next = (M.next + 1) % SKYMARK_CAP;
+  M.list = M.list.filter(q => q.slot !== m.slot); M.list.push(m); s.sky = m;
+}
+function skyMarkWrite(k){
+  const M = skyMarks, i = k.sky.slot*12, bx = k.ax + k.dx*k.len, by = k.ay + k.dy*k.len, tw = 0.13;
+  const nx = -k.dy*tw/2, ny = k.dx*tw/2, v = [k.ax+nx, k.ay+ny, k.ax-nx, k.ay-ny, bx+nx, by+ny, bx-nx, by-ny];
+  for (let q = 0; q < 4; q++){ const x = v[q*2], y = v[q*2+1]; M.pos[i + q*3] = x; M.pos[i + q*3 + 1] = ground(x, y) + 0.04; M.pos[i + q*3 + 2] = y; }
+  M.geo.attributes.position.needsUpdate = true;
+}
+function updateSkyMarks(){
+  const M = skyMarks; if (!M.list.length) return;
+  const now = performance.now();
+  M.list = M.list.filter(m => {
+    const f = m.t0 === null ? 1 : Math.max(0, 1 - (now - m.t0)/SKYMARK_FADE), e = f*f, i = m.slot*16;
+    for (let q = 0; q < 4; q++){ for (let c = 0; c < 3; c++) M.col[i + q*4 + c] = M.rgb[c]; M.col[i + q*4 + 3] = e; }
+    return f > 0;
+  });
+  M.geo.attributes.color.needsUpdate = true;
+}
 
 function applyTheme(){
   readColors();
@@ -6022,7 +6078,7 @@ function loop(t){
   const dt = Math.min(0.1, (t-last)/1000); last = t; pollPad();
   // a prompt interrupts the game: the skier holds still (keeping their speed) until it's answered
   if (!promptCtx){ const n = Math.max(1, Math.ceil(dt * 60 - 1e-6)); for (let k = 0; k < n; k++) step(dt/n); }
-  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updatePet(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract(); updateSky(dt); updateSpace(dt); updateZone5(dt); updateCourt(dt); updateBlackHole(dt);
+  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updatePet(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract(); updateSky(dt); updateSpace(dt); updateZone5(dt); updateCourt(dt); updateBlackHole(dt); updateSkyMarks();
   if (trial.K && !promptCtx) trial.t += dt;
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through

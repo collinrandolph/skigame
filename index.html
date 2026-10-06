@@ -2798,7 +2798,7 @@ const bridge = buildBridge(BRIDGE), bridge2 = buildBridge(BRIDGE2);
 // ---- obstacle controls. each locked way on (the east gate, the drawbridge, the south gate) has its own control facing
 // the side you arrive from: one indicator light per terminal in its zone, red until that terminal is powered and then
 // green, and an antenna light that stays red until you ski up to the control with every terminal powered, which opens
-// it (then the antenna turns green). the gates carry theirs on the lintel; the drawbridge has a post on the north bank
+// it (then the antenna turns green). the gates carry theirs on the lintel (both faces); each drawbridge has a post on each bank
 function gateLights(gt, zone, side){
   // a row of lights on the lintel's face toward the approach side (local x = side)
   const n = KIOSK_COUNT[zone], mats = [];
@@ -2808,9 +2808,10 @@ function gateLights(gt, zone, side){
   }
   return mats;
 }
-const makeBridgePost = (B, off = 2.4, dy = -2.2) => {
-  const x = B.x + B.W/2 + off, y = B.yN + dy, g = new THREE.Group();
-  g.position.set(x, height(x, y) - 0.05, y); g.rotation.y = Math.PI/2;   // its face (-z) turned toward the trail (west)
+// side: which side of the deck it stands (+1 east, -1 west); y: how far along, on whichever bank
+const makeBridgePost = (B, y, side = 1, off = 2.4) => {
+  const x = B.x + side*(B.W/2 + off), g = new THREE.Group();
+  g.position.set(x, height(x, y) - 0.05, y); g.rotation.y = side*Math.PI/2;   // its face (-z) turned toward the deck
   scene.add(g);
   pt(g, bx(1.3, 0.5, 1.1), SM.slate, 0, 0.2, 0);
   pt(g, bx(0.8, 2.6, 0.6), SM.hull, 0, 1.7, 0);
@@ -2823,17 +2824,20 @@ const makeBridgePost = (B, off = 2.4, dy = -2.2) => {
   const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: orbGlowTex, color: ANTENNA.red, transparent: true, depthWrite: false, fog: false, opacity: 0.8 }));
   halo.position.set(0, 5.15, 0); halo.scale.set(1.8, 1.8, 1); g.add(halo);
   SOLIDS.push({ x, y, r: 0.9 });
-  return { x, y, lights: mats, status, halo };
+  return { x, y, side, lights: mats, status, halo };
 };
-const bridgePost = makeBridgePost(BRIDGE), bridge2Post = makeBridgePost(BRIDGE2, 4.2, 2.4);   // set back, clear of the two trails meeting there
+// a post on each bank, so each drawbridge can be lowered from either side. each stands clear of the trails meeting there
+const BRIDGE_POSTS = [[BRIDGE, makeBridgePost(BRIDGE, BRIDGE.yN - 2.2)], [BRIDGE, makeBridgePost(BRIDGE, BRIDGE.yS + 2.2, 1, 4.2)],
+  [BRIDGE2, makeBridgePost(BRIDGE2, BRIDGE2.yN + 2.4, 1, 4.2)], [BRIDGE2, makeBridgePost(BRIDGE2, BRIDGE2.yS + 2.2, -1, 4.2)]];
 const CONTROLS = [
-  { zone: 1, name: 'east gate', lights: gateLights(gate, 1, -1), status: gate.status, halo: gate.halo, x: GATE.x - 5, y: GATE.y, r: 8,
+  { zone: 1, name: 'east gate', lights: [...gateLights(gate, 1, -1), ...gateLights(gate, 1, 1)], status: gate.status, halo: gate.halo, x: GATE.x, y: GATE.y, r: 9,
     isOpen: () => gateOpen, open: () => setGateOpen(true), msg: 'The east gate is opening.' },
-  { zone: 2, name: 'drawbridge', lights: bridgePost.lights, status: bridgePost.status, halo: bridgePost.halo, x: bridgePost.x - 2, y: bridgePost.y, r: 7,
-    isOpen: () => bridgeWanted, open: () => { bridgeWanted = true; }, msg: 'The drawbridge is coming down.' },
-  { zone: 2, name: 'lower drawbridge', lights: bridge2Post.lights, status: bridge2Post.status, halo: bridge2Post.halo, x: bridge2Post.x - 2, y: bridge2Post.y, r: 7,
-    isOpen: () => bridge2Wanted, open: () => { bridge2Wanted = true; }, msg: 'The lower drawbridge is coming down.' },
-  // the south gate runs on zone 1's terminals too, with lights on both faces: it opens from either side
+  ...BRIDGE_POSTS.map(([B, P]) => B === BRIDGE
+    ? { zone: 2, name: 'drawbridge', lights: P.lights, status: P.status, halo: P.halo, x: P.x - P.side*2, y: P.y, r: 7,
+        isOpen: () => bridgeWanted, open: () => { bridgeWanted = true; }, msg: 'The drawbridge is coming down.' }
+    : { zone: 2, name: 'lower drawbridge', lights: P.lights, status: P.status, halo: P.halo, x: P.x - P.side*2, y: P.y, r: 7,
+        isOpen: () => bridge2Wanted, open: () => { bridge2Wanted = true; }, msg: 'The lower drawbridge is coming down.' }),
+  // the south gate runs on zone 1's terminals too. both gates have lights on both faces: they open from either side
   { zone: 1, name: 'south gate', lights: [...gateLights(gate2, 1, -1), ...gateLights(gate2, 1, 1)], status: gate2.status, halo: gate2.halo, x: SADDLE.x, y: SADDLE.y, r: 9,
     isOpen: () => gate2Open, open: () => { gate2Open = true; }, msg: 'The south gate is opening.' },
 ];

@@ -4848,7 +4848,7 @@ const MUSICIANS = (() => {
     if (kind === 'horn'){ const hg = new THREE.Group(); hg.position.set(0, 1.12, -0.18); hg.rotation.x = -1.15; b.add(hg); pt(hg, new THREE.ConeGeometry(0.16, 1.6, 12, 1, true), brass, 0, 0.85, 0).material.side = THREE.DoubleSide; pt(hg, cy(0.03, 0.03, 0.3, 6), brass, 0, 0.0, 0); }
     if (kind === 'harp'){ pt(inst, new THREE.TorusGeometry(0.32, 0.03, 6, 18, Math.PI*1.2), wood, 0, 0.95, -0.3, 0, 0, 0.4); for (let k = 0; k < 5; k++) pt(inst, cy(0.006, 0.006, 0.45 - k*0.05, 4), hide, -0.15 + k*0.07, 0.95, -0.3); }
     if (kind === 'chimes'){ pt(inst, cy(0.02, 0.02, 1.5, 6), wood, 0.25, 1.0, -0.25); for (let k = 0; k < 4; k++){ const c = pt(inst, new THREE.OctahedronGeometry(0.07, 0), CRYSTAL_MAT.gem2, 0.25 + (k - 1.5)*0.09, 1.55, -0.32); c.scale.set(1, 2.2, 1); } pt(inst, cy(0.01, 0.01, 0.3, 4), wood, 0.25, 1.72, -0.32, 0, 0, Math.PI/2); }
-    return { rig, kind, ph: rnd()*6, x, y };
+    return { rig, kind, ph: rnd()*6, x, y, hx: x, hy: y, cx: x, cy: y, th: face, face0: face };
   });
 })();
 // ---- the crowned court: a ring of six diamond insignias on level snow, straight down the line from the hidden way,
@@ -4897,9 +4897,9 @@ const facingTo = (x, y, tx, ty) => Math.atan2(tx - x, -(ty - y));
 function diamondPos(k){ const a = k/6*Math.PI*2; return [RING6.x + Math.cos(a)*RING6.r, RING6.y + Math.sin(a)*RING6.r]; }
 function slotPos(k){
   if (k < DIAMONDS) return diamondPos(CALF_D[k]);
-  // the rest gather in two arcs of six outside the ring, east and west, alternating sides as they come and filling
-  // from the observatory end (south) northward; the way through, north to south, stays open
-  const j = k - DIAMONDS, side = j % 2 ? -1 : 1, m = Math.min(5, j >> 1), a = (70 - m*28)*Math.PI/180, R = 12.5;
+  // the rest watch from two arcs of six on the ring's south side, east and west of the way through, well back from the
+  // ring and clear of the Starway's portal; they alternate sides as they come, filling from the observatory end
+  const j = k - DIAMONDS, side = j % 2 ? -1 : 1, m = Math.min(5, j >> 1), a = (62 - m*10)*Math.PI/180, R = 25;
   return [RING6.x + side*Math.cos(a)*R, RING6.y + Math.sin(a)*R];
 }
 const court = (() => {
@@ -4962,7 +4962,7 @@ function calfToTrio(h, slot){
   if (instant){ h.x = sx; h.y = sy; h.th = facingTo(sx, sy, RING6.x, RING6.y); }
   for (const o of [dress.drape, dress.crown]){ o.visible = instant; o.scale.setScalar(instant ? 1 : 0.01); }
   z5Calves.push(c); calfUI();
-  if (!instant){ toast(slot < DIAMONDS ? 'Your calf leaves you for the crowned trio.' : 'Your calf joins the crowned court.'); music.chime(0.5); saveProgress(); }
+  if (!instant){ if (slot < DIAMONDS) toast('Your calf leaves you for the crowned trio.'); music.chime(0.5); saveProgress(); }   // (past the third, nothing is said: the rest is a secret)
 }
 function segDist(px, py, ax, ay, bx, by){
   const dx = bx - ax, dy = by - ay, u = Math.max(0, Math.min(1, ((px - ax)*dx + (py - ay)*dy) / Math.max(1e-6, dx*dx + dy*dy)));
@@ -5043,6 +5043,7 @@ function updateCourt(dt){
   // the calves: walk to their spot, wait to be dressed, then stay
   for (const c of z5Calves){
     const h = c.h, r = h.rig;
+    if (c.conga) continue;                                       // dancing (see the celebration)
     if (c.phase === 'walk'){
       const [tx, ty] = [c.sx, c.sy], dx = tx - h.x, dy = ty - h.y, dist = Math.hypot(dx, dy), sp = 4;
       if (dist < 0.3){ c.phase = 'wait'; h.x = c.sx; h.y = c.sy; music.chime(0.6); }
@@ -5067,7 +5068,7 @@ function updateCourt(dt){
         c.phase = 'dressed';
         if (c.slot < DIAMONDS && n === DIAMONDS){ toast('The third calf is crowned. Three more diamonds appear, and the elders step forward.'); music.chime(1, true); }
         else if (c.slot < DIAMONDS){ toast(n + ' of ' + DIAMONDS + ' calves crowned.'); music.chime(n/DIAMONDS); }
-        else { toast('Another calf is crowned.'); music.chime(0.8); }
+        else music.chime(0.8);
         saveProgress();
       }
     }
@@ -5095,6 +5096,7 @@ function updateCourt(dt){
   if (!ATTEND[0].task && !ATTEND[1].task){ const c = z5Calves.find(q => q.phase === 'wait' && !q.served && !q.claimed); if (c){ c.claimed = true; for (const A of ATTEND) A.task = c; } }
   let both = true;
   for (const A of ATTEND){
+    if (A.conga){ both = false; continue; }
     const r = A.rig, c = A.task;
     let tx = A.hx, ty = A.hy, sp = 1.4;
     if (c){ const co = Math.cos(c.h.th), sn = Math.sin(c.h.th); tx = c.h.x + co*A.side*2.1 - sn*0.3; ty = c.h.y + sn*A.side*2.1 + co*0.3; sp = 4.5; }
@@ -5115,7 +5117,100 @@ function updateCourt(dt){
   }
   const c = ATTEND[0].task;
   if (c){ if (both) c.served = true; if (c.phase === 'dressed' && c.t > 2.2) for (const A of ATTEND) A.task = null; else if (c.phase === 'dressed') c.t += dt; }
+  updateParty(dt);
 }
+// ---- the celebration: once all fifteen calves are crowned, everyone not in the ring (the twelve watching calves, the
+// musicians and the attendants) forms two conga lines, one each side of the plateau, winding round on their own
+// loops so they never cross the centre line or block the way through; and out in space six vast translucent moose,
+// each bigger than the planet, walk slowly round it
+const PARTY = (() => {
+  const W = [[228, 860], [205, 850], [180, 862], [160, 885], [175, 905], [200, 900], [215, 920], [200, 945], [170, 950], [145, 930], [130, 900], [140, 865], [165, 845], [200, 838], [225, 845]];
+  const mk = pts => { const c = new THREE.CatmullRomCurve3(pts.map(([x, y]) => new THREE.Vector3(x, 0, y)), true, 'centripetal'), N = 600; return { P: c.getSpacedPoints(N), N, len: c.getLength() }; };
+  return { on: false, k: 0, t: 0, told: false, members: [], lines: [mk(W), mk(W.map(([x, y]) => [500 - x, y]).reverse())], cosmic: null };
+})();
+function partyAt(L, s){
+  s = ((s % L.len) + L.len) % L.len;
+  const f = s/L.len*L.N, i = Math.floor(f), u = f - i, a = L.P[i], b = L.P[Math.min(L.N, i + 1)];
+  return [a.x + (b.x - a.x)*u, a.z + (b.z - a.z)*u];
+}
+function partyMembers(){
+  // west line and east line: calves and aliens alternating, about 4 m apart
+  const out = [];
+  for (const lane of [0, 1]){
+    const west = lane === 0;
+    const calves = z5Calves.filter(c => c.slot >= DIAMONDS && (c.sx < RING6.x) === west).map(c => ({ kind: 'calf', c }));
+    const aliens = [...MUSICIANS.filter(m => (m.hx < Z5_TEMPLE.x) === west).map(m => ({ kind: 'mus', m })), ...ATTEND.filter(A => (A.hx < RING6.x) === west).map(A => ({ kind: 'att', A }))];
+    const row = []; for (let i = 0; i < Math.max(calves.length, aliens.length); i++){ if (aliens[i]) row.push(aliens[i]); if (calves[i]) row.push(calves[i]); }
+    row.forEach((m, i) => { m.lane = lane; m.off = -i*4; m.gait = Math.random(); out.push(m); });
+  }
+  for (const m of out){ if (m.c) m.c.conga = true; if (m.A) m.A.conga = true; }
+  return out;
+}
+// where a member is and how to move it
+const pm = {
+  get(m){ return m.c ? [m.c.h.x, m.c.h.y, m.c.h.th] : m.m ? [m.m.cx, m.m.cy, m.m.th] : [m.A.x, m.A.y, m.A.th]; },
+  set(m, x, y, th){ if (m.c){ m.c.h.x = x; m.c.h.y = y; m.c.h.th = th; } else if (m.m){ m.m.cx = x; m.m.cy = y; m.m.th = th; } else { m.A.x = x; m.A.y = y; m.A.th = th; } },
+  rig(m){ return m.c ? m.c.h.rig : m.m ? m.m.rig : m.A.rig; },
+};
+function updateParty(dt){
+  const P = PARTY, all = z5Calves.length >= 15 && z5Calves.every(c => c.phase === 'dressed');
+  if (all && !P.on){
+    P.on = true; P.members = partyMembers();
+    if (!P.told){ P.told = true; music.chime(1, true); }               // no words: it's a secret ending
+  }
+  if (!all && P.on){
+    // it's over (a reset): everyone back to their places
+    P.on = false;
+    for (const m of P.members){ if (m.c) m.c.conga = false; if (m.A){ m.A.conga = false; m.A.x = m.A.hx; m.A.y = m.A.hy; } if (m.m){ m.m.cx = m.m.hx; m.m.cy = m.m.hy; m.m.th = m.m.face0; } }
+    P.members = [];
+  }
+  P.k += ((P.on ? 1 : 0) - P.k) * Math.min(1, dt*0.4);
+  if (P.on){
+    P.t += dt*1.3;
+    for (const m of P.members){
+      const L = P.lines[m.lane], [tx, ty] = partyAt(L, P.t + m.off), [x, y, th] = pm.get(m), dx = tx - x, dy = ty - y, dist = Math.hypot(dx, dy);
+      // hurry along to your place in the line, then keep step
+      const sp = dist > 0.3 ? Math.min(5, 1.3 + dist*1.5) : 1.3, st = Math.min(dist, sp*dt);
+      const nx = dist > 1e-6 ? x + dx/dist*st : x, ny = dist > 1e-6 ? y + dy/dist*st : y;
+      const [ax, ay] = partyAt(L, P.t + m.off + 1.5), want = dist > 2 ? Math.atan2(dx, -dy) : Math.atan2(ax - tx, -(ay - ty));
+      let d = want - th; d -= Math.round(d/(2*Math.PI))*2*Math.PI;
+      pm.set(m, nx, ny, th + d*Math.min(1, dt*5));
+      const r = pm.rig(m), [px, py, pth] = pm.get(m);
+      r.root.position.set(px, height(px, py), py); r.root.rotation.y = -pth;
+      m.gait += sp*dt;
+      if (m.kind === 'calf'){ walkMoose(r, m.gait/1.1, 0.42); r.head.rotation.x = 0.1*Math.sin(m.gait*1.5); }
+      else { const ph = m.gait*Math.PI*1.6; r.body.position.y = 0.05*Math.abs(Math.sin(ph)); r.body.rotation.z = 0.12*Math.sin(ph*0.5); if (r.train) r.train.rotation.y = 0.2*Math.sin(ph*0.5); }
+    }
+  }
+  updateCosmic(dt);
+}
+// the cosmic moose: six of them, translucent and faintly shifting in colour, walking a slow circle round the planet
+function updateCosmic(dt){
+  const P = PARTY;
+  if (P.k < 0.01 && !P.cosmic) return;
+  if (!P.cosmic){
+    P.cosmic = [0, 1, 2, 3, 4, 5].map(i => {
+      const mat = new THREE.MeshBasicMaterial({ color: 0xb8a6ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide });
+      const rig = buildMoose(false); rig.root.traverse(o => { if (o.isMesh){ o.material = mat; o.frustumCulled = false; } });
+      rig.root.scale.setScalar(58);
+      return { rig, mat, a: i/6*Math.PI*2, ph: i*1.3, gait: i*0.3 };
+    });
+  }
+  const show = space.world.visible && P.k > 0.01, now = performance.now()/1000;
+  for (const M of P.cosmic){
+    M.rig.root.visible = show; if (!show) continue;
+    M.a += dt*0.018; M.gait += dt*0.35;
+    // a great circle out past the planet (its near side brushing the planet), so from the plateau they tower over the
+    // horizon without ever stepping over the cliff
+    const R = 250, cx = 250, cz = 1500, x = cx + Math.cos(M.a)*R, z = cz + Math.sin(M.a)*R, y = -30 + 30*Math.sin(M.a*2 + M.ph);
+    M.rig.root.position.set(x, y, z); M.rig.root.rotation.y = -Math.atan2(-Math.sin(M.a), -Math.cos(M.a)) + Math.PI;   // walking along the circle
+    walkMoose(M.rig, M.gait, 0.35);
+    for (const T of M.rig.tentacles) T.segs.forEach((g, k) => { g.rotation.x = 0.2*Math.sin(now*0.8 + T.phase + k*0.7) + 0.12; g.rotation.z = 0.18*Math.sin(now*0.6 + T.phase + k*0.5); });
+    M.mat.opacity = 0.22*P.k*space.k;
+    M.mat.color.setHSL((0.72 + 0.08*Math.sin(now*0.15 + M.ph)) % 1, 0.7, 0.72);
+  }
+}
+
 function updateZone5(dt){
   const near = S.y > WORLD.y1 - 120;
   { const M = zone5.domeM, want = SKY_ON && Math.hypot(S.x - Z5_TEMPLE.x, S.y - Z5_TEMPLE.y) < 17 ? 0.1 : 1; M.opacity += (want - M.opacity)*Math.min(1, dt*5); M.depthWrite = M.opacity > 0.98; }
@@ -5243,7 +5338,8 @@ function fireworkBurst(cx, cy, cz){
 function updateFireworks(dt){
   const F = fireworks;
   _bhv.set(S.x, ground(S.x, S.y) + 1, S.y);
-  if (SKY_ON && SKY_ON.d.final && _bhv.distanceTo(blackHole.centre) > 72){
+  // on the Starway out in the open, or (on or off any bridge) anywhere in zone 5 while the court is celebrating
+  if ((SKY_ON && SKY_ON.d.final && _bhv.distanceTo(blackHole.centre) > 72) || (PARTY.on && S.y > WORLD.y1 - 20)){
     F.t -= dt;
     if (F.t <= 0){
       F.t = 0.3 + Math.random()*0.55;
@@ -6366,7 +6462,7 @@ function loop(t){
 }
 loadProgress(); applyRegalia(); calfUI();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

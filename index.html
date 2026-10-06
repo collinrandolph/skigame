@@ -1295,7 +1295,8 @@ const CROWN_SPIRAL = (() => {
   for (let i = 1; i < X.length; i++) cum.push(cum[i-1] + Math.hypot(X[i] - X[i-1], Y[i] - Y[i-1]));
   const n = X.length, L = cum[n-1], a = 12, m = CROWN.rise/(L - a/2), H = new Float64Array(n);
   for (let i = 0; i < n; i++){ const q = cum[i]; H[i] = RING_LEVEL + (q < a ? m*q*q/(2*a) : m*(q - a/2)); }
-  const d = { name: 'Crystal Spiral', X, Y, H, cum, n, L, hw: 2.8, cap: true, always: true, box: [s.x - CROWN.r1 - 6, s.y - CROWN.r1 - 6, s.x + CROWN.r1 + 6, s.y + CROWN.r1 + 6] };
+  // (an end to get on at, its foot on the floor; its top is closed; no junctions)
+  const d = { name: 'Crystal Spiral', X, Y, H, cum, n, L, hw: 2.8, cap: true, always: true, kind: 'spiral', ends: [{ ground: true }, { ground: false }], joins: [], box: [s.x - CROWN.r1 - 6, s.y - CROWN.r1 - 6, s.x + CROWN.r1 + 6, s.y + CROWN.r1 + 6] };
   const sp = []; for (let i = 0; i < n; i += 3) sp.push(X[i], Y[i]);
   d.trail = { name: d.name, diff: 'blue', s: sp, w: 2*d.hw, bx: d.box.slice(), len: L, climb: CROWN.rise, mid: [X[n >> 2], Y[n >> 2]], cave: true, deck: true };
   // the crystals: evenly up the path from just past its foot to the lookout at the top
@@ -7973,12 +7974,17 @@ function renderWorlds(){
   renderer.clippingPlanes = []; renderer.autoClear = true; camera.layers.set(0);
 }
 // ---- the light underground and on the station, and how close in the camera comes
-let caveK = 0, caveCamK = 0, stationK = 0, caveLit = false;
+let caveK = 0, caveCamK = 0, stationK = 0, caveLit = false, caveShown = true;
 const CAVE_FOG = new THREE.Color(0x17141f), CAVE_SKY = new THREE.Color(0xa69be6), CAVE_GND = new THREE.Color(0x4f4878);
 const _cc = new THREE.Color(), _hb = new THREE.Color(), _hg = new THREE.Color();
 function updateCave(dt){
   const nearCave = Math.hypot(Math.max(CAVE_BOX.x0 - S.x, 0, S.x - CAVE_BOX.x1), Math.max(CAVE_BOX.y0 - S.y, 0, S.y - CAVE_BOX.y1)) < 120;
-  if (nearCave || UNDER){ if (!caveDress.done) buildCaveDressing(); updateCaveTiles(); }
+  if (nearCave || UNDER){ if (!caveDress.done){ const before = new Set(scene.children); buildCaveDressing(); caveDress.objs = scene.children.filter(o => !before.has(o) && o !== STATION_GROUP); } updateCaveTiles(); }
+  // on the surface the cave is drawn only round the mine's entrance (so you see into the tunnel): anywhere else its
+  // rooms and roofs, beyond the map's edge and under it, stay hidden
+  { const show = UNDER || Math.hypot(camera.position.x - MINE.x, camera.position.z - MINE.y) < 70 || Math.hypot(S.x - MINE.x, S.y - MINE.y) < 70;
+    if (show !== caveShown){ caveShown = show; for (const o of caveDress.objs || []) o.visible = show; if (show && caveDress.crownGems) caveDress.crownGems.forEach((m, k) => { m.visible = !crownHas(k); }); for (const t of caveTiles.values()){ if (t.mesh) t.mesh.visible = show; if (t.roof) t.roof.visible = show; } }
+    else if (!show) for (const t of caveTiles.values()){ if (t.mesh && t.mesh.visible) t.mesh.visible = false; if (t.roof && t.roof.visible) t.roof.visible = false; } }
   const powered = cavePowered();
   let want = 0, camWant = 0, stWant = 0;
   if (ONSTATION) stWant = 1;

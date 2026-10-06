@@ -135,6 +135,7 @@ The underground was built in a sandbox copy of the game and is now merged into i
   - crate stacks, barrels and cable reels;
   - prefab huts and compressors;
   - lamp posts and striped barriers.
+- **Seen from the surface:** the cave is drawn only round the mine's entrance (so you can see into the tunnel). Anywhere else on the surface its rooms and roofs, under and beyond the map's edge, are hidden.
 - **Lights:** the cave has a couple of dozen light spots, but only a fixed pool of six real lights. The crown room keeps just two gentle ones (its pillar, lanterns and crystals glow on their own). Each frame they take the places of the nearest spots, which keeps every graphics card responsive (the crown room used to freeze some).
 - **Landmark camera:** coming up to the crystal gate, the crown door or the cargo bin at the space port, the camera eases into zone 5's low, upward-looking framing.
 

@@ -311,7 +311,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <div class="btns"><button id="copySet" type="button">Copy settings</button><button id="defSet" type="button">Restore defaults</button></div>
     <p class="note" id="setNote">Your slider changes are kept in this browser.</p>
     <h4>Testing</h4>
-    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button><button id="arrowBtn" type="button">Heading arrow: off</button><button id="cpAltar" type="button">Checkpoint: altar</button><button id="cpZ5" type="button">Checkpoint: zone 5</button><button id="caveMouth" type="button">Cave: the mine</button><button id="caveHall" type="button">Cave: the hub</button><button id="caveStation" type="button">Cave: the station</button><button id="caveRegalia" type="button">Reward outfit: off</button><button id="cpRing" type="button">Checkpoint: story ring</button><button id="cpStation" type="button">Checkpoint: station</button></div>
+    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button><button id="arrowBtn" type="button">Heading arrow: off</button><button id="cpAltar" type="button">Checkpoint: altar</button><button id="cpZ5" type="button">Checkpoint: zone 5</button><button id="caveMouth" type="button">Cave: the mine</button><button id="caveHall" type="button">Cave: the hub</button><button id="caveStation" type="button">Cave: the station</button><button id="caveRegalia" type="button">Reward outfit: off</button><button id="cpRing" type="button">Checkpoint: village loop</button><button id="cpStation" type="button">Checkpoint: station</button></div>
     <label for="tOrb1">Zone 1 terminals powered<output id="oOrb1"></output><input id="tOrb1" type="range" min="0" max="2" step="1" value="0"></label>
     <label for="tOrb2">Zone 2 terminals powered<output id="oOrb2"></output><input id="tOrb2" type="range" min="0" max="3" step="1" value="0"></label>
     <label for="tOrb3">Zone 3 terminals powered<output id="oOrb3"></output><input id="tOrb3" type="range" min="0" max="5" step="1" value="0"></label>
@@ -892,10 +892,12 @@ const PORTAL_HW = 4.5;
 // reached by a spiral ramp, eight dock arms (a walkway each side of a docked ship) and two portal arms out to the
 // portals. all metal decks, all railed. pieces at deck level are straight walkways: [ax, ay, bx, by, half-width]
 const STATION = { x: PORTAL_X + 190, y: 300, h: RING_LEVEL, R: 95, hw: 4.5, hubR: 40, deckR: 46, deckHW: 3.5, deckUp: 8, armIn: 96, armOut: 185, walkHW: 2.5 };
-STATION.walks = []; STATION.docks = []; STATION.arms = [];
+STATION.walks = []; STATION.docks = []; STATION.arms = []; STATION.loops = [];
 for (let k = 0; k < 8; k++){
   const a = k*Math.PI/4, ux = Math.cos(a), uy = Math.sin(a), big = k === 0, off = big ? 13 : 10, out = big ? STATION.armOut + 15 : STATION.armOut;
-  const dock = { k, ux, uy, big, off, r0: STATION.armIn + 12, r1: out - 8 }; STATION.docks.push(dock);
+  const dock = { k, a, ux, uy, big, off, out, r0: STATION.armIn + 12, r1: out - 9 }; STATION.docks.push(dock);
+  // the two walkways meet in a loop round the ship's nose
+  STATION.loops.push({ x: STATION.x + ux*out, y: STATION.y + uy*out, ux, uy, a, r: off, hw: STATION.walkHW, name: 'Dock ' + (k + 1) });
   for (const sd of [-1, 1]){
     const nx = -uy*off*sd, ny = ux*off*sd;
     STATION.walks.push([STATION.x + ux*STATION.armIn + nx, STATION.y + uy*STATION.armIn + ny, STATION.x + ux*out + nx, STATION.y + uy*out + ny, STATION.walkHW, 'Dock ' + (k + 1)]);
@@ -907,10 +909,12 @@ for (const T of TRANSPORT){
 }
 // the spiral ramp, from the walkway ring's inside edge up to the hub deck: a third of a turn, rising 8 m
 STATION.ramp = (() => {
-  const X = [], Y = [], H = [], cum = [0], th0 = 20*Math.PI/180, sweep = 110*Math.PI/180, r0 = STATION.R - STATION.hw + 0.8, r1 = STATION.deckR + STATION.deckHW - 0.8;
-  for (let k = 0; k <= 160; k++){ const t = k/160, r = r0 + (r1 - r0)*t, th = th0 + sweep*t; X.push(STATION.x + Math.cos(th)*r); Y.push(STATION.y + Math.sin(th)*r); H.push(STATION.h + STATION.deckUp*smooth01(0, 1, t)); }
+  const X = [], Y = [], H = [], cum = [0], th0 = 20*Math.PI/180, sweep = 120*Math.PI/180, r0 = STATION.R, r1 = STATION.deckR;   // centre line to centre line
+  // level while it still overlaps either deck, climbing only in between
+  const tA = (STATION.hw + STATION.deckHW)/(r0 - r1), tB = 1 - (2*STATION.deckHW)/(r0 - r1);
+  for (let k = 0; k <= 160; k++){ const t = k/160, r = r0 + (r1 - r0)*t, th = th0 + sweep*t; X.push(STATION.x + Math.cos(th)*r); Y.push(STATION.y + Math.sin(th)*r); H.push(STATION.h + STATION.deckUp*smooth01(tA, tB, t)); }
   for (let i = 1; i < X.length; i++) cum.push(cum[i-1] + Math.hypot(X[i] - X[i-1], Y[i] - Y[i-1]));
-  return { X, Y, H, cum, n: X.length, hw: 2.5 };
+  return { X, Y, H, cum, n: X.length, hw: STATION.deckHW };
 })();
 let ONSTATION = false;       // on the space station (a world of its own, reached through the portals)
 // ---- the rooms. each spoke room's floor drops from its hub end to its ring end; its theme shapes the floor along its
@@ -918,14 +922,14 @@ let ONSTATION = false;       // on the space station (a world of its own, reache
 const SPOKE_R = 125, SPOKE_TOP = -8, SPOKE_BOT = -36, LIFT_LAT = 22;
 const SPOKES = [
   { a: 36,  theme: 'rollers',  name: 'Roller Coaster',  slick: 0.2 },
-  { a: 108, theme: 'lift',     name: 'Lift & Slalom',   slick: 0.5 },
+  { a: 108, theme: 'lift',     name: 'Lift & Slalom',   slick: 1 },
   { a: 180, theme: 'crown',    name: 'Crown Room',      slick: 1 },
   { a: 252, theme: 'berms',    name: 'Berm Run',        slick: 0.2 },
   { a: 324, theme: 'halfpipe', name: 'Half-pipe Chute', slick: 0.2 },
 ];
 for (const s of SPOKES){ [s.x, s.y] = polar(s.a, SPOKE_R); s.ux = Math.cos(rad(s.a)); s.uy = Math.sin(rad(s.a)); s.edge = s.theme === 'crown' ? 28 : 38; }
 const local = (s, a, lat) => [s.x + s.ux*a - s.uy*lat, s.y + s.uy*a + s.ux*lat];
-const SLALOM = a => -8 + 11*Math.sin(2*Math.PI*(a + 7.5)/30);    // the slalom's line across the lift room
+const SLALOM = a => -6 + 5.5*Math.sin(2*Math.PI*a/36);          // the slalom's line across the lift room: a turn every 18 m
 function spokeFeature(s, a, lat){
   switch (s.theme){
     case 'rollers': return 1.0*Math.sin(2*Math.PI*a/16);
@@ -953,7 +957,7 @@ for (const s of SPOKES){
 {
   const circles = [];
   for (let a = RING_A0; a <= RING_A1 + 1e-6; a += 2.5){ const [x, y] = ringPt(a); circles.push([x, y, ringW(a)]); }
-  ROOMS.push({ name: 'The Story Ring', ring: true, circles, k: 20, H: 38, wallW: 12, edgeH: 9, slick: 1, base: (x, y) => RING_LEVEL + 1.5*Math.sin(x/37)*Math.cos(y/41) });
+  ROOMS.push({ name: 'The Village Loop', ring: true, circles, k: 20, H: 38, wallW: 12, edgeH: 9, slick: 1, base: (x, y) => RING_LEVEL + 1.5*Math.sin(x/37)*Math.cos(y/41) });
 }
 for (const T of TRANSPORT) ROOMS.push({ name: 'Transport Room', transport: T, circles: [[T.x, T.y, 30]], k: 12, H: 30, wallW: 8, edgeH: 7, slick: 1, base: () => RING_LEVEL });
 const RING_ROOM = ROOMS.find(r => r.ring), ringBase = (x, y) => RING_ROOM.base(x, y);
@@ -1088,12 +1092,13 @@ function stationD(x, y){
   const r = Math.hypot(x - STATION.x, y - STATION.y);
   let d = Math.min(Math.abs(r - STATION.R) - STATION.hw, Math.abs(r - STATION.deckR) - STATION.deckHW);
   for (const w of STATION.walks) d = Math.min(d, segDist(x, y, w[0], w[1], w[2], w[3]) - w[4]);
+  for (const L of STATION.loops){ const rx = x - L.x, ry = y - L.y; if (rx*L.ux + ry*L.uy >= 0) d = Math.min(d, Math.abs(Math.hypot(rx, ry) - L.r) - L.hw); }
   if (r > STATION.deckR - 4 && r < STATION.R + 2) d = Math.min(d, stationRamp(x, y)[0] - STATION.ramp.hw);
   return d;
 }
 function stationFloor(x, y){
   const r = Math.hypot(x - STATION.x, y - STATION.y);
-  if (r > STATION.deckR - 4 && r < STATION.R){ const [d, h] = stationRamp(x, y); if (d < STATION.ramp.hw + 0.4) return h; }
+  if (r > STATION.deckR - 4 && r < STATION.R + STATION.hw + 1){ const [d, h] = stationRamp(x, y); if (d < STATION.ramp.hw + 0.4) return h; }
   if (Math.abs(r - STATION.deckR) < STATION.deckHW + 0.8) return STATION.h + STATION.deckUp;
   return STATION.h;
 }
@@ -1155,12 +1160,13 @@ function caveLift(dt){
   S.tgt += dh*Math.min(1, dt*4); S.th += (S.tgt - S.th)*Math.min(1, dt*6);
   return true;
 }
-// ---- the cave city in the story ring: terraced dwellings carved into both walls with a street down the middle, and a
-// second level: a terrace along the first row of buildings, winding from wall to wall over the street on bridges, with
-// a ramp up from the street at one end and down at the other. there are two of these, one each side of the crown room
+// ---- the cave city in the village loop: terraced dwellings carved into both walls with a street down the middle, and a
+// second level: light bridges along the first row of buildings, winding from wall to wall over the street, with a
+// ramp up from the street at one end and down at the other (two, one each side of the crown room). like the other
+// light bridges they're dark until the crystal gate opens (or the testing switch is on)
 let CAVE_DECK = null;          // the terrace you're skiing on, if any: { d: deck, i: sample hint }
 function ringLocal(x, y){ const dx = x - CAVE_C.x, dy = y - CAVE_C.y; let a = Math.atan2(dy, dx)*180/Math.PI; if (a < 0) a += 360; return [a, Math.hypot(dx, dy) - ringR(a), ringW(a)]; }
-const TERR_H = RING_LEVEL + 7.5, TERR_SET = 9, STREET_EDGE = 12.5;   // terrace top; how far in from the ring's edge it runs; the street's edge
+const TERR_H = RING_LEVEL + 7.5, TERR_SET = 11, STREET_EDGE = 12.5;   // terrace top; how far in from the ring's edge it runs; the street's edge
 // where the ring's inner wall stays open (the halls' mouths) and the ends near the transport rooms
 const CITY_GAPS_IN = SPOKES.map(s => [s.a - 10, s.a + (s.theme === 'lift' ? 16 : 10)]);
 function cityBuilt(a, side){ if (a < 34 || a > 326) return false; if (side < 0) for (const g of CITY_GAPS_IN) if (a > g[0] && a < g[1]) return false; return true; }
@@ -1216,7 +1222,7 @@ function caveDeckStep(){
     if ((p.s <= 0.3 && v < 0) || (p.s >= D.d.L - 0.3 && v > 0)) CAVE_DECK = null;
     return;
   }
-  if (sp < 0.3) return;
+  if (sp < 0.3 || !skyActive()) return;
   for (const d of CITY_DECKS) for (const end of [0, 1]){
     const i = end ? d.n - 1 : 0, ex = d.X[i], ey = d.Y[i]; if (Math.hypot(S.x - ex, S.y - ey) > d.hw) continue;
     const j = end ? d.n - 6 : 5, ix = d.X[j] - ex, iy = d.Y[j] - ey, L = Math.hypot(ix, iy);
@@ -1225,7 +1231,7 @@ function caveDeckStep(){
 }
 // on the street, a ramp's rising sides are in the way (a bridge high overhead isn't)
 function cityRampSD(x, y, floor){
-  let d = 99;
+  let d = 99; if (!skyActive()) return d;
   for (const dk of CITY_DECKS){
     if (x < dk.box[0] || x > dk.box[2] || y < dk.box[1] || y > dk.box[3]) continue;
     const p = cityProj(dk, x, y, null); if (p.dist > dk.hw + 0.5) continue;
@@ -1247,10 +1253,16 @@ for (const s of SPOKES){
 { const pts = [[PORTAL_X, TRANSPORT[0].y], [TRANSPORT[0].x, TRANSPORT[0].y]];
   for (let a = RING_A1 - 6; a >= RING_A0 + 6; a -= 8) pts.push(ringPt(a));
   pts.push([TRANSPORT[1].x, TRANSPORT[1].y], [PORTAL_X, TRANSPORT[1].y]);
-  CAVE_TRAILS.push({ name: 'Story Ring', diff: 'green', pts }); }
+  CAVE_TRAILS.push({ name: 'Village Loop', diff: 'green', pts }); }
 { const circle = (R, name, w) => { const pts = []; for (let k = 0; k <= 72; k++){ const t = k/72*2*Math.PI; pts.push([STATION.x + Math.cos(t)*R, STATION.y + Math.sin(t)*R]); } STATION_TRAILS.push({ name, diff: 'green', pts, w }); };
   circle(STATION.R, 'Main Walkway', 2*STATION.hw); circle(STATION.deckR, 'Hub Deck', 2*STATION.deckHW);
-  for (const w of STATION.walks) STATION_TRAILS.push({ name: w[5], diff: 'green', pts: [[w[0], w[1]], [(w[0] + w[2])/2, (w[1] + w[3])/2], [w[2], w[3]]], w: 2*w[4] });
+  for (const w of STATION.arms) STATION_TRAILS.push({ name: w[5], diff: 'green', pts: [[w[0], w[1]], [(w[0] + w[2])/2, (w[1] + w[3])/2], [w[2], w[3]]], w: 2*w[4] });
+  STATION.docks.forEach((dk, k) => {
+    const L = STATION.loops[k], wa = STATION.walks[2*k], wb = STATION.walks[2*k + 1], pts = [[wa[0], wa[1]], [wa[2], wa[3]]];
+    for (let t = 1; t < 12; t++){ const ang = L.a - Math.PI/2 + Math.PI*t/12; pts.push([L.x + Math.cos(ang)*L.r, L.y + Math.sin(ang)*L.r]); }
+    pts.push([wb[2], wb[3]], [wb[0], wb[1]]);
+    STATION_TRAILS.push({ name: L.name, diff: dk.big ? 'blue' : 'green', pts, w: 2*STATION.walkHW });
+  });
   const R = STATION.ramp, pts = []; for (let i = 0; i < R.n; i += 8) pts.push([R.X[i], R.Y[i]]); pts.push([R.X[R.n-1], R.Y[R.n-1]]);
   STATION_TRAILS.push({ name: 'Hub Ramp', diff: 'blue', pts, w: 2*R.hw }); }
 for (const t of [...CAVE_TRAILS, ...STATION_TRAILS]){
@@ -1446,7 +1458,7 @@ let lastKickAt = 0, lastPushAt = 0, weightLeg = null, camPending = 0;
 // mark grows along that line as the body travels. when the body drifts too far off that line (a curve, or
 // the V opening wider than a leg can reach), the ski is lifted and set down again under the skier.
 function newSki(side, ang, ax = S.x, ay = S.y){
-  const s = { ax, ay, dx: Math.sin(ang), dy: -Math.cos(ang), len: 0, live: true, side, slot: -1, dirty: true, noTrack: !!SKY_ON || ONSTATION };
+  const s = { ax, ay, dx: Math.sin(ang), dy: -Math.cos(ang), len: 0, live: true, side, slot: -1, dirty: true, noTrack: !!SKY_ON || ONSTATION || !!CAVE_DECK };
   skyMarkNew(s);
   skis.push(s); if (skis.length > 1200) skis.shift();
   return s;
@@ -2300,7 +2312,7 @@ function step(dt){
   else {
     // gravity along the skis. on an energy bridge a climb costs no speed: only a descent's pull counts
     const gpull = G * (hx*fx + hy*fy) * dt;
-    if (!SKY_ON || gpull*fwd < 0 || Math.abs(fwd) < 0.05) fwd -= gpull;
+    if (!(SKY_ON || CAVE_DECK) || gpull*fwd < 0 || Math.abs(fwd) < 0.05) fwd -= gpull;
     // tuck: crouched low with skis together, so air drag drops
     fwd *= Math.exp(-P.glide * surf * S.slick * (mode === 'tuck' ? 1 - P.tuck/100 : 1) * dt);
     const dec = (P.fric * f.fric * surf * S.slick + (mode === 'plow' ? P.plow : 0)) * dt;
@@ -7012,7 +7024,7 @@ function camTarget(){
 const CAVE_BOX = { x0: -790, x1: -20, y0: -20, y1: 620 };
 const caveTiles = new Map(); let caveJob = null, caveJobKey = null;
 const CAVE_LOAD = 170, CAVE_DROP = 260;
-const pastPortal = (x, y) => x > PORTAL_X + 1e-6 && TRANSPORT.some(T => Math.abs(y - T.y) < 36);
+const pastPortal = (x, y) => x > PORTAL_X + 1e-6 && x < PORTAL_X + 12 && TRANSPORT.some(T => Math.abs(y - T.y) < 36);   // (just the bit of each transport room past its wall, not the shaft)
 function caveCellOpen(f, x, y){ return f.ceil - f.floor > 0.02 && x <= MINE.x + 1e-6 && !pastPortal(x, y); }
 const ROOF_COL = { ice: new THREE.Color(0x9fb8cc), rock: new THREE.Color(0x56667a), deep: new THREE.Color(0x3e4a5c) };
 const CAVE_MATS = [];        // every material of the cave's own (the portal rendering needs to know them)
@@ -7184,7 +7196,7 @@ function buildCaveDressing(){
   // the slalom: gates of two poles, alternating red and blue, at each turn of its line
   { const s = LIFT_SPOKE, poleG = new THREE.CylinderGeometry(0.05, 0.05, 1.9, 6), mats = [new THREE.MeshLambertMaterial({ color: 0xd9463e }), new THREE.MeshLambertMaterial({ color: 0x2f6fd6 })];
     let k = 0;
-    for (let a = -30; a <= 30; a += 7.5, k++) for (const sd of [-1, 1]){
+    for (let a = -27; a <= 27; a += 18, k++) for (const sd of [-1, 1]){
       const [x, y] = local(s, a, SLALOM(a)*smooth01(38, 24, Math.abs(a)) + sd*2.2); caveField(x, y, f);
       const m = new THREE.Mesh(poleG, mats[k % 2]); m.position.set(x, f.floor + 0.95, y); scene.add(m);
       const fl = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.45), mats[k % 2]); fl.material.side = THREE.DoubleSide; fl.position.set(x, f.floor + 1.6, y); scene.add(fl);
@@ -7246,41 +7258,30 @@ function buildCaveDressing(){
       const W = ringW(a), len = rad(2.4)*(ringR(a) + side*(W - 9))*0.86;
       const lat1 = side*(W - 9.5), [x1, y1] = polar(a, ringR(a) + lat1); caveField(x1, y1, f);
       // the first row: under a terrace it holds the terrace up; under a low ramp there's no room for one
-      let top1 = f.floor + 3.5 + rnd()*3;
-      for (const dk of CITY_DECKS){ const p = cityProj(dk, x1, y1, null); if (p.dist < dk.hw + 3.2) top1 = p.h - 0.8; }
+      let top1 = f.floor + 3.5 + rnd()*2.5;
+      for (const dk of CITY_DECKS){ const p = cityProj(dk, x1, y1, null); if (p.dist < dk.hw + 3.5) top1 = Math.min(top1, p.h - 1.2); }
       if (top1 - f.floor >= 1.5) put(a, lat1, 6, len, f.floor - 1, top1, side);
-      const lat2 = side*(W - 5), [x2, y2] = polar(a, ringR(a) + lat2); caveField(x2, y2, f);
-      const top2 = Math.max(top1, f.floor) + 4 + rnd()*5; put(a + (rnd() - 0.5)*0.6, lat2, 4, len*0.9, f.floor - 1, top2, side);
+      const lat2 = side*(W - 4), [x2, y2] = polar(a, ringR(a) + lat2); caveField(x2, y2, f);
+      const top2 = Math.max(top1, f.floor) + 4 + rnd()*5; put(a + (rnd() - 0.5)*0.6, lat2, 3, len*0.9, f.floor - 1, top2, side);
       if (rnd() < 0.7){ const lat3 = side*(W - 1.5), [x3, y3] = polar(a, ringR(a) + lat3); caveField(x3, y3, f); put(a + (rnd() - 0.5)*0.8, lat3, 3, len*0.8, f.floor - 1, Math.max(top2, f.floor) + 3 + rnd()*5, side); }
     }
     bm.count = nb; wm.count = nw; bm.instanceColor.needsUpdate = true; scene.add(bm); scene.add(wm);
   }
-  // ---- the terraces: a groomed top between low adobe parapets, a slab beneath (which shows where it bridges the street)
+  // ---- the terraces, as light bridges: a pale glowing deck with purple railings of light (hidden until they're lit)
   {
-    const cv = document.createElement('canvas'); cv.width = 32; cv.height = 64; const x = cv.getContext('2d');
-    x.fillStyle = C.groomed || '#f4f8fb'; x.fillRect(0, 0, 32, 64); x.fillStyle = C.cord || '#dfe8ef'; for (let k = 0; k < 32; k += 6) x.fillRect(k, 0, 3, 64);
-    const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    const topMat = new THREE.MeshLambertMaterial({ map: tex }), adobe = new THREE.MeshLambertMaterial({ color: 0xa88d6d, side: THREE.DoubleSide });
+    const deckMat = new THREE.MeshBasicMaterial({ color: 0xd8ccff, side: THREE.DoubleSide, transparent: true, opacity: 0.92 }), railMat = new THREE.MeshBasicMaterial({ color: 0xa47cff });
+    caveDress.terraces = [];
     for (const d of CITY_DECKS){
-      const top = [], uv = [], idx = [], wall = [], under = [];
+      const g = new THREE.Group(), top = [], idx = [], rails = [[], []];
       for (let i = 0; i < d.n; i++){
-        const a = Math.max(0, i - 1), b = Math.min(d.n - 1, i + 1), tx = d.X[b] - d.X[a], ty = d.Y[b] - d.Y[a], tl = Math.hypot(tx, ty), nx = -ty/tl, ny = tx/tl, h = d.H[i];
-        for (const sd of [-1, 1]){ top.push(d.X[i] + nx*d.hw*sd, h, d.Y[i] + ny*d.hw*sd); uv.push(sd < 0 ? 0 : 1, d.cum[i]/4); }
-        if (i){
-          idx.push(2*i - 2, 2*i, 2*i - 1, 2*i - 1, 2*i, 2*i + 1);
-          const ha = d.H[i-1], ia = i - 1, pa = Math.max(0, ia - 1), pb = Math.min(d.n - 1, ia + 1), ta = Math.hypot(d.X[pb] - d.X[pa], d.Y[pb] - d.Y[pa]), nxa = -(d.Y[pb] - d.Y[pa])/ta, nya = (d.X[pb] - d.X[pa])/ta;
-          for (const sd of [-1, 1]){
-            const ax = d.X[ia] + nxa*(d.hw + 0.2)*sd, ay = d.Y[ia] + nya*(d.hw + 0.2)*sd, bx = d.X[i] + nx*(d.hw + 0.2)*sd, by = d.Y[i] + ny*(d.hw + 0.2)*sd;
-            wall.push(ax, ha - 0.9, ay, bx, h - 0.9, by, ax, ha + 0.7, ay, ax, ha + 0.7, ay, bx, h - 0.9, by, bx, h + 0.7, by);   // parapet and the slab's edge
-          }
-          const ax0 = d.X[ia] - nxa*(d.hw + 0.2), ay0 = d.Y[ia] - nya*(d.hw + 0.2), ax1 = d.X[ia] + nxa*(d.hw + 0.2), ay1 = d.Y[ia] + nya*(d.hw + 0.2);
-          const bx0 = d.X[i] - nx*(d.hw + 0.2), by0 = d.Y[i] - ny*(d.hw + 0.2), bx1 = d.X[i] + nx*(d.hw + 0.2), by1 = d.Y[i] + ny*(d.hw + 0.2);
-          under.push(ax0, ha - 0.9, ay0, bx0, h - 0.9, by0, ax1, ha - 0.9, ay1, ax1, ha - 0.9, ay1, bx0, h - 0.9, by0, bx1, h - 0.9, by1);
-        }
+        const a = Math.max(0, i - 1), b = Math.min(d.n - 1, i + 1), tx = d.X[b] - d.X[a], ty = d.Y[b] - d.Y[a], tl = Math.hypot(tx, ty), nx = -ty/tl, ny = tx/tl, h = d.H[i] + 0.04;
+        for (const sd of [-1, 1]){ top.push(d.X[i] + nx*d.hw*sd, h, d.Y[i] + ny*d.hw*sd); if (i % 2 === 0) rails[sd < 0 ? 0 : 1].push(new THREE.Vector3(d.X[i] + nx*d.hw*sd, h + 1.0, d.Y[i] + ny*d.hw*sd)); }
+        if (i) idx.push(2*i - 2, 2*i, 2*i - 1, 2*i - 1, 2*i, 2*i + 1);
       }
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(top, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
-      scene.add(new THREE.Mesh(g, topMat));
-      for (const arr of [wall, under]){ const q = new THREE.BufferGeometry(); q.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); q.computeVertexNormals(); scene.add(new THREE.Mesh(q, adobe)); }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(top, 3)); geo.setIndex(idx);
+      g.add(new THREE.Mesh(geo, deckMat));
+      for (const r of rails) g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(r), r.length, 0.07, 5, false), railMat));
+      scene.add(g); caveDress.terraces.push(g);
     }
   }
   // ---- the space station (from the concept): metal decks with light strips, the domed hub, ships at the docks, the
@@ -7293,19 +7294,73 @@ function buildCaveDressing(){
     const G = STATION_GROUP, h = STATION.h;
     const deck = (rep) => { const t = plates.clone(); t.needsUpdate = true; t.repeat.set(rep[0], rep[1]); return new THREE.MeshLambertMaterial({ map: t, side: THREE.DoubleSide }); };
     const strip = new THREE.MeshBasicMaterial({ color: 0x9fd0ff }), steel = new THREE.MeshLambertMaterial({ color: 0x5c6773 }), hull = new THREE.MeshLambertMaterial({ color: 0xd9dde2 }), hull2 = new THREE.MeshLambertMaterial({ color: 0x8e97a2 }), glow = new THREE.MeshBasicMaterial({ color: 0x6fb6ff });
-    const ringDeck = (R, hw, y) => {
-      const m = new THREE.Mesh(new THREE.RingGeometry(R - hw, R + hw, 192, 1), deck([R/4, R/4])); m.rotation.x = -Math.PI/2; m.position.set(STATION.x, y, STATION.y); G.add(m);
-      for (const r of [R - hw, R + hw]){ const t = new THREE.Mesh(new THREE.TorusGeometry(r, 0.06, 5, 192), strip); t.rotation.x = Math.PI/2; t.position.set(STATION.x, y + 1.0, STATION.y); G.add(t); }
-      const u = new THREE.Mesh(new THREE.CylinderGeometry(R + hw, R + hw, 1.2, 96, 1, true), steel); u.position.set(STATION.x, y - 0.6, STATION.y); G.add(u);
+    // each deck piece's footprint, so its railing can leave a gap wherever another piece joins it
+    const inPiece = (id, x, y) => {
+      const r = Math.hypot(x - STATION.x, y - STATION.y);
+      if (id !== 'main' && Math.abs(r - STATION.R) < STATION.hw - 0.2) return true;
+      if (id !== 'hub' && Math.abs(r - STATION.deckR) < STATION.deckHW - 0.2) return true;
+      if (id !== 'ramp' && r > STATION.deckR - 4 && r < STATION.R + 2 && stationRamp(x, y)[0] < STATION.ramp.hw - 0.2) return true;
+      for (let k = 0; k < STATION.walks.length; k++){ const w = STATION.walks[k]; if (id !== 'w' + k && segDist(x, y, w[0], w[1], w[2], w[3]) < w[4] - 0.2) return true; }
+      for (let k = 0; k < STATION.loops.length; k++){ const L = STATION.loops[k], rx = x - L.x, ry = y - L.y; if (id !== 'l' + k && rx*L.ux + ry*L.uy >= 0 && Math.abs(Math.hypot(rx, ry) - L.r) < L.hw - 0.2) return true; }
+      return false;
     };
-    ringDeck(STATION.R, STATION.hw, h); ringDeck(STATION.deckR, STATION.deckHW, h + STATION.deckUp);
-    // the walkways: the dock arms (one each side of every ship) and the two portal arms
-    for (const w of STATION.walks){
-      const dx = w[2] - w[0], dy = w[3] - w[1], L = Math.hypot(dx, dy), m = new THREE.Mesh(new THREE.PlaneGeometry(L, 2*w[4]), deck([L/8, w[4]/4]));
-      m.rotation.set(-Math.PI/2, 0, -Math.atan2(dy, dx)); m.position.set((w[0] + w[2])/2, h + 0.01, (w[1] + w[3])/2); G.add(m);
-      for (const sd of [-1, 1]){ const r = new THREE.Mesh(new THREE.BoxGeometry(L, 0.08, 0.08), strip); r.rotation.y = -Math.atan2(dy, dx); r.position.set((w[0] + w[2])/2 - dy/L*w[4]*sd, h + 1.0, (w[1] + w[3])/2 + dx/L*w[4]*sd); G.add(r); }
-      const s = new THREE.Mesh(new THREE.BoxGeometry(L, 1.0, 2*w[4]), steel); s.rotation.y = -Math.atan2(dy, dx); s.position.set((w[0] + w[2])/2, h - 0.5, (w[1] + w[3])/2); G.add(s);
-    }
+    // a railing along points [x, y, height], broken where it would cross another piece
+    const railing = (id, pts) => {
+      let run = [];
+      const flush = () => { if (run.length > 1) G.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(run), Math.max(2, run.length), 0.06, 5, false), strip)); run = []; };
+      for (const p of pts){ if (inPiece(id, p[0], p[1])) flush(); else run.push(new THREE.Vector3(p[0], p[2] + 1.0, p[1])); }
+      flush();
+    };
+    const circlePts = (cx, cy, R, y, a0 = 0, a1 = 2*Math.PI, n = 360) => { const o = []; for (let k = 0; k <= n; k++){ const a = a0 + (a1 - a0)*k/n; o.push([cx + Math.cos(a)*R, cy + Math.sin(a)*R, y]); } return o; };
+    // the two round decks: a plated top, steel sides inside and out, and a steel underside
+    const ringDeck = (id, R, hw, y) => {
+      const m = new THREE.Mesh(new THREE.RingGeometry(R - hw, R + hw, 192, 1), deck([R/4, R/4])); m.rotation.x = -Math.PI/2; m.position.set(STATION.x, y, STATION.y); G.add(m);
+      for (const rr of [R - hw, R + hw]){ const u = new THREE.Mesh(new THREE.CylinderGeometry(rr, rr, 1.2, 128, 1, true), steel); u.material.side = THREE.DoubleSide; u.position.set(STATION.x, y - 0.6, STATION.y); G.add(u); }
+      const b = new THREE.Mesh(new THREE.RingGeometry(R - hw, R + hw, 192, 1), steel); b.rotation.x = Math.PI/2; b.position.set(STATION.x, y - 1.2, STATION.y); G.add(b);
+      railing(id, circlePts(STATION.x, STATION.y, R - hw, y)); railing(id, circlePts(STATION.x, STATION.y, R + hw, y));
+    };
+    steel.side = THREE.DoubleSide;
+    ringDeck('main', STATION.R, STATION.hw, h); ringDeck('hub', STATION.deckR, STATION.deckHW, h + STATION.deckUp);
+    // a straight walkway, trimmed to the round deck it runs into, with depth: plated top, steel sides and underside
+    const trim = (ax, ay, bx, by) => {
+      // where along a->b the edge leaves / enters the walkway ring's outer edge
+      const RR = STATION.R + STATION.hw, fx = ax - STATION.x, fy = ay - STATION.y, dx = bx - ax, dy = by - ay;
+      const A = dx*dx + dy*dy, B = 2*(fx*dx + fy*dy), Cc = fx*fx + fy*fy - RR*RR, disc = B*B - 4*A*Cc;
+      let t0 = 0, t1 = 1;
+      if (disc > 0){ const q = Math.sqrt(disc), r1 = (-B - q)/(2*A), r2 = (-B + q)/(2*A); if (Cc < 0) t0 = Math.max(0, r2); else if (Math.hypot(bx - STATION.x, by - STATION.y) < RR) t1 = Math.min(1, r1); }
+      return [ax + dx*t0, ay + dy*t0, ax + dx*t1, ay + dy*t1];
+    };
+    const slab = (quads, yTop) => {
+      // quads: [[x,y] x4] corners going round. top (plated), sides and bottom
+      const pos = [], uv = [], sideP = [];
+      for (const q of quads){
+        const L = Math.hypot(q[1][0] - q[0][0], q[1][1] - q[0][1]);
+        pos.push(...q[0], ...q[1], ...q[2], ...q[0], ...q[2], ...q[3]);
+        uv.push(0, 0, L/8, 0, L/8, 0.6, 0, 0, L/8, 0.6, 0, 0.6);
+        for (let k = 0; k < 4; k++){ const a = q[k], b = q[(k + 1) % 4]; sideP.push(a[0], yTop, a[1], b[0], yTop, b[1], a[0], yTop - 1.0, a[1], b[0], yTop, b[1], b[0], yTop - 1.0, b[1], a[0], yTop - 1.0, a[1]); }
+        sideP.push(q[0][0], yTop - 1.0, q[0][1], q[2][0], yTop - 1.0, q[2][1], q[1][0], yTop - 1.0, q[1][1], q[0][0], yTop - 1.0, q[0][1], q[3][0], yTop - 1.0, q[3][1], q[2][0], yTop - 1.0, q[2][1]);
+      }
+      const top = []; for (let k = 0; k < pos.length; k += 2) top.push(pos[k], yTop, pos[k+1]);
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(top, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.computeVertexNormals();
+      const sd = new THREE.BufferGeometry(); sd.setAttribute('position', new THREE.Float32BufferAttribute(sideP, 3)); sd.computeVertexNormals();
+      G.add(new THREE.Mesh(g, deck([1, 1]))); G.add(new THREE.Mesh(sd, steel));
+    };
+    STATION.walks.forEach((w, k) => {
+      const dx = w[2] - w[0], dy = w[3] - w[1], L = Math.hypot(dx, dy), nx = -dy/L*w[4], ny = dx/L*w[4];
+      const e1 = trim(w[0] + nx, w[1] + ny, w[2] + nx, w[3] + ny), e2 = trim(w[0] - nx, w[1] - ny, w[2] - nx, w[3] - ny);
+      slab([[[e1[0], e1[1]], [e1[2], e1[3]], [e2[2], e2[3]], [e2[0], e2[1]]]], h);
+      for (const e of [e1, e2]){ const pts = []; for (let t = 0; t <= 1.0001; t += 1/Math.max(2, Math.ceil(L/2))) pts.push([e[0] + (e[2] - e[0])*t, e[1] + (e[3] - e[1])*t, h]); railing('w' + k, pts); }
+    });
+    // the loops round the ships' noses
+    STATION.loops.forEach((Lp, k) => {
+      const n = 24, quads = [], a0 = Lp.a - Math.PI/2;
+      for (let i = 0; i < n; i++){
+        const p = (t, r) => [Lp.x + Math.cos(a0 + Math.PI*t)*r, Lp.y + Math.sin(a0 + Math.PI*t)*r];
+        quads.push([p(i/n, Lp.r - Lp.hw), p((i + 1)/n, Lp.r - Lp.hw), p((i + 1)/n, Lp.r + Lp.hw), p(i/n, Lp.r + Lp.hw)]);
+      }
+      slab(quads, h);
+      for (const rr of [Lp.r - Lp.hw, Lp.r + Lp.hw]) railing('l' + k, circlePts(Lp.x, Lp.y, rr, h, a0, a0 + Math.PI, 48));
+    });
     // the spiral ramp up to the hub deck
     { const R = STATION.ramp, pos = [], uv = [], idx = [], rails = [[], []];
       for (let i = 0; i < R.n; i++){ const a = Math.max(0, i - 1), b = Math.min(R.n - 1, i + 1), tx = R.X[b] - R.X[a], ty = R.Y[b] - R.Y[a], tl = Math.hypot(tx, ty), nx = -ty/tl, ny = tx/tl;
@@ -7313,7 +7368,12 @@ function buildCaveDressing(){
         if (i) idx.push(2*i - 2, 2*i, 2*i - 1, 2*i - 1, 2*i, 2*i + 1); }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
       G.add(new THREE.Mesh(g, deck([1, 1])));
-      for (const r of rails) G.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(r), r.length, 0.06, 5, false), strip)); }
+      for (const r of rails) railing('ramp', r.map(v => [v.x, v.z, v.y - 1.0]));
+      // and its depth: steel sides and underside
+      const sideP = [];
+      for (let i = 1; i < R.n; i++){ for (const k of [0, 1]){ const a = rails[k][i-1], b = rails[k][i]; sideP.push(a.x, a.y - 1, a.z, b.x, b.y - 1, b.z, a.x, a.y - 2, a.z, b.x, b.y - 1, b.z, b.x, b.y - 2, b.z, a.x, a.y - 2, a.z); }
+        const a0 = rails[0][i-1], a1 = rails[1][i-1], b0 = rails[0][i], b1 = rails[1][i]; sideP.push(a0.x, a0.y - 2, a0.z, a1.x, a1.y - 2, a1.z, b0.x, b0.y - 2, b0.z, a1.x, a1.y - 2, a1.z, b1.x, b1.y - 2, b1.z, b0.x, b0.y - 2, b0.z); }
+      const sd = new THREE.BufferGeometry(); sd.setAttribute('position', new THREE.Float32BufferAttribute(sideP, 3)); sd.computeVertexNormals(); G.add(new THREE.Mesh(sd, steel)); }
     // the hub: a broad drum with a band of light, a low dome and a spire of antennas
     { const hb = new THREE.Group(); hb.position.set(STATION.x, h, STATION.y); G.add(hb);
       const drum = new THREE.Mesh(new THREE.CylinderGeometry(STATION.hubR, STATION.hubR + 2, 26, 64), hull); drum.position.y = 7; hb.add(drum);
@@ -7448,6 +7508,7 @@ function updateCave(dt){
   for (const m of caveDress.gens) m.color.setHex(powered ? 0xb79cff : 0x3a3048);
   for (const m of caveDress.membranes){ m.material.color.setHex(powered ? 0xb79cff : 0x2c2238); m.material.opacity = powered ? 0.16 : 0.95; }
   if (caveDress.crownBarrier) caveDress.crownBarrier.visible = !CROWN_GATE.open;
+  if (caveDress.terraces){ const on = skyActive() || !!CAVE_DECK; for (const t of caveDress.terraces) t.visible = on; }
   if (caveDress.liftTex) caveDress.liftTex.offset.y = (caveDress.liftTex.offset.y + dt*LIFT.v/3) % 1;
   if (caveDress.planet) caveDress.planet.rotation.y += dt*0.004;
   if (sk > 0.05 && camera.far < 7000){ camera.far = 7000; camera.updateProjectionMatrix(); }   // the planet's horizon is far off
@@ -7530,7 +7591,7 @@ $('caveMouth').addEventListener('click', () => caveSpawn('mouth'));
 $('caveHall').addEventListener('click', () => caveSpawn('hall'));
 $('caveStation').addEventListener('click', () => caveSpawn('station'));
 // checkpoints in the cave: kept like the others, so a new visit starts you there
-for (const [id, where, msg] of [['cpRing', 'ring', 'Checkpoint set in the story ring.'], ['cpStation', 'station', 'Checkpoint set on the space station.']])
+for (const [id, where, msg] of [['cpRing', 'ring', 'Checkpoint set in the village loop.'], ['cpStation', 'station', 'Checkpoint set on the space station.']])
   $(id).addEventListener('click', () => { checkpoint = { cave: where }; saveProgress(); caveSpawn(where); toast(msg); });
 // testing: put the reward outfit on or off (it's what opens the crown gate)
 const regaliaBtn = () => { $('caveRegalia').textContent = 'Reward outfit: ' + (completions > 0 ? 'on' : 'off'); };

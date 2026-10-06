@@ -322,6 +322,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tAramp">Trail assist ease-in (ms)<output id="oAramp"></output><input id="tAramp" type="range" min="0" max="4000" step="100" value="1500"></label>
     <h4>Camera</h4>
     <label for="tCamd">Camera distance (m)<output id="oCamd"></output><input id="tCamd" type="range" min="4" max="24" step="0.5" value="15"></label>
+    <label for="tPixel">Pixel size (big, chunky pixels like A Short Hike; 1 is off)<output id="oPixel"></output><input id="tPixel" type="range" min="1" max="6" step="1" value="3"></label>
     <label for="tSway">Camera side-follow (s)<output id="oSway"></output><input id="tSway" type="range" min="0.1" max="2" step="0.05" value="0.8"></label>
     <label for="tCam">Camera smoothing (s)<output id="oCam"></output><input id="tCam" type="range" min="0.1" max="1.5" step="0.05" value="0.6"></label>
     <label for="tAhug">Camera hugs trail (%)<output id="oAhug"></output><input id="tAhug" type="range" min="0" max="1" step="0.05" value="0.35"></label>
@@ -360,13 +361,20 @@ const PX_PER_M = 28;        // world scale: 1 grid cell = 1 m, major line every 
 let W = 0, H = 0, dpr = 1;
 function resize(){
   dpr = Math.min(devicePixelRatio||1, 2); W = innerWidth; H = innerHeight; cv.width = W*dpr; cv.height = H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
-  if (typeof renderer !== 'undefined'){ renderer.setPixelRatio(dpr); renderer.setSize(W, H, false); camera.aspect = W/H; camera.updateProjectionMatrix(); }
+  // the pixel look: the 3D view is drawn at a fraction of the screen's resolution and scaled up with hard edges, so
+  // each of its pixels is a chunky block (the same as snapping every screen pixel to a coarser grid and resampling;
+  // the HUD and map, on their own canvas, stay sharp)
+  if (typeof renderer !== 'undefined'){
+    const px = P.pixel > 1 ? P.pixel : 0;
+    renderer.setPixelRatio(px ? 1/px : dpr); renderer.setSize(W, H, false); camera.aspect = W/H; camera.updateProjectionMatrix();
+    renderer.domElement.style.imageRendering = px ? 'pixelated' : '';
+  }
 }
 addEventListener('resize', resize);
 
 const $ = id => document.getElementById(id);
 const P = {};
-const tune = [['tSky','oSky','sky',v=>v ? 'on' : 'when the crystal gate opens'],['tMagnet','oMagnet','magnet',v=>v ? v.toFixed(1) : 'off'],['tRumble','oRumble','rumble',v=>v ? v.toFixed(0)+'%' : 'off'],['tRumble2','oRumble2','rumble2',v=>v ? v.toFixed(0)+'%' : 'off'],['tRumbleL','oRumbleL','rumbleL',v=>v ? v.toFixed(1)+'%' : 'off'],['tMarks','oMarks','marks',v=>v.toFixed(0)+'%'],['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tSwait','oSwait','swait',v=>v.toFixed(0)],['tSthrow','oSthrow','sthrow',v=>v.toFixed(0)],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tBsnap','oBsnap','bsnap',v=>v ? v.toFixed(0) : 'off'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKfloor','oKfloor','kfloor',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
+const tune = [['tPixel','oPixel','pixel',v=>v > 1 ? v.toFixed(0) + ' px' : 'off'],['tSky','oSky','sky',v=>v ? 'on' : 'when the crystal gate opens'],['tMagnet','oMagnet','magnet',v=>v ? v.toFixed(1) : 'off'],['tRumble','oRumble','rumble',v=>v ? v.toFixed(0)+'%' : 'off'],['tRumble2','oRumble2','rumble2',v=>v ? v.toFixed(0)+'%' : 'off'],['tRumbleL','oRumbleL','rumbleL',v=>v ? v.toFixed(1)+'%' : 'off'],['tMarks','oMarks','marks',v=>v.toFixed(0)+'%'],['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tSwait','oSwait','swait',v=>v.toFixed(0)],['tSthrow','oSthrow','sthrow',v=>v.toFixed(0)],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tBsnap','oBsnap','bsnap',v=>v ? v.toFixed(0) : 'off'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKfloor','oKfloor','kfloor',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
   ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tOffglide','oOffglide','offglide',v=>v.toFixed(0)+'%'],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -380,7 +388,7 @@ tune.forEach(([i,o,k,f]) => {
   const el = $(i);
   if (saved[i] !== undefined) el.value = saved[i];
   const upd = () => { P[k] = +el.value; $(o).textContent = f(+el.value); };
-  el.addEventListener('input', () => { upd(); saveTuning(); if (k === 'marks' && typeof recolourTracks === 'function') recolourTracks(); }); upd();
+  el.addEventListener('input', () => { upd(); saveTuning(); if (k === 'marks' && typeof recolourTracks === 'function') recolourTracks(); if (k === 'pixel') resize(); }); upd();
 });
 $('dbgToggle').addEventListener('click', e => {
   DBG.on = !DBG.on; e.target.textContent = 'Stick debug: ' + (DBG.on ? 'on' : 'off'); $('dbgBox').hidden = !DBG.on; dbgRender();
@@ -8047,7 +8055,9 @@ function updateCave(dt){
 // near a portal, the camera's line to you must pass through the doorway: if it would cross the portals' wall anywhere
 // else, it's brought in to your side of it
 function portalCamClamp(){
+  // (only at a doorway: the mine shaft crosses the portals' wall line too, far from either doorway)
   if (!UNDER) return;
+  if (!TRANSPORT.some(T => Math.abs(S.y - T.y) < 36) || caveField(S.x, S.y).shaftS !== Infinity) return;
   const p = camera.position, sx = S.x, sz = S.y, sy = camH + 1.2;
   if ((p.x - PORTAL_X)*(sx - PORTAL_X) >= 0) return;               // both on the same side
   const t = (PORTAL_X - sx)/(p.x - sx), z = sz + (p.z - sz)*t, y = sy + (p.y - sy)*t;

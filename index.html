@@ -1101,7 +1101,9 @@ function caveField(x, y, out = CF){
   let d = Infinity, floor = Infinity, ceil = -Infinity, sd = -Infinity, best = Infinity, bestHall = false, bestW = 9, shaftS = Infinity, slick = 1;
   const shape = (di, base, H, wallW, edgeH, isHall, sl, hi) => {
     let f, c;
-    if (di >= 0){ f = base + edgeH + 30*di; c = base + edgeH - 30*di; }
+    // (past its wall the two part steeply, but only by a few metres: further out they'd be spikes hundreds of metres
+    // tall in the edge triangles of the cave's surfaces, poking up through the ground)
+    if (di >= 0){ const q = Math.min(30*di, 4); f = base + edgeH + q; c = base + edgeH - q; }
     else { const t = Math.max(0, 1 + di/wallW), t2 = Math.max(0, 1 + di/(2*wallW)); f = base + edgeH*Math.pow(t, 2.2); c = base + H - (H - edgeH)*t2*t2; }
     floor = floor === Infinity ? f : smin(floor, f, 0.6);
     ceil = ceil === -Infinity ? c : -smin(-ceil, -c, 1);
@@ -1117,7 +1119,7 @@ function caveField(x, y, out = CF){
   // portal, where the ridge gives plenty of cover and the tunnel must keep its full height)
   if (x > WORLD.x0 - 5){
     const capK = shaftS < 24 ? smooth01(14, 24, shaftS) : 1;
-    if (capK > 0){ const cap = heightNat(x, y) - 1.2; if (ceil > cap) ceil += (cap - ceil)*capK; }
+    if (capK > 0){ const cap = heightNat(x, y) - 1.2; if (ceil > cap) ceil += (cap - ceil)*capK; if (floor > cap) floor += (cap - floor)*capK; }
   }
   if (ceil < floor) ceil = floor;
   out.d = d; out.floor = floor; out.ceil = ceil; out.wallW = bestW; out.shaftS = shaftS; out.hall = bestHall ? 1 : 0; out.sd = sd; out.slick = slick;
@@ -7974,17 +7976,21 @@ function renderWorlds(){
   renderer.clippingPlanes = []; renderer.autoClear = true; camera.layers.set(0);
 }
 // ---- the light underground and on the station, and how close in the camera comes
-let caveK = 0, caveCamK = 0, stationK = 0, caveLit = false, caveShown = true;
+let caveK = 0, caveCamK = 0, stationK = 0, caveLit = false, caveShown = -1;
+const _bx = new THREE.Box3(), _mineP = new THREE.Vector3();
 const CAVE_FOG = new THREE.Color(0x17141f), CAVE_SKY = new THREE.Color(0xa69be6), CAVE_GND = new THREE.Color(0x4f4878);
 const _cc = new THREE.Color(), _hb = new THREE.Color(), _hg = new THREE.Color();
 function updateCave(dt){
   const nearCave = Math.hypot(Math.max(CAVE_BOX.x0 - S.x, 0, S.x - CAVE_BOX.x1), Math.max(CAVE_BOX.y0 - S.y, 0, S.y - CAVE_BOX.y1)) < 120;
   if (nearCave || UNDER){ if (!caveDress.done){ const before = new Set(scene.children); buildCaveDressing(); caveDress.objs = scene.children.filter(o => !before.has(o) && o !== STATION_GROUP); } updateCaveTiles(); }
-  // on the surface the cave is drawn only round the mine's entrance (so you see into the tunnel): anywhere else its
-  // rooms and roofs, beyond the map's edge and under it, stay hidden
-  { const show = UNDER || Math.hypot(camera.position.x - MINE.x, camera.position.z - MINE.y) < 70 || Math.hypot(S.x - MINE.x, S.y - MINE.y) < 70;
-    if (show !== caveShown){ caveShown = show; for (const o of caveDress.objs || []) o.visible = show; if (show && caveDress.crownGems) caveDress.crownGems.forEach((m, k) => { m.visible = !crownHas(k); }); for (const t of caveTiles.values()){ if (t.mesh) t.mesh.visible = show; if (t.roof) t.roof.visible = show; } }
-    else if (!show) for (const t of caveTiles.values()){ if (t.mesh && t.mesh.visible) t.mesh.visible = false; if (t.roof && t.roof.visible) t.roof.visible = false; } }
+  // on the surface the cave is drawn only round the mine's entrance (so you see into the tunnel), and then only the
+  // parts of it near the entrance: the rest (its rooms, their roofs and icicles, out under and beyond the map's edge)
+  // stays hidden. 2 underground: everything; 1 near the entrance: the nearby parts; 0 elsewhere: nothing
+  { const near = Math.hypot(camera.position.x - MINE.x, camera.position.z - MINE.y) < 70 || Math.hypot(S.x - MINE.x, S.y - MINE.y) < 70;
+    const state = UNDER ? 2 : near ? 1 : 0, mp = _mineP.set(MINE.x, MINE.F0, MINE.y);
+    const nearMine = o => { if (o.userData.nearMine === undefined){ _bx.setFromObject(o); o.userData.nearMine = !_bx.isEmpty() && _bx.distanceToPoint(mp) < 45; } return o.userData.nearMine; };
+    if (state !== caveShown){ caveShown = state; for (const o of caveDress.objs || []) o.visible = state === 2 || (state === 1 && nearMine(o)); if (state === 2 && caveDress.crownGems) caveDress.crownGems.forEach((m, k) => { m.visible = !crownHas(k); }); }
+    for (const t of caveTiles.values()) for (const m of [t.mesh, t.roof]){ if (!m) continue; const v = state === 2 || (state === 1 && nearMine(m)); if (m.visible !== v) m.visible = v; } }
   const powered = cavePowered();
   let want = 0, camWant = 0, stWant = 0;
   if (ONSTATION) stWant = 1;

@@ -431,13 +431,15 @@ const SPUR = (() => {
   return { x1, y1, x2, y2: riverY(x2), hw: 17, half: 25 };
 })();
 // river crossings: a stone ramp on each bank rising from the snow to deck level, and a timber deck spanning the
-// water between them. the ramps meet the snow flush. the zone 2 crossing is a drawbridge, raised until zone 2's orbs
-// are in; the lower crossing (zone 3 to the switchbacks below zone 1) is a plain fixed bridge.
+// water between them. the ramps meet the snow flush. both crossings are drawbridges, raised until zone 2's terminals
+// are all powered, then each lowered from its own control.
 function makeBridge(x, gated){
   const yc = riverY(x), IN = RIVER_HW + 0.8, OUT = RIVER_BANK + 8;           // deck half-length, ramp outer end
   return { x, yc, IN, OUT, yN: yc - OUT, yS: yc + OUT, hw: 1.8, W: 4.0, gated, deck: null };
 }
-const BRIDGE = makeBridge(300, true), BRIDGE2 = makeBridge(20, false), BRIDGES = [BRIDGE, BRIDGE2];
+const BRIDGE = makeBridge(300, true), BRIDGE2 = makeBridge(20, true), BRIDGES = [BRIDGE, BRIDGE2];
+// the pass through the spur: a notch cut down to the snow, so the switchbacks below the saddle can be reached from zone 2
+const SPUR_PASS = { y: 122, flat: 5, edge: 18, open: 9 };
 // zone 3's frozen lake: an irregular oval, flat ice that skis like groomed trail
 const LAKE = { x: 175, y: 300, rx: 78, ry: 48, h: -1.4 };
 function lakeQ(x, y){
@@ -446,10 +448,10 @@ function lakeQ(x, y){
 }
 const onLake = (x, y) => lakeQ(x, y) < 1;
 // the saddle: a notch in the south side of zone 1's mountains, reached by switchbacks from the river below. the south
-// gate sits in it, opened by zone 3's orbs
+// gate sits in it, opened by zone 1's terminals (from either side)
 const SADDLE = { x: RING.x, y: RING.y + ringCrest(Math.PI/2), h: 18 };
 G4.y = divideY(G4.x);
-let bridgeDown = 0;       // 0 raised .. 1 lowered (animated)
+let bridgeDown = 0, bridge2Down = 0;       // 0 raised .. 1 lowered (animated)
 
 // ---- terrain: gentle rolling hills, heights in metres (about ±3 m over 20–60 m wavelengths)
 const FLAT_GROUND = false;  // true makes the whole map level (no hills, no gravity pull), for testing
@@ -473,7 +475,7 @@ function spurHeight(x, y){
   const d = segDist(x, y, SPUR.x1, SPUR.y1, SPUR.x2, SPUR.y2); if (d >= SPUR.half) return 0;
   const tip = smooth01(RIVER_BANK - 3, RIVER_BANK + 8, Math.abs(y - riverY(x)));   // ends in a bluff above the water
   const amp = 24 + 5*Math.sin(y/9) + 3*Math.sin(x/5 + y/11);
-  return amp * tip * 0.5*(1 + Math.cos(Math.PI*d/SPUR.half));
+  return amp * tip * 0.5*(1 + Math.cos(Math.PI*d/SPUR.half)) * smooth01(SPUR_PASS.flat, SPUR_PASS.edge, Math.abs(y - SPUR_PASS.y));
 }
 function edgeHeight(x, y){
   const e = Math.min(x - WORLD.x0, WORLD.x1 - x, y - WORLD.y0, WORLD.y1 - y);
@@ -579,7 +581,7 @@ function height(x, y){
   return h;
 }
 // what you stand on: the terrain, or a bridge. each deck sits level, a little above the middle of its two banks
-const bridgeOpen = B => !B.gated || bridgeDown > 0.98;
+const bridgeOpen = B => !B.gated || (B === BRIDGE2 ? bridge2Down : bridgeDown) > 0.98;
 const deckLevel = (B = BRIDGE) => B.deck ?? (B.deck = (height(B.x, B.yN) + height(B.x, B.yS))/2 + 0.3);
 // a ramp's surface: the snow's own height across its outer end, rising evenly to the deck at the water's edge
 function rampH(x, y, B = BRIDGE){
@@ -620,7 +622,7 @@ function obstacleSD(x, y, terrainOnly = false){
   // the switchbacks: a lane along the trail, up through the mountains to the saddle
   if (SWB){ const b = swbSample(x, y); if (b) ring = Math.max(ring, -(b[0] - (TRAIL_W/2 + 0.6))); }
   let d = ring;
-  // the south gate across the saddle, shut until zone 3's orbs are in
+  // the south gate across the saddle, shut until it's opened with zone 1's terminals powered
   if (!gate2Open) d = Math.min(d, Math.max(Math.abs(y - SADDLE.y) - 0.35, Math.abs(x - SADDLE.x) - 4.6));
   // the gate: stone walls either side of the doors always, the doors themselves until zone 1's orbs are in
   const gx = Math.abs(x - GATE.x);
@@ -631,8 +633,8 @@ function obstacleSD(x, y, terrainOnly = false){
   { const gx = Math.abs(x - G4.x), gy = Math.abs(y - G4.y);
     d = Math.min(d, Math.hypot(gx - (G4.hw + 1.4), gy) - 1.4);                       // the two pylons
     if (!gate4Open) d = Math.min(d, Math.max(gy - 0.7, gx - G4.hw - 0.5)); }
-  // the spur ridge down to the river
-  d = Math.min(d, segDist(x, y, SPUR.x1, SPUR.y1, SPUR.x2, SPUR.y2) - SPUR.hw);
+  // the spur ridge down to the river, with its pass
+  d = Math.min(d, Math.max(segDist(x, y, SPUR.x1, SPUR.y1, SPUR.x2, SPUR.y2) - SPUR.hw, SPUR_PASS.open - Math.abs(y - SPUR_PASS.y)));
   // the river, with the bridge across it once it's lowered
   let river = Math.abs(y - riverY(x)) - RIVER_BANK;
   // crossings: open along the ramps, and over the water once the deck is down (else you stop at the ramp's end)
@@ -675,6 +677,9 @@ function zoneAt(x, y){
   return x > SPUR.x1 ? 2 : 3;      // the strip west of the spur belongs to zone 3's way back
 }
 function inZone1(x, y){ return zoneAt(x, y) === 1; }
+// the zone the HUD and map show: as zoneAt, but the strip under the switchbacks is reached from zone 2 now (zoneAt
+// keeps it as zone 3 so the scenery laid out by zone stays put)
+function hudZone(x, y){ const z = zoneAt(x, y); return z === 3 && y < riverY(x) ? 2 : z; }
 
 // ---- groomed trail network. control points in metres; north is up (negative y).
 // difficulty uses the usual trail-map marks: easiest green circle, more difficult blue square, most difficult black diamond
@@ -697,6 +702,8 @@ const TRAILS = [
   // the way back: from zone 1's home stretch up to the saddle, then switchbacks down the far side to the lower bridge
   { name:'Switchbacks',      diff:'black',  zone:0, saddleAt:6, pts:[[-30,18],[-48,38],[-30,52],[5,48],[12,62],[-6,80],[SADDLE.x,SADDLE.y],
       [-8,95],[-18,99],[-24,105],[-18,111],[26,111],[32,117],[26,123],[-14,123],[-20,129],[-14,135],[12,135],[BRIDGE2.x,BRIDGE2.yN - 1]] },
+  // zone 2's way west: through the pass in the spur to the foot of the switchbacks, without crossing the river
+  { name:'Spur Pass',        diff:'green',  zone:0, pts:[[246,95],[215,108],[180,116],[140,120],[105,122],[75,122],[58,125],[50,131],[40,135.5],[30,137],[23,138.5],[BRIDGE2.x,BRIDGE2.yN - 1]] },
   // zone 3: around and across the frozen lake, among the ruins
   { name:'Bridge Road',      diff:'green',  zone:3, pts:[[BRIDGE2.x,BRIDGE2.yS + 1],[45,195],[100,212],[150,218],[200,214],[250,205],[285,190],[BRIDGE.x,BRIDGE.yS + 1]] },
   { name:'Lake Loop',        diff:'green',  zone:3, pts:[[175.0,236.0],[209.6,243.2],[238.6,256.7],[262.4,275.4],[269.0,300.0],[264.5,325.2],[239.8,344.1],[209.2,356.2],[175.0,364.0],[137.6,361.5],[105.6,347.2],[88.7,324.3],[81.0,300.0],[90.8,276.3],[106.9,253.6],[137.2,237.9],[175.0,236.0]] },
@@ -2723,10 +2730,10 @@ function buildGate(gx, gy, rotY, reach){
 const gate = buildGate(GATE.x, GATE.y, 0, PASS_HW + 5);
 const gate2 = buildGate(SADDLE.x, SADDLE.y, -Math.PI/2, 9);    // the south gate: doors open toward zone 3 (south)
 function setGateOpen(on){ gateOpen = on; }
-// the drawbridge: a steel deck hinged on the far (south) bank between two white lifting pylons, standing up on end
-// until zone 2's orbs are in, then lowered across the river. the lower bridge is the same deck, always down.
+// the drawbridges: a steel deck hinged on the far (south) bank between two white lifting pylons, standing up on end
+// until zone 2's terminals are powered and its control is reached, then lowered across the river
 // both are outpost tech: steel deck plates, slate abutments, white bollards and light rails
-let bridgeWanted = false;
+let bridgeWanted = false, bridge2Wanted = false;
 function buildBridge(B){
   const D = deckLevel(B), { x: BX, yc, IN, OUT, W } = B, L = 2*IN;
   const g = new THREE.Group(); scene.add(g);
@@ -2787,8 +2794,7 @@ function buildBridge(B){
   const chains = (B.gated ? [-1, 1] : []).map(sx => { const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]); const l = new THREE.Line(geo, chainMat); hinge.add(l); return { l, sx }; });
   return { g, leaf, chains, L, W };
 }
-const bridge = buildBridge(BRIDGE);
-buildBridge(BRIDGE2);                 // the lower bridge is always down
+const bridge = buildBridge(BRIDGE), bridge2 = buildBridge(BRIDGE2);
 // ---- obstacle controls. each locked way on (the east gate, the drawbridge, the south gate) has its own control facing
 // the side you arrive from: one indicator light per terminal in its zone, red until that terminal is powered and then
 // green, and an antenna light that stays red until you ski up to the control with every terminal powered, which opens
@@ -2802,8 +2808,8 @@ function gateLights(gt, zone, side){
   }
   return mats;
 }
-const bridgePost = (() => {
-  const B = BRIDGE, x = B.x + B.W/2 + 2.4, y = B.yN - 2.2, g = new THREE.Group();
+const makeBridgePost = (B, off = 2.4, dy = -2.2) => {
+  const x = B.x + B.W/2 + off, y = B.yN + dy, g = new THREE.Group();
   g.position.set(x, height(x, y) - 0.05, y); g.rotation.y = Math.PI/2;   // its face (-z) turned toward the trail (west)
   scene.add(g);
   pt(g, bx(1.3, 0.5, 1.1), SM.slate, 0, 0.2, 0);
@@ -2818,28 +2824,36 @@ const bridgePost = (() => {
   halo.position.set(0, 5.15, 0); halo.scale.set(1.8, 1.8, 1); g.add(halo);
   SOLIDS.push({ x, y, r: 0.9 });
   return { x, y, lights: mats, status, halo };
-})();
+};
+const bridgePost = makeBridgePost(BRIDGE), bridge2Post = makeBridgePost(BRIDGE2, 4.2, 2.4);   // set back, clear of the two trails meeting there
 const CONTROLS = [
   { zone: 1, name: 'east gate', lights: gateLights(gate, 1, -1), status: gate.status, halo: gate.halo, x: GATE.x - 5, y: GATE.y, r: 8,
     isOpen: () => gateOpen, open: () => setGateOpen(true), msg: 'The east gate is opening.' },
   { zone: 2, name: 'drawbridge', lights: bridgePost.lights, status: bridgePost.status, halo: bridgePost.halo, x: bridgePost.x - 2, y: bridgePost.y, r: 7,
     isOpen: () => bridgeWanted, open: () => { bridgeWanted = true; }, msg: 'The drawbridge is coming down.' },
-  { zone: 3, name: 'south gate', lights: gateLights(gate2, 3, 1), status: gate2.status, halo: gate2.halo, x: SADDLE.x, y: SADDLE.y + 5, r: 8,
+  { zone: 2, name: 'lower drawbridge', lights: bridge2Post.lights, status: bridge2Post.status, halo: bridge2Post.halo, x: bridge2Post.x - 2, y: bridge2Post.y, r: 7,
+    isOpen: () => bridge2Wanted, open: () => { bridge2Wanted = true; }, msg: 'The lower drawbridge is coming down.' },
+  // the south gate runs on zone 1's terminals too, with lights on both faces: it opens from either side
+  { zone: 1, name: 'south gate', lights: [...gateLights(gate2, 1, -1), ...gateLights(gate2, 1, 1)], status: gate2.status, halo: gate2.halo, x: SADDLE.x, y: SADDLE.y, r: 9,
     isOpen: () => gate2Open, open: () => { gate2Open = true; }, msg: 'The south gate is opening.' },
 ];
 for (const c of CONTROLS) c.told = false;
 function updateControls(){
   for (const c of CONTROLS){
     const ks = zoneKiosks(c.zone);
-    c.lights.forEach((m, k) => m.color.setHex(ks[k] && ks[k].state === 'powered' ? ANTENNA.green : ANTENNA.red));
+    c.lights.forEach((m, k) => m.color.setHex(ks[k % ks.length] && ks[k % ks.length].state === 'powered' ? ANTENNA.green : ANTENNA.red));
     const col = c.isOpen() ? ANTENNA.green : ANTENNA.red;
     c.status.color.setHex(col); c.halo.material.color.setHex(col);
   }
 }
 function animateBridge(dt){
-  const target = bridgeWanted ? 1 : 0;
-  bridgeDown += Math.sign(target - bridgeDown) * Math.min(Math.abs(target - bridgeDown), dt / 4);
-  const e = bridgeDown*bridgeDown*(3 - 2*bridgeDown);
+  bridgeDown = poseBridge(bridge, bridgeDown, bridgeWanted, dt);
+  bridge2Down = poseBridge(bridge2, bridge2Down, bridge2Wanted, dt);
+}
+function poseBridge(bridge, down, wanted, dt){
+  const target = wanted ? 1 : 0;
+  down += Math.sign(target - down) * Math.min(Math.abs(target - down), dt / 4);
+  const e = down*down*(3 - 2*down);
   const a = (1 - e) * 82*Math.PI/180;      // raised: stood up at 82 degrees; lowered: level with the ramps
   bridge.leaf.rotation.x = a;
   for (const c of bridge.chains){
@@ -2848,6 +2862,7 @@ function animateBridge(dt){
     pos.setXYZ(1, c.sx*(bridge.W/2 - 0.06), Math.sin(a)*bridge.L*0.95 + 1.0*Math.cos(a), -Math.cos(a)*bridge.L*0.95 + 1.0*Math.sin(a));
     pos.needsUpdate = true;
   }
+  return down;
 }
 function animateGate(dt){
   const target = gateOpen ? 1 : 0;
@@ -2924,16 +2939,16 @@ function powerKiosk(K, quiet = false){
   if (quiet) return;
   music.chime(1, true);
   const z = K.zone, left = zoneKiosks(z).length - kiosksPowered(z);
-  if (!left) toast(z === 1 ? 'Every terminal is powered. Ski to the east gate to open it.' : z === 2 ? 'Every terminal is powered. Ski to the drawbridge to lower it.'
-    : 'Every terminal is powered. Ski to the south gate to open it, and the altar in the Broken Circle has stirred.');
+  if (!left) toast(z === 1 ? 'Every terminal is powered. The east gate and the south gate will open when you reach them.' : z === 2 ? 'Every terminal is powered. Both drawbridges will lower when you reach them.'
+    : 'Every terminal in this zone is powered.');
   else toast('Terminal powered. ' + left + ' more in this zone.');
   saveProgress();
 }
-// what a zone's kiosks open: zone 1 the east gate, zone 2 the drawbridge, zone 3 the south gate (and the altar wakes)
-function unlockZone(z, quiet){
-  if (z === 1 && !gateOpen){ setGateOpen(true); if (!quiet) toast('Every kiosk is powered. The east gate is open.'); }
-  if (z === 2 && !bridgeWanted){ bridgeWanted = true; if (!quiet) toast('Every kiosk is powered. The bridge is coming down.'); }
-  if (z === 3 && !gate2Open){ gate2Open = true; if (!quiet) toast('Every kiosk is powered. The south gate is open, and the altar in the Broken Circle stirs.'); }
+// what a zone's kiosks open (old saves only): zone 1 both gates, zone 2 both drawbridges. zone 3's terminals are kept
+// for the way into the caves, still to come
+function unlockZone(z){
+  if (z === 1){ setGateOpen(true); gate2Open = true; }
+  if (z === 2){ bridgeWanted = true; bridge2Wanted = true; }
 }
 // dev: power the first n of a zone's kiosks (the rest back to dormant) and open or shut its way on to match
 function setKiosksPowered(zone, n){
@@ -2942,9 +2957,8 @@ function setKiosksPowered(zone, n){
     else { K.state = 'dormant'; for (const o of K.orbs){ o.got = false; o.fade = 0; o.g.visible = false; } updateKioskLook(K); }
   });
   const done = zoneDone(zone);
-  if (zone === 1) setGateOpen(done);
-  if (zone === 2) bridgeWanted = done;
-  if (zone === 3) gate2Open = done;
+  if (zone === 1){ setGateOpen(done); gate2Open = done; }
+  if (zone === 2) bridgeWanted = bridge2Wanted = done;
 }
 { const el = $('tCry'); el.addEventListener('input', () => { setCrystalsCollected(+el.value); checkpoint = { a: 1 }; saveProgress(); $('oCry').textContent = el.value + ' / ' + CRYSTAL_TOTAL; }); }
 for (const z of [1, 2, 3]){
@@ -2957,7 +2971,7 @@ function resetOrbs(){
   for (const K of KIOSKS){ K.state = 'dormant'; K.dismissed = false; for (const o of K.orbs){ o.got = false; o.fade = 0; o.g.visible = false; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; } updateKioskLook(K); }
   if (trial.K){ const K = trial.K; trial.K = null; updateKioskLook(K); }
   releasePet(); returnZ5Calves(); sleepGiant(); checkpoint = null; pet.lastDismissed = -1; SKY_ON = null; bhShown = false;
-  setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; altar.state = 0; altar.dismissed = false; setCrystalsCollected(0); setCrystalsActive(false); updateAltarLook(); gate4Open = false; gate4.open = 0; bridgeWanted = false; bridgeDown = 0; animateGate(0);
+  setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; altar.state = 0; altar.dismissed = false; setCrystalsCollected(0); setCrystalsActive(false); updateAltarLook(); gate4Open = false; gate4.open = 0; bridgeWanted = bridge2Wanted = false; bridgeDown = bridge2Down = 0; animateGate(0);
   saveProgress();
 }
 
@@ -5431,7 +5445,7 @@ function saveProgress(){
   // v2: each kiosk's state and orbs, the altar's state, and the crystals
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ v: 2,
     kiosks: KIOSKS.map(K => K.state[0]).join(''), korbs: orbs.map(o => o.got ? 1 : 0).join(''),
-    altar: altar.state, crystals: crystals.map(c => c.got ? 1 : 0).join(''), open: [gateOpen, bridgeWanted, gate2Open].map(b => b ? 1 : 0).join(''), pet: pet.h ? pet.h.id : -1, pd: pet.lastDismissed, giant: giant.up ? 1 : 0, cp: checkpoint, z5: z5Calves.map(c => [c.h.id, c.slot]) })); } catch (e) {}
+    altar: altar.state, crystals: crystals.map(c => c.got ? 1 : 0).join(''), open: [gateOpen, bridgeWanted, gate2Open, bridge2Wanted].map(b => b ? 1 : 0).join(''), pet: pet.h ? pet.h.id : -1, pd: pet.lastDismissed, giant: giant.up ? 1 : 0, cp: checkpoint, z5: z5Calves.map(c => [c.h.id, c.slot]) })); } catch (e) {}
 }
 function loadProgress(){
   let p = null; try { p = JSON.parse(localStorage.getItem(PROGRESS_KEY) || 'null'); } catch (e) {}
@@ -5452,10 +5466,11 @@ function loadProgress(){
     crystals.forEach((c, i) => { if (p.crystals?.[i] === '1'){ c.got = true; c.fade = 1; } });
   } else return;
   // which ways are open: saved since the gate controls; older saves open every finished zone's way
-  if (p.v === 2 && typeof p.open === 'string'){ if (p.open[0] === '1') setGateOpen(true); if (p.open[1] === '1') bridgeWanted = true; if (p.open[2] === '1') gate2Open = true; }
+  if (p.v === 2 && typeof p.open === 'string'){ if (p.open[0] === '1') setGateOpen(true); if (p.open[1] === '1') bridgeWanted = true; if (p.open[2] === '1') gate2Open = true; if (p.open[3] === '1' || (p.open.length < 4 && bridgeWanted)) bridge2Wanted = true; }
   else for (const z of [1, 2, 3]) if (zoneDone(z)) unlockZone(z, true);
   if (gateOpen) gate.open = 1;
   if (bridgeWanted) bridgeDown = 1;
+  if (bridge2Wanted) bridge2Down = 1;
   if (gate2Open) gate2.open = 1;
   crystals.forEach(c => { c.g.visible = crystalsActive && !c.got; });
   if (altar.state === 2){ gate4Open = true; gate4.open = 1; }
@@ -5921,13 +5936,13 @@ function draw(){
       ctx.fillText('EAST GATE · ' + (gateOpen ? 'OPEN' : kiosksPowered(1) + ' / ' + KIOSK_COUNT[1] + ' TERMINALS'), p[0], p[1]);
     }
   }
-  {
-    const bx = BRIDGE.x, by = (BRIDGE.yN + BRIDGE.yS)/2, d = Math.hypot(bx - S.x, by - S.y);
-    const p = d < 140 && project(bx, BRIDGE.yS, height(bx, BRIDGE.yS) + 8.4);
+  for (const [B, down] of [[BRIDGE, bridgeWanted], [BRIDGE2, bridge2Wanted]]){
+    const bx = B.x, by = (B.yN + B.yS)/2, d = Math.hypot(bx - S.x, by - S.y);
+    const p = d < 140 && project(bx, B.yS, height(bx, B.yS) + 8.4);
     if (p){
       ctx.globalAlpha = Math.min(1, (140 - d) / 40);
-      ctx.fillStyle = bridgeWanted ? C.orb : C.ink;
-      ctx.fillText('BRIDGE · ' + (bridgeWanted ? 'DOWN' : kiosksPowered(2) + ' / ' + KIOSK_COUNT[2] + ' TERMINALS'), p[0], p[1]);
+      ctx.fillStyle = down ? C.orb : C.ink;
+      ctx.fillText('BRIDGE · ' + (down ? 'DOWN' : kiosksPowered(2) + ' / ' + KIOSK_COUNT[2] + ' TERMINALS'), p[0], p[1]);
     }
   }
   {
@@ -5936,7 +5951,7 @@ function draw(){
     if (p){
       ctx.globalAlpha = Math.min(1, (140 - d) / 40);
       ctx.fillStyle = gate2Open ? C.orb : C.ink;
-      ctx.fillText('SOUTH GATE · ' + (gate2Open ? 'OPEN' : kiosksPowered(3) + ' / ' + KIOSK_COUNT[3] + ' TERMINALS'), p[0], p[1]);
+      ctx.fillText('SOUTH GATE · ' + (gate2Open ? 'OPEN' : kiosksPowered(1) + ' / ' + KIOSK_COUNT[1] + ' TERMINALS'), p[0], p[1]);
     }
   }
   {
@@ -6171,7 +6186,7 @@ function drawDiff(d, x, y, r){
 // overview map: inside the ring it frames zone 1; beyond the gate it shows the whole map
 const mapBox = zone => {
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-  for (const t of TRAILS) if (t.zone === zone || (zone === 3 && (t.name === 'Switchbacks' || t.name === 'Crystal Gate')) || (zone === 4 && t.name === 'Crystal Gate')) for (let i = 0; i < t.s.length; i += 2){ x0 = Math.min(x0, t.s[i]); x1 = Math.max(x1, t.s[i]); y0 = Math.min(y0, t.s[i+1]); y1 = Math.max(y1, t.s[i+1]); }
+  for (const t of TRAILS) if (t.zone === zone || (zone === 3 && (t.name === 'Switchbacks' || t.name === 'Crystal Gate')) || (zone === 2 && (t.name === 'Switchbacks' || t.name === 'Spur Pass')) || (zone === 4 && t.name === 'Crystal Gate')) for (let i = 0; i < t.s.length; i += 2){ x0 = Math.min(x0, t.s[i]); x1 = Math.max(x1, t.s[i]); y0 = Math.min(y0, t.s[i+1]); y1 = Math.max(y1, t.s[i+1]); }
   return { x0: x0 - 30, x1: x1 + 30, y0: y0 - 30, y1: y1 + 30 };
 };
 const MAP_BOX = { 1: mapBox(1), 2: mapBox(2), 3: mapBox(3), 4: mapBox(4), 5: { x0: Z5.x0, x1: Z5.x1, y0: WORLD.y1 - 20, y1: Z5.cliff + 15 } };
@@ -6186,7 +6201,11 @@ function renderMapLayers(g, MAP, mx, my, mw, mh, sc){
   g.beginPath();
   for (let k = 0; k <= 96; k++){ const th = k/96*2*Math.PI, r = ringCrest(th), x = mX(RING.x + r*Math.cos(th)), y = mY(RING.y + r*Math.sin(th)); k ? g.lineTo(x, y) : g.moveTo(x, y); }
   g.stroke();
-  g.lineWidth = Math.max(3, SPUR.hw*2*sc); g.beginPath(); g.moveTo(mX(SPUR.x1), mY(SPUR.y1)); g.lineTo(mX(SPUR.x2), mY(SPUR.y2)); g.stroke();
+  { // the spur, broken at its pass
+    const at = y => [mX(SPUR.x1 + (SPUR.x2 - SPUR.x1)*(y - SPUR.y1)/(SPUR.y2 - SPUR.y1)), mY(y)];
+    g.lineWidth = Math.max(3, SPUR.hw*2*sc); g.beginPath();
+    g.moveTo(mX(SPUR.x1), mY(SPUR.y1)); g.lineTo(...at(SPUR_PASS.y - SPUR_PASS.open));
+    g.moveTo(...at(SPUR_PASS.y + SPUR_PASS.open)); g.lineTo(mX(SPUR.x2), mY(SPUR.y2)); g.stroke(); }
   g.globalAlpha = 0.8; g.strokeStyle = C.water; g.lineWidth = Math.max(1.5, RIVER_HW*2*sc);
   g.beginPath(); for (let x = WORLD.x0; x <= WORLD.x1; x += 6){ x === WORLD.x0 ? g.moveTo(mX(x), mY(riverY(x))) : g.lineTo(mX(x), mY(riverY(x))); } g.stroke();
   g.globalAlpha = 0.9; g.fillStyle = C.lake; g.beginPath();
@@ -6233,14 +6252,15 @@ function renderMapLayers(g, MAP, mx, my, mw, mh, sc){
   g.beginPath(); g.moveTo(mX(GATE.x), mY(GATE.y - PASS_HW)); g.lineTo(mX(GATE.x), mY(GATE.y + PASS_HW)); g.stroke();
   g.strokeStyle = bridgeWanted ? C.orb : C.ink;
   g.beginPath(); g.moveTo(mX(BRIDGE.x), mY(BRIDGE.yN)); g.lineTo(mX(BRIDGE.x), mY(BRIDGE.yS)); g.stroke();
-  g.strokeStyle = C.ink; g.beginPath(); g.moveTo(mX(BRIDGE2.x), mY(BRIDGE2.yN)); g.lineTo(mX(BRIDGE2.x), mY(BRIDGE2.yS)); g.stroke();
+  g.strokeStyle = bridge2Wanted ? C.orb : C.ink;
+  g.beginPath(); g.moveTo(mX(BRIDGE2.x), mY(BRIDGE2.yN)); g.lineTo(mX(BRIDGE2.x), mY(BRIDGE2.yS)); g.stroke();
   g.strokeStyle = gate2Open ? C.orb : C.ink;
   g.beginPath(); g.moveTo(mX(SADDLE.x - 5), mY(SADDLE.y)); g.lineTo(mX(SADDLE.x + 5), mY(SADDLE.y)); g.stroke();
   g.restore();
   return { mX, mY };
 }
 function drawMinimap(){
-  const MAP = MAP_BOX[zoneAt(S.x, S.y)];
+  const MAP = MAP_BOX[hudZone(S.x, S.y)];
   const size = W < 520 ? 104 : 150, pad = 16;
   const sc = size / Math.max(MAP.x1 - MAP.x0, MAP.y1 - MAP.y0);
   const mw = (MAP.x1 - MAP.x0)*sc, mh = (MAP.y1 - MAP.y0)*sc;
@@ -6367,11 +6387,11 @@ function hud(){
   {
     // the counter shows what you're doing: a running kiosk's orbs, the crystals once the altar has woken them, or else
     // how many of this zone's kiosks are powered
-    const z = zoneAt(S.x, S.y), K = activeKiosk() || trial.K, cry = !K && altar.state === 1;
+    const z = hudZone(S.x, S.y), K = activeKiosk() || trial.K, cry = !K && altar.state === 1;
     let n = 0, tot = 0, label = '';
     if (K){ n = kioskGot(K); tot = ORBS_PER_KIOSK; label = trial.K === K ? fmtTime(trial.t) : n === tot ? 'Back to the terminal' : 'Orbs'; }
     else if (cry){ n = crystalsGot(); tot = CRYSTAL_TOTAL; label = n === tot ? 'Back to the altar' : 'Crystals'; }
-    else if (z !== 4 && z !== 5){ n = kiosksPowered(z); tot = KIOSK_COUNT[z]; label = n === tot ? (z === 1 ? (gateOpen ? 'Gate open' : 'Ski to the gate') : z === 2 ? (bridgeWanted ? 'Bridge down' : 'Ski to the bridge') : !gate2Open ? 'Ski to the south gate' : altar.state === 2 ? 'Crystal gate open' : 'South gate open') : 'Terminals'; }
+    else if (z !== 4 && z !== 5){ n = kiosksPowered(z); tot = KIOSK_COUNT[z]; label = n === tot ? (z === 1 ? (gateOpen && gate2Open ? 'Gates open' : 'Ski to the gates') : z === 2 ? (bridgeWanted && bridge2Wanted ? 'Bridges down' : 'Ski to the bridges') : altar.state === 2 ? 'Crystal gate open' : 'All powered') : 'Terminals'; }
     const txt = tot ? n + ' / ' + tot : 'Zone ' + z;
     $('orbHud').dataset.kind = cry ? 'crystal' : '';
     const el = $('orbN'); if (el.textContent !== txt){ if (tot && n > 0) { const h = $('orbHud'); h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); } el.textContent = txt; }
@@ -6485,7 +6505,7 @@ function loop(t){
 }
 loadProgress(); applyRegalia(); calfUI();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get bridge2Down(){ return bridge2Down; }, SPUR_PASS, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

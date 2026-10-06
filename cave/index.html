@@ -920,11 +920,11 @@ let ONSTATION = false;       // on the space station (a world of its own, reache
 // own axis (a: along, out from the hub; lat: across). slick: how much of the usual drag and friction its snow has
 const SPOKE_R = 125, SPOKE_TOP = -8, SPOKE_BOT = -36, LIFT_LAT = 22;
 const SPOKES = [
-  { a: 36,  theme: 'rollers',  name: 'Roller Coaster',  slick: 0.2 },
+  { a: 36,  theme: 'rollers',  name: 'Roller Coaster',  slick: 1 },
   { a: 108, theme: 'lift',     name: 'Lift & Slalom',   slick: 1 },
   { a: 180, theme: 'crown',    name: 'Crown Room',      slick: 1 },
-  { a: 252, theme: 'berms',    name: 'Berm Run',        slick: 0.2 },
-  { a: 324, theme: 'halfpipe', name: 'Half-pipe Chute', slick: 0.2 },
+  { a: 252, theme: 'berms',    name: 'Berm Run',        slick: 1 },
+  { a: 324, theme: 'halfpipe', name: 'Half-pipe Chute', slick: 1 },
 ];
 for (const s of SPOKES){ [s.x, s.y] = polar(s.a, SPOKE_R); s.ux = Math.cos(rad(s.a)); s.uy = Math.sin(rad(s.a)); s.edge = s.theme === 'crown' ? 28 : 38; }
 // the crown room: round and tall, an enormous crystal pillar at its heart and a stone path spiralling up round it,
@@ -1280,21 +1280,27 @@ function deckSD(x, y){
   if (d.cap && p.s > d.L - 3){ const k = d.n - 1, tx = d.X[k] - d.X[k-1], ty = d.Y[k] - d.Y[k-1], tl = Math.hypot(tx, ty), along = ((x - d.X[k])*tx + (y - d.Y[k])*ty)/tl; return Math.min(d.hw - Math.abs(p.lat), -0.8 - along); }
   if (p.s < 1 || p.s > d.L - 1) return 9; return d.hw - Math.abs(p.lat);
 }
-// up a ramp from the street onto a terrace (heading in at either end), and back down at the far end
+// on and off, as on the energy bridges: you get on only through a portal at a ramp's foot, heading in along it (within
+// about 55°), never backwards or in over the side; you get off at the far foot, and that portal then leaves you alone
+// until you've skied 10 m clear of it, so you can always leave. (the spiral's foot works the same way, without a portal)
+let caveDeckExit = null;
 function caveDeckStep(){
   if (!UNDER || ONSTATION){ CAVE_DECK = null; return; }
-  const sp = Math.hypot(S.vx, S.vy);
   if (CAVE_DECK){
     const D = CAVE_DECK, p = cityProj(D.d, S.x, S.y, D.i); D.i = p.i;
     const v = S.vx*p.tx + S.vy*p.ty;
-    if ((p.s <= 0.3 && v < 0) || (!D.d.cap && p.s >= D.d.L - 0.3 && v > 0)) CAVE_DECK = null;
+    if (p.s <= 0.3 && v < 0){ CAVE_DECK = null; caveDeckExit = { d: D.d, end: 0 }; }
+    else if (!D.d.cap && p.s >= D.d.L - 0.3 && v > 0){ CAVE_DECK = null; caveDeckExit = { d: D.d, end: 1 }; }
     return;
   }
-  if (sp < 0.3) return;
+  if (caveDeckExit){ const d = caveDeckExit.d, i = caveDeckExit.end ? d.n - 1 : 0; if (Math.hypot(S.x - d.X[i], S.y - d.Y[i]) > 10) caveDeckExit = null; }
+  const v = Math.hypot(S.vx, S.vy), mx = v > 0.6 ? S.vx/v : Math.sin(S.th), my = v > 0.6 ? S.vy/v : -Math.cos(S.th);
   for (const d of skyActive() ? [...CITY_DECKS, CROWN_SPIRAL] : [CROWN_SPIRAL]) for (const end of d.cap ? [0] : [0, 1]){
-    const i = end ? d.n - 1 : 0, ex = d.X[i], ey = d.Y[i]; if (Math.hypot(S.x - ex, S.y - ey) > d.hw) continue;
-    const j = end ? d.n - 6 : 5, ix = d.X[j] - ex, iy = d.Y[j] - ey, L = Math.hypot(ix, iy);
-    if ((S.vx*ix + S.vy*iy)/(sp*L) > 0.5){ CAVE_DECK = { d, i: end ? d.n - 2 : 0 }; return; }
+    if (caveDeckExit && caveDeckExit.d === d && caveDeckExit.end === end) continue;
+    const i = end ? d.n - 1 : 0; if (Math.abs(S.x - d.X[i]) > 8 || Math.abs(S.y - d.Y[i]) > 8) continue;
+    const p = cityProj(d, S.x, S.y, end ? d.n - 2 : 0), sIn = end ? d.L - p.s : p.s;
+    if ((mx*p.tx + my*p.ty)*(end ? -1 : 1) < 0.55) continue;
+    if (sIn < 1.5 && Math.abs(p.lat) < d.hw - 0.5 && p.dist < d.hw){ CAVE_DECK = { d, i: p.i }; return; }
   }
 }
 // on the street, a ramp's rising sides are in the way (a bridge high overhead isn't)
@@ -7378,7 +7384,18 @@ function buildCaveDressing(){
     const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), Sv = new THREE.Vector3(), Pv = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
     const pal = [0xb79f80, 0xa88d6d, 0x9c8264, 0xc2ab8c, 0x8f7559];
     let nb = 0, nw = 0;
+    // nothing stands up into a terrace: anything whose footprint comes under one is cut down to sit beneath it
+    caveDress.bld = [];
     const put = (a, lat, depth, len, base, top, side) => {
+      { const ux = Math.cos(rad(a)), uy = Math.sin(rad(a)), [cx, cy0] = polar(a, ringR(a) + lat);
+        for (const dk of CITY_DECKS){
+          if (cx < dk.box[0] - 8 || cx > dk.box[2] + 8 || cy0 < dk.box[1] - 8 || cy0 > dk.box[3] + 8) continue;
+          for (const u of [-0.5, 0, 0.5]) for (const v of [-0.5, -0.25, 0, 0.25, 0.5]){
+            const q = cityProj(dk, cx + ux*u*depth - uy*v*len, cy0 + uy*u*depth + ux*v*len, null);
+            if (q.dist < dk.hw + 1.2) top = Math.min(top, q.h - 1.0);
+          }
+        }
+        if (nb < N && top - base >= 1.2) caveDress.bld.push([cx, cy0, ux, uy, depth, len, base, top]); }
       if (nb >= N || top - base < 1.2) return;
       const [x, y] = polar(a, ringR(a) + lat), h = top - base;
       Q.setFromAxisAngle(Y, -rad(a)); Pv.set(x, base + h/2, y); Sv.set(depth, h, len); M.compose(Pv, Q, Sv); bm.setMatrixAt(nb, M);
@@ -7396,30 +7413,70 @@ function buildCaveDressing(){
       const W = ringW(a), len = rad(2.4)*(ringR(a) + side*(W - 9))*0.86;
       const lat1 = side*(W - 9.5), [x1, y1] = polar(a, ringR(a) + lat1); caveField(x1, y1, f);
       // the first row: under a terrace it holds the terrace up; under a low ramp there's no room for one
-      let top1 = f.floor + 3.5 + rnd()*2.5;
-      for (const dk of CITY_DECKS){ const p = cityProj(dk, x1, y1, null); if (p.dist < dk.hw + 3.5) top1 = Math.min(top1, p.h - 1.2); }
-      if (top1 - f.floor >= 1.5) put(a, lat1, 6, len, f.floor - 1, top1, side);
+      const top1 = f.floor + 3.5 + rnd()*2.5;
+      put(a, lat1, 6, len, f.floor - 1, top1, side);
       const lat2 = side*(W - 4), [x2, y2] = polar(a, ringR(a) + lat2); caveField(x2, y2, f);
       const top2 = Math.max(top1, f.floor) + 4 + rnd()*5; put(a + (rnd() - 0.5)*0.6, lat2, 3, len*0.9, f.floor - 1, top2, side);
       if (rnd() < 0.7){ const lat3 = side*(W - 1.5), [x3, y3] = polar(a, ringR(a) + lat3); caveField(x3, y3, f); put(a + (rnd() - 0.5)*0.8, lat3, 3, len*0.8, f.floor - 1, Math.max(top2, f.floor) + 3 + rnd()*5, side); }
     }
     bm.count = nb; wm.count = nw; bm.instanceColor.needsUpdate = true; scene.add(bm); scene.add(wm);
   }
-  // ---- the terraces, as light bridges: a pale glowing deck with purple railings of light (hidden until they're lit)
+  // ---- the terraces, as light bridges like the ones up top: a deck of light that shows only while you're riding it
+  // (pylons hold it up where no rooftop does), and a portal at each foot, two white posts that gain caps of light and
+  // an arch once the bridges are lit
   {
-    const deckMat = new THREE.MeshBasicMaterial({ color: 0xd8ccff, side: THREE.DoubleSide, transparent: true, opacity: 0.92 }), railMat = new THREE.MeshBasicMaterial({ color: 0xa47cff });
-    caveDress.terraces = [];
+    caveDress.terraces = []; caveDress.terracePortals = [];
+    const post = new THREE.MeshLambertMaterial({ color: 0xe3e8ec }), pyRing = new THREE.MeshBasicMaterial({ color: 0xa993d6 });
     for (const d of CITY_DECKS){
-      const g = new THREE.Group(), top = [], idx = [], rails = [[], []];
-      for (let i = 0; i < d.n; i++){
-        const a = Math.max(0, i - 1), b = Math.min(d.n - 1, i + 1), tx = d.X[b] - d.X[a], ty = d.Y[b] - d.Y[a], tl = Math.hypot(tx, ty), nx = -ty/tl, ny = tx/tl, h = d.H[i] + 0.04;
-        for (const sd of [-1, 1]){ top.push(d.X[i] + nx*d.hw*sd, h, d.Y[i] + ny*d.hw*sd); if (i % 2 === 0) rails[sd < 0 ? 0 : 1].push(new THREE.Vector3(d.X[i] + nx*d.hw*sd, h + 1.0, d.Y[i] + ny*d.hw*sd)); }
-        if (i) idx.push(2*i - 2, 2*i, 2*i - 1, 2*i - 1, 2*i, 2*i + 1);
+      const g = new THREE.Group(); g.visible = false; scene.add(g);
+      const deckMat = new THREE.MeshLambertMaterial({ color: 0xece8f8, emissive: 0x30284a, transparent: true, opacity: 0, side: THREE.DoubleSide });
+      const edgeMat = new THREE.MeshLambertMaterial({ color: 0x4f6276, transparent: true, opacity: 0, side: THREE.DoubleSide });
+      const railMat = new THREE.MeshBasicMaterial({ map: skyRailTex.clone(), color: 0xa993d6, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+      railMat.map.needsUpdate = true; railMat.map.wrapS = THREE.RepeatWrapping;
+      const top = [], side = [], rail = [], uv = [];
+      const nrm = i => { const a = Math.max(0, i - 1), b = Math.min(d.n - 1, i + 1), tx = d.X[b] - d.X[a], ty = d.Y[b] - d.Y[a], l = Math.hypot(tx, ty); return [-ty/l, tx/l]; };
+      for (let i = 0; i < d.n - 1; i++){
+        const [ax, ay] = nrm(i), [bx, by] = nrm(i + 1), hw = d.hw, ha = d.H[i] + 0.04, hb = d.H[i+1] + 0.04;
+        const a1 = [d.X[i] - ax*hw, ha, d.Y[i] - ay*hw], a2 = [d.X[i] + ax*hw, ha, d.Y[i] + ay*hw], b1 = [d.X[i+1] - bx*hw, hb, d.Y[i+1] - by*hw], b2 = [d.X[i+1] + bx*hw, hb, d.Y[i+1] + by*hw];
+        top.push(...a1, ...b1, ...a2, ...a2, ...b1, ...b2);
+        const u0 = d.cum[i]/6, u1 = d.cum[i+1]/6;
+        for (const [p, q] of [[a1, b1], [a2, b2]]){
+          side.push(p[0], p[1], p[2], q[0], q[1], q[2], p[0], p[1] - 0.7, p[2], p[0], p[1] - 0.7, p[2], q[0], q[1], q[2], q[0], q[1] - 0.7, q[2]);
+          rail.push(p[0], p[1], p[2], q[0], q[1], q[2], p[0], p[1] + 1.0, p[2], p[0], p[1] + 1.0, p[2], q[0], q[1], q[2], q[0], q[1] + 1.0, q[2]);
+          uv.push(u0, 1, u1, 1, u0, 0, u0, 0, u1, 1, u1, 0);
+        }
       }
-      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(top, 3)); geo.setIndex(idx);
-      g.add(new THREE.Mesh(geo, deckMat));
-      for (const r of rails) g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(r), r.length, 0.07, 5, false), railMat));
-      scene.add(g); caveDress.terraces.push(g);
+      const mk = (arr, mat, uvs) => { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); if (uvs) geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2)); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); g.add(m); return m; };
+      mk(top, deckMat); mk(side, edgeMat); mk(rail, railMat, uv).renderOrder = 3;
+      caveDress.terraces.push({ d, g, op: 0, mats: [[deckMat, 0.82], [edgeMat, 0.9], [railMat, 0.75]], railMat });
+      // pylons, about every 30 m where the deck stands clear of the floor with no rooftop under it (never in the
+      // middle of the street)
+      let next = 14;
+      for (let i = 0; i < d.n; i++){
+        if (d.cum[i] < next || d.L - d.cum[i] < 12) continue;
+        caveField(d.X[i], d.Y[i], f); const clear = d.H[i] - f.floor; if (clear < 4) continue;
+        const [a, lat, Wd] = ringLocal(d.X[i], d.Y[i]), overStreet = Math.abs(lat) < Wd - STREET_EDGE;
+        if (overStreet ? Math.abs(lat) < 7 : cityBuilt(a, lat > 0 ? 1 : -1)) continue;
+        next = d.cum[i] + 30;
+        const hgt = clear + 1.5, col = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 1.1, hgt, 10), post); col.position.set(d.X[i], f.floor - 1.5 + hgt/2 - 0.6, d.Y[i]); scene.add(col);
+        const head = new THREE.Mesh(new THREE.BoxGeometry(2*d.hw*0.8, 0.5, 1.6), post); head.position.set(d.X[i], d.H[i] - 0.95, d.Y[i]);
+        head.rotation.y = Math.atan2(d.X[Math.min(d.n - 1, i + 1)] - d.X[i], d.Y[Math.min(d.n - 1, i + 1)] - d.Y[i]); scene.add(head);
+        const rg = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.35, 12), pyRing); rg.position.set(d.X[i], d.H[i] - 2.4, d.Y[i]); scene.add(rg);
+        CAVE_SOLIDS.push({ x: d.X[i], y: d.Y[i], r: 1.2 });
+      }
+      // the portals
+      for (const end of [0, 1]){
+        const i = end ? d.n - 1 : 0, j = end ? d.n - 4 : 3, tx = d.X[j] - d.X[i], ty = d.Y[j] - d.Y[i], l = Math.hypot(tx, ty), w = d.hw + 0.6;
+        const pg = new THREE.Group(); pg.position.set(d.X[i], d.H[i] - 0.05, d.Y[i]); pg.rotation.y = Math.atan2(tx/l, ty/l); scene.add(pg);
+        const lite = new THREE.MeshBasicMaterial({ color: 0xc9b8ee }), lit = [];
+        for (const sx of [-1, 1]){ const p = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 6.5, 8), post); p.position.set(sx*w, 3.25, 0); pg.add(p);
+          const c = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), lite); c.position.set(sx*w, 6.7, 0); pg.add(c); lit.push(c); }
+        const arch = new THREE.Mesh(new THREE.TorusGeometry(w, 0.12, 6, 24, Math.PI), lite); arch.position.set(0, 6.5, 0); pg.add(arch); lit.push(arch);
+        const pad = new THREE.Mesh(new THREE.CircleGeometry(w + 0.4, 24), new THREE.MeshBasicMaterial({ color: 0xa993d6, transparent: true, opacity: 0, depthWrite: false }));
+        pad.rotation.x = -Math.PI/2; pad.position.y = 0.08; pg.add(pad);
+        const r = pg.rotation.y; CAVE_SOLIDS.push({ x: d.X[i] - Math.cos(r)*w, y: d.Y[i] + Math.sin(r)*w, r: 0.4 }, { x: d.X[i] + Math.cos(r)*w, y: d.Y[i] - Math.sin(r)*w, r: 0.4 });
+        caveDress.terracePortals.push({ lit, pad });
+      }
     }
   }
   // ---- the space station (from the concept): metal decks with light strips, the domed hub, ships at the docks, the
@@ -7654,7 +7711,15 @@ function updateCave(dt){
   { const G = CROWN_GATE;
     if (caveDress.crownDoor){ caveDress.crownDoor.position.y = -G.k*(CROWN.dH + 1.5); caveDress.crownDoor.visible = G.k < 0.999; }
     if (caveDress.crownGems && caveK > 0.01){ const t = performance.now()/1000; caveDress.crownGems.forEach((m, k) => { m.rotation.y = t*1.6 + k; }); } }
-  if (caveDress.terraces){ const on = skyActive() || !!CAVE_DECK; for (const t of caveDress.terraces) t.visible = on; }
+  if (caveDress.terraces){
+    const act = skyActive(), now = performance.now()/1000;
+    for (const t of caveDress.terraces){
+      const want = CAVE_DECK && CAVE_DECK.d === t.d ? 1 : 0; t.op += (want - t.op)*Math.min(1, dt*(want ? 6 : 2.5));
+      if (t.op < 0.005){ t.op = 0; t.g.visible = false; continue; }
+      t.g.visible = true; for (const [m, k] of t.mats) m.opacity = t.op*k; t.railMat.map.offset.x = -now*1.2;
+    }
+    for (const p of caveDress.terracePortals){ for (const m of p.lit) m.visible = act; p.pad.material.opacity = act ? 0.25 + 0.1*Math.sin(now*2) : 0; }
+  }
   if (caveDress.liftTex) caveDress.liftTex.offset.y = (caveDress.liftTex.offset.y + dt*LIFT.v/3) % 1;
   if (caveDress.planet) caveDress.planet.rotation.y += dt*0.004;
   if (sk > 0.05 && camera.far < 7000){ camera.far = 7000; camera.updateProjectionMatrix(); }   // the planet's horizon is far off

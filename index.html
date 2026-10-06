@@ -266,10 +266,10 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tTurn3">3rd same-side kick turn (°)<output id="oTurn3"></output><input id="tTurn3" type="range" min="0" max="45" step="0.5" value="15"></label>
     <label for="tKfloor">Least turn after two same-side kicks, even after a pause (°)<output id="oKfloor"></output><input id="tKfloor" type="range" min="0" max="45" step="0.5" value="15"></label>
     <label for="tKwin">Kick-turn window (ms between kicks)<output id="oKwin"></output><input id="tKwin" type="range" min="200" max="2000" step="50" value="450"></label>
-    <label for="tK180">Quick same-side kicks for a full turn<output id="oK180"></output><input id="tK180" type="range" min="3" max="12" step="1" value="6"></label>
-    <label for="tK180t">Quick trigger kicks for a full turn<output id="oK180t"></output><input id="tK180t" type="range" min="3" max="12" step="1" value="5"></label>
+    <label for="tK180">Quick same-side kicks for a full turn<output id="oK180"></output><input id="tK180" type="range" min="3" max="12" step="1" value="8"></label>
+    <label for="tK180t">Quick trigger kicks for a full turn<output id="oK180t"></output><input id="tK180t" type="range" min="3" max="12" step="1" value="6"></label>
     <label for="tTfStop">Full turn when slow or stopped (°)<output id="oTfStop"></output><input id="tTfStop" type="range" min="45" max="270" step="5" value="180"></label>
-    <label for="tTfMove">Full turn at skating speed (°)<output id="oTfMove"></output><input id="tTfMove" type="range" min="30" max="270" step="5" value="90"></label>
+    <label for="tTfMove">Full turn at skating speed (°)<output id="oTfMove"></output><input id="tTfMove" type="range" min="30" max="270" step="5" value="80"></label>
     <label for="tTfVlo">Slow below (km/h)<output id="oTfVlo"></output><input id="tTfVlo" type="range" min="0" max="20" step="1" value="1"></label>
     <label for="tTfVhi">Skating speed from (km/h)<output id="oTfVhi"></output><input id="tTfVhi" type="range" min="2" max="30" step="1" value="14"></label>
     <label for="tDecay">Same-leg push loss (% per kick)<output id="oDecay"></output><input id="tDecay" type="range" min="0" max="60" step="5" value="20"></label>
@@ -278,16 +278,16 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <h4>Snow and glide</h4>
     <label for="tFric">Snow friction (m/s²)<output id="oFric"></output><span class="sl"><input id="tFric" type="range" min="0" max="2" step="0.05" value="0.4"><i class="ghost" id="tFricG"></i></span></label>
     <label for="tGlide">Speed drag<output id="oGlide"></output><input id="tGlide" type="range" min="0.01" max="1" step="0.01" value="0.25"></label>
-    <label for="tOff">Ungroomed snow (× friction)<output id="oOff"></output><input id="tOff" type="range" min="1" max="12" step="0.5" value="1"></label>
+    <label for="tOff">Ungroomed snow (× friction)<output id="oOff"></output><input id="tOff" type="range" min="1" max="12" step="0.5" value="1.5"></label>
     <label for="tOffglide">Held glide off-trail (% of the cut)<output id="oOffglide"></output><input id="tOffglide" type="range" min="0" max="100" step="5" value="100"></label>
     <label for="tGrip">Edge grip<output id="oGrip"></output><input id="tGrip" type="range" min="0.5" max="25" step="0.5" value="25"></label>
     <label for="tGwin">Glide window (ms)<output id="oGwin"></output><input id="tGwin" type="range" min="0" max="2000" step="50" value="600"></label>
     <label for="tGcut">Glide friction cut (%)<output id="oGcut"></output><input id="tGcut" type="range" min="0" max="100" step="5" value="95"></label>
-    <label for="tMax">Top speed (km/h)<output id="oMax"></output><span class="sl"><input id="tMax" type="range" min="10" max="60" step="1" value="32"><i class="ghost" id="tMaxG"></i></span></label>
+    <label for="tMax">Top speed (km/h)<output id="oMax"></output><span class="sl"><input id="tMax" type="range" min="10" max="60" step="1" value="38"><i class="ghost" id="tMaxG"></i></span></label>
     <p class="note">Markers show the live value: friction changes off the trail and while gliding, skate angle with speed.</p>
-    <label for="tMarks">Ski mark strength (%)<output id="oMarks"></output><input id="tMarks" type="range" min="15" max="100" step="5" value="70"></label>
+    <label for="tMarks">Ski mark strength (%)<output id="oMarks"></output><input id="tMarks" type="range" min="15" max="100" step="5" value="40"></label>
     <h4>Classic, poling and braking</h4>
-    <label for="tClassic">Classic kick (m/s)<output id="oClassic"></output><input id="tClassic" type="range" min="0.2" max="2.5" step="0.05" value="1"></label>
+    <label for="tClassic">Classic kick (m/s)<output id="oClassic"></output><input id="tClassic" type="range" min="0.2" max="2.5" step="0.05" value="1.55"></label>
     <label for="tPole">Double-pole push (m/s)<output id="oPole"></output><input id="tPole" type="range" min="0.2" max="2" step="0.05" value="0.8"></label>
     <label for="tPlow">Snow plow brake (m/s²)<output id="oPlow"></output><input id="tPlow" type="range" min="0.5" max="6" step="0.1" value="2.5"></label>
     <label for="tPlowhold">Snow plow hold (ms)<output id="oPlowhold"></output><input id="tPlowhold" type="range" min="50" max="600" step="10" value="200"></label>
@@ -303,7 +303,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tAswitch">Trail switch ease-in (ms)<output id="oAswitch"></output><input id="tAswitch" type="range" min="0" max="4000" step="100" value="1500"></label>
     <label for="tAramp">Trail assist ease-in (ms)<output id="oAramp"></output><input id="tAramp" type="range" min="0" max="4000" step="100" value="1500"></label>
     <h4>Camera</h4>
-    <label for="tCamd">Camera distance (m)<output id="oCamd"></output><input id="tCamd" type="range" min="4" max="24" step="0.5" value="24"></label>
+    <label for="tCamd">Camera distance (m)<output id="oCamd"></output><input id="tCamd" type="range" min="4" max="24" step="0.5" value="15"></label>
     <label for="tSway">Camera side-follow (s)<output id="oSway"></output><input id="tSway" type="range" min="0.1" max="2" step="0.05" value="0.8"></label>
     <label for="tCam">Camera smoothing (s)<output id="oCam"></output><input id="tCam" type="range" min="0.1" max="1.5" step="0.05" value="0.6"></label>
     <label for="tAhug">Camera hugs trail (%)<output id="oAhug"></output><input id="tAhug" type="range" min="0" max="1" step="0.05" value="0.35"></label>
@@ -2353,7 +2353,7 @@ const trees = (() => {
 // ---- ice boulders scattered through the open snow among the trees, the same faceted ice as round the zone 2 beacon:
 // lone boulders, clusters like the beacon's, upright shards and flat slabs, in three tints of ice, half sunk in the
 // snow. seeded, so they're the same every time; kept off trails and lawns, out of the buildings, water and the stadium.
-// drawn as instanced meshes. the bigger pieces are solid
+// drawn as instanced meshes. they're scenery only: you ski straight through them
 const BOULDERS = (() => {
   const tb0 = performance.now();
   let seed = 9191; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -2381,7 +2381,6 @@ const BOULDERS = (() => {
   if (/[?&]debug\b/.test(location.search)) console.log('boulders', out.length, (performance.now() - tb0).toFixed(0) + ' ms');
   return out;
 })();
-for (const b of BOULDERS) if (b.size > 1.1) SOLIDS.push({ x: b.x, y: b.y, r: b.size*0.85 });
 {
   // shapes: rounded boulder, rougher boulder, tall shard, flat slab; tints: the beacon's ice, a deeper blue, a frosty white
   const geos = [new THREE.DodecahedronGeometry(1, 0), new THREE.IcosahedronGeometry(1, 0), new THREE.OctahedronGeometry(1, 0), new THREE.DodecahedronGeometry(1, 0)];
@@ -3938,8 +3937,8 @@ HERD = (() => {
   let seed = 777; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const out = [];
   const make = role => {
-    const calf = role.startsWith('calf'), big = role.startsWith('big'), scale = calf ? 0.55 : big ? 1.5 + rnd()*0.5 : 1;
-    return { role, calf, big, scale, cr: calf ? 0.8 : 1.4*scale, sleep: role.includes('sleep') };
+    const calf = role.startsWith('calf'), big = role.startsWith('big'), scale = calf ? 0.75 : big ? 1.5 + rnd()*0.5 : 1;
+    return { role, calf, big, scale, cr: 1.4*scale, sleep: role.includes('sleep') };
   };
   const clear = (x, y, cr) => obstacleSD(x, y) > cr + 1 && !out.some(h => Math.hypot(h.x - x, h.y - y) < h.cr + cr + 2.2)
                                && !trees.some(t => Math.abs(t.x - x) < cr + 1.5 && Math.abs(t.y - y) < cr + 1.5);
@@ -4050,7 +4049,7 @@ function sleepGiant(){
 // everywhere. it walks in your tracks a few metres behind (a trail of breadcrumbs of where you've been), matching your
 // speed and closing the gap if it falls back; it never blocks you, and it stamps six-legged hoof prints in the snow.
 // bring it to the sleeping giant and the giant stands up
-const PET_FOLLOW = 3.2;
+const PET_FOLLOW = 6.4;
 const pet = { h: null, crumbs: [], s: 0, th: 0, gait: 0, step: 0, side: 0, join: false, lastDismissed: -1 };
 const hoofPrints = (() => {
   const cap = 1200, geo = new THREE.CircleGeometry(1, 8); geo.rotateX(-Math.PI/2);

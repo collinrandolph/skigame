@@ -4395,7 +4395,7 @@ const SKY = (() => {
     z5: { ground: true, hidden: true, x: 250, y: 880 },
     // the Starway: out from the cliff into space, through the planet, and back to the cliff
     s1: { ground: true, hidden: true, x: 250, y: 911 },
-    bh: { blackhole: true, hidden: true, ...(() => { const a = (-90 + 24*30)*Math.PI/180; return { x: 250 + Math.cos(a)*14, y: 1250 + Math.sin(a)*14, h: 44 }; })() },
+    bh: { blackhole: true, hidden: true, ...(() => { const a = (-90 + 24*30)*Math.PI/180; return { x: 250, y: 1250, h: 34 }; })() },   // the bridge ends inside the black hole itself
   };
   for (const k in N){ const n = N[k]; n.id = k; if (n.ground) n.h = height(n.x, n.y) + 0.05; }
   // decks: node to node through control points [x, y, h] (h is a target; clearance over the terrain is added below)
@@ -4435,7 +4435,10 @@ const SKY = (() => {
       [250, 1010, 64], [249, 1070, 72], [244, 1135, 82], [246, 1195, 89],
       // the spiral: two turns closing from 50 m to 8 m across, dropping evenly along its length (not per turn, or the
       // tight inner turns would plunge)
-      ...(() => { const R = t => 50 - 36*t, tot = 24*(50 + 14)/2, out = []; for (let k = 1; k < 24; k++){ const t = k/24, a = (-90 + k*30)*Math.PI/180, done = k*(50 + R(t))/2; out.push([250 + Math.cos(a)*R(t), 1250 + Math.sin(a)*R(t), 89 - 45*done/tot]); } return out; })()] },
+      ...(() => { const R = t => 50 - 36*t, tot = 24*(50 + 14)/2, out = []; for (let k = 1; k <= 24; k++){ const t = k/24, a = (-90 + k*30)*Math.PI/180, done = k*(50 + R(t))/2; out.push([250 + Math.cos(a)*R(t), 1250 + Math.sin(a)*R(t), 89 - 45*done/tot]); }
+        // then a last tightening curl that plunges into the black hole, so the bridge never visibly ends
+        for (const [deg, r, h] of [[295, 9.5, 41.5], [318, 5, 37.5]]){ const a = deg*Math.PI/180; out.push([250 + Math.cos(a)*r, 1250 + Math.sin(a)*r, h]); }
+        return out; })()] },
   ];
   // loop entrances: ski into an on-ramp's portal the wrong way (down the ramp's line, toward its foot) and instead of
   // being shoved up the ramp backwards you're carried out the far side of the portal on a teardrop loop that swings

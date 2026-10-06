@@ -311,7 +311,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <div class="btns"><button id="copySet" type="button">Copy settings</button><button id="defSet" type="button">Restore defaults</button></div>
     <p class="note" id="setNote">Your slider changes are kept in this browser.</p>
     <h4>Testing</h4>
-    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button><button id="arrowBtn" type="button">Heading arrow: off</button><button id="cpAltar" type="button">Checkpoint: altar</button></div>
+    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button><button id="arrowBtn" type="button">Heading arrow: off</button><button id="cpAltar" type="button">Checkpoint: altar</button><button id="cpZ5" type="button">Checkpoint: zone 5</button></div>
     <label for="tOrb1">Zone 1 terminals powered<output id="oOrb1"></output><input id="tOrb1" type="range" min="0" max="2" step="1" value="0"></label>
     <label for="tOrb2">Zone 2 terminals powered<output id="oOrb2"></output><input id="tOrb2" type="range" min="0" max="3" step="1" value="0"></label>
     <label for="tOrb3">Zone 3 terminals powered<output id="oOrb3"></output><input id="tOrb3" type="range" min="0" max="5" step="1" value="0"></label>
@@ -2950,6 +2950,7 @@ for (const z of [1, 2, 3]){
   const el = $('tOrb' + z);
   el.addEventListener('input', () => { setKiosksPowered(z, +el.value); saveProgress(); $('oOrb' + z).textContent = el.value + ' / ' + KIOSK_COUNT[z]; });
 }
+$('cpZ5').addEventListener('click', () => { checkpoint = { z5: 1 }; wakeGiant(true); saveProgress(); spawnAtCheckpoint(); toast('Checkpoint set in zone 5.'); });   // (the giant stands, so the way back is open)
 $('cpAltar').addEventListener('click', () => { checkpoint = { a: 1 }; altar.dismissed = true; saveProgress(); spawnAtCheckpoint(); toast('Checkpoint set at the altar.'); });
 function resetOrbs(){
   for (const K of KIOSKS){ K.state = 'dormant'; K.dismissed = false; for (const o of K.orbs){ o.got = false; o.fade = 0; o.g.visible = false; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; } updateKioskLook(K); }
@@ -4579,8 +4580,9 @@ function skyStep(){
       if (d.final && !courtOpen()){ starwayHint(d, end); continue; }
       const pr = deckProj(d, S.x, S.y, end === d.A ? 0 : d.n - 2), sIn = end === d.A ? pr.s : d.len - pr.s;
       const v = Math.hypot(S.vx, S.vy), mx = v > 0.6 ? S.vx/v : Math.sin(S.th), my = v > 0.6 ? S.vy/v : -Math.cos(S.th);
-      if ((mx*pr.tx + my*pr.ty)*(end === d.A ? 1 : -1) < 0.25) continue;      // only heading in along it, never backwards up it
-      if (sIn > -0.2 && sIn < 5 && Math.abs(pr.lat) < d.w/2 - 0.3){ SKY_ON = { d, i: pr.i, h: pr.h }; skyEnterAt = performance.now(); if (d.final && pet.h) calfToTrio(pet.h); return; }
+      if ((mx*pr.tx + my*pr.ty)*(end === d.A ? 1 : -1) < 0.55) continue;      // only heading in along it (within about 55°), never backwards or across it
+      // on only through the portal itself, not in over the side
+      if (sIn > -0.2 && sIn < 1.5 && Math.abs(pr.lat) < d.w/2 - 0.5){ SKY_ON = { d, i: pr.i, h: pr.h }; skyEnterAt = performance.now(); if (d.final && pet.h) calfToTrio(pet.h); return; }
     }
     return;
   }
@@ -4895,7 +4897,10 @@ const facingTo = (x, y, tx, ty) => Math.atan2(tx - x, -(ty - y));
 function diamondPos(k){ const a = k/6*Math.PI*2; return [RING6.x + Math.cos(a)*RING6.r, RING6.y + Math.sin(a)*RING6.r]; }
 function slotPos(k){
   if (k < DIAMONDS) return diamondPos(CALF_D[k]);
-  const j = k - DIAMONDS; return [268 + Math.floor(j/5)*3.4, 882 + (j % 5)*3];
+  // the rest gather in two arcs of six outside the ring, east and west, alternating sides as they come and filling
+  // from the observatory end (south) northward; the way through, north to south, stays open
+  const j = k - DIAMONDS, side = j % 2 ? -1 : 1, m = Math.min(5, j >> 1), a = (70 - m*28)*Math.PI/180, R = 12.5;
+  return [RING6.x + side*Math.cos(a)*R, RING6.y + Math.sin(a)*R];
 }
 const court = (() => {
   const g = new THREE.Group(); scene.add(g);
@@ -4932,7 +4937,7 @@ const court = (() => {
 const ATTEND = (() => {
   let seed = 4040; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const white = lam(0xf1ece0), white2 = lam(0xd4ccba); white.flatShading = white2.flatShading = true;
-  return [[239.5, 890], [260.5, 890]].map(([x, y], i) => {
+  return [[232, 891], [268, 891]].map(([x, y], i) => {
     const rig = buildAlien(rnd);
     rig.root.traverse(o => { if (!o.isMesh) return; if (o.material === NPC_MAT.robe) o.material = white; else if (o.material === NPC_MAT.robe2) o.material = white2; else if (o.material === NPC_MAT.sash) o.material = GOLD; });
     pt(rig.arms[i], cy(0.02, 0.02, 1.5, 6), GOLD, 0, -0.5, 0);                // a slim gold staff
@@ -5050,7 +5055,7 @@ function updateCourt(dt){
       }
     } else {
       // on its spot: turn to face the trio and stand
-      let d = (c.slot < DIAMONDS ? facingTo(h.x, h.y, RING6.x, RING6.y) : facingTo(h.x, h.y, 250, h.y)) - h.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; h.th += d*Math.min(1, dt*3);
+      let d = facingTo(h.x, h.y, RING6.x, RING6.y) - h.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; h.th += d*Math.min(1, dt*3);
       idleMoose(r, now, h.ph || 0, 0);
     }
     if (c.phase === 'wait' && c.served){
@@ -5309,6 +5314,8 @@ function spawnAtCheckpoint(){
     spawnAt(K.tx, K.ty, th); K.dismissed = true;
   } else if (checkpoint.a){
     spawnAt(altar.x + 10, altar.y, Math.PI/2); altar.dismissed = true;     // on the dais, facing out of the circle
+  } else if (checkpoint.z5){
+    spawnAt(250, 881, Math.PI);                                           // zone 5: at the foot of the hidden way, looking down the line
   }
   if (pet.h) petArrive();
 }

@@ -269,7 +269,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tK180">Quick same-side kicks for a full turn<output id="oK180"></output><input id="tK180" type="range" min="3" max="12" step="1" value="8"></label>
     <label for="tK180t">Quick trigger kicks for a full turn<output id="oK180t"></output><input id="tK180t" type="range" min="3" max="12" step="1" value="6"></label>
     <label for="tTfStop">Full turn when slow or stopped (°)<output id="oTfStop"></output><input id="tTfStop" type="range" min="45" max="270" step="5" value="180"></label>
-    <label for="tTfMove">Full turn at skating speed (°)<output id="oTfMove"></output><input id="tTfMove" type="range" min="30" max="270" step="5" value="80"></label>
+    <label for="tTfMove">Full turn at skating speed (°)<output id="oTfMove"></output><input id="tTfMove" type="range" min="30" max="270" step="5" value="90"></label>
     <label for="tTfVlo">Slow below (km/h)<output id="oTfVlo"></output><input id="tTfVlo" type="range" min="0" max="20" step="1" value="1"></label>
     <label for="tTfVhi">Skating speed from (km/h)<output id="oTfVhi"></output><input id="tTfVhi" type="range" min="2" max="30" step="1" value="14"></label>
     <label for="tDecay">Same-leg push loss (% per kick)<output id="oDecay"></output><input id="tDecay" type="range" min="0" max="60" step="5" value="20"></label>
@@ -2433,10 +2433,10 @@ const ANTENNA = { red: 0xd9534a, yellow: 0xf2c14e, green: 0x5cc87a };   // anten
 const ORB_COUNT = { 1: 20, 2: 30, 3: 50 }, ORB_R = 1.7;
 const ORB_COUNT_Z1 = ORB_COUNT[1];
 // a zone's trails as a graph: the junctions are the nodes, the stretches of trail between them the edges
-function trailGraph(zone){
+function trailGraph(zone){            // zone null: every trail, connectors included
   const nodes = [], edges = [];
   const nodeAt = (x, y) => { let i = nodes.findIndex(n => Math.hypot(n[0] - x, n[1] - y) < 5); if (i < 0){ nodes.push([x, y]); i = nodes.length - 1; } return i; };
-  for (const t of TRAILS.filter(t => t.zone === zone)){
+  for (const t of TRAILS.filter(t => zone === null || t.zone === zone)){
     const p = t.s, n = p.length/2, cuts = new Set([0, n - 1]);
     for (const q of JUNCTION_PTS){
       let bi = -1, bd = 4;
@@ -2448,7 +2448,7 @@ function trailGraph(zone){
       const i0 = cs[k], i1 = cs[k+1]; if (i1 - i0 < 2) continue;
       const pts = []; let len = 0;
       for (let i = i0; i <= i1; i++){ pts.push(p[i*2], p[i*2+1]); if (i > i0) len += Math.hypot(p[i*2] - p[i*2-2], p[i*2+1] - p[i*2-1]); }
-      edges.push({ a: nodeAt(p[i0*2], p[i0*2+1]), b: nodeAt(p[i1*2], p[i1*2+1]), pts, len });
+      edges.push({ a: nodeAt(p[i0*2], p[i0*2+1]), b: nodeAt(p[i1*2], p[i1*2+1]), pts, len, zone: t.zone });
     }
   }
   return { nodes, edges };
@@ -4084,7 +4084,7 @@ function releasePet(){
 function dismissPet(){
   // sent home: it trots back to its herd, and the next calf you come across (not this one) will follow you instead
   const h = pet.h; if (!h) return;
-  pet.h = null; pet.lastDismissed = h.id; h.sleep = false; h.returning = true; HERD.push(h);
+  pet.h = null; pet.lastDismissed = h.id; h.sleep = false; h.returning = true; h.route = undefined; HERD.push(h);
   $('calfBtn').hidden = true; toast('Your calf heads back to its herd.'); saveProgress();
 }
 function dismissPrompt(){
@@ -4159,19 +4159,70 @@ function updatePet(dt){
   // the giant: come near it with your calf and it stands
   if (!giant.up && Math.hypot(S.x - 137, S.y - 614) < 62 && giantInView()) wakeGiant(false);
 }
+// ---- the whole trail network as one graph (bridges join the trail ends on either bank), for a sent-home calf to
+// find its way back along the trails
+const TRAIL_NET = (() => {
+  const G = trailGraph(null), near = (x, y) => { let bi = -1, bd = 6; G.nodes.forEach((n, i) => { const d = Math.hypot(n[0] - x, n[1] - y); if (d < bd){ bd = d; bi = i; } }); return bi; };
+  for (const B of BRIDGES){
+    const a = near(B.x, B.yN - 1), b = near(B.x, B.yS + 1);
+    if (a >= 0 && b >= 0) G.edges.push({ a, b, pts: [B.x, B.yN - 1, B.x, B.yS + 1], len: B.yS - B.yN + 2, zone: 0 });
+  }
+  for (const e of G.edges){ const c = [0]; for (let i = 2; i < e.pts.length; i += 2) c.push(c[c.length - 1] + Math.hypot(e.pts[i] - e.pts[i-2], e.pts[i+1] - e.pts[i-1])); e.cum = c; }
+  return G;
+})();
+// a route along the trails from (x, y) to the zone 4 trail nearest (hx, hy), as a polyline, or null
+function trailRoute(x, y, hx, hy){
+  const G = TRAIL_NET, nearest = (px, py, ok) => { let best = null; G.edges.forEach((e, ei) => { if (ok && !ok(e)) return; for (let i = 0; i < e.pts.length; i += 2){ const d = Math.hypot(e.pts[i] - px, e.pts[i+1] - py); if (!best || d < best.d) best = { ei, i: i/2, d }; } }); return best; };
+  const A = nearest(x, y), B = nearest(hx, hy, e => e.zone === 4); if (!A || !B) return null;
+  const seg = (e, i0, i1) => { const out = []; if (i0 <= i1) for (let i = i0; i <= i1; i++) out.push(e.pts[i*2], e.pts[i*2+1]); else for (let i = i0; i >= i1; i--) out.push(e.pts[i*2], e.pts[i*2+1]); return out; };
+  const eA = G.edges[A.ei], eB = G.edges[B.ei], nA = eA.pts.length/2 - 1, nB = eB.pts.length/2 - 1;
+  // Dijkstra from the start's two ways onto the network
+  const dist = G.nodes.map(() => Infinity), prev = G.nodes.map(() => null), done = new Set();
+  dist[eA.a] = Math.min(dist[eA.a], eA.cum[A.i]); prev[eA.a] = { start: true, pts: seg(eA, A.i, 0) };
+  if (eA.len - eA.cum[A.i] < dist[eA.b]){ dist[eA.b] = eA.len - eA.cum[A.i]; prev[eA.b] = { start: true, pts: seg(eA, A.i, nA) }; }
+  for (;;){
+    let u = -1; dist.forEach((d, i) => { if (!done.has(i) && d < Infinity && (u < 0 || d < dist[u])) u = i; });
+    if (u < 0) break; done.add(u);
+    G.edges.forEach((e, ei) => {
+      if (e.a !== u && e.b !== u) return;
+      const v = e.a === u ? e.b : e.a, nd = dist[u] + e.len;
+      if (nd < dist[v]){ dist[v] = nd; prev[v] = { from: u, ei, fwd: e.a === u }; }
+    });
+  }
+  // the best way off the network onto the target edge (or straight along a shared edge)
+  let best = null;
+  if (A.ei === B.ei) best = { cost: Math.abs(eA.cum[A.i] - eA.cum[B.i]), direct: true };
+  for (const [node, cost, tail] of [[eB.a, eB.cum[B.i], () => seg(eB, 0, B.i)], [eB.b, eB.len - eB.cum[B.i], () => seg(eB, nB, B.i)]]){
+    const c = dist[node] + cost; if (c < Infinity && (!best || c < best.cost)) best = { cost: c, node, tail };
+  }
+  if (!best) return null;
+  if (best.direct) return seg(eA, A.i, B.i);
+  const parts = [best.tail()]; let n = best.node;
+  while (prev[n] && !prev[n].start){ const pr = prev[n], e = G.edges[pr.ei]; parts.push(pr.fwd ? seg(e, 0, e.pts.length/2 - 1) : seg(e, e.pts.length/2 - 1, 0)); n = pr.from; }
+  if (prev[n]) parts.push(prev[n].pts);
+  return parts.reverse().flat();
+}
 function updateHerd(dt){
   const now = performance.now()/1000;
   for (const h of HERD){
     if (h.returning){
-      // a dismissed calf trotting home; far from you it's simply back
-      const dx = h.hx - h.x, dy = h.hy - h.y, dist = Math.hypot(dx, dy), r = h.rig;
-      if (dist < 0.5 || Math.hypot(h.x - S.x, h.y - S.y) > 150){ h.returning = false; h.x = h.hx; h.y = h.hy; h.sleep = h.role.includes('sleep'); }
+      // a sent-home calf: it keeps to the trails until it's back in zone 4, then cuts across the snow to its herd.
+      // out of sight it hurries
+      const r = h.rig, far = Math.hypot(h.x - S.x, h.y - S.y) > 150;
+      if (h.route === undefined) h.route = zoneAt(h.x, h.y) === 4 ? null : trailRoute(h.x, h.y, h.hx, h.hy), h.ri = 0;
+      if (h.route && zoneAt(h.x, h.y) === 4 && h.ri > 0) h.route = null;        // home ground: off the trail now
+      let tx = h.hx, ty = h.hy;
+      if (h.route){ while (h.ri < h.route.length/2 - 1 && Math.hypot(h.route[h.ri*2] - h.x, h.route[h.ri*2+1] - h.y) < 1) h.ri++; tx = h.route[h.ri*2]; ty = h.route[h.ri*2+1]; }
+      const dx = tx - h.x, dy = ty - h.y, dist = Math.hypot(dx, dy);
+      if (!h.route && Math.hypot(h.hx - h.x, h.hy - h.y) < 0.5){ h.returning = false; h.route = undefined; h.x = h.hx; h.y = h.hy; h.sleep = h.role.includes('sleep'); }
       else {
-        const sp = 3.5, st = Math.min(dist, sp*dt); h.x += dx/dist*st; h.y += dy/dist*st;
+        if (h.route && h.ri >= h.route.length/2 - 1 && dist < 1) h.route = null;    // end of the trail route: on to the herd
+        const sp = far ? 10 : 3.5, st = Math.min(dist, sp*dt); if (dist > 1e-6){ h.x += dx/dist*st; h.y += dy/dist*st; }
         let d = Math.atan2(dx, -dy) - h.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; h.th += d*Math.min(1, dt*5);
+        r.root.visible = !far; if (far) continue;
         h.gait += sp*dt; const ph = h.gait/0.9*Math.PI*2;
         for (const L of r.legs){ const q = ph + (L.set ? Math.PI : 0); L.hip.rotation.x = 0.45*Math.sin(q); L.knee.rotation.x = -Math.max(0, Math.cos(q))*0.6; }
-        r.body.position.y = Math.abs(Math.sin(ph))*0.05; r.root.visible = true;
+        r.body.position.y = Math.abs(Math.sin(ph))*0.05;
         r.root.position.set(h.x, height(h.x, h.y), h.y); r.root.rotation.y = -h.th;
         continue;
       }

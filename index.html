@@ -151,6 +151,11 @@ summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid
 .pcard .phint{margin:12px 0 0;font-size:12px;color:var(--muted)}
 @media (pointer:coarse){.pcard .phint{display:none}}
 
+/* ---- calf button: beside the music toggle while a calf is following you; sends it back to its herd ---- */
+.calfbtn{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);left:64px;z-index:7;width:40px;height:40px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(6px);cursor:pointer;box-sizing:border-box;touch-action:manipulation}
+.calfbtn[hidden]{display:none}
+.calfbtn svg{width:24px;height:24px}
+
 /* ---- music toggle: top left, every view and device ---- */
 .musicbtn{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);left:16px;z-index:7;width:40px;height:40px;padding:0;display:inline-flex;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(6px);cursor:pointer;box-sizing:border-box;touch-action:manipulation}
 .musicbtn svg{width:22px;height:22px}
@@ -192,6 +197,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 <canvas id="c"></canvas>
 
 <button class="musicbtn" id="musicBtn" type="button" aria-pressed="true" aria-label="Music on/off" title="Music (M)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" fill-opacity=".15"/><g class="ic-on"><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/></g><g class="ic-off"><path d="M16 9.5l5 5M21 9.5l-5 5"/></g></svg></button>
+<button class="calfbtn" id="calfBtn" type="button" aria-label="Send your calf back to its herd" title="Send your calf back (H / Y)" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9.5c0-3 2.2-5 5-5s5 2 5 5v2.5c0 2.6-1.6 5-3 6.5h-4c-1.4-1.5-3-3.9-3-6.5z" fill="currentColor" fill-opacity=".15"/><path d="M7.2 8.5 4 6.5M16.8 8.5 20 6.5"/><circle cx="10" cy="10.5" r=".6" fill="currentColor"/><circle cx="14" cy="10.5" r=".6" fill="currentColor"/><path d="M10.5 18.5v1.5M13.5 18.5v1.5"/></svg></button>
 <button class="mapbtn" id="mapBtn" type="button" aria-label="Open the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg></button>
 <div class="bigmap" id="bigMap" role="dialog" aria-label="Map"><canvas id="bigMapCv"></canvas><button class="close" id="mapClose" type="button" aria-label="Close the map">✕</button></div>
 <div class="orbhud" id="orbHud" aria-live="polite"><i class="gem" aria-hidden="true"></i><b id="orbN">0 / 20</b><span id="orbZone">Orbs</span></div>
@@ -1239,6 +1245,8 @@ function pollPad(){
   if (promptCtx){ promptPad(trig); return; }
   // after a prompt, the buttons that answered it are ignored until they're let go (A would toggle classic)
   if (padHold){ if ([0, 1, 2].some(i => trig(i) > 0.3)) return; padHold = false; both.rtDown = false; }
+  // Y: send your calf back (asks first)
+  if (trig(3) > 0.5){ if (!pollPad.yDown){ pollPad.yDown = true; if (pet.h){ dismissPrompt(); return; } } } else pollPad.yDown = false;
   pollTwin(gp);
 }
 // ---- stop at a kiosk or the altar: a full-screen prompt that takes all input until it's answered.
@@ -1543,6 +1551,7 @@ addEventListener('keydown', e => {
   if (k === 'w' || k === 'arrowup'){ e.preventDefault(); if (!e.repeat) setTuck(true, 'key'); return; }
   if (k === 'q' || k === 'e'){ e.preventDefault(); keySteer[k] = 1; return; }
   if (k === 'c'){ e.preventDefault(); if (!e.repeat) toggleClassic(); return; }
+  if (k === 'h'){ e.preventDefault(); if (!e.repeat) dismissPrompt(); return; }
   if (k === ' '){ e.preventDefault(); if (!e.repeat) doublePoleInput(); return; }
   const leg = keyLeg(k); if (!leg) return;
   e.preventDefault();
@@ -1616,7 +1625,7 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
   const editable = t => t && t.closest && t.closest('input,textarea,select,[contenteditable]');
   document.addEventListener('selectstart', e => { if (!editable(e.target)) e.preventDefault(); });
   document.addEventListener('contextmenu', e => { if (!editable(e.target)) e.preventDefault(); });
-  for (const el of document.querySelectorAll('.pad,.mtoggle,#gl')) el.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+  for (const el of document.querySelectorAll('.pad,.mtoggle,#gl,.calfbtn')) el.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
   document.addEventListener('touchend', e => { const n = Date.now(); if (n - lastTouchEnd < 350) e.preventDefault(); lastTouchEnd = n; }, { passive: false });
   for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
   document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
@@ -2834,7 +2843,7 @@ for (const z of [1, 2, 3]){
 }
 function resetOrbs(){
   for (const K of KIOSKS){ K.state = 'dormant'; K.dismissed = false; for (const o of K.orbs){ o.got = false; o.fade = 0; o.g.visible = false; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; } updateKioskLook(K); }
-  releasePet(); sleepGiant(); checkpoint = null;
+  releasePet(); sleepGiant(); checkpoint = null; pet.lastDismissed = -1;
   setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; altar.state = 0; altar.dismissed = false; setCrystalsCollected(0); setCrystalsActive(false); updateAltarLook(); gate4Open = false; gate4.open = 0; bridgeWanted = false; bridgeDown = 0; animateGate(0);
   saveProgress();
 }
@@ -4016,6 +4025,12 @@ function updateGiant(dt){
     p.sp.material.opacity = 0.55 * Math.sin(Math.PI*Math.min(1, u*1.4)) * (1 - u*0.4);
   }
 }
+// is the giant on screen? (it only gets up where you can see it happen)
+const _fr = new THREE.Frustum(), _fm = new THREE.Matrix4(), _gs = new THREE.Sphere(new THREE.Vector3(), 9);
+function giantInView(){
+  camera.updateMatrixWorld(); _fm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); _fr.setFromProjectionMatrix(_fm);
+  giant.rig.body.getWorldPosition(_gs.center); return _fr.intersectsSphere(_gs);
+}
 function refootGiant(){
   const e = SOLIDS.find(o => o.foot === giant.foot); giant.rig.root.updateMatrixWorld(true);
   const f = buildFootprint({ model: giant.rig.root }); if (e) e.foot = f; giant.foot = f;
@@ -4036,7 +4051,7 @@ function sleepGiant(){
 // speed and closing the gap if it falls back; it never blocks you, and it stamps six-legged hoof prints in the snow.
 // bring it to the sleeping giant and the giant stands up
 const PET_FOLLOW = 3.2;
-const pet = { h: null, crumbs: [], s: 0, th: 0, gait: 0, step: 0, side: 0 };
+const pet = { h: null, crumbs: [], s: 0, th: 0, gait: 0, step: 0, side: 0, join: false, lastDismissed: -1 };
 const hoofPrints = (() => {
   const cap = 1200, geo = new THREE.CircleGeometry(1, 8); geo.rotateX(-Math.PI/2);
   const mat = new THREE.MeshBasicMaterial({ color: 0x9fb4c6, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
@@ -4052,23 +4067,43 @@ function hoofPrint(x, y, th){
 function petCrumbsReset(){
   pet.crumbs = [{ x: S.x, y: S.y, s: 0 }];
   // start it a little behind you, along your heading
-  pet.s = -PET_FOLLOW; pet.th = S.th;
+  pet.s = -PET_FOLLOW; pet.th0 = S.th;
 }
 function adoptPet(h, quiet){
   if (!h || pet.h) return;
   HERD = HERD.filter(q => q !== h);                     // no longer one of the herd, and no longer solid
-  pet.h = h; h.sleep = false; h.rig.root.visible = true;
-  petCrumbsReset();
+  pet.h = h; h.sleep = false; h.returning = false; h.rig.root.visible = true;
+  petCrumbsReset(); pet.join = true;                    // it runs over from wherever it is to fall in behind you
+  $('calfBtn').hidden = false;
   if (!quiet){ toast('A calf has decided to follow you.'); music.chime(0.7); saveProgress(); }
 }
 function releasePet(){
+  // straight back to its place in the herd (used by a full reset)
   const h = pet.h; if (!h) return;
-  pet.h = null; h.x = h.hx; h.y = h.hy; h.sleep = h.role.includes('sleep'); HERD.push(h);
+  pet.h = null; h.x = h.hx; h.y = h.hy; h.sleep = h.role.includes('sleep'); h.returning = false; HERD.push(h); $('calfBtn').hidden = true;
+}
+function dismissPet(){
+  // sent home: it trots back to its herd, and the next calf you come across (not this one) will follow you instead
+  const h = pet.h; if (!h) return;
+  pet.h = null; pet.lastDismissed = h.id; h.sleep = false; h.returning = true; HERD.push(h);
+  $('calfBtn').hidden = true; toast('Your calf heads back to its herd.'); saveProgress();
+}
+function dismissPrompt(){
+  if (!pet.h || promptCtx) return;
+  openPrompt({ title: 'Your calf', body: 'Send your calf back to its herd? The next calf you come across will follow you instead.', go: 'Send back', onGo: dismissPet });
+}
+$('calfBtn').addEventListener('click', dismissPrompt);
+// after a jump (a checkpoint at the start of a visit, a reset) the calf starts a little way off and runs in
+function petArrive(){
+  if (!pet.h) return;
+  petCrumbsReset();
+  const h = pet.h, c = Math.cos(S.th), sn = Math.sin(S.th);
+  h.x = S.x - sn*16 + c*7; h.y = S.y + c*16 + sn*7; pet.join = true;
 }
 function crumbAt(sx){
   // position and heading at distance sx along your trail (before the first crumb: straight back from it along your heading)
   const C = pet.crumbs;
-  if (sx <= C[0].s || C.length < 2){ const d = C[0].s - sx; return [C[0].x - Math.sin(pet.th)*d, C[0].y + Math.cos(pet.th)*d, pet.th]; }
+  if (sx <= C[0].s || C.length < 2){ const d = C[0].s - sx; return [C[0].x - Math.sin(pet.th0)*d, C[0].y + Math.cos(pet.th0)*d, pet.th0]; }
   let lo = 0, hi = C.length - 1;
   while (hi - lo > 1){ const m = (lo + hi) >> 1; if (C[m].s < sx) lo = m; else hi = m; }
   const a = C[lo], b = C[hi], u = Math.min(1, (sx - a.s) / Math.max(1e-6, b.s - a.s));
@@ -4076,21 +4111,30 @@ function crumbAt(sx){
 }
 function updatePet(dt){
   if (!pet.h){
-    for (const h of HERD) if (h.calf && Math.hypot(h.x - S.x, h.y - S.y) < 8){ adoptPet(h); break; }
+    for (const h of HERD) if (h.calf && h.id !== pet.lastDismissed && !h.returning && Math.hypot(h.x - S.x, h.y - S.y) < 8){ adoptPet(h); break; }
     if (!pet.h) return;
   }
   const h = pet.h, r = h.rig, C = pet.crumbs, last = C[C.length - 1];
   // lay breadcrumbs as you go (a jump, like a reset, starts the trail again)
   const dd = Math.hypot(S.x - last.x, S.y - last.y);
-  if (dd > 25) petCrumbsReset();
+  if (dd > 25){ petArrive(); return; }
   else if (dd > 0.3){ C.push({ x: S.x, y: S.y, s: last.s + dd }); if (C.length > 1500) C.shift(); }
   const L2 = C[C.length - 1], you = L2.s + Math.hypot(S.x - L2.x, S.y - L2.y), want = you - PET_FOLLOW;
   // match your speed, plus a little to close the gap (or less to let it open back up to the buffer)
   const v = Math.hypot(S.vx, S.vy);
-  const vc = Math.max(0, Math.min(v + 5, v + (want - pet.s)*2.2));
-  pet.s = Math.min(want + 0.2, pet.s + vc*dt);
-  if (pet.s < C[0].s - 30) pet.s = want;                 // fell hopelessly behind: catch up
-  const [x, y, th0] = crumbAt(pet.s);
+  let vc, x, y, th0;
+  if (pet.join){
+    // running in: straight for the spot behind you, faster than you're going, until it's there; then into your tracks
+    const [tx, ty] = crumbAt(want), dx = tx - h.x, dy = ty - h.y, dist = Math.hypot(dx, dy);
+    vc = Math.max(6, v + 4);
+    if (dist < 0.8 || dist < vc*dt){ pet.join = false; pet.s = want; [x, y, th0] = crumbAt(pet.s); }
+    else { x = h.x + dx/dist*vc*dt; y = h.y + dy/dist*vc*dt; th0 = Math.atan2(dx, -dy); }
+  } else {
+    vc = Math.max(0, Math.min(v + 5, v + (want - pet.s)*2.2));
+    pet.s = Math.min(want + 0.2, pet.s + vc*dt);
+    if (pet.s < C[0].s - 30){ pet.join = true; }        // fell far behind: run to catch up
+    [x, y, th0] = crumbAt(pet.s);
+  }
   let d = th0 - pet.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; pet.th += d*Math.min(1, dt*6);
   h.x = x; h.y = y;
   r.root.position.set(x, ground(x, y), y); r.root.rotation.y = -pet.th;
@@ -4114,11 +4158,25 @@ function updatePet(dt){
     }
   }
   // the giant: come near it with your calf and it stands
-  if (!giant.up && Math.hypot(S.x - 137, S.y - 614) < 62) wakeGiant(false);
+  if (!giant.up && Math.hypot(S.x - 137, S.y - 614) < 62 && giantInView()) wakeGiant(false);
 }
 function updateHerd(dt){
   const now = performance.now()/1000;
   for (const h of HERD){
+    if (h.returning){
+      // a dismissed calf trotting home; far from you it's simply back
+      const dx = h.hx - h.x, dy = h.hy - h.y, dist = Math.hypot(dx, dy), r = h.rig;
+      if (dist < 0.5 || Math.hypot(h.x - S.x, h.y - S.y) > 150){ h.returning = false; h.x = h.hx; h.y = h.hy; h.sleep = h.role.includes('sleep'); }
+      else {
+        const sp = 3.5, st = Math.min(dist, sp*dt); h.x += dx/dist*st; h.y += dy/dist*st;
+        let d = Math.atan2(dx, -dy) - h.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; h.th += d*Math.min(1, dt*5);
+        h.gait += sp*dt; const ph = h.gait/0.9*Math.PI*2;
+        for (const L of r.legs){ const q = ph + (L.set ? Math.PI : 0); L.hip.rotation.x = 0.45*Math.sin(q); L.knee.rotation.x = -Math.max(0, Math.cos(q))*0.6; }
+        r.body.position.y = Math.abs(Math.sin(ph))*0.05; r.root.visible = true;
+        r.root.position.set(h.x, height(h.x, h.y), h.y); r.root.rotation.y = -h.th;
+        continue;
+      }
+    }
     const r = h.rig, far = Math.hypot(h.x - S.x, h.y - S.y) > 150;
     r.root.visible = !far; if (far) continue;
     if (h.sleep){
@@ -4165,13 +4223,13 @@ function spawnAtCheckpoint(){
   } else if (checkpoint.a){
     spawnAt(altar.x + 10, altar.y, Math.PI/2); altar.dismissed = true;     // on the dais, facing out of the circle
   }
-  if (pet.h) petCrumbsReset();
+  if (pet.h) petArrive();
 }
 function saveProgress(){
   // v2: each kiosk's state and orbs, the altar's state, and the crystals
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ v: 2,
     kiosks: KIOSKS.map(K => K.state[0]).join(''), korbs: orbs.map(o => o.got ? 1 : 0).join(''),
-    altar: altar.state, crystals: crystals.map(c => c.got ? 1 : 0).join(''), open: [gateOpen, bridgeWanted, gate2Open].map(b => b ? 1 : 0).join(''), pet: pet.h ? pet.h.id : -1, giant: giant.up ? 1 : 0, cp: checkpoint })); } catch (e) {}
+    altar: altar.state, crystals: crystals.map(c => c.got ? 1 : 0).join(''), open: [gateOpen, bridgeWanted, gate2Open].map(b => b ? 1 : 0).join(''), pet: pet.h ? pet.h.id : -1, pd: pet.lastDismissed, giant: giant.up ? 1 : 0, cp: checkpoint })); } catch (e) {}
 }
 function loadProgress(){
   let p = null; try { p = JSON.parse(localStorage.getItem(PROGRESS_KEY) || 'null'); } catch (e) {}
@@ -4200,7 +4258,8 @@ function loadProgress(){
   crystals.forEach(c => { c.g.visible = crystalsActive && !c.got; });
   if (altar.state === 2){ gate4Open = true; gate4.open = 1; }
   for (const K of KIOSKS) updateKioskLook(K);
-  if (p.v === 2 && p.pet >= 0) adoptPet(HERD.find(h => h.id === p.pet), true);
+  if (p.v === 2 && typeof p.pd === 'number') pet.lastDismissed = p.pd;
+  if (p.v === 2 && p.pet >= 0){ adoptPet(HERD.find(h => h.id === p.pet), true); petArrive(); }
   if (p.v === 2 && p.giant) wakeGiant(true);
   if (p.v === 2 && p.cp){ checkpoint = p.cp; spawnAtCheckpoint(); }
   updateAltarLook(); animateGate(0); animateGate4(0);

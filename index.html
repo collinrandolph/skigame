@@ -4555,8 +4555,11 @@ function skyGround(x, y){
 function skyStep(){
   if (!SKY_ON){
     if (!skyActive()) return;
+    // just got off at a ramp's foot: that portal leaves you alone until you've skied clear of it (you're leaving
+    // the way a wrong-way entry comes in, and it would loop you straight back on)
+    if (skyExitNode && Math.hypot(S.x - skyExitNode.x, S.y - skyExitNode.y) > 10) skyExitNode = null;
     for (const d of SKY.decks) for (const end of [d.A, d.B]){
-      if (!end.ground || (d.hidden && !giant.up)) continue;
+      if (!end.ground || end === skyExitNode || (d.hidden && !giant.up)) continue;
       if (d.final && !courtOpen()){ starwayHint(d, end); continue; }
       const pr = deckProj(d, S.x, S.y, end === d.A ? 0 : d.n - 2), sIn = end === d.A ? pr.s : d.len - pr.s;
       const v = Math.hypot(S.vx, S.vy), mx = v > 0.6 ? S.vx/v : Math.sin(S.th), my = v > 0.6 ? S.vy/v : -Math.cos(S.th);
@@ -4598,7 +4601,7 @@ function skyStep(){
     if (!promptCtx && !bhShown && bhK > 0.97){ bhShown = true; blackHolePrompt(); }
   }
   // off at the foot of a ramp
-  if ((d.A.ground && pr.s < -0.3) || (d.B.ground && pr.s > d.len + 0.3)){ SKY_ON = null; return; }
+  if ((d.A.ground && pr.s < -0.3) || (d.B.ground && pr.s > d.len + 0.3)){ skyExitNode = d.A.ground && pr.s < -0.3 ? d.A : d.B; SKY_ON = null; return; }
   // the railings: kept inside the deck, and the end of a deck (past a junction) holds you too
   const lim = d.w/2 - BODY_R, nx = -pr.ty, ny = pr.tx;              // left of travel
   let push = 0, px = 0, py = 0;
@@ -4608,7 +4611,7 @@ function skyStep(){
     const vn = S.vx*px + S.vy*py; if (vn > 0){ S.vx -= px*vn; S.vy -= py*vn; S.vx *= 0.97; S.vy *= 0.97; }
   }
 }
-let skyEnterAt = 0;
+let skyEnterAt = 0, skyExitNode = null;
 // trees a bridge would pass through are taken out (a bridge only shows while you ride it, but you'd ski into them)
 {
   const cell = 8, grid = new Map(), key = (a, b) => a + ',' + b;

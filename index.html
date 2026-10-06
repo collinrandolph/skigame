@@ -5125,7 +5125,9 @@ function updateCourt(dt){
 // loops so they never cross the centre line or block the way through; and out in space six vast translucent moose,
 // each bigger than the planet, walk slowly round it
 const PARTY = (() => {
-  const W = [[228, 860], [205, 850], [180, 862], [160, 885], [175, 905], [200, 900], [215, 920], [200, 945], [170, 950], [145, 930], [130, 900], [140, 865], [165, 845], [200, 838], [225, 845]];
+  // staged to be watched from the ring: each loop winds back and forth between the ring and the cliff, beside the
+  // observatory, on its own side of the way through (never within 10 m of the centre line)
+  const W = [[238, 904], [222, 899], [206, 906], [190, 900], [174, 907], [160, 903], [150, 915], [154, 930], [168, 944], [184, 953], [200, 945], [216, 954], [229, 946], [236, 928], [240, 915]];
   const mk = pts => { const c = new THREE.CatmullRomCurve3(pts.map(([x, y]) => new THREE.Vector3(x, 0, y)), true, 'centripetal'), N = 600; return { P: c.getSpacedPoints(N), N, len: c.getLength() }; };
   return { on: false, k: 0, t: 0, told: false, members: [], lines: [mk(W), mk(W.map(([x, y]) => [500 - x, y]).reverse())], cosmic: null };
 })();
@@ -5196,7 +5198,9 @@ function updateCosmic(dt){
       const mat = new THREE.MeshBasicMaterial({ color: 0xb8a6ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide });
       const rig = buildMoose(false); rig.root.traverse(o => { if (o.isMesh){ o.material = mat; o.frustumCulled = false; } });
       const t = deg*Math.PI/180, D = 470, x = RING6.x + Math.sin(t)*D, z = RING6.y + Math.cos(t)*D;
-      rig.root.scale.setScalar(46); rig.root.position.set(x, 12, z);   // standing down in the void, sized and set so, seen from the ring with the plateau camera, each rises whole over the cliff's horizon rig.root.rotation.y = -facingTo(x, z, RING6.x, RING6.y);
+      // standing down in the void, sized and set so that, seen from the ring with the plateau camera, each rises whole
+      // over the cliff's horizon; facing the ring
+      rig.root.scale.setScalar(46); rig.root.position.set(x, 12, z); rig.root.rotation.y = -facingTo(x, z, RING6.x, RING6.y);
       walkMoose(rig, 0, 0);
       return { rig, mat, ph: i*1.3 };
     });

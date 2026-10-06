@@ -202,6 +202,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 <div class="bigmap" id="bigMap" role="dialog" aria-label="Map"><canvas id="bigMapCv"></canvas><button class="close" id="mapClose" type="button" aria-label="Close the map">✕</button></div>
 <div class="orbhud" id="orbHud" aria-live="polite"><i class="gem" aria-hidden="true"></i><b id="orbN">0 / 20</b><span id="orbZone">Orbs</span></div>
 <div class="toast" id="toast" role="status"></div>
+<div id="bhVeil" style="position:fixed;inset:0;z-index:39;background:#000;opacity:0;pointer-events:none"></div>
 <div class="prompt" id="prompt" role="dialog" aria-modal="true" aria-labelledby="pTitle" hidden><div class="pcard">
   <h3 id="pTitle"></h3><p id="pBody"></p>
   <div class="pbtns"><button id="pGo" type="button"></button><button id="pNo" type="button" class="ghostbtn">Cancel</button></div>
@@ -511,11 +512,16 @@ function riverCut(x, y){ return -2.6 * (1 - smooth01(RIVER_HW - 1, RIVER_BANK + 
 // at the sides; the plateau ends at the cliff, which drops away hundreds of metres
 function zone5Height(x, y){
   const ridge = 48 + 9*Math.sin(x/17 + y/23) + 6*Math.sin((x - y)/11);
-  const t = smooth01(WORLD.y1, Z5.y0 + 12, y);
   const side = 1 - smooth01(Z5.x0 - 10, Z5.x0 + 30, x) * smooth01(Z5.x1 + 10, Z5.x1 - 30, x);
   const plateau = Z5.h + 1.6*Math.sin(x/19)*Math.cos(y/13) + 0.8*Math.sin((x + y)/9);
-  let h = ridge*(1 - t) + plateau*t;
-  h += 6*Math.sin(Math.PI*t);                                    // a crest between zone 4's mountains and the plateau
+  let h = plateau;
+  const yB = Z5.y0 + 12;
+  if (y < yB){
+    // a Hermite curve from zone 4's height and slope at the seam to the plateau (level), so the mountainside carries
+    // straight on, rounds over a crest and settles
+    const hA = heightNat(x, WORLD.y1), sA = Math.min(3, (hA - heightNat(x, WORLD.y1 - 2))/2), L = yB - WORLD.y1, u = (y - WORLD.y1)/L;
+    h = (2*u*u*u - 3*u*u + 1)*hA + (u*u*u - 2*u*u + u)*L*sA + (-2*u*u*u + 3*u*u)*plateau;
+  }
   h += (Math.max(ridge, Z5.h) + 14 - h) * side;
   // the court: dead level from the foot of the pass past the ring and the trio to the observatory
   { const dx = Math.abs(x - 250); if (dx < 40 && y < 940){ const w = (1 - smooth01(26, 40, dx)) * (1 - smooth01(926, 940, y)) * smooth01(850, 866, y); h += (Z5.h - h) * w; } }
@@ -2293,7 +2299,7 @@ const LAWN_PARTS = (() => {
     }
   }
   // zone 5: the whole plateau is groomed
-  parts.push({ kind: 'box', x0: Z5.x0 - 40, x1: Z5.x1 + 40, y0: WORLD.y1 + 8, y1: Z5.cliff + 40, bx: [Z5.x0 - 40, WORLD.y1 + 8, Z5.x1 + 40, Z5.cliff + 40] });
+  parts.push({ kind: 'box', x0: Z5.x0 - 40, x1: Z5.x1 + 40, y0: Z5.y0 + 14, y1: Z5.cliff + 40, bx: [Z5.x0 - 40, Z5.y0 + 14, Z5.x1 + 40, Z5.cliff + 40] });
   return parts;
 })();
 function partSD(p, x, y){
@@ -4515,10 +4521,11 @@ function skyStep(){
   }
   o.i = pr.i; o.h = pr.h;
   // the end of the line: the edge of the black hole holds you, and asks what you'd like to do
-  if (d.B.blackhole && pr.s > d.len - 8){
+  if (d.B.blackhole) bhWant = Math.max(0, Math.min(1, (pr.s - (d.len - BH_SWALLOW))/(BH_SWALLOW - 6)));
+  if (d.B.blackhole && pr.s > d.len - 6){
     S.vx *= 0.92; S.vy *= 0.92;
     if (pr.s > d.len - 2){ const back = pr.s - (d.len - 2); S.x -= pr.tx*back; S.y -= pr.ty*back; S.vx = S.vy = 0; }
-    if (!promptCtx && !bhShown){ bhShown = true; blackHolePrompt(); }
+    if (!promptCtx && !bhShown && bhK > 0.97){ bhShown = true; blackHolePrompt(); }
   }
   // off at the foot of a ramp
   if ((d.A.ground && pr.s < -0.3) || (d.B.ground && pr.s > d.len + 0.3)){ SKY_ON = null; return; }
@@ -5042,7 +5049,7 @@ const blackHole = (() => {
   const fm = new THREE.MeshBasicMaterial({ map: stripes, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, fog: false });
   const funnel = new THREE.Mesh(new THREE.LatheGeometry(prof, 72), fm); funnel.position.set(C0.x, 0, C0.z); space.world.add(funnel);
   // the hole, its disk and its glow
-  const hole = new THREE.Mesh(new THREE.SphereGeometry(3, 28, 18), new THREE.MeshBasicMaterial({ color: 0x000000, fog: false })); hole.position.set(C0.x, C0.y, C0.z); space.world.add(hole);
+  const hole = new THREE.Mesh(new THREE.SphereGeometry(3, 28, 18), new THREE.MeshBasicMaterial({ color: 0x000000, fog: false, side: THREE.DoubleSide })); hole.position.set(C0.x, C0.y, C0.z); space.world.add(hole);
   const diskTex = canvasTex(256, 256, (x, w) => {
     const g = x.createRadialGradient(w/2, w/2, w*0.2, w/2, w/2, w/2);
     g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.15, 'rgba(236,226,255,0.95)'); g.addColorStop(0.45, 'rgba(169,147,214,0.55)'); g.addColorStop(1, 'rgba(90,74,142,0)');
@@ -5058,10 +5065,19 @@ const blackHole = (() => {
   space.mats.push([fm, 0.9], [dm, 1], [hm, 0.8]);
   // drawn over the planet's shell, so only shown from inside it
   funnel.renderOrder = 1; disk.renderOrder = 2; halo.renderOrder = 2;
-  return { funnel, stripes, disk, halo, centre: new THREE.Vector3(250, 94, 1250), shell: space.world.children[0].material };
+  return { funnel, stripes, disk, halo, hole, centre: new THREE.Vector3(250, 94, 1250), shell: space.world.children[0].material };
 })();
 const _bhv = new THREE.Vector3();
+// the swallow: over the Starway's last stretch the hole swells until it takes the end of the bridge and then you, and
+// the screen goes black. bhWant is set by the ride; it eases back out when you've gone (back to the observatory, or
+// back to the start)
+const BH_SWALLOW = 46;
+let bhK = 0, bhWant = 0;
 function updateBlackHole(dt){
+  if (!(SKY_ON && SKY_ON.d.final)) bhWant = 0;
+  bhK += (bhWant - bhK) * Math.min(1, dt*(bhWant > bhK ? 3 : 1.2));
+  { const k = bhK, g = 1 + k*k*11; blackHole.hole.scale.setScalar(g); blackHole.disk.scale.setScalar(1 + k*k*7); blackHole.halo.scale.set(20 + k*k*160, 20 + k*k*160, 1);
+    $('bhVeil').style.opacity = String(Math.max(0, Math.min(1, (k - 0.55)/0.4))); }
   if (!space.world.visible) return;
   // once you're inside the planet its shell is drawn from the inside only, so it never hides you from a camera that
   // hasn't caught up yet
@@ -5093,7 +5109,8 @@ function fireworkBurst(cx, cy, cz){
 }
 function updateFireworks(dt){
   const F = fireworks;
-  if (SKY_ON && SKY_ON.d.final){
+  _bhv.set(S.x, ground(S.x, S.y) + 1, S.y);
+  if (SKY_ON && SKY_ON.d.final && _bhv.distanceTo(blackHole.centre) > 72){
     F.t -= dt;
     if (F.t <= 0){
       F.t = 0.3 + Math.random()*0.55;
@@ -5243,10 +5260,11 @@ const regalia = (() => {
   const gold = new THREE.MeshLambertMaterial({ color: 0xe6bf4f }); gold.flatShading = true;
   const crown = buildCrown(); crown.scale.setScalar(0.42); crown.position.y = 0.035; body.hat.add(crown);   // the court's crown, sized to your hat
   const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.1335, 0.1335, 1, 16, 1, true), gold); belt.scale.y = 0.085; belt.position.y = -0.36; body.torso.add(belt);
-  return { crown, belt };
+  const emblem = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), gold); emblem.position.set(0, 0.08, 0.128); emblem.scale.set(0.06, 0.16, 0.012); body.torso.add(emblem);   // the court's diamond, on your back
+  return { crown, belt, emblem };
 })();
 function applyRegalia(){
-  const on = completions > 0; regalia.crown.visible = regalia.belt.visible = on;
+  const on = completions > 0; regalia.crown.visible = regalia.belt.visible = regalia.emblem.visible = on;
   if (on) skierMat.color.setHex(0x7b3fe0);
 }
 for (const k of ['L','R']) body.ski[k].geometry.translate(0, 0, -0.15);   // binding a little behind the ski's middle

@@ -2025,7 +2025,7 @@ function checkInteract(){
   if (promptCtx || SKY_ON) return;
   for (const K of KIOSKS) if (K.state === 'active' && kioskGot(K) === orbsFor(K) && Math.hypot(S.x - K.x, S.y - K.y) < 7){ powerKiosk(K); K.dismissed = true; }
   if (trial.K && kioskGot(trial.K) === ORBS_PER_KIOSK && Math.hypot(S.x - trial.K.x, S.y - trial.K.y) < 7){ trial.K.dismissed = true; endTrial(true); }
-  const spots = [...KIOSKS.map(K => [K, 7, () => kioskPrompt(K)]), [altar, 8, altarPrompt], ...(ceremony === 1 && OBS_ALTAR.rise > 0.9 ? [[OBS_ALTAR, 8, obsAltarPrompt]] : []), ...(ONSTATION && stationFloor(S.x, S.y) > STATION.h + 4 ? [[SHIP_SPOT, 7, shipPrompt]] : [])];
+  const spots = [...KIOSKS.map(K => [K, 7, () => kioskPrompt(K)]), [altar, 8, altarPrompt], ...(ceremony === 1 && OBS_ALTAR.rise > 0.9 ? [[OBS_ALTAR, 8, obsAltarPrompt]] : []), ...(ONSTATION && stationFloor(S.x, S.y) < STATION.h + 2 ? [[SHIP_SPOT, 6, shipPrompt]] : [])];
   for (const [it, r, fn] of spots){
     const d = Math.hypot(S.x - it.x, S.y - it.y);
     if (d > r + 6) it.dismissed = false;
@@ -5680,8 +5680,9 @@ function completeCeremony(){
   toast('The altar takes the crystals and sinks away. Out in space the cosmic moose appear, and past the cliff the Starway lights.');
 }
 // the ship waiting at the station's big east dock, for crystals it can't get now the old mine's stripped bare
-// (where you deal with the crew: on the hub deck, on the side facing Dock 1, by the cargo bin waiting to be filled)
-const SHIP_SPOT = { x: STATION.x + STATION.deckR, y: STATION.y, dismissed: false };
+// (where you deal with the crew: on the main walkway at Dock 1, behind the waiting ship, by the cargo bin waiting to be
+// filled, which stands just off the walkway's outer edge)
+const SHIP_SPOT = { x: STATION.x + STATION.R + 2, y: STATION.y, dismissed: false };
 function shipPrompt(){
   if (crownSpent === 'altar') return { title: 'The waiting ship', body: 'The crew are still stranded, waiting for crystals. Yours went to the court.' };
   const n = crownCarried();
@@ -7358,10 +7359,10 @@ function updateCaveTiles(){
 // lights: violet over each room, warm lamps down the mine. they're always there (so nothing recompiles) but dark
 // until you're underground, and dim until zone 3's terminals are powered
 const caveLights = [];
-// the cave's lights are many (a couple of dozen), but only a fixed pool of eight real lights is ever in the scene:
+// the cave's lights are many (a couple of dozen), but only a fixed pool of six real lights is ever in the scene:
 // each frame they take the places of the nearest ones. (every light costs every lit surface, and that many at once
 // stalls some graphics cards; a fixed count also means nothing has to be rebuilt as you move about)
-const LIGHT_POOL = Array.from({ length: 8 }, () => { const L = new THREE.PointLight(0xffffff, 0, 50, 1.2); scene.add(L); return L; });
+const LIGHT_POOL = Array.from({ length: 6 }, () => { const L = new THREE.PointLight(0xffffff, 0, 50, 1.2); scene.add(L); return L; });
 let caveLightsPooled = 0;
 function poolCaveLights(pw, k){
   // the real lights made while dressing the cave become stand-ins: where they are and how they shine
@@ -7422,10 +7423,11 @@ function buildCaveDressing(){
   let seed = 9091; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const f = {}, rx = () => CAVE_BOX.x0 + rnd()*(CAVE_BOX.x1 - CAVE_BOX.x0), ry = () => CAVE_BOX.y0 + rnd()*(CAVE_BOX.y1 - CAVE_BOX.y0);
   const offTrail = (x, y, r) => { const u = UNDER, st = ONSTATION, dk = CAVE_DECK; UNDER = true; ONSTATION = false; CAVE_DECK = null; const d = nearestTrail(x, y).d; UNDER = u; ONSTATION = st; CAVE_DECK = dk; return d > r; };
-  // crystal clusters up the walls (beyond where you can ride)
+  // crystal clusters up the walls (beyond where you can ride): only in the crown room. the rest of the mine has been
+  // mined bare
   const placed = [];
-  for (let k = 0; k < 30000 && placed.length < 90; k++){
-    const x = rx(), y = ry(); if (pastPortal(x, y) || x > MINE.x) continue;
+  for (let k = 0; k < 30000 && placed.length < 14; k++){
+    const a = rnd()*Math.PI*2, rr = CROWN.R - 1 - rnd()*3, x = CROWN.s.x + Math.cos(a)*rr, y = CROWN.s.y + Math.sin(a)*rr;
     caveField(x, y, f); if (f.hall > 0.3 || f.d < -2.6 || f.d > -0.9) continue;
     if (placed.some(p => Math.hypot(p[0] - x, p[1] - y) < 16)) continue;
     placed.push([x, y]); crystalCluster(x, y, f.floor - 0.2, 0.9 + rnd()*1.1, rnd);
@@ -7509,7 +7511,7 @@ function buildCaveDressing(){
     }
     // a band of gold along the lintel, and a light on the facade so it can't be missed
     pt(g, new THREE.BoxGeometry(2*sp, 0.5, 0.3), GOLD, 0, dH + 0.3, -0.7);
-    for (const sd of [-1, 0, 1]){ const L = new THREE.PointLight(sd ? 0xffcf8a : 0xc9a6ff, 0, sd ? 30 : 55, 1.2); L.position.set(fx - 9, b + (sd ? 8 : 16), y0 + sd*12); scene.add(L); caveLights.push({ L, k: sd ? 0.9 : 1.5 }); }
+    for (const sd of [0]){ const L = new THREE.PointLight(sd ? 0xffcf8a : 0xc9a6ff, 0, sd ? 30 : 55, 1.2); L.position.set(fx - 9, b + (sd ? 8 : 16), y0 + sd*12); scene.add(L); caveLights.push({ L, k: sd ? 0.9 : 1.5 }); }
   }
   // the great crystal: a pillar from the floor into the roof, glowing, with crystals clustered round its foot
   {
@@ -7520,7 +7522,7 @@ function buildCaveDressing(){
     for (let k = 0; k < 7; k++){ const a = k/7*Math.PI*2 + 0.4, r = CROWN.pillarR*0.85, h = 8 + (k % 3)*5; const c = pt(pg, new THREE.OctahedronGeometry(1, 0), k % 2 ? CRYSTAL_MAT.gem : pm, Math.cos(a)*r, h*0.35, Math.sin(a)*r, (rnd() - 0.5)*0.5, rnd()*3, 0.35*Math.cos(a)); c.scale.set(2.2, h*0.5, 2.2); }
     for (let k = 0; k < 9; k++){ const a = k/9*Math.PI*2, r = CROWN.pillarR + 3 + rnd()*4; crystalCluster(s.x + Math.cos(a)*r, s.y + Math.sin(a)*r, b - 0.3, 1 + rnd()*1.4, rnd); }
     CAVE_SOLIDS.push({ x: s.x, y: s.y, r: CROWN.pillarR + 1 });
-    for (const [h, k] of [[6, 2.0], [30, 1.6], [56, 1.2]]){ const L = new THREE.PointLight(0xb48cff, 0, 110, 1.1); L.position.set(s.x - 14, b + h, s.y); scene.add(L); caveLights.push({ L, k }); }
+    for (const [h, k] of [[24, 0.9]]){ const L = new THREE.PointLight(0xb48cff, 0, 110, 1.1); L.position.set(s.x - 14, b + h, s.y); scene.add(L); caveLights.push({ L, k }); }
   }
   // the spiral path: a stone slab, walled both sides, lanterns along its outer wall, and the thirty crystals
   {
@@ -7547,7 +7549,7 @@ function buildCaveDressing(){
       const m = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.3, 6), postM); m.position.set(lx, d.H[i] + 1.55, ly); scene.add(m);
       const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.42, 0.32), lampMat); lamp.position.set(lx, d.H[i] + 2.35, ly); scene.add(lamp);
     }
-    for (const u of [0.15, 0.45, 0.75, 0.98]){ let i = 0; while (i < d.n - 2 && d.cum[i+1] < u*d.L) i++; const L = new THREE.PointLight(0xffc27a, 0, 40, 1.3); L.position.set(d.X[i], d.H[i] + 5, d.Y[i]); scene.add(L); caveLights.push({ L, k: 0.9 }); }
+    for (const u of []){ let i = 0; while (i < d.n - 2 && d.cum[i+1] < u*d.L) i++; const L = new THREE.PointLight(0xffc27a, 0, 40, 1.3); L.position.set(d.X[i], d.H[i] + 5, d.Y[i]); scene.add(L); caveLights.push({ L, k: 0.9 }); }
     caveDress.crownGems = d.gems.map((g, k) => {
       let i = 0; while (i < d.n - 2 && d.cum[i+1] < g) i++;
       const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 0), CRYSTAL_MAT.gem2); m.scale.set(1, 1.7, 1); m.position.set(d.X[i], d.H[i] + 1.15, d.Y[i]); m.visible = !crownHas(k); scene.add(m); return m;
@@ -7577,8 +7579,8 @@ function buildCaveDressing(){
     }
   }
   // ---- the miners' things, left about the ungroomed floor of every room (thickest round the transport rooms): drill
-  // rigs, ore carts on stubs of rail, crate stacks, barrels, prefab huts, compressors, conveyor sections, lamp posts,
-  // cable reels, heaps of purple ore and striped barriers. all merged into a few meshes; the bigger ones are solid
+  // rigs, empty ore carts, crate stacks, barrels, prefab huts, compressors, conveyor sections, lamp posts, cable reels
+  // and striped barriers (no crystals: the mine's been worked out). all merged into a few meshes; the bigger ones are solid
   {
     const M = { wood: lam(0x7a5a3a), rust: lam(0x8a4b2e), paint: lam(0xd9a63a), steel: new THREE.MeshLambertMaterial({ color: 0x5d6876 }), dark: lam(0x2f3640),
       tent: lam(0xc98a3e), tent2: lam(0x4f6f8f), white: lam(0xd6dde4), red: lam(0xc0453a) };
@@ -7588,9 +7590,8 @@ function buildCaveDressing(){
     const KIT = {
       drill: g => { for (let k = 0; k < 3; k++){ const a = k/3*Math.PI*2; const l = Cy(g, 0.09, 0.12, 6.2, M.paint, Math.cos(a)*1.3, 2.9, Math.sin(a)*1.3); l.rotation.set(Math.sin(a)*0.22, 0, -Math.cos(a)*0.22); }
         B(g, 1.1, 0.9, 0.9, M.dark, 0, 5.6, 0); Cy(g, 0.12, 0.12, 4.5, M.steel, 0, 2.6, 0); const bit = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.6, 8), M.steel); bit.rotation.x = Math.PI; bit.position.y = 0.3; g.add(bit); B(g, 1.4, 0.7, 1.0, M.paint, 1.9, 0.35, 0.6); return 2.2; },
-      cart: g => { for (const z of [-0.55, 0.55]) B(g, 6, 0.08, 0.1, M.steel, 0, 0.05, z); for (let x = -2.6; x <= 2.6; x += 0.8) B(g, 0.2, 0.06, 1.5, M.wood, x, 0.02, 0);
-        B(g, 1.8, 0.9, 1.1, M.rust, 0.6, 0.85, 0); for (const [x, z] of [[0, -0.55], [1.2, -0.55], [0, 0.55], [1.2, 0.55]]) Cy(g, 0.22, 0.22, 0.12, M.dark, x, 0.25, z, Math.PI/2);
-        for (let k = 0; k < 4; k++){ const c = new THREE.Mesh(new THREE.OctahedronGeometry(0.28, 0), CAVE_GEM[k % 2]); c.position.set(0.2 + k*0.3, 1.35, (k % 2 - 0.5)*0.4); g.add(c); } return 1.6; },
+      cart: g => { B(g, 1.8, 0.9, 1.1, M.rust, 0, 0.85, 0); B(g, 1.6, 0.06, 0.9, M.dark, 0, 1.28, 0);         // (empty: the mine's been worked out)
+        for (const [x, z] of [[-0.6, -0.55], [0.6, -0.55], [-0.6, 0.55], [0.6, 0.55]]) Cy(g, 0.22, 0.22, 0.12, M.dark, x, 0.25, z, Math.PI/2); return 1.3; },
       crates: g => { B(g, 1.2, 1.2, 1.2, M.wood, 0, 0.6, 0, 0.1); B(g, 1.0, 1.0, 1.0, M.wood, 1.3, 0.5, 0.2, -0.2); B(g, 0.9, 0.9, 0.9, M.wood, 0.4, 1.65, 0.1, 0.4); B(g, 1.2, 0.7, 0.8, M.tent2, -1.1, 0.35, 0.6, 0.3); return 1.8; },
       barrels: g => { const ms = [M.rust, M.tent2, M.red]; for (let k = 0; k < 5; k++){ const a = k*1.3; Cy(g, 0.32, 0.32, 0.95, ms[k % 3], Math.cos(a)*(k ? 0.75 : 0), 0.48, Math.sin(a)*(k ? 0.75 : 0)); } const lying = Cy(g, 0.32, 0.32, 0.95, M.rust, 1.6, 0.32, 0.2, 0, Math.PI/2); lying.rotation.y = 0.6; return 1.4; },
       hut: g => { B(g, 4.2, 2.6, 3.2, M.white, 0, 1.3, 0); const roof = B(g, 4.6, 0.25, 3.6, M.tent2, 0, 2.75, 0); roof.rotation.z = 0.06; B(g, 0.9, 1.9, 0.08, M.dark, 0.8, 0.95, -1.62); B(g, 1.0, 0.6, 0.08, M.tent, -1.0, 1.6, -1.62);
@@ -7598,11 +7599,9 @@ function buildCaveDressing(){
       compressor: g => { B(g, 2.2, 1.2, 1.2, M.paint, 0, 0.6, 0); Cy(g, 0.45, 0.45, 2.0, M.steel, 0, 1.6, 0, 0, Math.PI/2); for (let k = 0; k < 3; k++) B(g, 0.08, 0.5, 1.21, M.dark, -0.7 + k*0.7, 0.75, 0);
         const hose = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.06, 6, 16, Math.PI*1.4), M.dark); hose.position.set(1.4, 0.2, 0); hose.rotation.x = Math.PI/2; g.add(hose); return 1.5; },
       conveyor: g => { const bed = B(g, 7, 0.3, 1.1, M.dark, 0, 1.6, 0); bed.rotation.z = 0.28; for (let x = -3; x <= 3; x += 2) Cy(g, 0.08, 0.1, 1.8 + x*0.28, M.paint, x, (1.8 + x*0.28)/2, 0.4), Cy(g, 0.08, 0.1, 1.8 + x*0.28, M.paint, x, (1.8 + x*0.28)/2, -0.4);
-        for (let k = 0; k < 6; k++){ const c = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), CAVE_GEM[k % 2]); c.position.set(-2.6 + k*1.0, 1.0 + k*0.28 + 0.3, 0); g.add(c); } return 3.4; },
+        return 3.4; },
       lamp: g => { Cy(g, 0.07, 0.09, 4.2, M.steel, 0, 2.1, 0); B(g, 0.9, 0.08, 0.08, M.steel, 0.4, 4.15, 0); const l = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), lampMat); l.position.set(0.8, 3.95, 0); g.add(l); B(g, 0.5, 0.2, 0.5, M.dark, 0, 0.1, 0); return 0.5; },
       reel: g => { Cy(g, 0.9, 0.9, 0.12, M.wood, 0, 0.9, -0.45, Math.PI/2); Cy(g, 0.9, 0.9, 0.12, M.wood, 0, 0.9, 0.45, Math.PI/2); Cy(g, 0.6, 0.6, 0.8, M.dark, 0, 0.9, 0, Math.PI/2); return 1.0; },
-      ore: g => { for (let k = 0; k < 7; k++){ const a = k*0.9, r = k ? 0.6 + (k % 3)*0.3 : 0; const c = new THREE.Mesh(new THREE.OctahedronGeometry(0.4 + (k % 2)*0.25, 0), CAVE_GEM[k % 2]); c.position.set(Math.cos(a)*r, 0.3, Math.sin(a)*r); c.rotation.set(k, k*2, 0); g.add(c); }
-        const heap = new THREE.Mesh(new THREE.ConeGeometry(1.6, 1.1, 9), M.dark); heap.position.y = 0.3; g.add(heap); return 1.6; },
       barrier: g => { for (const x of [-1.4, 1.4]) Cy(g, 0.06, 0.06, 1.1, M.steel, x, 0.55, 0); for (let k = 0; k < 6; k++) B(g, 0.5, 0.22, 0.06, k % 2 ? M.white : M.red, -1.25 + k*0.5, 1.0, 0); return 1.5; },
     };
     const kinds = Object.keys(KIT), near = ['hut', 'compressor', 'reel', 'crates', 'barrels', 'lamp', 'cart', 'conveyor'];
@@ -7617,7 +7616,7 @@ function buildCaveDressing(){
       if (!offTrail(x, y, 8) || cityStreetSD(x, y) < 2 || !clearOfBridges(x, y, 2) || inCrownRoom(x, y) || Math.hypot(x - CROWN.fx, y - CROWN.y) < 30) return false;
       if (x > PORTAL_X - 3 && TRANSPORT.some(T => Math.abs(y - T.y) < 36)) return false;
       const g = new THREE.Group(); const r = KIT[kind](g); g.position.set(x, fl - 0.05, y); g.rotation.y = rnd()*Math.PI*2; src.add(g);
-      placed.push([x, y, r]); if (kind !== 'lamp' && kind !== 'ore') CAVE_SOLIDS.push({ x, y, r: r*0.8 });
+      placed.push([x, y, r]); if (kind !== 'lamp') CAVE_SOLIDS.push({ x, y, r: r*0.8 });
       return true;
     };
     // each room: a handful at random spots on open floor
@@ -7852,9 +7851,10 @@ function buildCaveDressing(){
       const cx = STATION.x + dk.ux*(dk.r0 + dk.r1)/2, cy = STATION.y + dk.uy*(dk.r0 + dk.r1)/2;
       g.position.set(cx, h + 1.5, cy); g.rotation.y = -Math.atan2(dk.uy, dk.ux); G.add(g);
     }
-    // the cargo bin for the waiting ship's crystals: open-topped, hung off the hub deck's outer edge facing Dock 1 (clear
-    // of the deck), glowing purple inside, the court's diamond on its side, and a column of light so you can find it
-    { const bx0 = STATION.x + STATION.deckR + STATION.deckHW + 2.2, by0 = STATION.y, hb = h + STATION.deckUp, bg = new THREE.Group(); bg.position.set(bx0, hb, by0); G.add(bg);
+    // the cargo bin for the waiting ship's crystals: open-topped, on a bracket off the main walkway's outer edge at Dock 1,
+    // right behind the ship's engines (clear of the walkway), glowing purple inside, the court's diamond on its sides,
+    // and a column of light so you can find it
+    { const bx0 = STATION.x + STATION.R + STATION.hw + 1.8, by0 = STATION.y, hb = h, bg = new THREE.Group(); bg.position.set(bx0, hb, by0); G.add(bg);
       const binM = new THREE.MeshLambertMaterial({ color: 0x55606e, side: THREE.DoubleSide });
       for (const [w, d, x, z] of [[3.2, 0.15, 0, -1.6], [3.2, 0.15, 0, 1.6], [0.15, 3.2, -1.6, 0], [0.15, 3.2, 1.6, 0]]){ const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1.8, d), binM); m.position.set(x, 0.3, z); bg.add(m); }
       const fl = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.2, 3.2), binM); fl.position.y = -0.6; bg.add(fl);
@@ -7875,7 +7875,7 @@ function buildCaveDressing(){
         const x = S0.x + r, y = S0.y + off; put(x, y, h, ang(x, y, S0.x + r + 6, S0.y));
       }
       for (let k = 0; k < 6; k++){ const t = (k - 2.5)*0.05, rr = S0.R + (k % 2 ? 3.2 : -3.2), x = S0.x + Math.cos(t)*rr, y = S0.y + Math.sin(t)*rr; put(x, y, h, ang(x, y, S0.x + 120, S0.y)); }
-      for (let k = 0; k < 5; k++){ const t = (k - 2)*0.07, rr = S0.deckR + 1.6, x = S0.x + Math.cos(t)*rr, y = S0.y + Math.sin(t)*rr; put(x, y, h + S0.deckUp, ang(x, y, S0.x + 60, S0.y)); }
+      for (let k = 0; k < 5; k++){ const t = (k < 2 ? -1 : 1)*(0.035 + (k % 2)*0.02) + (k === 4 ? 0.03 : 0), rr = S0.R + 3.4, x = S0.x + Math.cos(t)*rr, y = S0.y + Math.sin(t)*rr; put(x, y, h, ang(x, y, S0.x + S0.R + 4, S0.y)); }
       // and a few at every other dock, by the rails
       for (let d = 1; d < 8; d++){ const dk = S0.docks[d]; for (let k = 0; k < 3; k++){ const side = k % 2 ? 1 : -1, r = S0.armIn + 6 + k*9 + prnd()*4, nx = -dk.uy, ny = dk.ux, off = dk.off + side*(S0.walkHW - 0.6);
         const x = S0.x + dk.ux*r + nx*off*1, y = S0.y + dk.uy*r + ny*off*1; put(x, y, h, ang(x, y, S0.x + dk.ux*(r + 5), S0.y + dk.uy*(r + 5))); } }

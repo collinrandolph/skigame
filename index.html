@@ -5867,7 +5867,8 @@ function draw(){
   }
   // on zone 5's plateau (on the ground, not a bridge) the camera comes down low and lifts its gaze to the horizon,
   // with a wider view, so the sky, the planet and whatever stands in space are framed over the court
-  { const want = !SKY_ON && S.y > Z5.y0 + 10 ? 1 : 0; plateauCam += (want - plateauCam) * Math.min(1, fdt*1.5); }
+  // (and it holds that framing all along the Starway)
+  { const want = (!SKY_ON && S.y > Z5.y0 + 10) || (SKY_ON && SKY_ON.d.final) ? 1 : 0; plateauCam += (want - plateauCam) * Math.min(1, fdt*1.5); }
   const pk = plateauCam*plateauCam*(3 - 2*plateauCam);
   const cxw = focus.x - dx*back, cyw = focus.y - dy*back;
   camera.position.set(cxw, Math.max(camH + up - pk*up*0.62, ground(cxw, cyw) + 1.5), cyw);

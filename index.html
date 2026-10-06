@@ -8045,8 +8045,9 @@ function portalCamClamp(){
 }
 // underground, keep the camera inside the cave: pulled in toward you from any wall, and between the floor and the roof
 function caveCamClamp(){
-  const p = camera.position, inWay = Math.abs(p.z - MINE.y) < 20 && mineS(p.x) > -8;
-  if ((!UNDER && !inWay) || ONSTATION) return;
+  // (on the surface, only while you're in the mine's cut yourself, not on a bridge passing over or anywhere nearby)
+  const p = camera.position, inWay = Math.abs(p.z - MINE.y) < 20 && mineS(p.x) > -8, youInCut = !SKY_ON && mineS(S.x) > -36 && Math.abs(S.y - MINE.y) < 16;
+  if ((!UNDER && !(inWay && youInCut)) || ONSTATION) return;
   // out through a doorway, looking back in (only right by the doorways: the shaft also runs east of the portals' wall)
   if (p.x > PORTAL_X && p.x < PORTAL_X + 40 && S.x < PORTAL_X + 30 && caveField(S.x, S.y).shaftS === Infinity && TRANSPORT.some(T => Math.abs(p.z - T.y) < PORTAL_HW + 6 && Math.abs(S.y - T.y) < 40)) return;
   const f = {};
@@ -8054,6 +8055,8 @@ function caveCamClamp(){
   caveField(cx, cz, f);
   if (f.d > -1.1){
     let lo = 0, hi = 1;
+    // (if even where you stand isn't inside the cave's shape, there's nothing to pull the camera back into: leave it)
+    caveField(S.x, S.y, f); if (f.d > -0.2) return;
     for (let it = 0; it < 14; it++){ const m = (lo + hi)/2; caveField(S.x + (cx - S.x)*m, S.y + (cz - S.y)*m, f); if (f.d <= -1.1) lo = m; else hi = m; }
     cx = S.x + (cx - S.x)*lo; cz = S.y + (cz - S.y)*lo;
     caveField(cx, cz, f);

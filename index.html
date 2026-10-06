@@ -847,7 +847,7 @@ function walkTrail(p, i, u, dir, dist){
 function assistCands(){
   if (!SKY_ON) return TRAILS;
   const out = [SKY_ON.d];
-  for (const nd of [SKY_ON.d.A, SKY_ON.d.B]) if (!nd.ground) for (const d2 of nd.decks) if (!out.includes(d2)) out.push(d2);
+  for (const nd of [SKY_ON.d.A, SKY_ON.d.B]) if (!nd.ground) for (const d2 of nd.decks) if (!out.includes(d2) && !d2.loop && d2 !== SKY_ON.d.twin) out.push(d2);
   return out;
 }
 function trailAssistTarget(x, y, heading, ahead, prefer, centring = 1){
@@ -4501,9 +4501,21 @@ const SKY = (() => {
     Object.assign(d, { A, B, n, X, Y, H, cum, len: cum[n-1], w: SKY_W, op: 0 });
     d.s = Array.from({ length: n*2 }, (_, k) => k % 2 ? Y[k >> 1] : X[k >> 1]);   // as a polyline, so trail assist can follow it like a trail
   }
+  // each loop entrance is a whole bridge of its own: its loop, then an exact copy of the ramp from where the loop meets
+  // it on up to the ramp's junction. so there's no hand-over between them: the two are twins that share the upper ramp,
+  // and only the one you're on is ever shown
+  for (const d of decks) if (d.spurOf){
+    const r = d.spurOf, up = r.A === d.A ? 1 : -1, far = up > 0 ? r.B : r.A, idx = [];
+    for (let i = d.mergeK + up; i >= 0 && i < r.n; i += up) idx.push(i);
+    const X = [...d.X, ...idx.map(i => r.X[i])], Y = [...d.Y, ...idx.map(i => r.Y[i])], H = [...d.H, ...idx.map(i => r.H[i])];
+    const n = X.length, cum = new Float32Array(n); for (let i = 1; i < n; i++) cum[i] = cum[i-1] + Math.hypot(X[i] - X[i-1], Y[i] - Y[i-1]);
+    delete N[d.b]; d.b = far.id;
+    Object.assign(d, { B: far, n, X: Float32Array.from(X), Y: Float32Array.from(Y), H: Float32Array.from(H), cum, len: cum[n-1] });
+    d.s = Array.from({ length: n*2 }, (_, k) => k % 2 ? Y[k >> 1] : X[k >> 1]);
+    d.twin = r; r.twin = d;
+  }
   const nodes = Object.values(N);
   for (const nd of nodes) nd.decks = decks.filter(d => d.A === nd || d.B === nd);
-  for (const d of decks) if (d.spurOf){ (d.spurOf.mergeWith = d.spurOf.mergeWith || []).push(d); d.mergeWith = [d.spurOf]; }
   return { N, nodes, decks };
   // the loop's route, read off the sampled ramp it joins: back out through the portal, round to one side (whichever
   // is clearer and flatter), and in alongside the ramp to merge onto its centre line
@@ -4550,7 +4562,7 @@ function skyGround(x, y){
   const o = SKY_ON, d = o.d, pr = deckProj(d, x, y, o.i, o.h);
   if (Math.abs(pr.lat) <= d.w/2 + 0.6 && pr.s >= -0.6 && pr.s <= d.len + 0.6) return pr.h;
   const end = pr.s < 45 ? d.A : pr.s > d.len - 45 ? d.B : null;
-  if (end && !end.ground) for (const d2 of end.decks){ if (d2 === d) continue;
+  if (end && !end.ground) for (const d2 of end.decks){ if (d2 === d || d2.loop || d2 === d.twin) continue;
     const q = deckProj(d2, x, y, d2.A === end ? 0 : d2.n - 2); if (Math.abs(q.lat) <= d2.w/2 + 0.6 && q.s >= -0.6 && q.s <= d2.len + 0.6) return q.h; }
   return null;
 }
@@ -4568,7 +4580,7 @@ function skyStep(){
       const pr = deckProj(d, S.x, S.y, end === d.A ? 0 : d.n - 2), sIn = end === d.A ? pr.s : d.len - pr.s;
       const v = Math.hypot(S.vx, S.vy), mx = v > 0.6 ? S.vx/v : Math.sin(S.th), my = v > 0.6 ? S.vy/v : -Math.cos(S.th);
       if ((mx*pr.tx + my*pr.ty)*(end === d.A ? 1 : -1) < 0.25) continue;      // only heading in along it, never backwards up it
-      if (sIn > -0.2 && sIn < 5 && Math.abs(pr.lat) < d.w/2 - 0.3){ if (d.look && d.look.gLow) d.variant = 'straight'; SKY_ON = { d, i: pr.i, h: pr.h }; skyEnterAt = performance.now(); if (d.final && pet.h) calfToTrio(pet.h); return; }
+      if (sIn > -0.2 && sIn < 5 && Math.abs(pr.lat) < d.w/2 - 0.3){ SKY_ON = { d, i: pr.i, h: pr.h }; skyEnterAt = performance.now(); if (d.final && pet.h) calfToTrio(pet.h); return; }
     }
     return;
   }
@@ -4582,6 +4594,7 @@ function skyStep(){
     const v = Math.hypot(S.vx, S.vy) || 1, vx = S.vx/v, vy = S.vy/v;
     let best = null, bs = -Infinity;
     for (const d2 of end.decks){
+      if (d2 !== d && (d2.loop || d2 === d.twin)) continue;           // never onto a loop bridge, or your own twin
       const q = d2 === d ? pr : deckProj(d2, S.x, S.y, d2.A === end ? 0 : d2.n - 2), fromEnd = d2.A === end ? q.s : d2.len - q.s;
       if (Math.abs(q.lat) > d2.w/2 + 0.2 || fromEnd < -1 || fromEnd > 45) continue;
       const out = d2.A === end ? 1 : -1, al = (vx*q.tx + vy*q.ty)*out;    // heading away from the junction along it
@@ -4591,10 +4604,6 @@ function skyStep(){
       if (sc > bs){ bs = sc; best = [d2, q]; }
     }
     if (best && best[0] !== d){ d = best[0]; pr = best[1]; o.d = d; }
-  }
-  if (d.spurOf && pr.s > d.len - 12){
-    const r = d.spurOf, q = deckProj(r, S.x, S.y, d.mergeK);
-    if (pr.s > d.len - 2.5 && Math.abs(q.lat) < r.w/2 - 0.3){ d = r; pr = q; o.d = r; }
   }
   o.i = pr.i; o.h = pr.h;
   // the end of the line: the edge of the black hole holds you, and asks what you'd like to do
@@ -4671,23 +4680,17 @@ for (const d of SKY.decks){
   const railMat = new THREE.MeshBasicMaterial({ map: skyRailTex.clone(), color: 0xa993d6, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
   railMat.map.needsUpdate = true; railMat.map.wrapS = THREE.RepeatWrapping;
   const L = i => { const j0 = Math.max(0, i - 1), j1 = Math.min(d.n - 1, i + 1), tx = d.X[j1] - d.X[j0], ty = d.Y[j1] - d.Y[j0], l = Math.hypot(tx, ty) || 1; return [ty/l, -tx/l]; };   // points to the right... see below
-  // a ramp with a loop entrance: its lower stretch, from the foot up to where the loop joins, is built as its own piece
-  // so only one way in shows at a time (the straight ramp, or the loop)
-  const sp = d.mergeWith && !d.spurOf ? d.mergeWith[0] : null, up = d.A.ground ? 1 : -1;
-  const isLow = i => sp && (up > 0 ? i < sp.mergeK : i >= sp.mergeK);
-  const low = { top: [], side: [], railL: [], railR: [], uvL: [], uvR: [] };
-  const inOther = (x, y) => [d.A, d.B].some(nd => !nd.ground && nd.decks.some(d2 => { if (d2 === d) return false; if (Math.hypot(x - nd.x, y - nd.y) > 45) return false; const q = deckProj(d2, x, y, d2.A === nd ? 0 : d2.n - 2); return Math.abs(q.lat) < d2.w/2 - 0.1 && q.s > 0.2 && q.s < d2.len - 0.2; }));
+  const inOther = (x, y) => [d.A, d.B].some(nd => !nd.ground && nd.decks.some(d2 => { if (d2 === d || d2 === d.twin) return false; if (Math.hypot(x - nd.x, y - nd.y) > 45) return false; const q = deckProj(d2, x, y, d2.A === nd ? 0 : d2.n - 2); return Math.abs(q.lat) < d2.w/2 - 0.1 && q.s > 0.2 && q.s < d2.len - 0.2; }));
   for (let i = 0; i < d.n - 1; i++){
     const [ax, ay] = L(i), [bx2, by2] = L(i + 1), hw = d.w/2;
     const a1 = [d.X[i] - ax*hw, d.H[i], d.Y[i] - ay*hw], a2 = [d.X[i] + ax*hw, d.H[i], d.Y[i] + ay*hw];
     const b1 = [d.X[i+1] - bx2*hw, d.H[i+1], d.Y[i+1] - by2*hw], b2 = [d.X[i+1] + bx2*hw, d.H[i+1], d.Y[i+1] + by2*hw];
-    const T = isLow(i) ? low : null, tp = T ? T.top : top, sd = T ? T.side : side;
-    tp.push(...a1, ...b1, ...a2, ...a2, ...b1, ...b2);
+    top.push(...a1, ...b1, ...a2, ...a2, ...b1, ...b2);
     for (const [p, q] of [[a1, b1], [a2, b2]]){
-      sd.push(p[0], p[1], p[2], q[0], q[1], q[2], p[0], p[1] - 0.7, p[2], p[0], p[1] - 0.7, p[2], q[0], q[1], q[2], q[0], q[1] - 0.7, q[2]);
+      side.push(p[0], p[1], p[2], q[0], q[1], q[2], p[0], p[1] - 0.7, p[2], p[0], p[1] - 0.7, p[2], q[0], q[1], q[2], q[0], q[1] - 0.7, q[2]);
     }
     const u0 = d.cum[i]/6, u1 = d.cum[i+1]/6;
-    for (const [p, q, arr, uv] of T ? [[a1, b1, T.railL, T.uvL], [a2, b2, T.railR, T.uvR]] : [[a1, b1, railL, uvL], [a2, b2, railR, uvR]]){
+    for (const [p, q, arr, uv] of [[a1, b1, railL, uvL], [a2, b2, railR, uvR]]){
       if (inOther((p[0] + q[0])/2, (p[2] + q[2])/2)) continue;        // no railing across a junction's opening
       arr.push(p[0], p[1], p[2], q[0], q[1], q[2], p[0], p[1] + 1.0, p[2], p[0], p[1] + 1.0, p[2], q[0], q[1], q[2], q[0], q[1] + 1.0, q[2]);
       uv.push(u0, 1, u1, 1, u0, 0, u0, 0, u1, 1, u1, 0);
@@ -4696,16 +4699,6 @@ for (const d of SKY.decks){
   const mk = (arr, mat, uv) => { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); if (uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; g.add(m); return m; };
   mk(top, deckMat); mk(side, edgeMat);
   const rl = mk([...railL, ...railR], railMat, [...uvL, ...uvR]); rl.renderOrder = 3;
-  let gLow = null, lowSphere = null;
-  if (sp){
-    // the lower stretch, in a group of its own (its bounds kept to test whether it's on screen)
-    const gMain = g; gLow = new THREE.Group(); gMain.add(gLow);
-    const mk2 = (arr, mat, uv) => { const m = mk(arr, mat, uv); gMain.remove(m); gLow.add(m); return m; };
-    mk2(low.top, deckMat); mk2(low.side, edgeMat); mk2([...low.railL, ...low.railR], railMat, [...low.uvL, ...low.uvR]).renderOrder = 3;
-    const pts = []; for (let i = 0; i < d.n; i++) if (isLow(i)) pts.push(new THREE.Vector3(d.X[i], d.H[i], d.Y[i]));
-    lowSphere = new THREE.Sphere().setFromPoints(pts); lowSphere.radius += 4;
-    d.variant = 'straight';
-  }
   // pylons: about every 110 m where the deck stands well clear of the ground, never right at an end
   const pyMat = new THREE.MeshLambertMaterial({ color: 0xe3e8ec, transparent: true, opacity: 0 }), pyRing = new THREE.MeshBasicMaterial({ color: 0xa993d6, transparent: true, opacity: 0 });
   let next = 40;
@@ -4719,7 +4712,7 @@ for (const d of SKY.decks){
     head.rotation.y = Math.atan2(d.X[Math.min(d.n - 1, i + 1)] - d.X[i], d.Y[Math.min(d.n - 1, i + 1)] - d.Y[i]); g.add(head);
     const ringM = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.35, 12), pyRing); ringM.position.set(d.X[i], d.H[i] - 2.4, d.Y[i]); g.add(ringM);
   }
-  d.look = { g, mats: [[deckMat, 0.82], [edgeMat, 0.9], [railMat, 0.75], [pyMat, 1], [pyRing, 0.9]], railMat, gLow, lowSphere };
+  d.look = { g, mats: [[deckMat, 0.82], [edgeMat, 0.9], [railMat, 0.75], [pyMat, 1], [pyRing, 0.9]], railMat };
 }
 // the on-ramp portals: two slender posts and an arch of light over the foot of each ramp, findable from afar
 const skyPortals = SKY.nodes.filter(n => n.ground).map(n => {
@@ -4743,20 +4736,7 @@ function updateSky(dt){
   const o = SKY_ON, show = new Set();
   if (o){
     show.add(o.d); const pr = deckProj(o.d, S.x, S.y, o.i);
-    for (const [nd, dist] of [[o.d.A, pr.s], [o.d.B, o.d.len - pr.s]]) if (!nd.ground && dist < 90) for (const d2 of nd.decks) show.add(d2);
-    if (o.d.spurOf && o.d.len - pr.s < 60) show.add(o.d.spurOf);
-  }
-  // one way onto each looped ramp at a time. take the loop and the straight lower stretch goes; it only comes back once
-  // it's off screen (or you're right on top of it, heading down), so nothing ever pops in or out in view
-  for (const d of SKY.decks){
-    if (!d.look.gLow) continue;
-    if (o && d.mergeWith.includes(o.d)){ d.variant = 'loop'; continue; }
-    if (d.variant !== 'loop') continue;
-    camera.updateMatrixWorld(); _fm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); _fr.setFromProjectionMatrix(_fm);
-    let force = false;
-    if (o && o.d === d){ const pr = deckProj(d, S.x, S.y, o.i), fromFoot = d.A.ground ? pr.s : d.len - pr.s, k = d.mergeWith[0].mergeK, mergeS = d.cum[k] - (d.A.ground ? 0 : 0), mS = d.A.ground ? d.cum[k] : d.len - d.cum[k];
-      const v = Math.hypot(S.vx, S.vy) || 1, down = ((S.vx*pr.tx + S.vy*pr.ty)/v)*(d.A.ground ? 1 : -1) < 0; force = down && fromFoot < mS + 12; }
-    if (force || !_fr.intersectsSphere(d.look.lowSphere)) d.variant = 'straight';
+    for (const [nd, dist] of [[o.d.A, pr.s], [o.d.B, o.d.len - pr.s]]) if (!nd.ground && dist < 90) for (const d2 of nd.decks) if (d2 === o.d || (!d2.loop && d2 !== o.d.twin)) show.add(d2);
   }
   for (const d of SKY.decks){
     const want = show.has(d) ? 1 : 0;
@@ -4765,7 +4745,6 @@ function updateSky(dt){
     d.look.g.visible = true;
     for (const [m, k] of d.look.mats) m.opacity = d.op * k;
     d.look.railMat.map.offset.x = -now*1.2;
-    if (d.look.gLow) d.look.gLow.visible = d.variant === 'straight';
   }
 }
 // ---- zone 5: the observatory. a stepped bone platform at the cliff's edge, a ring of columns capped with glowing

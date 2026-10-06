@@ -4672,6 +4672,24 @@ const skyRailTex = (() => {
   g.fillStyle = p; g.fillRect(24, 0, 16, 32);
   const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; return t;
 })();
+// where a pylon may stand: off the trails (with room to ski past), off the lawns, out of the buildings and camps,
+// clear of the river and the lake, the terminals and their orbs, the herds and anything solid
+function pylonClear(x, y){
+  const R = 1.3;
+  if (y > WORLD.y1 - 10) return false;                                // none in zone 5 or on its mountains: the crowned court's line stays clear
+  if (nearestTrail(x, y).d < TRAIL_W/2 + R + 2.5 || lawnSD(x, y) < R + 2) return false;
+  if (STRUCTS.some(o => Math.hypot(o.x - x, o.y - y) < o.r + R + 4)) return false;
+  if (Math.abs(y - riverY(x)) < RIVER_BANK + R + 4 || lakeQ(x, y) < 1.15) return false;
+  if (KIOSKS.some(K => Math.hypot(K.x - x, K.y - y) < 8 || K.orbs.some(o => Math.hypot(o.x - x, o.y - y) < 5))) return false;
+  if (nearHerd(x, y, 12) || obstacleSD(x, y) < R + 2) return false;
+  return true;
+}
+// a pylon's foot: any tree or ice boulder right there is taken out
+function pylonCut(x, y){
+  const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  trees.forEach((t, ti) => { if (!t.cut && Math.hypot(t.x - x, t.y - y) < 1.3 + 1.6*t.s + 0.5){ t.cut = true; for (const m of treeMeshes){ m.setMatrixAt(ti, zero); m.instanceMatrix.needsUpdate = true; } } });
+  for (const b of BOULDERS) if (!b.cut && Math.hypot(b.x - x, b.y - y) < 1.3 + b.size*1.6 + 0.5){ b.cut = true; for (const q of b.parts){ q.mesh.setMatrixAt(q.idx, zero); q.mesh.instanceMatrix.needsUpdate = true; } }
+}
 const SKY_PYLON = { mat: new THREE.MeshLambertMaterial({ color: 0xe3e8ec }), ring: new THREE.MeshBasicMaterial({ color: 0xa993d6 }), g: new THREE.Group() };
 scene.add(SKY_PYLON.g);
 for (const d of SKY.decks){
@@ -4708,8 +4726,8 @@ for (const d of SKY.decks){
   for (let i = 0; i < d.n; i++){
     if (d.space || d.loop || d.cum[i] < next || d.len - d.cum[i] < 30) continue;   // (a loop bridge shares its ramp's pylons)
     const gh = height(d.X[i], d.Y[i]), clear = d.H[i] - gh;
-    if (clear < 9){ continue; }
-    next = d.cum[i] + 110;
+    if (clear < 9 || !pylonClear(d.X[i], d.Y[i])){ continue; }       // (not in the way of anything: it waits for the next clear spot)
+    next = d.cum[i] + 110; pylonCut(d.X[i], d.Y[i]);
     const hgt = clear + 1.5, col = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.3, hgt, 10), pyMat); col.position.set(d.X[i], gh - 1.5 + hgt/2 - 0.6, d.Y[i]); pg.add(col);
     SOLIDS.push({ x: d.X[i], y: d.Y[i], r: 1.4 });
     const head = new THREE.Mesh(new THREE.BoxGeometry(d.w*0.8, 0.5, 1.6), pyMat); head.position.set(d.X[i], d.H[i] - 0.95, d.Y[i]);
@@ -6342,7 +6360,7 @@ function loop(t){
 }
 loadProgress(); applyRegalia(); calfUI();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

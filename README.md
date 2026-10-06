@@ -109,4 +109,19 @@ The map is four times its old area and split into zones, each locked until you c
 ## Files
 
 - `index.html` is the current game.
+- `cave/index.html` is the cave sandbox: a copy of the game with the underground added, built separately so it can be tuned on its own before it's merged into the main game (see below).
 - `prototypes/top-down-2d.html` is the earlier top-down canvas version.
+
+## Cave sandbox (work in progress)
+
+The underground is being built in its own copy of the game (`cave/index.html`), so the main game stays untouched until the two are merged. It's the whole game plus the cave, in the cave's real place on the map, so the merge is mostly a matter of copying the cave's sections across. Every visit starts on the Mine Road, a short way from the mine.
+
+- **The mine:** a rocky ridge on the empty west side of zone 3, reached by the green **Mine Road** from the Watcher Climb. A cut leads into its east face, to a timber portal. The cut's floor has exactly the tunnel's cross-section where they meet, so there's no seam: you ski straight through the portal and underground, with no loading or teleport.
+- **The mine shaft:** a horseshoe tunnel about 8 m wide and 5.6 m high with steel arches every 5 m and lamps along the crown. It runs straight in for 20 m, then winds down through S-bends at up to about 17% for 150 m to the cavern.
+- **The cavern:** a single long hall, about 80 m across and 220 m long, under the open ground west of the camps. The roof is 15–20 m up, hung with icicles. The floor is groomed snow that drops gently to the south. The walls curve up like a quarter-pipe that you can ride a few metres up. It's lit violet by glowing crystal clusters up the walls, with five big ones out on the floor (they're solid). The green **Cavern Loop** runs round the hall.
+- **Underground:** below ground, the floor, walls and trails are the cave's own, and the surface (its buildings, people and trails) doesn't count. The light and fog fade from daylight to the cave's dark violet over the first 25 m of tunnel, and back as you come out. The camera comes in close and low in the tunnel and keeps a little of that in the hall, and it never goes through a wall or the roof.
+- **How it's built:** the cave is a second layer of ground under the map. One shape (the tunnel plus a chain of overlapping chambers) gives the floor, which curves up into the walls, and the roof, which curves down to meet it. The roof always stays at least a metre under the snow above. The floor uses the same snow and groomed-trail texturing as the surface. Where the tunnel meets the ridge's face, the surface ground isn't drawn inside the tunnel's outline, so you see into the mine.
+- **Map:** the cavern's outline and its trails show as dashed lines.
+- **Testing:** **Cave: the mine** and **Cave: the cavern** in dev view's Testing group put you at the mine's approach or in the hall.
+- **Next:** flow lines with rollers, pump sections, berms and wall rides (no jumps or drops), more entrances, and the mine's teleporter chamber.
+

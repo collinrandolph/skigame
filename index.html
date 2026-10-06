@@ -4564,7 +4564,7 @@ function skyStep(){
       const pr = deckProj(d, S.x, S.y, end === d.A ? 0 : d.n - 2), sIn = end === d.A ? pr.s : d.len - pr.s;
       const v = Math.hypot(S.vx, S.vy), mx = v > 0.6 ? S.vx/v : Math.sin(S.th), my = v > 0.6 ? S.vy/v : -Math.cos(S.th);
       if ((mx*pr.tx + my*pr.ty)*(end === d.A ? 1 : -1) < 0.25) continue;      // only heading in along it, never backwards up it
-      if (sIn > -0.5 && sIn < 5 && Math.abs(pr.lat) < d.w/2 - 0.3){ SKY_ON = { d, i: pr.i, h: pr.h }; skyEnterAt = performance.now(); if (d.final && pet.h) calfToTrio(pet.h); return; }
+      if (sIn > -0.2 && sIn < 5 && Math.abs(pr.lat) < d.w/2 - 0.3){ SKY_ON = { d, i: pr.i, h: pr.h }; skyEnterAt = performance.now(); if (d.final && pet.h) calfToTrio(pet.h); return; }
     }
     return;
   }
@@ -4601,7 +4601,7 @@ function skyStep(){
     if (!promptCtx && !bhShown && bhK > 0.97){ bhShown = true; blackHolePrompt(); }
   }
   // off at the foot of a ramp
-  if ((d.A.ground && pr.s < -0.3) || (d.B.ground && pr.s > d.len + 0.3)){ skyExitNode = d.A.ground && pr.s < -0.3 ? d.A : d.B; SKY_ON = null; return; }
+  if ((d.A.ground && pr.s < -0.3) || (d.B.ground && pr.s > d.len + 0.3)){ skyExitNode = d.A.ground && pr.s < -0.3 ? d.A : d.B; SKY_ON = null; return; }   // (you get on at least 0.2 m in, so this is never an instant bounce)
   // the railings: kept inside the deck, and the end of a deck (past a junction) holds you too
   const lim = d.w/2 - BODY_R, nx = -pr.ty, ny = pr.tx;              // left of travel
   let push = 0, px = 0, py = 0;
@@ -4667,7 +4667,11 @@ for (const d of SKY.decks){
   const railMat = new THREE.MeshBasicMaterial({ map: skyRailTex.clone(), color: 0xa993d6, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
   railMat.map.needsUpdate = true; railMat.map.wrapS = THREE.RepeatWrapping;
   const L = i => { const j0 = Math.max(0, i - 1), j1 = Math.min(d.n - 1, i + 1), tx = d.X[j1] - d.X[j0], ty = d.Y[j1] - d.Y[j0], l = Math.hypot(tx, ty) || 1; return [ty/l, -tx/l]; };   // points to the right... see below
-  const inOther = (x, y) => (d.mergeWith || []).some(d2 => { const q = deckProj(d2, x, y); return Math.abs(q.lat) < d2.w/2 + 0.2 && q.s > 0.5 && q.s < d2.len - 0.5; }) || [d.A, d.B].some(nd => !nd.ground && nd.decks.some(d2 => { if (d2 === d) return false; if (Math.hypot(x - nd.x, y - nd.y) > 45) return false; const q = deckProj(d2, x, y, d2.A === nd ? 0 : d2.n - 2); return Math.abs(q.lat) < d2.w/2 - 0.1 && q.s > 0.2 && q.s < d2.len - 0.2; }));
+  // where a loop entrance runs onto its ramp: the loop has no railing there, and the ramp's railing on that stretch
+  // is its own piece, shown only while the loop isn't (ride the ramp past it and it's a solid wall like the rest)
+  const inMerge = (x, y) => (d.mergeWith || []).some(d2 => { const q = deckProj(d2, x, y); return Math.abs(q.lat) < d2.w/2 + 0.2 && q.s > 0.5 && q.s < d2.len - 0.5; });
+  const mergeRail = [], mergeUv = [];
+  const inOther = (x, y) => [d.A, d.B].some(nd => !nd.ground && nd.decks.some(d2 => { if (d2 === d) return false; if (Math.hypot(x - nd.x, y - nd.y) > 45) return false; const q = deckProj(d2, x, y, d2.A === nd ? 0 : d2.n - 2); return Math.abs(q.lat) < d2.w/2 - 0.1 && q.s > 0.2 && q.s < d2.len - 0.2; }));
   for (let i = 0; i < d.n - 1; i++){
     const [ax, ay] = L(i), [bx2, by2] = L(i + 1), hw = d.w/2;
     const a1 = [d.X[i] - ax*hw, d.H[i], d.Y[i] - ay*hw], a2 = [d.X[i] + ax*hw, d.H[i], d.Y[i] + ay*hw];
@@ -4677,8 +4681,9 @@ for (const d of SKY.decks){
       side.push(p[0], p[1], p[2], q[0], q[1], q[2], p[0], p[1] - 0.7, p[2], p[0], p[1] - 0.7, p[2], q[0], q[1], q[2], q[0], q[1] - 0.7, q[2]);
     }
     const u0 = d.cum[i]/6, u1 = d.cum[i+1]/6;
-    for (const [p, q, arr, uv] of [[a1, b1, railL, uvL], [a2, b2, railR, uvR]]){
+    for (let [p, q, arr, uv] of [[a1, b1, railL, uvL], [a2, b2, railR, uvR]]){
       if (inOther((p[0] + q[0])/2, (p[2] + q[2])/2)) continue;        // no railing across a junction's opening
+      if (inMerge((p[0] + q[0])/2, (p[2] + q[2])/2)){ if (d.spurOf) continue; arr = mergeRail; uv = mergeUv; }
       arr.push(p[0], p[1], p[2], q[0], q[1], q[2], p[0], p[1] + 1.0, p[2], p[0], p[1] + 1.0, p[2], q[0], q[1], q[2], q[0], q[1] + 1.0, q[2]);
       uv.push(u0, 1, u1, 1, u0, 0, u0, 0, u1, 1, u1, 0);
     }
@@ -4686,6 +4691,7 @@ for (const d of SKY.decks){
   const mk = (arr, mat, uv) => { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); if (uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; g.add(m); return m; };
   mk(top, deckMat); mk(side, edgeMat);
   const rl = mk([...railL, ...railR], railMat, [...uvL, ...uvR]); rl.renderOrder = 3;
+  const mr = mergeRail.length ? mk(mergeRail, railMat, mergeUv) : null; if (mr) mr.renderOrder = 3;
   // pylons: about every 110 m where the deck stands well clear of the ground, never right at an end
   const pyMat = new THREE.MeshLambertMaterial({ color: 0xe3e8ec, transparent: true, opacity: 0 }), pyRing = new THREE.MeshBasicMaterial({ color: 0xa993d6, transparent: true, opacity: 0 });
   let next = 40;
@@ -4699,7 +4705,7 @@ for (const d of SKY.decks){
     head.rotation.y = Math.atan2(d.X[Math.min(d.n - 1, i + 1)] - d.X[i], d.Y[Math.min(d.n - 1, i + 1)] - d.Y[i]); g.add(head);
     const ringM = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.35, 12), pyRing); ringM.position.set(d.X[i], d.H[i] - 2.4, d.Y[i]); g.add(ringM);
   }
-  d.look = { g, mats: [[deckMat, 0.82], [edgeMat, 0.9], [railMat, 0.75], [pyMat, 1], [pyRing, 0.9]], railMat };
+  d.look = { g, mats: [[deckMat, 0.82], [edgeMat, 0.9], [railMat, 0.75], [pyMat, 1], [pyRing, 0.9]], railMat, mergeRail: mr };
 }
 // the on-ramp portals: two slender posts and an arch of light over the foot of each ramp, findable from afar
 const skyPortals = SKY.nodes.filter(n => n.ground).map(n => {
@@ -4733,6 +4739,7 @@ function updateSky(dt){
     d.look.g.visible = true;
     for (const [m, k] of d.look.mats) m.opacity = d.op * k;
     d.look.railMat.map.offset.x = -now*1.2;
+    if (d.look.mergeRail) d.look.mergeRail.visible = !(o && d.mergeWith.includes(o.d));
   }
 }
 // ---- zone 5: the observatory. a stepped bone platform at the cliff's edge, a ring of columns capped with glowing
@@ -6326,7 +6333,7 @@ function loop(t){
 }
 loadProgress(); applyRegalia(); calfUI();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, clearSky(){ SKY_ON = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

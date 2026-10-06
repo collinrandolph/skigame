@@ -311,7 +311,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <div class="btns"><button id="copySet" type="button">Copy settings</button><button id="defSet" type="button">Restore defaults</button></div>
     <p class="note" id="setNote">Your slider changes are kept in this browser.</p>
     <h4>Testing</h4>
-    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button><button id="arrowBtn" type="button">Heading arrow: off</button><button id="cpAltar" type="button">Checkpoint: altar</button><button id="cpZ5" type="button">Checkpoint: zone 5</button><button id="caveMouth" type="button">Cave: the mine</button><button id="caveHall" type="button">Cave: the cavern</button></div>
+    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button><button id="arrowBtn" type="button">Heading arrow: off</button><button id="cpAltar" type="button">Checkpoint: altar</button><button id="cpZ5" type="button">Checkpoint: zone 5</button><button id="caveMouth" type="button">Cave: the mine</button><button id="caveHall" type="button">Cave: the hub</button><button id="caveStation" type="button">Cave: the station</button></div>
     <label for="tOrb1">Zone 1 terminals powered<output id="oOrb1"></output><input id="tOrb1" type="range" min="0" max="2" step="1" value="0"></label>
     <label for="tOrb2">Zone 2 terminals powered<output id="oOrb2"></output><input id="tOrb2" type="range" min="0" max="3" step="1" value="0"></label>
     <label for="tOrb3">Zone 3 terminals powered<output id="oOrb3"></output><input id="tOrb3" type="range" min="0" max="5" step="1" value="0"></label>
@@ -847,11 +847,17 @@ function branchSnap(heading, side, stepDeg){
   return best === null ? null : side * best * Math.PI/180;
 }
 // ================= the cavern (sandbox) =================
-// a second layer of ground under the west side of zone 3. underground (UNDER), the floor below and the walls round you
-// come from here instead of the surface. the cave is one closed shape: a footprint (a tunnel from the mine's portal,
-// and the cavern, a chain of overlapping chambers), a floor and a roof. d is how far a point is outside the footprint
-// (negative inside). toward the edge the floor curves up (a quarter-pipe in the cavern, steep walls in the tunnel) and
-// the roof curves down, until they meet at the edge and seal it.
+// a second layer of ground, west of the map. underground (UNDER) the floor below you and the walls round you come from
+// here instead of the surface. the layout:
+//   the mine shaft runs from the portal in the ridge, under the map's west mountains, to the story ring, and across it
+//   (the crossroads) to the hub
+//   the hub, with five spoke rooms round it, each a skills park, each joined by a hall to the hub and another to the ring
+//   the story ring: a long, wandering cavern round everything, open at the west, where its two ends come to the
+//   transport rooms. each has a portal in its far wall, opened by power from zone 3's terminals, onto the space station
+//   the space station (for now a plain ring of light-bridge deck in space, with a dock deck to each portal)
+// the cave is rooms (each a chain of overlapping circles) and halls (tunnels along a centre line). d is how far a point
+// is outside them (negative inside). toward the edge the floor curves up into the walls and the roof curves down,
+// until they meet at the edge and seal it.
 function smoothPts(c){
   // Catmull-Rom through the control points, sampled about every metre (as the trails are)
   const out = [];
@@ -867,85 +873,212 @@ function smoothPts(c){
   const e = c[c.length-1]; out.push(e[0], e[1]);
   return out;
 }
-const CAVE_TRAILS = [
-  // down the mine from the portal to the cavern
-  { name:'Mine Shaft', diff:'blue', pts:[[MINE.x, MINE.y],[-34,296],[-44,296],[-52,289],[-55,276],[-50,262],[-48,248],[-54,234],[-66,224],[-82,219],[-95,226],[-102,240]] },
-  // round the cavern floor
-  { name:'Cavern Loop', diff:'green', pts:[[-102,240],[-86,258],[-80,282],[-76,330],[-84,380],[-96,420],[-112,416],[-118,400],[-124,350],[-122,300],[-118,262],[-102,240]] },
+const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0)/k; return Math.min(a, b) - h*h*k/4; };
+const CAVE_C = { x: -470, y: 300 }, CAVE_LEVEL = -24;
+const rad = a => a*Math.PI/180;
+const polar = (a, r) => [CAVE_C.x + Math.cos(rad(a))*r, CAVE_C.y + Math.sin(rad(a))*r];
+// the story ring's centre line wanders in and out, and its width varies, like the mountains round zone 1
+const ringR = a => 232 + 14*Math.sin(3*rad(a) + 0.7) + 8*Math.sin(5*rad(a) + 2);
+const ringW = a => 26 + 5*Math.sin(4*rad(a) + 1);
+const ringPt = a => polar(a, ringR(a));
+const RING_A0 = 197, RING_A1 = 523;                              // the ring runs all the way round except the west
+const PORTAL_X = -722;                                           // the portals' wall: west of it is space
+const TRANSPORT = [{ x: -700, y: 236 }, { x: -700, y: 364 }];
+const STATION = { x: -890, y: 300, R: 115, hw: 5, dhw: 4.5, h: CAVE_LEVEL };
+STATION.docks = TRANSPORT.map(T => ({ y: T.y, x1: STATION.x + Math.sqrt(STATION.R*STATION.R - (T.y - STATION.y)**2) }));
+// ---- the rooms. each spoke's theme shapes its floor along its own axis (a: along, out from the hub; lat: across)
+const SPOKE_R = 125;
+const SPOKES = [
+  { a: 0,   theme: 'rollers',  name: 'Roller Room',  level: -22 },
+  { a: 72,  theme: 'berms',    name: 'Berm Room',    level: -26 },
+  { a: 144, theme: 'pump',     name: 'Pump Room',    level: -24 },
+  { a: 216, theme: 'bowl',     name: 'The Bowl',     level: -24 },
+  { a: 288, theme: 'halfpipe', name: 'Half-pipe',    level: -22 },
 ];
-for (const t of CAVE_TRAILS){ t.s = smoothPts(t.pts); t.cave = true; }
-// the cavern's chambers: [x, y, radius], merged into one smooth hall
-const CHAMBERS = [[-108, 250, 32], [-104, 295, 40], [-98, 342, 42], [-106, 388, 36], [-98, 420, 26]];
-const CAVE_BOX = { x0: -150, x1: -20, y0: 205, y1: 452 };
-// the tunnel's centre line (the Mine Shaft trail), every third metre, with the distance along it
-const TUN = (() => {
-  const s = CAVE_TRAILS[0].s, X = [], Y = [], cum = [];
+for (const s of SPOKES){ [s.x, s.y] = polar(s.a, SPOKE_R); s.ux = Math.cos(rad(s.a)); s.uy = Math.sin(rad(s.a)); s.edge = s.theme === 'bowl' ? 26 : 38; }
+const PUMP = { L: 14, r: 13 };                                   // the pump track: an oval across the room, straights 2L long, ends of radius r
+function spokeFeature(s, a, lat){
+  switch (s.theme){
+    case 'rollers': return 0.75*Math.sin(2*Math.PI*a/14);
+    case 'berms': {                                              // a slalom line; the outside of every turn banked up
+      const w = 2*Math.PI/40, c = 13*Math.sin(w*a), e = lat - c, k = -Math.sin(w*a);
+      return 0.32*Math.max(-9, Math.min(9, e))*k*smooth01(12, 8, Math.abs(e));
+    }
+    case 'pump': {                                               // rollers down the straights, banked turns at the ends
+      const dl = Math.max(0, Math.abs(lat) - PUMP.L), dist = Math.hypot(a, dl), e = dist - PUMP.r, near = smooth01(11, 6, Math.abs(e));
+      if (near <= 0) return 0;
+      if (dl <= 0) return near*0.5*Math.sin(2*Math.PI*(lat + PUMP.L)/(2*PUMP.L/3));
+      return near*0.3*Math.max(-3, Math.min(6, e));
+    }
+    case 'bowl': { const r = Math.hypot(a, lat); return -4*Math.max(0, 1 - (r/36)**2); }
+    case 'halfpipe': return 5*Math.min(1, Math.abs(lat)/15)**2 * smooth01(46, 34, Math.abs(a));
+  }
+  return 0;
+}
+const ROOMS = [];
+ROOMS.push({ name: 'The Hub', circles: [[CAVE_C.x, CAVE_C.y, 32], [CAVE_C.x - 6, CAVE_C.y + 10, 26]], k: 12, H: 24, wallW: 9, edgeH: 7, base: () => CAVE_LEVEL });
+for (const s of SPOKES){
+  const bowl = s.theme === 'bowl';
+  ROOMS.push({ name: s.name, spoke: s, k: 14, H: bowl ? 26 : 22, wallW: bowl ? 16 : 9, edgeH: bowl ? 9 : 7,
+    circles: bowl ? [[s.x, s.y, 40]] : [[s.x - s.ux*14, s.y - s.uy*14, s.theme === 'pump' ? 40 : 36], [s.x + s.ux*14, s.y + s.uy*14, s.theme === 'pump' ? 40 : 36]],
+    // (the features fade out toward the walls, and round where the halls come in, so a hall arrives on level floor)
+    base: (x, y, d) => { const dx = x - s.x, dy = y - s.y, a = dx*s.ux + dy*s.uy, lat = -dx*s.uy + dy*s.ux;
+      return s.level + spokeFeature(s, a, lat)*smooth01(-10, -20, d)*(bowl ? 1 : smooth01(6, 16, Math.hypot(Math.abs(a) - s.edge, lat))); } });
+}
+{
+  const circles = [];
+  for (let a = RING_A0; a <= RING_A1 + 1e-6; a += 2.5){ const [x, y] = ringPt(a); circles.push([x, y, ringW(a)]); }
+  ROOMS.push({ name: 'The Story Ring', ring: true, circles, k: 20, H: 38, wallW: 12, edgeH: 9, base: (x, y) => CAVE_LEVEL + 1.5*Math.sin(x/37)*Math.cos(y/41) });
+}
+for (const T of TRANSPORT) ROOMS.push({ name: 'Transport Room', transport: T, circles: [[T.x, T.y, 30]], k: 12, H: 30, wallW: 8, edgeH: 7, base: () => CAVE_LEVEL });
+const RING_ROOM = ROOMS.find(r => r.ring), ringBase = (x, y) => RING_ROOM.base(x, y);
+// ---- the halls: a centre line, and a floor that runs smoothly from one end's height to the other's. the climb or drop
+// happens between the rooms (from where the hall leaves one room to where it enters the next), so a hall arrives
+// level with the room it opens into. a hall can also pass through heights on the way (anchors: [distance, height])
+const HALLS = [];
+function roomsD(x, y){ let d = Infinity; for (const R of ROOMS){ let r = Infinity; for (const c of R.circles) r = smin(r, Math.hypot(x - c[0], y - c[1]) - c[2], R.k); d = Math.min(d, r); } return d; }
+function addHall(name, pts, hS, hE, opt = {}){
+  const s = smoothPts(pts), X = [], Y = [], cum = [];
   for (let i = 0; i < s.length; i += 6){ X.push(s[i]); Y.push(s[i+1]); }
   if (X[X.length-1] !== s[s.length-2]){ X.push(s[s.length-2]); Y.push(s[s.length-1]); }
   cum.push(0); for (let i = 1; i < X.length; i++) cum.push(cum[i-1] + Math.hypot(X[i] - X[i-1], Y[i] - Y[i-1]));
-  return { X, Y, cum, n: X.length, sE: 0, bE: 0, g: 0, ease: 8, start: 6 };
-})();
-const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0)/k; return Math.min(a, b) - h*h*k/4; };
-function chamberD(x, y){ let d = Infinity; for (const c of CHAMBERS) d = smin(d, Math.hypot(x - c[0], y - c[1]) - c[2], 14); return d; }
-// the cavern floor: lower toward the south, gently rolling
-function chamberBase(x, y){ return -16 - 6*smooth01(235, 425, y) + 1.4*Math.sin(x/19 + 1)*Math.cos(y/27) + 0.8*Math.sin((x + 2*y)/23); }
-function chamberRoof(x, y){ return 21 + 3*Math.sin(x/29 + 0.5)*Math.cos(y/37) + 2*Math.sin((x - y)/19); }
-// where the tunnel comes into the cavern, and the even grade it drops at to get there (eased in and out over TUN.ease m)
-{
-  for (let i = 0; i < TUN.n; i++) if (chamberD(TUN.X[i], TUN.Y[i]) < 0){ TUN.sE = TUN.cum[i]; TUN.bE = chamberBase(TUN.X[i], TUN.Y[i]); break; }
-  TUN.g = (MINE.F0 - TUN.bE) / (TUN.sE - TUN.start - TUN.ease);
+  const h = { name, X, Y, cum, n: X.length, L: cum[cum.length - 1], mine: !!opt.mine };
+  // where it leaves the room it starts in, and enters the room it ends in
+  let sA = opt.start || 0, sB = h.L;
+  if (!opt.start){ for (let i = 0; i < h.n; i++) if (roomsD(X[i], Y[i]) > -2){ sA = cum[i]; break; } }
+  for (let i = h.n - 1; i >= 0; i--) if (roomsD(X[i], Y[i]) > -2){ sB = cum[i]; break; }
+  const A = [[sA, hS], ...(opt.via || []), [sB, hE]];
+  // slopes for a smooth curve through the anchors: level at the two ends, in between the average of either side
+  h.A = A.map((p, k) => [p[0], p[1], k === 0 || k === A.length - 1 ? 0 : (A[k+1][1] - A[k-1][1])/(A[k+1][0] - A[k-1][0])]);
+  HALLS.push(h); return h;
 }
-function tunnelBase(s){
-  const u = s - TUN.start, L = TUN.sE - TUN.start, e = TUN.ease, g = TUN.g, D = MINE.F0 - TUN.bE;
-  const drop = u <= 0 ? 0 : u < e ? g*u*u/(2*e) : u < L - e ? g*(u - e/2) : u < L ? D - g*(L - u)*(L - u)/(2*e) : D;
-  return MINE.F0 - drop;
-}
-function tunnelNear(x, y){
-  // distance to the tunnel's centre line and how far along it that is
-  let bd = Infinity, bs = 0; const X = TUN.X, Y = TUN.Y;
-  for (let i = 0; i < TUN.n - 1; i++){
-    const ax = X[i], ay = Y[i], dx = X[i+1] - ax, dy = Y[i+1] - ay;
-    if (Math.abs(x - ax) > bd + 4 && Math.abs(x - X[i+1]) > bd + 4 && Math.sign(x - ax) === Math.sign(x - X[i+1])) continue;
-    const L2 = dx*dx + dy*dy, u = Math.max(0, Math.min(1, ((x-ax)*dx + (y-ay)*dy)/L2)), d = Math.hypot(x - ax - u*dx, y - ay - u*dy);
-    if (d < bd){ bd = d; bs = TUN.cum[i] + u*(TUN.cum[i+1] - TUN.cum[i]); }
+function hallBase(h, s){
+  const A = h.A; if (s <= A[0][0]) return A[0][1];
+  for (let k = 0; k < A.length - 1; k++){
+    const [s0, h0, m0] = A[k], [s1, h1, m1] = A[k+1]; if (s > s1) continue;
+    const D = s1 - s0, u = (s - s0)/D, u2 = u*u, u3 = u2*u;
+    return (2*u3 - 3*u2 + 1)*h0 + (u3 - 2*u2 + u)*D*m0 + (-2*u3 + 3*u2)*h1 + (u3 - u2)*D*m1;
   }
-  // beyond the portal (back out into the cut) the tunnel carries straight on
-  const sm = mineS(x); if (sm < 0 && Math.abs(y - MINE.y) < bd){ bd = Math.abs(y - MINE.y); bs = sm; }
-  return [bd, bs];
+  return A[A.length-1][1];
 }
-const CF = { d: 0, floor: 0, ceil: 0, wallW: 0, s: 0, wT: 0 };
+const CROSS = ringPt(324);
+const CROSS_OUT = polar(324, ringR(324) + ringW(324) - 15), CROSS_IN = polar(324, ringR(324) - ringW(324) + 15);
+const SHAFT = addHall('Mine Shaft', [[MINE.x, MINE.y],[-34,296],[-44,296],[-52,289],[-55,276],[-50,262],[-48,248],[-54,234],[-66,224],[-82,219],[-102,222],[-140,212],[-190,196],[-240,182], CROSS_OUT], MINE.F0, ringBase(...CROSS_OUT), { start: 6, mine: true, via: [[140, -14]] });
+addHall('Crossroads', [CROSS_IN, polar(324, 150), [CAVE_C.x, CAVE_C.y]], ringBase(...CROSS_IN), CAVE_LEVEL);
+const local = (s, a, lat) => [s.x + s.ux*a - s.uy*lat, s.y + s.uy*a + s.ux*lat];
+for (const s of SPOKES){
+  s.e = s.theme === 'bowl' ? 30 : 40;                                // where the halls open into the room, along its axis
+  s.inPts = [[CAVE_C.x, CAVE_C.y], polar(s.a + 9, 62), local(s, -s.e, 0)];
+  s.outPts = [local(s, s.e, 0), polar(s.a - 4, 182), ringPt(s.a)];
+  const ringIn = polar(s.a, ringR(s.a) - ringW(s.a) + 15), edge = s.edge;
+  const R = ROOMS.find(q => q.spoke === s), lv = p => R.base(p[0], p[1], roomsD(p[0], p[1]));   // the room's floor where each hall opens into it
+  addHall(s.name + ' (in)', [s.inPts[0], s.inPts[1], local(s, -edge, 0)], CAVE_LEVEL, lv(local(s, -edge, 0)));
+  addHall(s.name + ' (out)', [local(s, edge, 0), s.outPts[1], ringIn], lv(local(s, edge, 0)), ringBase(...ringIn));
+}
+// ---- lookup grid: each 16 m cell lists the room circles and hall segments near enough to matter there
+const CG = { x0: -800, y0: -40, st: 16, nx: 0, ny: 0, cells: null, reach: 26 };
+{
+  CG.nx = Math.ceil((10 - CG.x0)/CG.st); CG.ny = Math.ceil((640 - CG.y0)/CG.st); CG.cells = Array.from({ length: CG.nx*CG.ny }, () => ({ c: [], s: [] }));
+  const put = (x0, y0, x1, y1, fn) => {
+    for (let j = Math.max(0, Math.floor((y0 - CG.y0)/CG.st)); j <= Math.min(CG.ny - 1, Math.floor((y1 - CG.y0)/CG.st)); j++)
+      for (let i = Math.max(0, Math.floor((x0 - CG.x0)/CG.st)); i <= Math.min(CG.nx - 1, Math.floor((x1 - CG.x0)/CG.st)); i++) fn(CG.cells[j*CG.nx + i]);
+  };
+  ROOMS.forEach((R, ri) => R.circles.forEach((c, ci) => { const q = c[2] + CG.reach; put(c[0] - q, c[1] - q, c[0] + q, c[1] + q, cell => cell.c.push(ri, ci)); }));
+  HALLS.forEach((h, hi) => { for (let i = 0; i < h.n - 1; i++){ const q = MINE.hw + CG.reach; put(Math.min(h.X[i], h.X[i+1]) - q, Math.min(h.Y[i], h.Y[i+1]) - q, Math.max(h.X[i], h.X[i+1]) + q, Math.max(h.Y[i], h.Y[i+1]) + q, cell => cell.s.push(hi, i)); } });
+}
+const _rd = new Float64Array(ROOMS.length), _hd = new Float64Array(HALLS.length), _hs = new Float64Array(HALLS.length);
+const CF = { d: 0, floor: 0, ceil: 0, wallW: 0, shaftS: Infinity, hall: 0, sd: 0 };
 function caveField(x, y, out = CF){
-  const [dt, sT] = tunnelNear(x, y), dT = dt - MINE.hw, dC = chamberD(x, y);
-  const d = smin(dT, dC, 5);
-  const wT = smooth01(-3, 3, dC - dT);                              // 1 in the tunnel, 0 in the cavern
-  const bC = chamberBase(x, y), bT = sT < TUN.sE ? tunnelBase(sT) : bC;
-  const base = bC + (bT - bC)*wT, wallW = 9 + (MINE.wallW - 9)*wT, edgeH = 7 + (MINE.edgeH - 7)*wT;
-  const Hc = chamberRoof(x, y), H = Hc + (MINE.H - Hc)*wT;
-  const t = Math.max(0, Math.min(1, 1 + d/wallW)), t2 = Math.max(0, Math.min(1, 1 + d/(2*wallW)));
-  const floor = base + edgeH*Math.pow(t, 2.2);
-  let ceil = base + H - (H - edgeH)*t2*t2;
-  // the rock overhead: away from the portal (where the ridge is plenty), the roof keeps a metre and more under the snow
-  const capK = 1 - wT*(1 - smooth01(14, 24, sT));
-  if (capK > 0){ const cap = heightNat(x, y) - 1.2; if (ceil > cap) ceil += (cap - ceil)*capK; }
+  const i = Math.floor((x - CG.x0)/CG.st), j = Math.floor((y - CG.y0)/CG.st);
+  const cell = (i >= 0 && j >= 0 && i < CG.nx && j < CG.ny) ? CG.cells[j*CG.nx + i] : null;
+  let shaftNear = mineS(x) < 0 && Math.abs(y - MINE.y) < 30;   // the cut, out past the portal
+  if ((!cell || (!cell.c.length && !cell.s.length)) && !shaftNear){ out.d = 99; out.floor = out.ceil = CAVE_LEVEL + 7; out.wallW = 9; out.shaftS = Infinity; out.hall = 0; out.sd = -99; return out; }
+  _rd.fill(Infinity); _hd.fill(Infinity);
+  if (cell){
+    const C = cell.c; for (let k = 0; k < C.length; k += 2){ const R = ROOMS[C[k]], c = R.circles[C[k+1]]; _rd[C[k]] = smin(_rd[C[k]], Math.hypot(x - c[0], y - c[1]) - c[2], R.k); }
+    const Sg = cell.s; for (let k = 0; k < Sg.length; k += 2){
+      const hi = Sg[k], h = HALLS[hi], q = Sg[k+1], ax = h.X[q], ay = h.Y[q], dx = h.X[q+1] - ax, dy = h.Y[q+1] - ay, L2 = dx*dx + dy*dy;
+      const u = Math.max(0, Math.min(1, ((x-ax)*dx + (y-ay)*dy)/L2)), dd = Math.hypot(x - ax - u*dx, y - ay - u*dy);
+      if (dd < _hd[hi]){ _hd[hi] = dd; _hs[hi] = h.cum[q] + u*(h.cum[q+1] - h.cum[q]); }
+    }
+  }
+  if (shaftNear){ const sm = mineS(x), lat = Math.abs(y - MINE.y); const hi = HALLS.indexOf(SHAFT); if (lat < _hd[hi]){ _hd[hi] = lat; _hs[hi] = sm; } }
+  // every shape near here gives its own floor and roof: inside it, its floor curves up toward its edge and its roof
+  // curves down to meet it; outside it, they cross over steeply. the cave's floor is the lowest of them and its roof
+  // the highest (smoothly), so where a hall runs into a room its tunnel cuts cleanly through the room's wall
+  let d = Infinity, floor = Infinity, ceil = -Infinity, sd = -Infinity, best = Infinity, bestHall = false, bestW = 9, shaftS = Infinity;
+  const shape = (di, base, H, wallW, edgeH, isHall, hi) => {
+    let f, c;
+    if (di >= 0){ f = base + edgeH + 30*di; c = base + edgeH - 30*di; }
+    else { const t = Math.max(0, 1 + di/wallW), t2 = Math.max(0, 1 + di/(2*wallW)); f = base + edgeH*Math.pow(t, 2.2); c = base + H - (H - edgeH)*t2*t2; }
+    floor = floor === Infinity ? f : smin(floor, f, 0.6);
+    ceil = ceil === -Infinity ? c : -smin(-ceil, -c, 1);
+    d = smin(d, di, 3);
+    sd = Math.max(sd, -(di + 0.38*wallW));
+    if (di < best){ best = di; bestHall = isHall; bestW = wallW; }
+    if (hi !== undefined && HALLS[hi] === SHAFT && di < 0) shaftS = _hs[hi];
+  };
+  for (let r = 0; r < ROOMS.length; r++){ const dr = _rd[r]; if (dr === Infinity || dr > 8) continue; const R = ROOMS[r]; shape(dr, R.base(x, y, dr), R.H, R.wallW, R.edgeH, false); }
+  for (let hi = 0; hi < HALLS.length; hi++){ if (_hd[hi] === Infinity) continue; const dh = _hd[hi] - MINE.hw; if (dh > 8) continue; shape(dh, hallBase(HALLS[hi], _hs[hi]), MINE.H, MINE.wallW, MINE.edgeH, true, hi); }
+  if (floor === Infinity){ out.d = 99; out.floor = out.ceil = CAVE_LEVEL + 7; out.wallW = 9; out.shaftS = Infinity; out.hall = 0; out.sd = -99; return out; }
+  // the rock overhead: under the map, the roof keeps a metre and more under the snow above (but not right by the
+  // portal, where the ridge gives plenty of cover and the tunnel must keep its full height)
+  if (x > WORLD.x0 - 5){
+    const capK = shaftS < 24 ? smooth01(14, 24, shaftS) : 1;
+    if (capK > 0){ const cap = heightNat(x, y) - 1.2; if (ceil > cap) ceil += (cap - ceil)*capK; }
+  }
   if (ceil < floor) ceil = floor;
-  out.d = d; out.floor = floor; out.ceil = ceil; out.wallW = wallW; out.s = sT; out.wT = wT;
+  out.d = d; out.floor = floor; out.ceil = ceil; out.wallW = bestW; out.shaftS = shaftS; out.hall = bestHall ? 1 : 0; out.sd = sd;
   return out;
 }
-function caveFloor(x, y){ return caveField(x, y).floor; }
-// the walls stop you once you've ridden a little way up them (about a third of the way to where they meet the roof)
-const CAVE_SOLIDS = [];      // the big crystal clusters out on the cavern floor
-function caveSD(x, y){
-  const f = caveField(x, y); let d = -(f.d + 0.38*f.wallW);
-  for (const o of CAVE_SOLIDS){ const q = Math.hypot(x - o.x, y - o.y) - o.r; if (q < d) d = q; }
+// the space station: deck everywhere you can stand, its edges railed
+function stationD(x, y){
+  let d = Math.abs(Math.hypot(x - STATION.x, y - STATION.y) - STATION.R) - STATION.hw;
+  for (const k of STATION.docks) d = Math.min(d, segDist(x, y, PORTAL_X, k.y, k.x1, k.y) - STATION.dhw);
   return d;
 }
-// in and out through the portal: crossing its line between the walls takes you underground or back up
+const cavePowered = () => zoneDone(3);                           // zone 3's terminals run the generators (and the lights)
+function caveFloor(x, y){ return x < PORTAL_X ? STATION.h : caveField(x, y).floor; }
+const CAVE_SOLIDS = [];      // the big crystal clusters out on the floors
+function caveSD(x, y){
+  if (x < PORTAL_X) return -(stationD(x, y) + 0.35);
+  const f = caveField(x, y); let d = f.sd;
+  for (const o of CAVE_SOLIDS){ const q = Math.hypot(x - o.x, y - o.y) - o.r; if (q < d) d = q; }
+  // each portal is a solid wall until the generators are running
+  if (!cavePowered()) for (const T of TRANSPORT) if (Math.abs(y - T.y) < 14) d = Math.min(d, x - PORTAL_X - 0.4);
+  return d;
+}
+// in and out through the mine's portal: crossing its line between the walls takes you underground or back up
 function caveStep(sPrev){
   const sm = mineS(S.x), inWay = Math.abs(S.y - MINE.y) < MINE.hw;
   if (!UNDER && sPrev <= 0 && sm > 0 && inWay) UNDER = true;
   else if (UNDER && sm <= 0) UNDER = false;
 }
+// ---- the courses
+const CAVE_TRAILS = [
+  { name: 'Mine Shaft', diff: 'blue', pts: [[MINE.x, MINE.y],[-34,296],[-44,296],[-52,289],[-55,276],[-50,262],[-48,248],[-54,234],[-66,224],[-82,219],[-102,222],[-140,212],[-190,196],[-240,182], CROSS] },
+  { name: 'Crossroads', diff: 'green', pts: [CROSS, polar(324, 150), [CAVE_C.x, CAVE_C.y]] },
+];
+for (const s of SPOKES){
+  let line;
+  if (s.theme === 'berms'){ line = []; for (let a = -40; a <= 40; a += 4) line.push(local(s, a, 13*Math.sin(2*Math.PI/40*a)*smooth01(40, 28, Math.abs(a)))); }
+  else line = [local(s, -s.e, 0), local(s, 0, 0), local(s, s.e, 0)];
+  CAVE_TRAILS.push({ name: s.name, diff: s.theme === 'rollers' || s.theme === 'pump' ? 'green' : s.theme === 'berms' ? 'blue' : 'black',
+    pts: [...s.inPts.slice(0, 2), ...line, ...s.outPts.slice(1)] });
+}
+{ const s = SPOKES.find(q => q.theme === 'pump'), pts = [];
+  for (let k = 0; k <= 64; k++){ const t = k/64*2*Math.PI, side = Math.cos(t) >= 0 ? 1 : -1;   // an oval: two straights joined by half-circles
+    const lat = side*PUMP.L + Math.cos(t)*PUMP.r, a = Math.sin(t)*PUMP.r; pts.push(local(s, a, lat)); }
+  CAVE_TRAILS.push({ name: 'Pump Track', diff: 'blue', pts, loop: true }); }
+{ const pts = [[PORTAL_X, TRANSPORT[0].y], [TRANSPORT[0].x, TRANSPORT[0].y]];
+  for (let a = RING_A0 + 6; a <= RING_A1 - 6; a += 8) pts.push(ringPt(a));
+  pts.push([TRANSPORT[1].x, TRANSPORT[1].y], [PORTAL_X, TRANSPORT[1].y]);
+  CAVE_TRAILS.push({ name: 'Story Ring', diff: 'green', pts }); }
+{ const pts = []; for (let k = 0; k <= 72; k++){ const t = k/72*2*Math.PI; pts.push([STATION.x + Math.cos(t)*STATION.R, STATION.y + Math.sin(t)*STATION.R]); }
+  CAVE_TRAILS.push({ name: 'Station Ring', diff: 'green', pts, station: true, w: 2*STATION.hw });
+  STATION.docks.forEach((k, i) => CAVE_TRAILS.push({ name: i ? 'Lower Dock' : 'Upper Dock', diff: 'green', pts: [[PORTAL_X, k.y], [(PORTAL_X + k.x1)/2, k.y], [k.x1, k.y]], station: true, w: 2*STATION.dhw })); }
 for (const t of CAVE_TRAILS){
+  t.s = smoothPts(t.pts); t.cave = true;
   const out = t.s; let len = 0, climb = 0;
   for (let i = 2; i < out.length; i += 2){ len += Math.hypot(out[i]-out[i-2], out[i+1]-out[i-1]); const dh = caveFloor(out[i], out[i+1]) - caveFloor(out[i-2], out[i-1]); if (dh > 0) climb += dh; }
   t.len = len; t.climb = climb;
@@ -953,7 +1086,11 @@ for (const t of CAVE_TRAILS){
   t.bx = [a - TRAIL_W, b - TRAIL_W, c + TRAIL_W, e + TRAIL_W];
   const m = (out.length/4|0)*2; t.mid = [out[m], out[m+1]];
 }
-const CAVE_JUNCTION_PTS = [[-102, 240]];
+// where the courses meet (centring eases off near these)
+const CAVE_JUNCTION_PTS = (() => {
+  const out = [[CAVE_C.x, CAVE_C.y], CROSS, ...SPOKES.map(s => ringPt(s.a)), ...STATION.docks.map(k => [k.x1, k.y]), ...TRANSPORT.map(T => [PORTAL_X, T.y])];
+  return out;
+})();
 // ================= end of the cavern's ground =================
 // distance from a point to the nearest groomed centre line
 function nearestTrail(x, y){
@@ -1133,7 +1270,7 @@ let lastKickAt = 0, lastPushAt = 0, weightLeg = null, camPending = 0;
 // mark grows along that line as the body travels. when the body drifts too far off that line (a curve, or
 // the V opening wider than a leg can reach), the ski is lifted and set down again under the skier.
 function newSki(side, ang, ax = S.x, ay = S.y){
-  const s = { ax, ay, dx: Math.sin(ang), dy: -Math.cos(ang), len: 0, live: true, side, slot: -1, dirty: true, noTrack: !!SKY_ON };
+  const s = { ax, ay, dx: Math.sin(ang), dy: -Math.cos(ang), len: 0, live: true, side, slot: -1, dirty: true, noTrack: !!SKY_ON || (UNDER && S.x < PORTAL_X) };
   skyMarkNew(s);
   skis.push(s); if (skis.length > 1200) skis.shift();
   return s;
@@ -1949,7 +2086,7 @@ function step(dt){
   S.off = offTrail(nt.d); S.trail = nt.t;
   if (!UNDER && (bridgeAt(S.x, S.y) || onLake(S.x, S.y))) S.off = 0;          // bridges, their ramps and the lake ice run like groomed trail
   if (S.off > 0 && !UNDER) S.off = Math.min(S.off, apronOff(S.x, S.y));   // and so do the lawns round the landmarks
-  if (SKY_ON) S.off = 0;                                       // the energy bridges glide like groomed trail
+  if (SKY_ON || (UNDER && S.x < PORTAL_X)) S.off = 0;          // the energy bridges (and the station's decks) glide like groomed trail
   S.gm = glideMult();
   // classic skis break their own track, so ungroomed snow adds no friction in classic mode
   const offK = mode === 'classic' ? 0 : S.off;
@@ -2265,18 +2402,17 @@ function* bakeTile(t){
 let mineUniforms = null;
 function groundMat(tex){
   const m = new THREE.MeshLambertMaterial({ map: tex });
-  if (!mineUniforms) mineUniforms = { uMine: { value: new THREE.Vector4(MINE.x, MINE.y, MINE.F0, TUN.g) },
-    uMineX: { value: new THREE.Vector4(MINE.hw, MINE.wallW, MINE.edgeH, MINE.H) }, uMineE: { value: new THREE.Vector2(TUN.start, TUN.ease) } };
+  if (!mineUniforms){ const a = SHAFT.A[0], b = SHAFT.A[1]; mineUniforms = { uMine: { value: new THREE.Vector4(MINE.x, MINE.y, MINE.F0, 0) },
+    uMineX: { value: new THREE.Vector4(MINE.hw, MINE.wallW, MINE.edgeH, MINE.H) }, uMineH: { value: new THREE.Vector4(a[0], b[0], b[1], b[2]) } }; }
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, mineUniforms);
     sh.vertexShader = 'varying vec3 vMineW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vMineW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vMineW;\nuniform vec4 uMine; uniform vec4 uMineX; uniform vec2 uMineE;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+    sh.fragmentShader = 'varying vec3 vMineW;\nuniform vec4 uMine; uniform vec4 uMineX; uniform vec4 uMineH;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
   {
     float s = uMine.x - vMineW.x, lat = abs(vMineW.z - uMine.y);
     if (s > 0.0 && s < 16.0 && lat < uMineX.x + 0.05){
-      float u = s - uMineE.x, e = uMineE.y, g = uMine.w;
-      float drop = u <= 0.0 ? 0.0 : (u < e ? g*u*u/(2.0*e) : g*(u - e/2.0));
-      float base = uMine.z - drop, d = lat - uMineX.x;
+      float D = uMineH.y - uMineH.x, u = clamp((s - uMineH.x)/D, 0.0, 1.0), u2 = u*u, u3 = u2*u;
+      float base = (2.0*u3 - 3.0*u2 + 1.0)*uMine.z + (-2.0*u3 + 3.0*u2)*uMineH.z + (u3 - u2)*D*uMineH.w, d = lat - uMineX.x;
       float t2 = clamp(1.0 + d/(2.0*uMineX.y), 0.0, 1.0);
       float roof = base + uMineX.w - (uMineX.w - uMineX.z)*t2*t2;
       if (vMineW.y < roof + 0.05) discard;
@@ -3115,7 +3251,7 @@ function powerKiosk(K, quiet = false){
   music.chime(1, true);
   const z = K.zone, left = zoneKiosks(z).length - kiosksPowered(z);
   if (!left) toast(z === 1 ? 'Every terminal is powered. The east gate and the south gate will open when you reach them.' : z === 2 ? 'Every terminal is powered. Both drawbridges will lower when you reach them.'
-    : 'Every terminal in this zone is powered.');
+    : 'Every terminal in this zone is powered. Deep in the mine, the generators are running.');
   else toast('Terminal powered. ' + left + ' more in this zone.');
   saveProgress();
 }
@@ -5582,7 +5718,7 @@ function resetAll(){
   toast(completions === 1 ? 'Everything begins again, but you carry the crown.' : 'Everything begins again. Completions: ' + completions + '.');
 }
 function updateSpace(dt){
-  const want = S.y > WORLD.y1 + 18 ? 1 : 0;
+  const want = S.y > WORLD.y1 + 18 || (typeof stationK !== 'undefined' && stationK > 0.05) ? 1 : 0;
   space.k += (want - space.k) * Math.min(1, dt*1.2);
   if (space.k < 0.002 && !want){ if (space.g.visible){ space.g.visible = false; space.world.visible = false; scene.fog.near = 55; scene.fog.far = 270; camera.far = 600; camera.updateProjectionMatrix(); applySkyColour(1); } return; }
   const k = space.k; space.g.visible = true; space.world.visible = true; space.g.position.copy(camera.position);
@@ -6086,7 +6222,7 @@ function draw(){
   ctx.font = '500 11px "IBM Plex Mono", ui-monospace, monospace'; ctx.textBaseline = 'middle';
   if (UNDER) for (const t of CAVE_TRAILS){
     const d = Math.hypot(t.mid[0] - S.x, t.mid[1] - S.y); if (d > 120) continue;
-    const gh = caveFloor(t.mid[0], t.mid[1]), p = project(t.mid[0], t.mid[1], gh + 2.2); if (!p) continue;
+    const gh = ground(t.mid[0], t.mid[1]), p = project(t.mid[0], t.mid[1], gh + 2.2); if (!p) continue;
     ctx.globalAlpha = Math.min(1, (120 - d) / 40);
     const label = t.name + '  ' + Math.round(t.len) + ' m  ↑' + Math.round(t.climb) + ' m';
     const w = ctx.measureText(label).width + 26, [sx, sy] = p;
@@ -6390,7 +6526,6 @@ const mapBox = zone => {
 const MAP_BOX = { 1: mapBox(1), 2: mapBox(2), 3: mapBox(3), 4: mapBox(4), 5: { x0: Z5.x0, x1: Z5.x1, y0: WORLD.y1 - 20, y1: Z5.cliff + 15 } };
 // the map's contents (terrain features, trails, buildings, orbs, crystals, gates), drawn into any 2D context at any
 // scale: the corner minimap uses it, and so does the full-screen map on phones. people and animals aren't shown.
-let caveOutline = null;
 function renderMapLayers(g, MAP, mx, my, mw, mh, sc){
   const mX = x => mx + (x - MAP.x0)*sc, mY = y => my + (y - MAP.y0)*sc;
   g.save(); g.beginPath(); g.rect(mx - 6, my - 6, mw + 12, mh + 12); g.clip();
@@ -6418,13 +6553,11 @@ function renderMapLayers(g, MAP, mx, my, mw, mh, sc){
     for (let i = 2; i < t.s.length; i += 2) g.lineTo(mX(t.s[i]), mY(t.s[i+1]));
     g.stroke();
   }
-  // the mine and cavern underneath, dashed: the cavern's outline, then its trails
-  g.save(); g.setLineDash([4, 3]); g.lineWidth = 1.2; g.strokeStyle = C.muted; g.globalAlpha = 0.9;
-  if (!caveOutline){ caveOutline = []; for (let k = 0; k <= 120; k++){ const th = k/120*Math.PI*2, cx = -102, cy = 335; let lo = 0, hi = 160; for (let it = 0; it < 16; it++){ const m = (lo + hi)/2; chamberD(cx + Math.cos(th)*m, cy + Math.sin(th)*m) < 0 ? lo = m : hi = m; } caveOutline.push(cx + Math.cos(th)*lo, cy + Math.sin(th)*lo); } }
-  g.beginPath(); for (let k = 0; k < caveOutline.length; k += 2) k ? g.lineTo(mX(caveOutline[k]), mY(caveOutline[k+1])) : g.moveTo(mX(caveOutline[k]), mY(caveOutline[k+1])); g.stroke();
-  g.lineWidth = 2;
-  for (const t of CAVE_TRAILS){ g.strokeStyle = C[t.diff]; g.beginPath(); g.moveTo(mX(t.s[0]), mY(t.s[1])); for (let i = 2; i < t.s.length; i += 2) g.lineTo(mX(t.s[i]), mY(t.s[i+1])); g.stroke(); }
-  g.restore();
+  // the mine and the cavern underneath: its floor plan as a faint fill, and its courses dashed
+  { const M = caveMask(); g.save(); g.imageSmoothingEnabled = true; g.drawImage(M.cv, mX(CAVE_MAP_BOX.x0), mY(CAVE_MAP_BOX.y0), M.cv.width*M.st*sc, M.cv.height*M.st*sc);
+    g.setLineDash([4, 3]); g.lineWidth = 2;
+    for (const t of CAVE_TRAILS){ g.strokeStyle = C[t.diff]; g.beginPath(); g.moveTo(mX(t.s[0]), mY(t.s[1])); for (let i = 2; i < t.s.length; i += 2) g.lineTo(mX(t.s[i]), mY(t.s[i+1])); g.stroke(); }
+    g.restore(); }
   // the divide (a rock band) with the crystal gate, and the crystals once they're out (purple diamonds)
   g.globalAlpha = 0.35; g.strokeStyle = C.rock; g.lineWidth = Math.max(3, DIVIDE_BAND*2*sc);
   g.beginPath(); for (let x = WORLD.x0; x <= WORLD.x1; x += 8){ x === WORLD.x0 ? g.moveTo(mX(x), mY(divideY(x))) : g.lineTo(mX(x), mY(divideY(x))); } g.stroke();
@@ -6466,7 +6599,7 @@ function renderMapLayers(g, MAP, mx, my, mw, mh, sc){
   return { mX, mY };
 }
 function drawMinimap(){
-  const MAP = MAP_BOX[hudZone(S.x, S.y)];
+  const MAP = UNDER ? CAVE_MAP_BOX : MAP_BOX[hudZone(S.x, S.y)];
   const size = W < 520 ? 104 : 150, pad = 16;
   const sc = size / Math.max(MAP.x1 - MAP.x0, MAP.y1 - MAP.y0);
   const mw = (MAP.x1 - MAP.x0)*sc, mh = (MAP.y1 - MAP.y0)*sc;
@@ -6492,7 +6625,7 @@ function drawBigMap(){
   const w = innerWidth, h = innerHeight, r = Math.min(devicePixelRatio || 1, 2);
   if (bigCv.width !== Math.round(w*r) || bigCv.height !== Math.round(h*r)){ bigCv.width = Math.round(w*r); bigCv.height = Math.round(h*r); }
   bigCtx.setTransform(r, 0, 0, r, 0, 0); bigCtx.clearRect(0, 0, w, h);
-  const M = { x0: WORLD.x0 + EDGE_WALL - 8, x1: WORLD.x1 - EDGE_WALL + 8, y0: WORLD.y0 + EDGE_WALL - 8, y1: WORLD.y1 - EDGE_WALL + 8 };
+  const M = { x0: CAVE_MAP_BOX.x0, x1: WORLD.x1 - EDGE_WALL + 8, y0: WORLD.y0 + EDGE_WALL - 8, y1: WORLD.y1 - EDGE_WALL + 8 };
   const top = 72, pad = 16, sc = Math.min((w - 2*pad) / (M.x1 - M.x0), (h - top - pad) / (M.y1 - M.y0));
   const mw = (M.x1 - M.x0)*sc, mh = (M.y1 - M.y0)*sc, mx = (w - mw)/2, my = top + (h - top - pad - mh)/2;
   bigCtx.fillStyle = C.mapbg; bigCtx.fillRect(mx - 6, my - 6, mw + 12, mh + 12);
@@ -6602,7 +6735,7 @@ function hud(){
     $('orbHud').dataset.kind = cry ? 'crystal' : '';
     const el = $('orbN'); if (el.textContent !== txt){ if (tot && n > 0) { const h = $('orbHud'); h.classList.remove('bump'); void h.offsetWidth; h.classList.add('bump'); } el.textContent = txt; }
     $('orbHud').dataset.done = tot && n === tot ? '1' : '';
-    $('orbZone').textContent = UNDER ? 'Underground' : tot ? label : z === 5 ? 'The observatory' : 'Beyond the divide';
+    $('orbZone').textContent = UNDER ? (S.x < PORTAL_X ? 'Space station' : 'Underground') : tot ? label : z === 5 ? 'The observatory' : 'Beyond the divide';
   }
   $('mToggle').dataset.mode = inClassic() ? 'classic' : 'skate';
   if (devView){ const el = $('tCry'), n = crystalsGot(); if (document.activeElement !== el && +el.value !== n) el.value = n; $('oCry').textContent = n + ' / ' + CRYSTAL_TOTAL; }
@@ -6692,93 +6825,94 @@ function camTarget(){
   return base;
 }
 // ================= the cavern (sandbox): drawing it, and the light and camera underground =================
-// the floor: tiles like the surface's (same snow, same groomed trails), but only the cells inside the cave, and none
-// east of the portal (out there the surface's own cut takes over)
+// the floor and roof are built in tiles on the surface's tile grid, streamed in round you like the surface's. the
+// floor has the same snow and groomed trails as the surface; only cells inside the cave are drawn, none east of the
+// mine's portal (out there the surface's own cut takes over) and none west of the transport rooms' portal wall
+const CAVE_BOX = { x0: -790, x1: -20, y0: -20, y1: 620 };
 const caveTiles = new Map(); let caveJob = null, caveJobKey = null;
-function caveCellOpen(f, x){ return f.ceil - f.floor > 0.02 && x <= MINE.x + 1e-6; }
+const CAVE_LOAD = 170, CAVE_DROP = 260;
+function caveCellOpen(f, x){ return f.ceil - f.floor > 0.02 && x <= MINE.x + 1e-6 && x >= PORTAL_X - 1e-6; }
+const ROOF_COL = { ice: new THREE.Color(0x9fb8cc), rock: new THREE.Color(0x56667a), deep: new THREE.Color(0x3e4a5c) };
 function* buildCaveTile(i, j){
   const x0 = TILE_WORLD.x0 + i*TILE_W, y0 = TILE_WORLD.y0 + j*TILE_H, nx = TILE_NX, ny = TILE_NY, R = TILE_R, GW = TILE_W + 1, GH = TILE_H + 1, key = i + ',' + j;
-  const hs = new Float32Array((nx+1)*(ny+1)), open = new Uint8Array(GW*GH), f = {};
-  const inBox = (x, y) => x >= CAVE_BOX.x0 - 2 && x <= CAVE_BOX.x1 + 2 && y >= CAVE_BOX.y0 - 2 && y <= CAVE_BOX.y1 + 2;
+  const hs = new Float32Array((nx+1)*(ny+1)), C = new Float32Array(GW*GH), open = new Uint8Array(GW*GH), f = {};
+  let any = false;
   for (let jj = 0; jj <= ny; jj++){
     for (let ii = 0; ii <= nx; ii++){
       const x = x0 + ii*R, y = y0 + jj*R;
-      if (!inBox(x, y)){ hs[jj*(nx+1)+ii] = -40; continue; }
       caveField(x, y, f); hs[jj*(nx+1)+ii] = f.floor;
-      if (!(ii & 1) && !(jj & 1)) open[(jj >> 1)*GW + (ii >> 1)] = caveCellOpen(f, x) ? 1 : 0;
+      if (!(ii & 1) && !(jj & 1)){ const v = (jj >> 1)*GW + (ii >> 1); C[v] = f.ceil; if (caveCellOpen(f, x)){ open[v] = 1; any = true; } }
     }
     if (jj % 8 === 7) yield;
   }
-  const idx = [];
+  if (!any){ caveTiles.set(key, { mesh: null, roof: null }); return; }
+  const idx = [], ridx = [];
   for (let cj = 0; cj < TILE_H; cj++) for (let ci = 0; ci < TILE_W; ci++){
     const a = ci + GW*cj, b = ci + GW*(cj+1), c = ci + 1 + GW*(cj+1), d = ci + 1 + GW*cj;
-    if (!(open[a] | open[b] | open[c] | open[d]) || x0 + ci + 1 > MINE.x + 1e-6) continue;
-    idx.push(a, b, d, b, c, d);
+    if (!(open[a] | open[b] | open[c] | open[d]) || x0 + ci + 1 > MINE.x + 1e-6 || x0 + ci < PORTAL_X - 1e-6) continue;
+    idx.push(a, b, d, b, c, d); ridx.push(a, d, b, b, d, c);
   }
-  if (!idx.length){ caveTiles.set(key, { mesh: null }); return; }
+  // the floor
   const g = new THREE.PlaneGeometry(TILE_W, TILE_H, TILE_W, TILE_H); g.rotateX(-Math.PI/2);
-  const pos = g.attributes.position, nrm = g.attributes.normal, H = (a, b) => hs[b*(nx+1)+a];
+  const pos = g.attributes.position, nrm = g.attributes.normal, Hh = (a, b) => hs[b*(nx+1)+a];
   for (let k = 0; k < pos.count; k++){
-    const ci = k % GW, cj = (k / GW) | 0, a = ci*2, b = cj*2, x = x0 + ci, z = y0 + cj;
-    pos.setXYZ(k, x, H(a, b), z);
-    const hx = a > 0 && a < nx ? (H(a+1, b) - H(a-1, b))/(2*R) : 0, hz = b > 0 && b < ny ? (H(a, b+1) - H(a, b-1))/(2*R) : 0;
+    const ci = k % GW, cj = (k / GW) | 0, a = ci*2, b = cj*2;
+    pos.setXYZ(k, x0 + ci, Hh(a, b), y0 + cj);
+    const hx = (Hh(Math.min(nx, a+1), b) - Hh(Math.max(0, a-1), b))/(R*(Math.min(nx, a+1) - Math.max(0, a-1)));
+    const hz = (Hh(a, Math.min(ny, b+1)) - Hh(a, Math.max(0, b-1)))/(R*(Math.min(ny, b+1) - Math.max(0, b-1)));
     const L = Math.hypot(hx, 1, hz); nrm.setXYZ(k, -hx/L, 1/L, -hz/L);
   }
   g.setIndex(idx); g.computeBoundingSphere();
   yield;
+  // the roof: icy rock in blues and greys, facing down
+  const rp = new Float32Array(GW*GH*3), rn = new Float32Array(GW*GH*3), rc = new Float32Array(GW*GH*3), c = new THREE.Color();
+  for (let cj = 0; cj < GH; cj++) for (let ci = 0; ci < GW; ci++){
+    const v = cj*GW + ci, x = x0 + ci, y = y0 + cj, h = C[v];
+    rp[v*3] = x; rp[v*3+1] = h; rp[v*3+2] = y;
+    const xa = Math.max(0, ci-1), xb = Math.min(GW-1, ci+1), ya = Math.max(0, cj-1), yb = Math.min(GH-1, cj+1);
+    const hx = (C[cj*GW + xb] - C[cj*GW + xa])/(xb - xa), hz = (C[yb*GW + ci] - C[ya*GW + ci])/(yb - ya), L = Math.hypot(hx, 1, hz);
+    rn[v*3] = hx/L; rn[v*3+1] = -1/L; rn[v*3+2] = hz/L;
+    const streak = 0.5 + 0.5*Math.sin(x*0.35 + Math.sin(y*0.13)*3)*Math.sin(y*0.21 - x*0.07);
+    c.copy(ROOF_COL.ice).lerp(ROOF_COL.rock, smooth01(0.35, 0.8, streak)).lerp(ROOF_COL.deep, smooth01(0.5, 2.5, Math.hypot(hx, hz))*0.6);
+    rc[v*3] = c.r; rc[v*3+1] = c.g; rc[v*3+2] = c.b;
+  }
+  const rg = new THREE.BufferGeometry();
+  rg.setAttribute('position', new THREE.BufferAttribute(rp, 3)); rg.setAttribute('normal', new THREE.BufferAttribute(rn, 3)); rg.setAttribute('color', new THREE.BufferAttribute(rc, 3));
+  rg.setIndex(ridx); rg.computeBoundingSphere();
+  yield;
   const cv = document.createElement('canvas'); cv.width = TILE_W * TEX_PPM; cv.height = TILE_H * TEX_PPM;
   const tex = new THREE.CanvasTexture(cv);
   tex.anisotropy = renderer.capabilities.getMaxAnisotropy(); tex.minFilter = THREE.LinearMipmapLinearFilter; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-  const t = { mesh: null, tex, cv, x0, y0, hs, baked: false, cave: true };
+  const t = { mesh: null, roof: null, tex, cv, x0, y0, hs, baked: false, cave: true };
   yield* bakeTile(t);
-  t.mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: tex }));
-  scene.add(t.mesh); caveTiles.set(key, t);
+  t.mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: tex })); scene.add(t.mesh);
+  t.roof = new THREE.Mesh(rg, new THREE.MeshLambertMaterial({ vertexColors: true })); scene.add(t.roof);
+  caveTiles.set(key, t);
+}
+function dropCaveTile(key){
+  const t = caveTiles.get(key); if (!t) return;
+  if (t.mesh){ scene.remove(t.mesh); t.mesh.geometry.dispose(); t.mesh.material.dispose(); t.tex.dispose(); scene.remove(t.roof); t.roof.geometry.dispose(); t.roof.material.dispose(); }
+  caveTiles.delete(key);
 }
 const CAVE_TILE_KEYS = (() => {
   const out = [];
-  for (let j = 0; j < TILES_Y; j++) for (let i = 0; i < TILES_X; i++){
-    const x0 = TILE_WORLD.x0 + i*TILE_W, y0 = TILE_WORLD.y0 + j*TILE_H;
-    if (x0 < CAVE_BOX.x1 && x0 + TILE_W > CAVE_BOX.x0 && y0 < CAVE_BOX.y1 && y0 + TILE_H > CAVE_BOX.y0) out.push([i, j]);
-  }
+  for (let j = Math.floor((CAVE_BOX.y0 - TILE_WORLD.y0)/TILE_H); j <= Math.floor((CAVE_BOX.y1 - TILE_WORLD.y0)/TILE_H); j++)
+    for (let i = Math.floor((CAVE_BOX.x0 - TILE_WORLD.x0)/TILE_W); i <= Math.floor((CAVE_BOX.x1 - TILE_WORLD.x0)/TILE_W); i++) out.push([i, j]);
   return out;
 })();
-// the roof: one mesh over the whole cave, facing down, icy rock in blues and greys
-const caveRoof = { mesh: null, job: null };
-function* buildCaveRoof(){
-  const B = CAVE_BOX, GW = B.x1 - B.x0 + 1, GH = B.y1 - B.y0 + 1, n = GW*GH;
-  const C = new Float32Array(n), F = new Float32Array(n), open = new Uint8Array(n), f = {};
-  for (let j = 0; j < GH; j++){
-    for (let i = 0; i < GW; i++){ const x = B.x0 + i, y = B.y0 + j; caveField(x, y, f); C[j*GW + i] = f.ceil; F[j*GW + i] = f.floor; open[j*GW + i] = caveCellOpen(f, x) ? 1 : 0; }
-    if (j % 6 === 5) yield;
+function updateCaveTiles(){
+  let best = null, bd = Infinity;
+  for (const [i, j] of CAVE_TILE_KEYS){
+    const key = i + ',' + j, d = tileDist(i, j, S.x, S.y);
+    if (caveTiles.has(key)){ if (d > CAVE_DROP) dropCaveTile(key); continue; }
+    if (d > CAVE_LOAD || key === caveJobKey) continue;
+    if (d < bd){ bd = d; best = [i, j]; }
   }
-  const pos = new Float32Array(n*3), nrm = new Float32Array(n*3), col = new Float32Array(n*3);
-  const ice = new THREE.Color(0x9fb8cc), rock = new THREE.Color(0x56667a), deep = new THREE.Color(0x3e4a5c), c = new THREE.Color();
-  for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++){
-    const k = j*GW + i, x = B.x0 + i, y = B.y0 + j, h = C[k];
-    pos.set([x, h, y], k*3);
-    const hx = (C[j*GW + Math.min(GW-1, i+1)] - C[j*GW + Math.max(0, i-1)])/2, hz = (C[Math.min(GH-1, j+1)*GW + i] - C[Math.max(0, j-1)*GW + i])/2;
-    const L = Math.hypot(hx, 1, hz); nrm.set([hx/L, -1/L, hz/L], k*3);
-    // strata and patches of clear ice, darker where the roof is steep (down toward the walls)
-    const streak = 0.5 + 0.5*Math.sin(x*0.35 + Math.sin(y*0.13)*3)*Math.sin(y*0.21 - x*0.07);
-    c.copy(ice).lerp(rock, smooth01(0.35, 0.8, streak)).lerp(deep, smooth01(0.5, 2.5, Math.hypot(hx, hz))*0.6);
-    col.set([c.r, c.g, c.b], k*3);
-  }
-  const idx = [];
-  for (let j = 0; j < GH - 1; j++) for (let i = 0; i < GW - 1; i++){
-    const a = j*GW + i, b = (j+1)*GW + i, cc = (j+1)*GW + i + 1, d = j*GW + i + 1;
-    if (!(open[a] | open[b] | open[cc] | open[d]) || B.x0 + i + 1 > MINE.x + 1e-6) continue;
-    idx.push(a, d, b, b, d, cc);                                // wound to face down
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  g.setIndex(idx); g.computeBoundingSphere();
-  caveRoof.mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true })); scene.add(caveRoof.mesh);
-  caveRoof.C = C; caveRoof.F = F; caveRoof.GW = GW; caveRoof.GH = GH;
-  yield;
-  buildCaveDressing(); caveRoof.done = true;
+  if (!caveJob && best){ caveJob = buildCaveTile(best[0], best[1]); caveJobKey = best.join(','); }
+  if (caveJob && run(caveJob, 6)){ caveJob = null; caveJobKey = null; }
 }
-// lights: violet over the big crystals, warm lamps down the mine. they're always there (so nothing recompiles) but
-// dark until you're underground
+// lights: violet over each room, warm lamps down the mine. they're always there (so nothing recompiles) but dark
+// until you're underground, and dim until zone 3's terminals are powered
 const caveLights = [];
 const CAVE_GEM = [new THREE.MeshLambertMaterial({ color: 0x8f74cf, emissive: 0x4a3584, flatShading: true }),
   new THREE.MeshLambertMaterial({ color: 0xb9a2ef, emissive: 0x6a52a8, flatShading: true })];
@@ -6793,105 +6927,151 @@ function crystalCluster(x, y, h, size, rnd){
   }
   return g;
 }
+const lampMat = new THREE.MeshBasicMaterial({ color: 0xffd08a });
+const caveDress = { done: false, gens: [], membranes: [] };
 function buildCaveDressing(){
+  caveDress.done = true;
   let seed = 9091; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const f = {};
-  // crystal clusters up the cavern's walls (beyond where you can ride), and a few big ones out on the floor
+  const f = {}, rx = () => CAVE_BOX.x0 + rnd()*(CAVE_BOX.x1 - CAVE_BOX.x0), ry = () => CAVE_BOX.y0 + rnd()*(CAVE_BOX.y1 - CAVE_BOX.y0);
+  const offTrail = (x, y, r) => { UNDER = true; const d = nearestTrail(x, y).d; UNDER = false; return d > r; };
+  // crystal clusters up the walls (beyond where you can ride)
   const placed = [];
-  for (let k = 0; k < 4000 && placed.length < 26; k++){
-    const x = CAVE_BOX.x0 + rnd()*(CAVE_BOX.x1 - CAVE_BOX.x0), y = CAVE_BOX.y0 + rnd()*(CAVE_BOX.y1 - CAVE_BOX.y0);
-    caveField(x, y, f); if (f.wT > 0.2 || f.d < -2.6 || f.d > -0.9) continue;
-    if (placed.some(p => Math.hypot(p[0] - x, p[1] - y) < 14)) continue;
+  for (let k = 0; k < 30000 && placed.length < 90; k++){
+    const x = rx(), y = ry(); if (x < PORTAL_X + 2) continue;
+    caveField(x, y, f); if (f.hall > 0.3 || f.d < -2.6 || f.d > -0.9) continue;
+    if (placed.some(p => Math.hypot(p[0] - x, p[1] - y) < 16)) continue;
     placed.push([x, y]); crystalCluster(x, y, f.floor - 0.2, 0.9 + rnd()*1.1, rnd);
   }
-  const big = [];
-  for (let k = 0; k < 4000 && big.length < 5; k++){
-    const x = CAVE_BOX.x0 + rnd()*(CAVE_BOX.x1 - CAVE_BOX.x0), y = CAVE_BOX.y0 + rnd()*(CAVE_BOX.y1 - CAVE_BOX.y0);
-    caveField(x, y, f); if (f.wT > 0.1 || f.d > -14) continue;
-    UNDER = true; const tr = nearestTrail(x, y).d; UNDER = false;
-    if (tr < 10 || big.some(p => Math.hypot(p[0] - x, p[1] - y) < 45)) continue;
-    big.push([x, y]); crystalCluster(x, y, f.floor - 0.3, 2.6 + rnd()*1.2, rnd); CAVE_SOLIDS.push({ x, y, r: 2.4 });
-    const L = new THREE.PointLight(0xa58cf0, 0, 60, 1.3); L.position.set(x, f.floor + 4, y); scene.add(L); caveLights.push({ L, k: 1.5 });
+  // a light over each room
+  for (const R of ROOMS){
+    const pts = R.ring ? [RING_A0 + 30, 260, 320, 380, 440, RING_A1 - 30].map(a => ringPt(a)) : [[R.circles[0][0], R.circles[0][1]]];
+    for (const [x, y] of pts){
+      caveField(x, y, f);
+      const L = new THREE.PointLight(R.transport ? 0xcfd8ff : 0xa58cf0, 0, R.ring ? 90 : 85, 1.2); L.position.set(x, f.floor + Math.min(14, (f.ceil - f.floor)*0.6), y); scene.add(L);
+      caveLights.push({ L, k: R.transport ? 0.9 : 0.8 });
+    }
   }
-  // icicles hanging from the cavern roof
-  const ICN = 320, icMat = new THREE.MeshLambertMaterial({ color: 0xc5dcec, emissive: 0x1d2c3c, flatShading: true });
-  const geo = new THREE.ConeGeometry(0.28, 1, 5); geo.rotateX(Math.PI); geo.translate(0, -0.5, 0);   // apex down, base at the origin
+  // a big crystal or two out on each room's floor, clear of the courses (solid)
+  for (const R of ROOMS){
+    if (R.ring || R.transport) continue;
+    for (let k = 0, n = 0; k < 400 && n < 2; k++){
+      const c = R.circles[(rnd()*R.circles.length) | 0], a = rnd()*Math.PI*2, r = rnd()*c[2], x = c[0] + Math.cos(a)*r, y = c[1] + Math.sin(a)*r;
+      caveField(x, y, f); if (f.d > -10 || f.hall > 0.1 || !offTrail(x, y, 11)) continue;
+      crystalCluster(x, y, f.floor - 0.3, 2.4 + rnd()*1.2, rnd); CAVE_SOLIDS.push({ x, y, r: 2.4 }); n++;
+    }
+  }
+  // icicles hanging from the roofs of the rooms
+  const ICN = 900, icMat = new THREE.MeshLambertMaterial({ color: 0xc5dcec, emissive: 0x1d2c3c, flatShading: true });
+  const geo = new THREE.ConeGeometry(0.28, 1, 5); geo.rotateX(Math.PI); geo.translate(0, -0.5, 0);
   const ic = new THREE.InstancedMesh(geo, icMat, ICN), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), Sv = new THREE.Vector3(), Pv = new THREE.Vector3();
   let n = 0;
-  for (let k = 0; k < 20000 && n < ICN; k++){
-    const x = CAVE_BOX.x0 + rnd()*(CAVE_BOX.x1 - CAVE_BOX.x0), y = CAVE_BOX.y0 + rnd()*(CAVE_BOX.y1 - CAVE_BOX.y0);
-    caveField(x, y, f); if (f.wT > 0.2 || f.d > -3 || f.ceil - f.floor < 10) continue;
-    const len = 1 + rnd()*rnd()*4, w = 0.6 + rnd()*0.9;
+  for (let k = 0; k < 60000 && n < ICN; k++){
+    const x = rx(), y = ry(); if (x < PORTAL_X + 2) continue;
+    caveField(x, y, f); if (f.hall > 0.2 || f.d > -3 || f.ceil - f.floor < 12) continue;
+    const len = 1 + rnd()*rnd()*5, w = 0.6 + rnd()*1.0;
     Pv.set(x, f.ceil + 0.3, y); Sv.set(w, len, w); M.compose(Pv, Q, Sv); ic.setMatrixAt(n++, M);
   }
   ic.count = n; scene.add(ic);
-  // the mine: steel arches along the tunnel every 5 m, with a lamp at the crown of every third one
-  const steel = new THREE.MeshLambertMaterial({ color: 0x3b4654 }), lampM = new THREE.MeshBasicMaterial({ color: 0xffd08a });
-  for (let s = 2, k = 0; s < TUN.sE - 4; s += 5, k++){
-    // the centre line here, and across it
-    let i = 0; while (i < TUN.n - 2 && TUN.cum[i+1] < s) i++;
-    const u = (s - TUN.cum[i])/(TUN.cum[i+1] - TUN.cum[i]), cx = TUN.X[i] + (TUN.X[i+1] - TUN.X[i])*u, cy = TUN.Y[i] + (TUN.Y[i+1] - TUN.Y[i])*u;
-    const tx = TUN.X[i+1] - TUN.X[i], ty = TUN.Y[i+1] - TUN.Y[i], tl = Math.hypot(tx, ty), nx = -ty/tl, ny = tx/tl;
-    const pts = [];
-    const at = lat => caveField(cx + nx*lat, cy + ny*lat, f);
+  // the mine shaft: steel arches every 5 m, with a lamp at the crown of every third one
+  const steel = new THREE.MeshLambertMaterial({ color: 0x3b4654 });
+  const H = SHAFT;
+  for (let s = 2, k = 0; s < H.L - 30; s += 5, k++){
+    let i = 0; while (i < H.n - 2 && H.cum[i+1] < s) i++;
+    const u = (s - H.cum[i])/(H.cum[i+1] - H.cum[i]), cx = H.X[i] + (H.X[i+1] - H.X[i])*u, cy = H.Y[i] + (H.Y[i+1] - H.Y[i])*u;
+    const tx = H.X[i+1] - H.X[i], ty = H.Y[i+1] - H.Y[i], tl = Math.hypot(tx, ty), nx = -ty/tl, ny = tx/tl;
+    const pts = [], at = lat => caveField(cx + nx*lat, cy + ny*lat, f);
     for (let lat = 3.2; lat <= 4.05; lat += 0.17){ at(lat); pts.push([cx + nx*(lat - 0.12), f.floor + 0.05, cy + ny*(lat - 0.12)]); }
     for (let lat = 4.0; lat >= -4.0; lat -= 0.5){ at(lat); pts.push([cx + nx*lat*0.97, f.ceil - 0.12, cy + ny*lat*0.97]); }
     for (let lat = -4.05; lat <= -3.2; lat += 0.17){ at(lat); pts.push([cx + nx*(lat + 0.12), f.floor + 0.05, cy + ny*(lat + 0.12)]); }
-    const c = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p)));
-    scene.add(new THREE.Mesh(new THREE.TubeGeometry(c, 40, 0.09, 6, false), steel));
+    const cr = new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p)));
+    scene.add(new THREE.Mesh(new THREE.TubeGeometry(cr, 40, 0.09, 6, false), steel));
     if (k % 3 === 0){
-      at(0); const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), lampM); lamp.position.set(cx, f.ceil - 0.35, cy); scene.add(lamp);
-      if (k % 9 === 0){ const L = new THREE.PointLight(0xffb468, 0, 26, 1.4); L.position.set(cx, f.ceil - 0.8, cy); scene.add(L); caveLights.push({ L, k: 1.1 }); }
+      at(0); const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), lampMat); lamp.position.set(cx, f.ceil - 0.35, cy); scene.add(lamp);
+      if (k % 15 === 0){ const L = new THREE.PointLight(0xffb468, 0, 26, 1.4); L.position.set(cx, f.ceil - 0.8, cy); scene.add(L); caveLights.push({ L, k: 1.1, lamp: true }); }
     }
   }
+  // the transport rooms: a steel bulkhead across the far end, with a doorway the portal fills; two generators
+  const wallMat = new THREE.MeshLambertMaterial({ color: 0x4a5462, side: THREE.DoubleSide }), frameMat = new THREE.MeshBasicMaterial({ color: 0xb79cff });
+  const genMat = new THREE.MeshLambertMaterial({ color: 0x5d6876 });
+  for (const T of TRANSPORT){
+    const b = CAVE_LEVEL, DW = 4.5, DH = 7.5;
+    const sh = new THREE.Shape(); sh.moveTo(-28, -4); sh.lineTo(28, -4); sh.lineTo(28, 36); sh.lineTo(-28, 36); sh.lineTo(-28, -4);
+    const hole = new THREE.Path(); hole.moveTo(-DW, 0); hole.lineTo(-DW, DH); hole.lineTo(DW, DH); hole.lineTo(DW, 0); hole.lineTo(-DW, 0); sh.holes.push(hole);
+    const toWorld = (geo, dx = 0) => { const p = geo.attributes.position; for (let v = 0; v < p.count; v++){ const u = p.getX(v), h = p.getY(v); p.setXYZ(v, PORTAL_X + dx, b + h, T.y + u); } geo.computeVertexNormals(); geo.computeBoundingSphere(); return geo; };
+    scene.add(new THREE.Mesh(toWorld(new THREE.ShapeGeometry(sh)), wallMat));
+    for (const [w, h, u, v] of [[0.5, DH + 0.5, -DW - 0.25, DH/2], [0.5, DH + 0.5, DW + 0.25, DH/2], [2*DW + 1, 0.5, 0, DH + 0.25]]){
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.6, h, w), frameMat); m.position.set(PORTAL_X + 0.1, b + v, T.y + u); scene.add(m);
+    }
+    const mem = new THREE.Mesh(toWorld(new THREE.PlaneGeometry(2*DW, DH).translate(0, DH/2, 0), 0.02), new THREE.MeshBasicMaterial({ color: 0x2c2238, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false }));
+    scene.add(mem); caveDress.membranes.push(mem);
+    for (const sd of [-1, 1]){
+      const gx = PORTAL_X + 10, gy = T.y + sd*11; caveField(gx, gy, f);
+      const g = new THREE.Group(); g.position.set(gx, f.floor, gy); scene.add(g);
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(3, 3.3, 8, 20), genMat); body.position.y = 4; g.add(body);
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(3.05, 3.05, 0.6, 20), new THREE.MeshBasicMaterial({ color: 0x3a3048 })); band.position.y = 6.2; g.add(band);
+      const band2 = band.clone(); band2.material = band.material; band2.position.y = 2.2; g.add(band2);
+      caveDress.gens.push(band.material); CAVE_SOLIDS.push({ x: gx, y: gy, r: 3.5 });
+    }
+  }
+  // the space station (for now): a ring of light-bridge deck in space, and a dock deck out to each portal
+  const deckMat = new THREE.MeshBasicMaterial({ color: 0xd8ccff, side: THREE.DoubleSide }), railMat = new THREE.MeshBasicMaterial({ color: 0xa47cff });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(STATION.R - STATION.hw, STATION.R + STATION.hw, 192, 1), deckMat); ring.rotation.x = -Math.PI/2; ring.position.set(STATION.x, STATION.h, STATION.y); scene.add(ring);
+  for (const r of [STATION.R - STATION.hw, STATION.R + STATION.hw]){ const t = new THREE.Mesh(new THREE.TorusGeometry(r, 0.07, 6, 192), railMat); t.rotation.x = Math.PI/2; t.position.set(STATION.x, STATION.h + 1.0, STATION.y); scene.add(t); }
+  for (const k of STATION.docks){
+    const len = PORTAL_X - k.x1, m = new THREE.Mesh(new THREE.PlaneGeometry(len, 2*STATION.dhw), deckMat); m.rotation.x = -Math.PI/2; m.position.set((PORTAL_X + k.x1)/2, STATION.h + 0.01, k.y); scene.add(m);
+    for (const sd of [-1, 1]){ const r = new THREE.Mesh(new THREE.BoxGeometry(len, 0.12, 0.12), railMat); r.position.set((PORTAL_X + k.x1)/2, STATION.h + 1.0, k.y + sd*STATION.dhw); scene.add(r); }
+  }
 }
-// the portal: two timber posts and a heavy lintel across the way in, braced, with a lantern on each post
+// the mine's portal: two timber posts and a heavy lintel across the way in, braced, with a lantern on each post
 {
   const wood = new THREE.MeshLambertMaterial({ color: 0x6b4b33 }), dark = new THREE.MeshLambertMaterial({ color: 0x4a3424 });
-  const lantern = new THREE.MeshBasicMaterial({ color: 0xffd08a });
   const g = new THREE.Group(); g.position.set(MINE.x, MINE.F0, MINE.y); scene.add(g);
   const add = (geo, mat, x, y, z, rx = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); g.add(m); return m; };
   for (const sd of [-1, 1]){
     add(new THREE.BoxGeometry(0.7, 7.2, 0.7), wood, 0, 2.8, sd*4.6);
-    add(new THREE.BoxGeometry(0.35, 2.6, 0.35), dark, 0.1, 4.6, sd*3.65, sd*0.62, 0);          // brace up to the lintel
-    add(new THREE.BoxGeometry(0.3, 0.45, 0.3), lantern, 0.45, 3.2, sd*4.15);
+    add(new THREE.BoxGeometry(0.35, 2.6, 0.35), dark, 0.1, 4.6, sd*3.65, sd*0.62, 0);
+    add(new THREE.BoxGeometry(0.3, 0.45, 0.3), lampMat, 0.45, 3.2, sd*4.15);
   }
   add(new THREE.BoxGeometry(0.9, 0.8, 11.2), wood, 0, 6.1, 0);
   add(new THREE.BoxGeometry(0.95, 0.12, 11.4), dark, 0, 6.55, 0);
 }
-let caveK = 0, caveCamK = 0, caveLit = false;
+// ---- the light underground and on the station, and how close in the camera comes
+let caveK = 0, caveCamK = 0, stationK = 0, caveLit = false;
 const CAVE_FOG = new THREE.Color(0x17141f), CAVE_SKY = new THREE.Color(0xa69be6), CAVE_GND = new THREE.Color(0x4f4878);
-const _cc = new THREE.Color();
+const _cc = new THREE.Color(), _hb = new THREE.Color(), _hg = new THREE.Color();
 function updateCave(dt){
-  // build the cave once you're close enough to see into it (a slice a frame)
-  if (Math.hypot(Math.max(CAVE_BOX.x0 - S.x, 0, S.x - CAVE_BOX.x1), Math.max(CAVE_BOX.y0 - S.y, 0, S.y - CAVE_BOX.y1)) < 120 || UNDER){
-    if (!caveRoof.done){ if (!caveRoof.job) caveRoof.job = buildCaveRoof(); if (run(caveRoof.job, 6)) caveRoof.job = null; }
-    else if (!caveJob){ const n = CAVE_TILE_KEYS.find(([i, j]) => !caveTiles.has(i + ',' + j)); if (n){ caveJob = buildCaveTile(n[0], n[1]); caveJobKey = n.join(','); } }
-    if (caveJob && run(caveJob, 6)){ caveJob = null; caveJobKey = null; }
-  }
-  // how far underground you are (for the light), and how close in the camera comes
-  let want = 0, camWant = 0;
-  if (UNDER){
+  const nearCave = Math.hypot(Math.max(CAVE_BOX.x0 - S.x, 0, S.x - CAVE_BOX.x1), Math.max(CAVE_BOX.y0 - S.y, 0, S.y - CAVE_BOX.y1)) < 120;
+  if (nearCave || UNDER){ if (!caveDress.done) buildCaveDressing(); updateCaveTiles(); }
+  const powered = cavePowered();
+  let want = 0, camWant = 0, stWant = 0;
+  if (UNDER && S.x < PORTAL_X) stWant = 1;
+  else if (UNDER){
     const f = caveField(S.x, S.y);
-    want = f.wT > 0.5 ? smooth01(1, 26, f.s) : 1;
-    camWant = Math.max(0.3, Math.min(1, (16 - (f.ceil - f.floor))/9));
+    want = f.shaftS < 30 ? smooth01(1, 26, f.shaftS) : 1;
+    camWant = Math.max(0.25, Math.min(1, (16 - (f.ceil - f.floor))/9));
+    if (powered) for (const T of TRANSPORT) stWant = Math.max(stWant, 0.4*smooth01(40, 2, Math.hypot(S.x - PORTAL_X, S.y - T.y)));
   } else {
     const sm = mineS(S.x), lat = Math.abs(S.y - MINE.y);
     if (sm > -36 && lat < 14) camWant = smooth01(-30, -4, sm);
   }
   caveK += (want - caveK) * Math.min(1, dt*1.5);
+  stationK += (stWant - stationK) * Math.min(1, dt*1.5);
   caveCamK += (camWant - caveCamK) * Math.min(1, dt*2);
-  const k = caveK;
-  for (const c of caveLights) c.L.intensity = c.k * k;
-  if (k > 0.002){
-    _cc.set(C.sky).lerp(CAVE_FOG, k); renderer.setClearColor(_cc); scene.fog.color.copy(_cc);
-    scene.fog.near = 55 + (14 - 55)*k; scene.fog.far = 270 + (150 - 270)*k;
-    const dark = new THREE.Color(C.sky).getHSL({}).l < 0.3;
-    hemi.intensity = (dark ? 0.55 : 0.75) + (0.62 - (dark ? 0.55 : 0.75))*k; sun.intensity = (dark ? 0.45 : 0.65)*(1 - 0.94*k);
-    hemi.color.set(0xffffff).lerp(CAVE_SKY, k); hemi.groundColor.set(0xa8c4d8).lerp(CAVE_GND, k);
+  const k = caveK, sk = stationK, pw = powered ? 1 : 0.15;
+  for (const c of caveLights) c.L.intensity = c.k * k * pw;
+  lampMat.color.setHex(powered ? 0xffd08a : 0x6b5a44);
+  for (const m of caveDress.gens) m.color.setHex(powered ? 0xb79cff : 0x3a3048);
+  for (const m of caveDress.membranes){ m.material.color.setHex(powered ? 0xb79cff : 0x2c2238); m.material.opacity = powered ? 0.18 : 0.95; }
+  if (k > 0.002 || sk > 0.002){
+    const dark = new THREE.Color(C.sky).getHSL({}).l < 0.3, h0 = dark ? 0.55 : 0.75, s0 = dark ? 0.45 : 0.65;
+    _cc.set(C.sky).lerp(CAVE_FOG, k).lerp(space.deep, sk); renderer.setClearColor(_cc); scene.fog.color.copy(_cc);
+    scene.fog.near = (55 + (14 - 55)*k)*(1 - sk) + 160*sk; scene.fog.far = (270 + (150 - 270)*k)*(1 - sk) + 700*sk;
+    hemi.intensity = (h0 + (0.62 - h0)*k)*(1 - sk) + 0.7*sk; sun.intensity = s0*(1 - 0.94*k)*(1 - sk) + 0.8*sk;
+    _hb.set(0xffffff).lerp(CAVE_SKY, k*(1 - sk)); _hg.set(0xa8c4d8).lerp(CAVE_GND, k*(1 - sk)); hemi.color.copy(_hb); hemi.groundColor.copy(_hg);
     caveLit = true;
   } else if (caveLit){
-    caveLit = false; applySkyColour(1); scene.fog.near = 55; scene.fog.far = 270;
+    caveLit = false;
+    if (space.k < 0.002){ applySkyColour(1); scene.fog.near = 55; scene.fog.far = 270; }
     const dark = new THREE.Color(C.sky).getHSL({}).l < 0.3;
     hemi.intensity = dark ? 0.55 : 0.75; sun.intensity = dark ? 0.45 : 0.65; hemi.color.set(0xffffff); hemi.groundColor.set(0xa8c4d8);
   }
@@ -6899,17 +7079,33 @@ function updateCave(dt){
 // underground, keep the camera inside the cave: pulled in toward you from any wall, and between the floor and the roof
 function caveCamClamp(){
   const p = camera.position, inWay = Math.abs(p.z - MINE.y) < 20 && mineS(p.x) > -8;
-  if (!UNDER && !inWay) return;
+  if ((!UNDER && !inWay) || S.x < PORTAL_X || p.x < PORTAL_X) return;
   const f = {};
   let cx = p.x, cz = p.z;
   caveField(cx, cz, f);
   if (f.d > -1.1){
-    let lo = 0, hi = 1;                                           // 0 = at the skier, 1 = where the camera wanted to be
+    let lo = 0, hi = 1;
     for (let it = 0; it < 14; it++){ const m = (lo + hi)/2; caveField(S.x + (cx - S.x)*m, S.y + (cz - S.y)*m, f); if (f.d <= -1.1) lo = m; else hi = m; }
     cx = S.x + (cx - S.x)*lo; cz = S.y + (cz - S.y)*lo;
     caveField(cx, cz, f);
   }
   p.set(cx, Math.max(f.floor + 1.0, Math.min(f.ceil - 0.7, p.y)), cz);
+}
+// the map: the cave's floor plan, as a faint fill (built once, the first time the map is drawn)
+let caveMapMask = null;
+const CAVE_MAP_BOX = { x0: -1030, x1: 0, y0: -20, y1: 620 };
+function caveMask(){
+  if (caveMapMask) return caveMapMask;
+  const st = 3, B = CAVE_MAP_BOX, w = Math.ceil((B.x1 - B.x0)/st), h = Math.ceil((B.y1 - B.y0)/st);
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const cx = cv.getContext('2d'), im = cx.createImageData(w, h), f = {};
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++){
+    const x = B.x0 + (i + 0.5)*st, y = B.y0 + (j + 0.5)*st;
+    const inside = x < PORTAL_X ? stationD(x, y) < 0 : (x <= MINE.x && caveField(x, y, f).d < 0);
+    if (inside){ const o = (j*w + i)*4; im.data[o] = 120; im.data[o+1] = 130; im.data[o+2] = 150; im.data[o+3] = 110; }
+  }
+  cx.putImageData(im, 0, 0);
+  return (caveMapMask = { cv, st });
 }
 function loop(t){
   // the simulation runs in steps of at most 1/60 s however slowly the page draws (phones often manage 30 fps or less),
@@ -6932,15 +7128,17 @@ function loop(t){
 loadProgress(); applyRegalia(); calfUI();
 // the cave sandbox: every visit starts on the Mine Road, a little way out from the mine, facing in
 function caveSpawn(where){
-  if (where === 'hall'){ spawnAt(-102, 244, Math.PI); UNDER = true; }
+  if (where === 'hall'){ spawnAt(CAVE_C.x + 8, CAVE_C.y, Math.PI/2); UNDER = true; }
+  else if (where === 'station'){ spawnAt(STATION.x + STATION.R, STATION.y, 0); UNDER = true; }
   else { UNDER = false; const a = [22, 283], b = [4, 293]; spawnAt(a[0], a[1], Math.atan2(b[0] - a[0], -(b[1] - a[1]))); }
   clearTracks();
 }
 caveSpawn('mouth');
 $('caveMouth').addEventListener('click', () => caveSpawn('mouth'));
 $('caveHall').addEventListener('click', () => caveSpawn('hall'));
+$('caveStation').addEventListener('click', () => caveSpawn('station'));
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { caveField, caveFloor, caveSD, CAVE_TRAILS, TUN, MINE, CHAMBERS, CAVE_BOX, caveTiles, caveRoof, caveSpawn, mineCut, mineRidge, heightNat, get UNDER(){ return UNDER; }, set UNDER(v){ UNDER = v; }, get caveK(){ return caveK; }, CAVE_SOLIDS, pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get bridge2Down(){ return bridge2Down; }, SPUR_PASS, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { caveField, caveFloor, caveSD, CAVE_TRAILS, SHAFT, HALLS, ROOMS, SPOKES, STATION, TRANSPORT, PORTAL_X, stationD, cavePowered, get stationK(){ return stationK; }, caveDress, MINE, CAVE_BOX, caveTiles, caveSpawn, mineCut, mineRidge, heightNat, get UNDER(){ return UNDER; }, set UNDER(v){ UNDER = v; }, get caveK(){ return caveK; }, CAVE_SOLIDS, caveMask, pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get bridge2Down(){ return bridge2Down; }, SPUR_PASS, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

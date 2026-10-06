@@ -310,7 +310,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <div class="btns"><button id="copySet" type="button">Copy settings</button><button id="defSet" type="button">Restore defaults</button></div>
     <p class="note" id="setNote">Your slider changes are kept in this browser.</p>
     <h4>Testing</h4>
-    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button><button id="cpAltar" type="button">Checkpoint: altar</button></div>
+    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button><button id="arrowBtn" type="button">Heading arrow: off</button><button id="cpAltar" type="button">Checkpoint: altar</button></div>
     <label for="tOrb1">Zone 1 terminals powered<output id="oOrb1"></output><input id="tOrb1" type="range" min="0" max="2" step="1" value="0"></label>
     <label for="tOrb2">Zone 2 terminals powered<output id="oOrb2"></output><input id="tOrb2" type="range" min="0" max="3" step="1" value="0"></label>
     <label for="tOrb3">Zone 3 terminals powered<output id="oOrb3"></output><input id="tOrb3" type="range" min="0" max="5" step="1" value="0"></label>
@@ -402,8 +402,8 @@ const legFlash = { L:0, R:0 };
 const WORLD = { x0:-170, x1:490, y0:-230, y1:790 };
 // zone 5: hidden beyond the map's south mountains, reached only by a hidden energy bridge. a small plateau with the
 // alien observatory, ending at a sheer cliff over open space. the ground tiles reach this far south to cover it
-const Z5 = { x0: 80, x1: 400, y0: 812, cliff: 905, h: 16 };
-const TILE_WORLD = { x0: WORLD.x0, x1: WORLD.x1, y0: WORLD.y0, y1: 960 };
+const Z5 = { x0: 80, x1: 400, y0: 812, cliff: 965, h: 50 };     // a high plateau, level with the mountain tops
+const TILE_WORLD = { x0: WORLD.x0, x1: WORLD.x1, y0: WORLD.y0, y1: 1030 };
 // the divide: a mountain wall across the whole map between zone 3 and zone 4 (further south, the same size again).
 // one notch through it, south of the broken circle, holds the great crystal gate
 function divideY(x){ return 470 + 8*Math.sin(x/53) + 5*Math.sin(x/23 + 1); }
@@ -509,23 +509,16 @@ function zone4Height(x, y){
 function riverCut(x, y){ return -2.6 * (1 - smooth01(RIVER_HW - 1, RIVER_BANK + 4, Math.abs(y - riverY(x)))); }
 // zone 5's ground: the south mountain band carries on past the map's edge and comes down onto the plateau, walled in
 // at the sides; the plateau ends at the cliff, which drops away hundreds of metres
-// the hidden way's pass: a notch cut through the mountains between zones 4 and 5, straight down the line of the court,
-// so the bridge can come down gently onto the plateau. from zone 4 it's a steep bank you can't ski up
-function passCut(x, y, h){
-  if (y < 745 || y > 840) return h;
-  const w = (1 - smooth01(12, 34, Math.abs(x - 250))) * smooth01(745, 768, y);
-  return h + (Math.min(h, Z5.h + 0.5) - h) * w;
-}
 function zone5Height(x, y){
   const ridge = 48 + 9*Math.sin(x/17 + y/23) + 6*Math.sin((x - y)/11);
   const t = smooth01(WORLD.y1, Z5.y0 + 12, y);
   const side = 1 - smooth01(Z5.x0 - 10, Z5.x0 + 30, x) * smooth01(Z5.x1 + 10, Z5.x1 - 30, x);
   const plateau = Z5.h + 1.6*Math.sin(x/19)*Math.cos(y/13) + 0.8*Math.sin((x + y)/9);
   let h = ridge*(1 - t) + plateau*t;
-  h += (ridge + 12 - h) * side;
-  h = passCut(x, y, h);
+  h += 6*Math.sin(Math.PI*t);                                    // a crest between zone 4's mountains and the plateau
+  h += (Math.max(ridge, Z5.h) + 14 - h) * side;
   // the court: dead level from the foot of the pass past the ring and the trio to the observatory
-  { const dx = Math.abs(x - 250); if (dx < 40 && y < 880){ const w = (1 - smooth01(26, 40, dx)) * (1 - smooth01(866, 880, y)) * smooth01(796, 812, y); h += (Z5.h - h) * w; } }
+  { const dx = Math.abs(x - 250); if (dx < 40 && y < 940){ const w = (1 - smooth01(26, 40, dx)) * (1 - smooth01(926, 940, y)) * smooth01(850, 866, y); h += (Z5.h - h) * w; } }
   // a promontory: past its side walls the ground falls away too, so out in space you see one cliff face, not the map's edge
   const sideK = smooth01(Z5.y0 + 10, Z5.y0 + 40, y);
   const drop = Math.max(smooth01(Z5.cliff - 3, Z5.cliff + 30, y), smooth01(Z5.x0 - 22, Z5.x0 - 55, x)*sideK, smooth01(Z5.x1 + 22, Z5.x1 + 55, x)*sideK);
@@ -545,7 +538,7 @@ function heightNat(x, y){
   // the lake: flattened to an ice sheet, the shore easing down to it
   const q = lakeQ(x, y);
   if (q < 1.35) h += (LAKE.h - h) * (1 - smooth01(0.98, 1.35, q));
-  return passCut(x, y, h);
+  return h;
 }
 // the switchbacks: below the saddle the mountainside is reshaped into an even slope, and each leg of the trail is cut
 // into it as a level-across bench at the trail's own height. SWB is filled in once the trail exists (see below).
@@ -4374,10 +4367,10 @@ const SKY = (() => {
     z2: { ground: true, x: 430, y: -52 }, z3: { ground: true, x: 430, y: 430 },
     // the hidden way: from under the standing giant's belly, south over the mountains to zone 5
     g5: { ground: true, hidden: true, ...(() => { const v = new THREE.Vector3(); giant.rig.body.getWorldPosition(v); return { x: v.x, y: v.z }; })() },
-    z5: { ground: true, hidden: true, x: 250, y: 820 },
+    z5: { ground: true, hidden: true, x: 250, y: 880 },
     // the Starway: out from the cliff into space, through the planet, and back to the cliff
-    s1: { ground: true, hidden: true, x: 250, y: 851 },
-    bh: { blackhole: true, hidden: true, ...(() => { const a = (-90 + 24*30)*Math.PI/180; return { x: 250 + Math.cos(a)*14, y: 1250 + Math.sin(a)*14, h: 10 }; })() },
+    s1: { ground: true, hidden: true, x: 250, y: 911 },
+    bh: { blackhole: true, hidden: true, ...(() => { const a = (-90 + 24*30)*Math.PI/180; return { x: 250 + Math.cos(a)*14, y: 1250 + Math.sin(a)*14, h: 44 }; })() },
   };
   for (const k in N){ const n = N[k]; n.id = k; if (n.ground) n.h = height(n.x, n.y) + 0.05; }
   // decks: node to node through control points [x, y, h] (h is a target; clearance over the terrain is added below)
@@ -4397,20 +4390,22 @@ const SKY = (() => {
     { name: 'Zone 3 ramp', a: 'J4', b: 'z3', pts: [[300, 385, 21], [340, 398, 14], [380, 410, 7], [410, 422, 2]] },
     // the hidden way: out between the giant's legs toward its head, round and up along the south mountains' flank,
     // over the ridge, and down onto the plateau
-    // the hidden way: out between the giant's legs, east over zone 4 and round to head due south, through the pass and
-    // down onto the plateau, lined up with the ring, the observatory and the planet
-    { name: 'Hidden way', a: 'g5', b: 'z5', hidden: true, pts: [[134, 616, 1], [124, 640, 4], [150, 668, 10], [200, 684, 17], [238, 702, 21], [250, 728, 22], [250, 762, 21], [250, 796, 19]] },
+    // the hidden way: out between the giant's legs, a long sweeping climb east and round over zone 4, up to the
+    // mountain tops, then due south over the crest and down onto the high plateau, lined up with the ring, the
+    // observatory and the planet
+    { name: 'Hidden way', a: 'g5', b: 'z5', hidden: true, pts: [[134, 616, 1], [124, 640, 4], [150, 672, 10], [205, 690, 18], [270, 684, 26], [330, 694, 34], [362, 722, 42], [350, 752, 50],
+      [310, 764, 57], [268, 772, 58], [252, 792, 59], [250, 815, 58], [250, 845, 54], [250, 868, 51]] },
     // the Starway: off the cliff's lip and out over the void, a long climb straight through the planet's heart, out
     // the far side, round past its rings and back in to the cliff east of the observatory. no pylons out here
     // the Starway, the last bridge: off the cliff's lip, over the void, into the planet, then round and down a funnel
     // of light in two narrowing turns to the black hole at the bottom
     // the Starway: from a portal just past the ring of diamonds, up over the observatory's tiers, through its hall and
     // out over the cliff, straight on to the planet and into it, spiralling down to the black hole
-    { name: 'Starway', a: 's1', b: 'bh', hidden: true, space: true, final: true, obs: true, pts: [...(() => { const g0 = height(250, 882) - 0.6; return [[250, 863, g0 + 2.9], [250, 872, g0 + 4.7], [250, 882, g0 + 4.8], [250, 892, g0 + 5.0], [250, 906, g0 + 6.3]]; })(),
-      [250, 960, 24], [249, 1050, 34], [244, 1130, 46], [246, 1195, 55],
+    { name: 'Starway', a: 's1', b: 'bh', hidden: true, space: true, final: true, obs: true, pts: [...(() => { const g0 = height(250, 942) - 0.6; return [[250, 923, g0 + 2.9], [250, 932, g0 + 4.7], [250, 942, g0 + 4.8], [250, 952, g0 + 5.0], [250, 966, g0 + 6.3]]; })(),
+      [250, 1010, 64], [249, 1070, 72], [244, 1135, 82], [246, 1195, 89],
       // the spiral: two turns closing from 50 m to 8 m across, dropping evenly along its length (not per turn, or the
       // tight inner turns would plunge)
-      ...(() => { const R = t => 50 - 36*t, tot = 24*(50 + 14)/2, out = []; for (let k = 1; k < 24; k++){ const t = k/24, a = (-90 + k*30)*Math.PI/180, done = k*(50 + R(t))/2; out.push([250 + Math.cos(a)*R(t), 1250 + Math.sin(a)*R(t), 55 - 45*done/tot]); } return out; })()] },
+      ...(() => { const R = t => 50 - 36*t, tot = 24*(50 + 14)/2, out = []; for (let k = 1; k < 24; k++){ const t = k/24, a = (-90 + k*30)*Math.PI/180, done = k*(50 + R(t))/2; out.push([250 + Math.cos(a)*R(t), 1250 + Math.sin(a)*R(t), 89 - 45*done/tot]); } return out; })()] },
   ];
   // sample each deck: a centripetal-ish Catmull-Rom through its control points, every ~2 m
   // the ground under a deck and a little way either side, so a deck crossing a ridge rides over it rather than through a cut
@@ -4438,7 +4433,7 @@ const SKY = (() => {
       const tx = X[Math.min(n - 1, i + 1)] - X[Math.max(0, i - 1)], ty = Y[Math.min(n - 1, i + 1)] - Y[Math.max(0, i - 1)], l = Math.hypot(tx, ty) || 1;
       const gEnd = Math.min(A.ground ? cum[i] : 1e9, B.ground ? cum[n-1] - cum[i] : 1e9);
       req[i] = terr(X[i], Y[i], tx/l, ty/l, gEnd > 90) + (gEnd < 4 ? 0.05 : gEnd < 30 ? 0.05 + (gEnd - 4)/26*3.4 : 3.5);
-      if (d.obs){ const r = Math.hypot(X[i] - 250, Y[i] - 882); if (r < 24) req[i] = Math.max(req[i], height(250, 882) - 0.6 + (r < 10.5 ? 4.6 : 4.6 - (r - 10.5)*0.2)); }   // one even ramp up over the tiers
+      if (d.obs){ const r = Math.hypot(X[i] - 250, Y[i] - 942); if (r < 24) req[i] = Math.max(req[i], height(250, 942) - 0.6 + (r < 10.5 ? 4.6 : 4.6 - (r - 10.5)*0.2)); }   // one even ramp up over the tiers
     }
     // raise to clear the ground, then smooth, over and over: the profile settles into a smooth curve resting on the
     // ground's high points instead of kinking up over each one
@@ -4642,7 +4637,7 @@ function updateSky(dt){
 // crystal, a domed hall with a lit slit, and a great ribbed telescope of bone pointing out over the cliff into space,
 // a crystal lens at its mouth. purple crystal grows everywhere on the plateau, and the natives here, in bright robes,
 // play music: drums, long horns, harps and crystal chimes. no people from the outpost have ever come this far
-const Z5_TEMPLE = { x: 250, y: 882 };
+const Z5_TEMPLE = { x: 250, y: 942 };
 const zone5 = (() => {
   const T = Z5_TEMPLE, h0 = height(T.x, T.y);
   const g = new THREE.Group(); g.position.set(T.x, h0 - 0.6, T.y); scene.add(g);
@@ -4680,7 +4675,7 @@ function nearDeck(x, y, r){ for (let i = 0; i < Z5_DECKPTS.length; i += 2) if (M
   for (let k = 0; k < 900 && placed.length < 110; k++){
     const x = Z5.x0 + 16 + rnd()*(Z5.x1 - Z5.x0 - 32), y = Z5.y0 + 8 + rnd()*(Z5.cliff - Z5.y0 - 6);
     const size = 0.5 + rnd()*rnd()*2.4;
-    if (Math.hypot(x - Z5_TEMPLE.x, y - Z5_TEMPLE.y) < 19 + size || Math.hypot(x - 150, y - 853) < 9 || (Math.abs(x - 250) < 30 + size && y < 870) || nearDeck(x, y, 7 + size*1.5)) continue;
+    if (Math.hypot(x - Z5_TEMPLE.x, y - Z5_TEMPLE.y) < 19 + size || Math.hypot(x - 150, y - 853) < 9 || (Math.abs(x - 250) < 30 + size && y < 930) || nearDeck(x, y, 7 + size*1.5)) continue;
     if (placed.some(p => Math.hypot(p.x - x, p.y - y) < 4 + (p.size + size)*1.2)) continue;
     placed.push({ x, y, size });
     const c = new THREE.Group(); c.position.set(x, height(x, y) - 0.2, y); c.rotation.y = rnd()*6.3; src.add(c);
@@ -4726,9 +4721,9 @@ const MUSICIANS = (() => {
 // over and dress it in a drape and crown of its own, and there it stays for good. when the third calf is crowned the
 // other three diamonds appear, the elders walk into the ring onto them, and the Starway wakes. calves past the
 // third join the court too, standing to the east
-const TRIO = { x: 250, y: 843 }, RING6 = { x: 250, y: 831, r: 6.5 }, DIAMONDS = 3;
+const TRIO = { x: 250, y: 903 }, RING6 = { x: 250, y: 891, r: 6.5 }, DIAMONDS = 3;
 const CALF_D = [0, 2, 4], ELDER_D = [1, 3, 5];     // diamond k sits at k × 60° round the ring (0 = east), so north and south stay open
-const GOLD = lam(0xe6bf4f); GOLD.flatShading = true;
+const GOLD = lam(0xe6bf4f); GOLD.flatShading = true; const GOLD_2S = GOLD.clone(); GOLD_2S.side = THREE.DoubleSide;
 const ROYAL = 0x7b3fe0, ROYAL_MAT = lam(ROYAL); ROYAL_MAT.flatShading = true;      // the trio's leader wears it, and so do you once you've been through the black hole
 const DRAPES = [0xd9468f, 0x2bb3a3, 0xf0a83a, 0xe0533d, 0x3f8fe0].map(c => { const m = lam(c); m.flatShading = true; return m; });
 const DG = {
@@ -4746,21 +4741,26 @@ function dressMoose(rig, k, mat){
     const e = new THREE.Mesh(DG.emblem, GOLD); e.position.set(sx*0.9, 0.28, 0); e.scale.set(0.05, 0.3, 0.22); drape.add(e);
     for (const sz of [-1, 1]){ const t = new THREE.Mesh(DG.tassel, GOLD); t.position.set(sx*0.62, -0.32, sz*1.15); drape.add(t); }
   }
-  const crown = new THREE.Group(); crown.position.set(0, 0.56, -0.92); rig.head.add(crown);
-  crown.add(new THREE.Mesh(DG.band, GOLD)).position.y = 0.1;
+  const crown = buildCrown(); crown.position.set(0, 0.56, -0.92); rig.head.add(crown);
+  return { drape, crown };
+}
+function buildCrown(){
+  // the court's crown: a gold band, six spikes tipped with gold beads, and a crystal diamond at the brow (facing -z)
+  const crown = new THREE.Group();
+  const band = new THREE.Mesh(DG.band, GOLD_2S); band.position.y = 0.1; crown.add(band);
   for (let i = 0; i < 6; i++){
     const a = i/6*Math.PI*2, s = new THREE.Mesh(DG.spike, GOLD); s.position.set(Math.sin(a)*0.27, 0.3, -Math.cos(a)*0.27); crown.add(s);
     const kb = new THREE.Mesh(DG.knob, GOLD); kb.position.set(Math.sin(a)*0.27, 0.43, -Math.cos(a)*0.27); crown.add(kb);
   }
   const gem = new THREE.Mesh(DG.emblem, CRYSTAL_MAT.gem); gem.position.set(0, 0.13, -0.3); gem.scale.set(0.08, 0.12, 0.05); crown.add(gem);
-  return { drape, crown };
+  return crown;
 }
 const facingTo = (x, y, tx, ty) => Math.atan2(tx - x, -(ty - y));
 // where each calf stands: its diamond, or past the third, rows to the east
 function diamondPos(k){ const a = k/6*Math.PI*2; return [RING6.x + Math.cos(a)*RING6.r, RING6.y + Math.sin(a)*RING6.r]; }
 function slotPos(k){
   if (k < DIAMONDS) return diamondPos(CALF_D[k]);
-  const j = k - DIAMONDS; return [268 + Math.floor(j/5)*3.4, 822 + (j % 5)*3];
+  const j = k - DIAMONDS; return [268 + Math.floor(j/5)*3.4, 882 + (j % 5)*3];
 }
 const court = (() => {
   const g = new THREE.Group(); scene.add(g);
@@ -4783,7 +4783,7 @@ const court = (() => {
     g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xb8a35a }))); }
   // the elders: a little smaller than the herd's grown moose, across the way to the Starway, facing the ring. each
   // has its diamond in the ring and a way round the calves to it
-  const trio = [[-4.2, 0, 3, [[239, 839]]], [0, -1, 1, []], [4.2, 1, 5, [[261, 839], [260, 827]]]].map(([dx, k, dk, via], i) => {
+  const trio = [[-4.2, 0, 3, [[239, 899]]], [0, -1, 1, []], [4.2, 1, 5, [[261, 899], [260, 887]]]].map(([dx, k, dk, via], i) => {
     const rig = buildMoose(false), x = TRIO.x + dx, y = TRIO.y; rig.root.scale.setScalar(0.85);
     rig.root.position.set(x, height(x, y), y);
     const d = dressMoose(rig, k, k < 0 ? ROYAL_MAT : null); if (k < 0) d.crown.scale.setScalar(1.25);
@@ -4797,7 +4797,7 @@ const court = (() => {
 const ATTEND = (() => {
   let seed = 4040; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const white = lam(0xf1ece0), white2 = lam(0xd4ccba); white.flatShading = white2.flatShading = true;
-  return [[239.5, 830], [260.5, 830]].map(([x, y], i) => {
+  return [[239.5, 890], [260.5, 890]].map(([x, y], i) => {
     const rig = buildAlien(rnd);
     rig.root.traverse(o => { if (!o.isMesh) return; if (o.material === NPC_MAT.robe) o.material = white; else if (o.material === NPC_MAT.robe2) o.material = white2; else if (o.material === NPC_MAT.sash) o.material = GOLD; });
     pt(rig.arms[i], cy(0.02, 0.02, 1.5, 6), GOLD, 0, -0.5, 0);                // a slim gold staff
@@ -5010,7 +5010,7 @@ const space = (() => {
   // inside it glows violet all round
   const world = new THREE.Group(); world.visible = false; scene.add(world);
   pm.side = THREE.DoubleSide;
-  const planet = new THREE.Mesh(new THREE.SphereGeometry(70, 48, 28), pm); planet.position.set(250, 60, 1250); planet.rotation.z = 0.35; world.add(planet);
+  const planet = new THREE.Mesh(new THREE.SphereGeometry(70, 48, 28), pm); planet.position.set(250, 94, 1250); planet.rotation.z = 0.35; world.add(planet);
   const inner = new THREE.Mesh(new THREE.SphereGeometry(69, 32, 20), new THREE.MeshBasicMaterial({ color: 0x8e7cb0, side: THREE.BackSide, transparent: true, opacity: 0, fog: false, depthWrite: false })); inner.position.copy(planet.position); world.add(inner);
   const rm = new THREE.MeshBasicMaterial({ color: 0xd8cff0, transparent: true, opacity: 0, side: THREE.DoubleSide, fog: false, depthWrite: false });
   const ringM = new THREE.Mesh(new THREE.RingGeometry(92, 128, 80), rm); ringM.position.copy(planet.position); ringM.rotation.set(1.25, 0.15, 0.35); world.add(ringM);
@@ -5022,19 +5022,25 @@ const space = (() => {
 // ---- inside the planet: the Starway spirals down a glowing funnel into a black hole at its throat. a dark sphere in
 // a white-violet accretion disk and halo, the funnel's stripes streaming inward
 const blackHole = (() => {
-  const C0 = { x: 250, y: 0, z: 1250 };
+  const C0 = { x: 250, y: 34, z: 1250 };
   const canvasTex = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); return t; };
-  // the funnel: a lathe just under the spiral deck (which drops ~1.07 m for every metre it closes in)
-  // (the deck drops about 1.25 m per metre it closes in, ending 14 m out); inside that it curls down into the throat
-  const prof = []; for (let k = 0; k <= 28; k++){ const r = 3.2 + k*1.9; prof.push(new THREE.Vector2(r, r >= 14 ? 1.25*r - 10.9 : -1.5 + (r - 3.2)*0.75)); }
+  // the funnel: a lathe read off the spiral deck itself, so at every radius it sits just under the lowest bit of deck
+  // within reach: it meets the deck's outer edge and stays below the rest. inside the last turn it curls down into
+  // the throat
+  const sw = SKY.decks.find(d => d.name === 'Starway'), samp = [];
+  for (let i = 0; i < sw.n; i++){ const r = Math.hypot(sw.X[i] - C0.x, sw.Y[i] - C0.z); if (r < 58) samp.push([r, sw.H[i]]); }
+  const under = r => { let m = Infinity; for (const [rr, hh] of samp) if (Math.abs(rr - r) < SKY_W/2 + 0.4) m = Math.min(m, hh); return m - 0.5; };
+  const prof = [], rIn = 14 - SKY_W/2, yIn = under(rIn);
+  for (let k = 0; k <= 8; k++){ const r = 3.2 + (rIn - 3.2)*k/8, u = k/8; prof.push(new THREE.Vector2(r, C0.y - 1.5 + (yIn - C0.y + 1.5)*u*u)); }
+  for (let r = rIn + 1; r <= 56; r += 1){ const y = under(r); if (!isFinite(y)) break; prof.push(new THREE.Vector2(r, Math.max(y, prof[prof.length - 1].y))); }
   const stripes = canvasTex(256, 128, (x, w, h) => {
     x.fillStyle = 'rgba(92,70,150,0.35)'; x.fillRect(0, 0, w, h);
     for (let i = 0; i < 10; i++){ const x0 = i/10*w; x.strokeStyle = i % 2 ? 'rgba(52,36,104,0.9)' : 'rgba(255,255,255,0.8)'; x.lineWidth = i % 2 ? 12 : 4;
       for (const o of [-w, 0, w]){ x.beginPath(); x.moveTo(x0 + o, 0); x.lineTo(x0 + o + w*0.35, h); x.stroke(); } }
   });
-  stripes.wrapS = stripes.wrapT = THREE.RepeatWrapping; stripes.repeat.set(4, 3);
+  stripes.wrapS = stripes.wrapT = THREE.RepeatWrapping; stripes.repeat.set(6, 4);
   const fm = new THREE.MeshBasicMaterial({ map: stripes, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, fog: false });
-  const funnel = new THREE.Mesh(new THREE.LatheGeometry(prof, 64), fm); funnel.position.set(C0.x, 0, C0.z); space.world.add(funnel);
+  const funnel = new THREE.Mesh(new THREE.LatheGeometry(prof, 72), fm); funnel.position.set(C0.x, 0, C0.z); space.world.add(funnel);
   // the hole, its disk and its glow
   const hole = new THREE.Mesh(new THREE.SphereGeometry(3, 28, 18), new THREE.MeshBasicMaterial({ color: 0x000000, fog: false })); hole.position.set(C0.x, C0.y, C0.z); space.world.add(hole);
   const diskTex = canvasTex(256, 256, (x, w) => {
@@ -5052,14 +5058,58 @@ const blackHole = (() => {
   space.mats.push([fm, 0.9], [dm, 1], [hm, 0.8]);
   // drawn over the planet's shell, so only shown from inside it
   funnel.renderOrder = 1; disk.renderOrder = 2; halo.renderOrder = 2;
-  return { funnel, stripes, disk, halo, centre: new THREE.Vector3(250, 60, 1250) };
+  return { funnel, stripes, disk, halo, centre: new THREE.Vector3(250, 94, 1250), shell: space.world.children[0].material };
 })();
+const _bhv = new THREE.Vector3();
 function updateBlackHole(dt){
   if (!space.world.visible) return;
-  const inside = camera.position.distanceTo(blackHole.centre) < 69;
+  // once you're inside the planet its shell is drawn from the inside only, so it never hides you from a camera that
+  // hasn't caught up yet
+  _bhv.set(S.x, ground(S.x, S.y) + 1, S.y);
+  const you = _bhv.distanceTo(blackHole.centre) < 71, inside = you || camera.position.distanceTo(blackHole.centre) < 69;
+  blackHole.shell.side = you ? THREE.BackSide : THREE.DoubleSide;
   blackHole.funnel.visible = blackHole.disk.visible = blackHole.halo.visible = inside; if (!inside) return;
   blackHole.stripes.offset.x += dt*0.05; blackHole.stripes.offset.y -= dt*0.35;      // streaming down and round
   blackHole.disk.rotation.z += dt*0.8;
+}
+// ---- fireworks: while you ride the Starway, bursts of colour open in the sky ahead and around you
+const fireworks = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d');
+  const g = x.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.7)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 32, 32);
+  return { tex: new THREE.CanvasTexture(c), list: [], t: 0, cols: [0xb48cff, 0xf2d36b, 0xff6fb5, 0x5fe0cf, 0xffffff, 0x8fb4ff, 0xff9a5c] };
+})();
+function fireworkBurst(cx, cy, cz){
+  const F = fireworks, N = 90, pos = new Float32Array(N*3), vel = new Float32Array(N*3), sp = 9 + Math.random()*8;
+  for (let i = 0; i < N; i++){
+    const u = Math.random()*2 - 1, a = Math.random()*Math.PI*2, r = Math.sqrt(1 - u*u), v = sp*(0.85 + Math.random()*0.3);
+    pos.set([cx, cy, cz], i*3); vel.set([Math.cos(a)*r*v, u*v, Math.sin(a)*r*v], i*3);
+  }
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({ map: F.tex, color: F.cols[(Math.random()*F.cols.length) | 0], size: 2.6, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 5; scene.add(pts);
+  F.list.push({ pts, pos, vel, age: 0, life: 1.8 + Math.random()*0.6 });
+  if (F.list.length > 16){ const o = F.list.shift(); scene.remove(o.pts); o.pts.geometry.dispose(); o.pts.material.dispose(); }
+}
+function updateFireworks(dt){
+  const F = fireworks;
+  if (SKY_ON && SKY_ON.d.final){
+    F.t -= dt;
+    if (F.t <= 0){
+      F.t = 0.3 + Math.random()*0.55;
+      const v = Math.hypot(S.vx, S.vy), fx = v > 1 ? S.vx/v : Math.sin(S.th), fy = v > 1 ? S.vy/v : -Math.cos(S.th);
+      const ahead = 28 + Math.random()*45, side = (Math.random() < 0.5 ? -1 : 1)*(12 + Math.random()*45);
+      fireworkBurst(S.x + fx*ahead - fy*side, ground(S.x, S.y) + 3 + Math.random()*16, S.y + fy*ahead + fx*side);
+    }
+  }
+  for (let k = F.list.length - 1; k >= 0; k--){
+    const b = F.list[k]; b.age += dt;
+    if (b.age > b.life){ scene.remove(b.pts); b.pts.geometry.dispose(); b.pts.material.dispose(); F.list.splice(k, 1); continue; }
+    const drag = Math.pow(0.35, dt);
+    for (let i = 0; i < b.pos.length; i += 3){ b.vel[i] *= drag; b.vel[i+1] = b.vel[i+1]*drag - 5*dt; b.vel[i+2] *= drag; b.pos[i] += b.vel[i]*dt; b.pos[i+1] += b.vel[i+1]*dt; b.pos[i+2] += b.vel[i+2]*dt; }
+    b.pts.geometry.attributes.position.needsUpdate = true;
+    const u = b.age/b.life; b.pts.material.opacity = u < 0.6 ? 1 : 1 - (u - 0.6)/0.4; b.pts.material.size = 2.6*(1 - 0.4*u);
+  }
 }
 // ---- the end of the Starway: go back to the observatory, or give everything back and start again
 let bhShown = false;
@@ -5073,7 +5123,7 @@ function confirmReset(){
 }
 function returnToObservatory(){
   SKY_ON = null; bhShown = false;
-  spawnAt(250, 821, Math.PI);                                      // at the foot of the hidden way, looking down the line
+  spawnAt(250, 881, Math.PI);                                      // at the foot of the hidden way, looking down the line
   toast('You are back at the observatory.');
 }
 function resetAll(){
@@ -5168,6 +5218,10 @@ const skiMat = new THREE.MeshLambertMaterial({ color: 0x2c3a49, polygonOffset: t
 const poleMat = new THREE.MeshLambertMaterial({ color: 0x8a939c });
 const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 12), skierMat);
 arrow.rotation.x = -Math.PI/2; arrow.position.set(0, 0.06, -1.3); skier.add(arrow);
+// the heading arrow on the snow is off unless you turn it on (dev view, Testing); the choice is kept in this browser
+{ let on = false; try { on = localStorage.getItem('skate-arrow') === '1'; } catch (e) {}
+  const set = v => { on = v; arrow.visible = v; $('arrowBtn').textContent = 'Heading arrow: ' + (v ? 'on' : 'off'); try { localStorage.setItem('skate-arrow', v ? '1' : '0'); } catch (e) {} };
+  set(on); $('arrowBtn').addEventListener('click', () => set(!on)); }
 const rig = new THREE.Group(); scene.add(rig);                  // the body, turned to the torso's heading
 const limb = (r, mat) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 1, 8), mat); rig.add(m); return m; };
 const UP = new THREE.Vector3(0, 1, 0), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3();
@@ -5187,10 +5241,7 @@ const body = {
 rig.add(body.head, body.hat, body.ski.L, body.ski.R);
 const regalia = (() => {
   const gold = new THREE.MeshLambertMaterial({ color: 0xe6bf4f }); gold.flatShading = true;
-  const crown = new THREE.Group(); crown.position.y = 0.05; body.hat.add(crown);
-  { const g2 = gold.clone(); g2.side = THREE.DoubleSide; crown.add(new THREE.Mesh(new THREE.CylinderGeometry(0.122, 0.116, 0.06, 14, 1, true), g2)); }
-  for (let i = 0; i < 6; i++){ const a = i/6*Math.PI*2, s = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.06, 5), gold); s.position.set(Math.sin(a)*0.12, 0.055, -Math.cos(a)*0.12); crown.add(s); }
-  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), CRYSTAL_MAT.gem); gem.position.set(0, 0.005, -0.126); gem.scale.set(0.024, 0.036, 0.012); crown.add(gem);
+  const crown = buildCrown(); crown.scale.setScalar(0.42); crown.position.y = 0.035; body.hat.add(crown);   // the court's crown, sized to your hat
   const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.1335, 0.1335, 1, 16, 1, true), gold); belt.scale.y = 0.085; belt.position.y = -0.36; body.torso.add(belt);
   return { crown, belt };
 })();
@@ -6148,7 +6199,7 @@ function loop(t){
   const dt = Math.min(0.1, (t-last)/1000); last = t; pollPad();
   // a prompt interrupts the game: the skier holds still (keeping their speed) until it's answered
   if (!promptCtx){ const n = Math.max(1, Math.ceil(dt * 60 - 1e-6)); for (let k = 0; k < n; k++) step(dt/n); }
-  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updatePet(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract(); updateSky(dt); updateSpace(dt); updateZone5(dt); updateCourt(dt); updateBlackHole(dt); updateSkyMarks();
+  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updatePet(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract(); updateSky(dt); updateSpace(dt); updateZone5(dt); updateCourt(dt); updateBlackHole(dt); updateFireworks(dt); updateSkyMarks();
   if (trial.K && !promptCtx) trial.t += dt;
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through
@@ -6162,7 +6213,7 @@ function loop(t){
 }
 loadProgress(); applyRegalia(); calfUI();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

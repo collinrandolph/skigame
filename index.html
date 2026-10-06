@@ -315,6 +315,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tOrb2">Zone 2 terminals powered<output id="oOrb2"></output><input id="tOrb2" type="range" min="0" max="3" step="1" value="0"></label>
     <label for="tOrb3">Zone 3 terminals powered<output id="oOrb3"></output><input id="tOrb3" type="range" min="0" max="5" step="1" value="0"></label>
     <label for="tSky">Energy bridges on (testing)<output id="oSky"></output><input id="tSky" type="range" min="0" max="1" step="1" value="0"></label>
+    <label for="tCalf">Calves crowned<output id="oCalf"></output><input id="tCalf" type="range" min="0" max="15" step="1" value="0"></label>
     <label for="tCry">Crystals collected<output id="oCry"></output><input id="tCry" type="range" min="0" max="20" step="1" value="0"></label>
     <p class="note">Sets how many of each collectable count as collected. Maxing a zone opens its gate or lowers its bridge.</p>
   </div>
@@ -508,6 +509,13 @@ function zone4Height(x, y){
 function riverCut(x, y){ return -2.6 * (1 - smooth01(RIVER_HW - 1, RIVER_BANK + 4, Math.abs(y - riverY(x)))); }
 // zone 5's ground: the south mountain band carries on past the map's edge and comes down onto the plateau, walled in
 // at the sides; the plateau ends at the cliff, which drops away hundreds of metres
+// the hidden way's pass: a notch cut through the mountains between zones 4 and 5, straight down the line of the court,
+// so the bridge can come down gently onto the plateau. from zone 4 it's a steep bank you can't ski up
+function passCut(x, y, h){
+  if (y < 745 || y > 840) return h;
+  const w = (1 - smooth01(12, 34, Math.abs(x - 250))) * smooth01(745, 768, y);
+  return h + (Math.min(h, Z5.h + 0.5) - h) * w;
+}
 function zone5Height(x, y){
   const ridge = 48 + 9*Math.sin(x/17 + y/23) + 6*Math.sin((x - y)/11);
   const t = smooth01(WORLD.y1, Z5.y0 + 12, y);
@@ -515,8 +523,9 @@ function zone5Height(x, y){
   const plateau = Z5.h + 1.6*Math.sin(x/19)*Math.cos(y/13) + 0.8*Math.sin((x + y)/9);
   let h = ridge*(1 - t) + plateau*t;
   h += (ridge + 12 - h) * side;
-  // the crowned trio's court: dead level round the ring of diamonds, easing back into the plateau
-  { const dc = Math.hypot(x - 250, y - 831); if (dc < 26){ const w = 1 - smooth01(15, 26, dc); h += (Z5.h - h) * w; } }
+  h = passCut(x, y, h);
+  // the court: dead level from the foot of the pass past the ring and the trio to the observatory
+  { const dx = Math.abs(x - 250); if (dx < 40 && y < 880){ const w = (1 - smooth01(26, 40, dx)) * (1 - smooth01(866, 880, y)) * smooth01(796, 812, y); h += (Z5.h - h) * w; } }
   // a promontory: past its side walls the ground falls away too, so out in space you see one cliff face, not the map's edge
   const sideK = smooth01(Z5.y0 + 10, Z5.y0 + 40, y);
   const drop = Math.max(smooth01(Z5.cliff - 3, Z5.cliff + 30, y), smooth01(Z5.x0 - 22, Z5.x0 - 55, x)*sideK, smooth01(Z5.x1 + 22, Z5.x1 + 55, x)*sideK);
@@ -536,7 +545,7 @@ function heightNat(x, y){
   // the lake: flattened to an ice sheet, the shore easing down to it
   const q = lakeQ(x, y);
   if (q < 1.35) h += (LAKE.h - h) * (1 - smooth01(0.98, 1.35, q));
-  return h;
+  return passCut(x, y, h);
 }
 // the switchbacks: below the saddle the mountainside is reshaped into an even slope, and each leg of the trail is cut
 // into it as a level-across bench at the trail's own height. SWB is filled in once the trail exists (see below).
@@ -586,6 +595,8 @@ let MOOSE = [];            // the tentacle moose wandering zones 2 and 3 (they'r
 let NPCS = [];             // people and natives, standing or walking loops (solid, small)
 let HERD = [];             // the moose herd at the far end of zone 4
 const z5Calves = [];       // calves that have joined the crowned trio in zone 5 (they stay there for good)
+const COMPLETIONS_KEY = 'skate-completions';
+let completions = 0; try { completions = +localStorage.getItem(COMPLETIONS_KEY) || 0; } catch (e) {}   // times you've reached the black hole and begun again
 function obstacleSD(x, y, terrainOnly = false){
   if (y > WORLD.y1){
     // zone 5: the plateau between its side walls, the mountain band behind and the cliff edge in front
@@ -1338,7 +1349,6 @@ function kioskPrompt(K){
 function altarPrompt(){
   if (altar.state === 2) return null;
   if (altar.state === 0){
-    if (!zoneDone(3)) return { title: 'Altar', body: 'The altar is silent. Power every terminal in this zone to wake it.', go: 'OK' };
     return { title: 'Altar', body: 'Wake the altar? 20 purple crystals will appear beside landmarks across zones 1 to 3.', go: 'Wake', onGo: wakeAltar };
   }
   const n = crystalsGot();
@@ -4161,7 +4171,7 @@ function adoptPet(h, quiet){
   HERD = HERD.filter(q => q !== h);                     // no longer one of the herd, and no longer solid
   pet.h = h; h.sleep = false; h.returning = false; h.rig.root.visible = true;
   petCrumbsReset(); pet.join = true;                    // it runs over from wherever it is to fall in behind you
-  $('calfBtn').hidden = false;
+  calfUI();
   if (!quiet){ toast('A calf has decided to follow you.'); music.chime(0.7); saveProgress(); }
 }
 function releasePet(){
@@ -4176,7 +4186,7 @@ function dismissPet(){
   $('calfBtn').hidden = true; toast('Your calf heads back to its herd.'); saveProgress();
 }
 function dismissPrompt(){
-  if (!pet.h || promptCtx) return;
+  if (!pet.h || promptCtx || !courtOpen()) return;
   openPrompt({ title: 'Your calf', body: 'Send your calf back to its herd? The next calf you come across will follow you instead.', go: 'Send back', onGo: dismissPet });
 }
 $('calfBtn').addEventListener('click', dismissPrompt);
@@ -4224,7 +4234,7 @@ function updatePet(dt){
   }
   let d = th0 - pet.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; pet.th += d*Math.min(1, dt*6);
   h.x = x; h.y = y;
-  if (pz === null && !pet.join && zoneAt(x, y) === 5 && y > Z5.y0 + 14){ h.th = pet.th; calfToTrio(h); return; }
+  if (pz === null && !pet.join && zoneAt(x, y) === 5 && y > Z5.y0 + 6){ h.th = pet.th; calfToTrio(h); return; }
   r.root.position.set(x, pz !== null ? pz : ground(x, y), y); r.root.rotation.y = -pet.th;
   // gait: a walk that quickens to a bounding run, longer strides at speed
   const stride = 0.75 + vc*0.09;
@@ -4364,10 +4374,10 @@ const SKY = (() => {
     z2: { ground: true, x: 430, y: -52 }, z3: { ground: true, x: 430, y: 430 },
     // the hidden way: from under the standing giant's belly, south over the mountains to zone 5
     g5: { ground: true, hidden: true, ...(() => { const v = new THREE.Vector3(); giant.rig.body.getWorldPosition(v); return { x: v.x, y: v.z }; })() },
-    z5: { ground: true, hidden: true, x: 150, y: 853 },
+    z5: { ground: true, hidden: true, x: 250, y: 820 },
     // the Starway: out from the cliff into space, through the planet, and back to the cliff
-    s1: { ground: true, hidden: true, x: 250, y: 843 },
-    bh: { blackhole: true, hidden: true, ...(() => { const a = (-90 + 24*30)*Math.PI/180; return { x: 250 + Math.cos(a)*8, y: 1250 + Math.sin(a)*8, h: 10 }; })() },
+    s1: { ground: true, hidden: true, x: 250, y: 851 },
+    bh: { blackhole: true, hidden: true, ...(() => { const a = (-90 + 24*30)*Math.PI/180; return { x: 250 + Math.cos(a)*14, y: 1250 + Math.sin(a)*14, h: 10 }; })() },
   };
   for (const k in N){ const n = N[k]; n.id = k; if (n.ground) n.h = height(n.x, n.y) + 0.05; }
   // decks: node to node through control points [x, y, h] (h is a target; clearance over the terrain is added below)
@@ -4387,19 +4397,20 @@ const SKY = (() => {
     { name: 'Zone 3 ramp', a: 'J4', b: 'z3', pts: [[300, 385, 21], [340, 398, 14], [380, 410, 7], [410, 422, 2]] },
     // the hidden way: out between the giant's legs toward its head, round and up along the south mountains' flank,
     // over the ridge, and down onto the plateau
-    { name: 'Hidden way', a: 'g5', b: 'z5', hidden: true, pts: [[134, 616, 1], [124, 640, 4], [140, 680, 10], [200, 722, 22], [270, 738, 33], [330, 748, 44], [372, 766, 55], [386, 796, 64],
-      [362, 818, 52], [322, 830, 40], [278, 840, 28], [232, 847, 18], [188, 851, 9]] },
+    // the hidden way: out between the giant's legs, east over zone 4 and round to head due south, through the pass and
+    // down onto the plateau, lined up with the ring, the observatory and the planet
+    { name: 'Hidden way', a: 'g5', b: 'z5', hidden: true, pts: [[134, 616, 1], [124, 640, 4], [150, 668, 10], [200, 684, 17], [238, 702, 21], [250, 728, 22], [250, 762, 21], [250, 796, 19]] },
     // the Starway: off the cliff's lip and out over the void, a long climb straight through the planet's heart, out
     // the far side, round past its rings and back in to the cliff east of the observatory. no pylons out here
     // the Starway, the last bridge: off the cliff's lip, over the void, into the planet, then round and down a funnel
     // of light in two narrowing turns to the black hole at the bottom
     // the Starway: from a portal just past the ring of diamonds, up over the observatory's tiers, through its hall and
     // out over the cliff, straight on to the planet and into it, spiralling down to the black hole
-    { name: 'Starway', a: 's1', b: 'bh', hidden: true, space: true, final: true, obs: true, pts: [...(() => { const g0 = height(250, 876) - 0.6; return [[250, 856, g0 + 1.9], [250, 866, g0 + 4.7], [250, 876, g0 + 4.8], [250, 887, g0 + 5.0], [250, 905, g0 + 6.5]]; })(),
+    { name: 'Starway', a: 's1', b: 'bh', hidden: true, space: true, final: true, obs: true, pts: [...(() => { const g0 = height(250, 882) - 0.6; return [[250, 863, g0 + 2.9], [250, 872, g0 + 4.7], [250, 882, g0 + 4.8], [250, 892, g0 + 5.0], [250, 906, g0 + 6.3]]; })(),
       [250, 960, 24], [249, 1050, 34], [244, 1130, 46], [246, 1195, 55],
       // the spiral: two turns closing from 50 m to 8 m across, dropping evenly along its length (not per turn, or the
       // tight inner turns would plunge)
-      ...(() => { const R = t => 50 - 42*t, tot = 24*(50 + 8)/2, out = []; for (let k = 1; k < 24; k++){ const t = k/24, a = (-90 + k*30)*Math.PI/180, done = k*(50 + R(t))/2; out.push([250 + Math.cos(a)*R(t), 1250 + Math.sin(a)*R(t), 55 - 45*done/tot]); } return out; })()] },
+      ...(() => { const R = t => 50 - 36*t, tot = 24*(50 + 14)/2, out = []; for (let k = 1; k < 24; k++){ const t = k/24, a = (-90 + k*30)*Math.PI/180, done = k*(50 + R(t))/2; out.push([250 + Math.cos(a)*R(t), 1250 + Math.sin(a)*R(t), 55 - 45*done/tot]); } return out; })()] },
   ];
   // sample each deck: a centripetal-ish Catmull-Rom through its control points, every ~2 m
   // the ground under a deck and a little way either side, so a deck crossing a ridge rides over it rather than through a cut
@@ -4427,7 +4438,7 @@ const SKY = (() => {
       const tx = X[Math.min(n - 1, i + 1)] - X[Math.max(0, i - 1)], ty = Y[Math.min(n - 1, i + 1)] - Y[Math.max(0, i - 1)], l = Math.hypot(tx, ty) || 1;
       const gEnd = Math.min(A.ground ? cum[i] : 1e9, B.ground ? cum[n-1] - cum[i] : 1e9);
       req[i] = terr(X[i], Y[i], tx/l, ty/l, gEnd > 90) + (gEnd < 4 ? 0.05 : gEnd < 30 ? 0.05 + (gEnd - 4)/26*3.4 : 3.5);
-      if (d.obs){ const r = Math.hypot(X[i] - 250, Y[i] - 876); if (r < 18) req[i] = Math.max(req[i], height(250, 876) - 0.6 + (r < 10.5 ? 4.6 : 4.6 - (r - 10.5)/7.5*2.6)); }
+      if (d.obs){ const r = Math.hypot(X[i] - 250, Y[i] - 882); if (r < 24) req[i] = Math.max(req[i], height(250, 882) - 0.6 + (r < 10.5 ? 4.6 : 4.6 - (r - 10.5)*0.2)); }   // one even ramp up over the tiers
     }
     // raise to clear the ground, then smooth, over and over: the profile settles into a smooth curve resting on the
     // ground's high points instead of kinking up over each one
@@ -4486,7 +4497,7 @@ function skyStep(){
     if (!skyActive()) return;
     for (const d of SKY.decks) for (const end of [d.A, d.B]){
       if (!end.ground || (d.hidden && !giant.up)) continue;
-      if (d.final && diamondsLit() < DIAMONDS){ starwayHint(d, end); continue; }
+      if (d.final && !courtOpen()){ starwayHint(d, end); continue; }
       const pr = deckProj(d, S.x, S.y, end === d.A ? 0 : d.n - 2), sIn = end === d.A ? pr.s : d.len - pr.s;
       if (sIn > -0.5 && sIn < 5 && Math.abs(pr.lat) < d.w/2 - 0.3){ SKY_ON = { d, i: pr.i, h: pr.h }; skyEnterAt = performance.now(); if (d.final && pet.h) calfToTrio(pet.h); return; }
     }
@@ -4611,7 +4622,7 @@ const skyPortals = SKY.nodes.filter(n => n.ground).map(n => {
 });
 function updateSky(dt){
   const act = skyActive(), now = performance.now()/1000;
-  for (const p of skyPortals){ const on = act && (!p.n.hidden || giant.up) && (!p.n.decks[0].final || diamondsLit() >= DIAMONDS); for (const m of p.lit) m.visible = on; p.pad.material.opacity = on ? 0.25 + 0.1*Math.sin(now*2) : 0; }
+  for (const p of skyPortals){ const on = act && (!p.n.hidden || giant.up) && (!p.n.decks[0].final || courtOpen()); for (const m of p.lit) m.visible = on; p.pad.material.opacity = on ? 0.25 + 0.1*Math.sin(now*2) : 0; }
   // which decks show: the one you're on, and near its end the ones you can carry on to (or have just come from)
   const o = SKY_ON, show = new Set();
   if (o){
@@ -4631,7 +4642,7 @@ function updateSky(dt){
 // crystal, a domed hall with a lit slit, and a great ribbed telescope of bone pointing out over the cliff into space,
 // a crystal lens at its mouth. purple crystal grows everywhere on the plateau, and the natives here, in bright robes,
 // play music: drums, long horns, harps and crystal chimes. no people from the outpost have ever come this far
-const Z5_TEMPLE = { x: 250, y: 876 };
+const Z5_TEMPLE = { x: 250, y: 882 };
 const zone5 = (() => {
   const T = Z5_TEMPLE, h0 = height(T.x, T.y);
   const g = new THREE.Group(); g.position.set(T.x, h0 - 0.6, T.y); scene.add(g);
@@ -4650,21 +4661,17 @@ const zone5 = (() => {
   pt(g, dome(7.6, 28, 12), domeM, 0, 9.0, 0);
   pt(g, new THREE.TorusGeometry(7.7, 0.3, 6, 32), SM.bone2, 0, 9.0, 0, Math.PI/2);
   pt(g, bx(0.7, 6.5, 0.4), SM.glow, 0, 12.6, 6.9, -0.6);                      // the dome's lit slit, facing the cliff
-  // the telescope: out of the dome toward the south, tilted up at the sky
-  const tel = new THREE.Group(); tel.position.set(0, 14.6, 2); tel.rotation.x = 0.62; g.add(tel);   // +z is south (over the cliff)
-  const tubeM = pt(tel, cy(2.6, 1.6, 18, 18), SM.bone, 0, 0, 0, Math.PI/2); tubeM.position.z = 8;
-  for (let k = 0; k < 5; k++) pt(tel, new THREE.TorusGeometry(2.05 + (4 - k)*0.2, 0.28, 8, 20), SM.bone2, 0, 0, 1 + k*3.6);
-  const lens = pt(tel, new THREE.OctahedronGeometry(2.4, 0), gem2, 0, 0, 17.6); lens.scale.set(1, 1, 0.45);
-  pt(tel, new THREE.SphereGeometry(1.3, 14, 10), SM.glow, 0, 0, 17.9);
-  for (const sx of [-1, 1]) pt(g, cy(0.5, 0.8, 9, 8), SM.bone2, sx*5.2, 12, 4.5, -0.35, 0, -sx*0.35);   // the mount's two legs, clear of the way through
   // the gateway on the plateau side
   for (const sx of [-1, 1]) pt(g, cy(0.7, 1, 9, 9), SM.bone, sx*4.5, 4.5, -17);
   tube(g, [[-4.5, 9, -17], [-2.5, 12, -17.3], [0, 13, -17.4], [2.5, 12, -17.3], [4.5, 9, -17]], 0.55, SM.bone2, 20, 7);
   pt(g, new THREE.OctahedronGeometry(0.9, 0), gem, 0, 13.4, -17.4).scale.set(1, 1.6, 1);
   const model = { model: g };
   SOLIDS.push({ x: T.x, y: T.y, r: 0, foot: buildFootprint(model) });
-  return { g, tel, domeM };
+  return { g, domeM };
 })();
+// samples of every bridge over zone 5, to keep the crystals off them
+const Z5_DECKPTS = []; for (const d of SKY.decks) for (let i = 0; i < d.n; i += 2) if (d.Y[i] > WORLD.y1 - 10) Z5_DECKPTS.push(d.X[i], d.Y[i]);
+function nearDeck(x, y, r){ for (let i = 0; i < Z5_DECKPTS.length; i += 2) if (Math.abs(Z5_DECKPTS[i] - x) < r && Math.hypot(Z5_DECKPTS[i] - x, Z5_DECKPTS[i+1] - y) < r) return true; return false; }
 // crystals everywhere: clusters across the plateau and along the cliff's lip, merged into a handful of meshes
 {
   let seed = 5151; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -4673,7 +4680,7 @@ const zone5 = (() => {
   for (let k = 0; k < 900 && placed.length < 110; k++){
     const x = Z5.x0 + 16 + rnd()*(Z5.x1 - Z5.x0 - 32), y = Z5.y0 + 8 + rnd()*(Z5.cliff - Z5.y0 - 6);
     const size = 0.5 + rnd()*rnd()*2.4;
-    if (Math.hypot(x - Z5_TEMPLE.x, y - Z5_TEMPLE.y) < 19 + size || Math.hypot(x - 150, y - 853) < 9 || (Math.abs(x - 250) < 14 + size && y < 862) || Math.hypot(x - 260, y - 831) < 16 + size) continue;
+    if (Math.hypot(x - Z5_TEMPLE.x, y - Z5_TEMPLE.y) < 19 + size || Math.hypot(x - 150, y - 853) < 9 || (Math.abs(x - 250) < 30 + size && y < 870) || nearDeck(x, y, 7 + size*1.5)) continue;
     if (placed.some(p => Math.hypot(p.x - x, p.y - y) < 4 + (p.size + size)*1.2)) continue;
     placed.push({ x, y, size });
     const c = new THREE.Group(); c.position.set(x, height(x, y) - 0.2, y); c.rotation.y = rnd()*6.3; src.add(c);
@@ -4712,24 +4719,28 @@ const MUSICIANS = (() => {
     return { rig, kind, ph: rnd()*6, x, y };
   });
 })();
-// ---- the crowned trio: three small grown moose in ceremonial drapes and gold crowns keep court on the plateau's east
-// side, beside a ring of six diamond insignias set in the snow. bring a calf onto the plateau and it leaves you for
-// the first open diamond, which lights under it; two robed attendants hurry over and dress it in a drape and crown
-// of its own, and there it stays for good. once all six diamonds glow the Starway wakes. calves past the sixth join
-// the court too, standing behind the trio
-const TRIO = { x: 266, y: 831 }, RING6 = { x: 250, y: 831, r: 6.5 }, DIAMONDS = 6;
+// ---- the crowned court: a ring of six diamond insignias on level snow, straight down the line from the hidden way,
+// and the trio of elders (three small grown moose in ceremonial drapes and gold crowns, the middle one in royal
+// purple) standing shoulder to shoulder across the way on to the Starway. only three of the diamonds show at first.
+// bring a calf onto the plateau and it leaves you for an open one, which lights under it; two robed attendants hurry
+// over and dress it in a drape and crown of its own, and there it stays for good. when the third calf is crowned the
+// other three diamonds appear, the elders walk into the ring onto them, and the Starway wakes. calves past the
+// third join the court too, standing to the east
+const TRIO = { x: 250, y: 843 }, RING6 = { x: 250, y: 831, r: 6.5 }, DIAMONDS = 3;
+const CALF_D = [0, 2, 4], ELDER_D = [1, 3, 5];     // diamond k sits at k × 60° round the ring (0 = east), so north and south stay open
 const GOLD = lam(0xe6bf4f); GOLD.flatShading = true;
-const DRAPES = [0xd9468f, 0x2bb3a3, 0xf0a83a, 0x8a5ce6, 0xe0533d, 0x3f8fe0].map(c => { const m = lam(c); m.flatShading = true; return m; });
+const ROYAL = 0x7b3fe0, ROYAL_MAT = lam(ROYAL); ROYAL_MAT.flatShading = true;      // the trio's leader wears it, and so do you once you've been through the black hole
+const DRAPES = [0xd9468f, 0x2bb3a3, 0xf0a83a, 0xe0533d, 0x3f8fe0].map(c => { const m = lam(c); m.flatShading = true; return m; });
 const DG = {
   drape: new THREE.SphereGeometry(1, 20, 8, 0, Math.PI*2, 0, Math.PI*0.56), hem: new THREE.TorusGeometry(1, 0.045, 5, 32),
   band: cy(0.3, 0.27, 0.2, 12, true), spike: new THREE.ConeGeometry(0.055, 0.24, 5), knob: new THREE.SphereGeometry(0.04, 6, 5),
   emblem: new THREE.OctahedronGeometry(1, 0), tassel: new THREE.SphereGeometry(0.07, 6, 5),
 };
-function dressMoose(rig, k){
+function dressMoose(rig, k, mat){
   // a drape over the barrel with a gold hem, a gold diamond on each flank and tassels at the corners; a gold crown
   // of spikes with a crystal at its brow. built hidden at zero size so it can be popped on
   const drape = new THREE.Group(); drape.position.set(0, 2.1, 0.1); rig.body.add(drape);
-  drape.add(new THREE.Mesh(DG.drape, DRAPES[k % DRAPES.length])).scale.set(0.93, 0.88, 1.73);
+  drape.add(new THREE.Mesh(DG.drape, mat || DRAPES[k % DRAPES.length])).scale.set(0.93, 0.88, 1.73);
   const hem = new THREE.Mesh(DG.hem, GOLD); hem.position.y = -0.88*0.187; hem.rotation.x = Math.PI/2; hem.scale.set(0.93*0.982, 1.73*0.982, 1); drape.add(hem);
   for (const sx of [-1, 1]){
     const e = new THREE.Mesh(DG.emblem, GOLD); e.position.set(sx*0.9, 0.28, 0); e.scale.set(0.05, 0.3, 0.22); drape.add(e);
@@ -4745,10 +4756,11 @@ function dressMoose(rig, k){
   return { drape, crown };
 }
 const facingTo = (x, y, tx, ty) => Math.atan2(tx - x, -(ty - y));
-// where each calf stands: the six diamonds round the ring, then rows behind the trio
+// where each calf stands: its diamond, or past the third, rows to the east
+function diamondPos(k){ const a = k/6*Math.PI*2; return [RING6.x + Math.cos(a)*RING6.r, RING6.y + Math.sin(a)*RING6.r]; }
 function slotPos(k){
-  if (k < DIAMONDS){ const a = k/DIAMONDS*Math.PI*2; return [RING6.x + Math.cos(a)*RING6.r, RING6.y + Math.sin(a)*RING6.r]; }
-  const j = k - DIAMONDS; return [TRIO.x + 5 + Math.floor(j/5)*3.4, TRIO.y - 6 + (j % 5)*3];
+  if (k < DIAMONDS) return diamondPos(CALF_D[k]);
+  const j = k - DIAMONDS; return [268 + Math.floor(j/5)*3.4, 822 + (j % 5)*3];
 }
 const court = (() => {
   const g = new THREE.Group(); scene.add(g);
@@ -4758,23 +4770,26 @@ const court = (() => {
   const off = m => { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; return m; };
   const inlay = off(new THREE.MeshLambertMaterial({ color: 0x3a3052 }));
   const diamonds = [];
-  for (let k = 0; k < DIAMONDS; k++){
-    const [x, y] = slotPos(k), y0 = hAt(x, y) + 0.04, a = Math.atan2(RING6.x - x, RING6.y - y);
-    const base = new THREE.Mesh(rhomb(1.9, 1.15), inlay); base.position.set(x, y0, y); base.rotation.y = a; g.add(base);
+  for (let k = 0; k < 6; k++){
+    const [x, y] = diamondPos(k), y0 = hAt(x, y) + 0.04, a = Math.atan2(RING6.x - x, RING6.y - y);
+    const grp = new THREE.Group(); grp.position.set(x, y0, y); grp.rotation.y = a; g.add(grp);
+    grp.add(new THREE.Mesh(rhomb(1.9, 1.15), inlay));
     const mat = off(new THREE.MeshBasicMaterial({ color: 0x6c5a8e })); mat.polygonOffsetFactor = -3;
-    const stone = new THREE.Mesh(rhomb(1.35, 0.78), mat); stone.position.set(x, y0 + 0.01, y); stone.rotation.y = a; g.add(stone);
-    diamonds.push({ mat, lit: 0 });
+    const stone = new THREE.Mesh(rhomb(1.35, 0.78), mat); stone.position.y = 0.01; grp.add(stone);
+    const elder = ELDER_D.includes(k); if (elder){ grp.visible = false; grp.scale.setScalar(0.01); }
+    diamonds.push({ mat, lit: 0, grp, elder, show: elder ? 0 : 1 });
   }
   { const pts = []; for (let i = 0; i <= 72; i++){ const a = i/72*Math.PI*2, x = RING6.x + Math.cos(a)*RING6.r, y = RING6.y + Math.sin(a)*RING6.r; pts.push(new THREE.Vector3(x, height(x, y) + 0.06, y)); }
     g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xb8a35a }))); }
-  // the trio: a little smaller than the herd's grown moose, each in its own colour, facing out over the ring
-  const trio = [[1.2, -3.6, 0], [-1.4, 0, 3], [1.2, 3.6, 1]].map(([dx, dy, k], i) => {
-    const rig = buildMoose(false), x = TRIO.x + dx, y = TRIO.y + dy; rig.root.scale.setScalar(0.85);
-    const th = facingTo(x, y, RING6.x, RING6.y);
-    rig.root.position.set(x, height(x, y), y); rig.root.rotation.y = -th;
-    const d = dressMoose(rig, k); if (i === 1) d.crown.scale.setScalar(1.25);
-    SOLIDS.push({ x, y, r: 1.5 });
-    return { rig, ph: i*1.7 };
+  // the elders: a little smaller than the herd's grown moose, across the way to the Starway, facing the ring. each
+  // has its diamond in the ring and a way round the calves to it
+  const trio = [[-4.2, 0, 3, [[239, 839]]], [0, -1, 1, []], [4.2, 1, 5, [[261, 839], [260, 827]]]].map(([dx, k, dk, via], i) => {
+    const rig = buildMoose(false), x = TRIO.x + dx, y = TRIO.y; rig.root.scale.setScalar(0.85);
+    rig.root.position.set(x, height(x, y), y);
+    const d = dressMoose(rig, k, k < 0 ? ROYAL_MAT : null); if (k < 0) d.crown.scale.setScalar(1.25);
+    const sol = { x, y, r: 1.9 }; SOLIDS.push(sol);
+    const [ex, ey] = diamondPos(dk);
+    return { rig, ph: i*1.7, x, y, bx: x, by: y, path: [...via, [ex, ey]], leg: 0, dk, th: 0, sol, gait: 0, inRing: false };
   });
   return { g, diamonds, trio };
 })();
@@ -4782,7 +4797,7 @@ const court = (() => {
 const ATTEND = (() => {
   let seed = 4040; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const white = lam(0xf1ece0), white2 = lam(0xd4ccba); white.flatShading = white2.flatShading = true;
-  return [[259.5, 826.5], [259.5, 835.5]].map(([x, y], i) => {
+  return [[239.5, 830], [260.5, 830]].map(([x, y], i) => {
     const rig = buildAlien(rnd);
     rig.root.traverse(o => { if (!o.isMesh) return; if (o.material === NPC_MAT.robe) o.material = white; else if (o.material === NPC_MAT.robe2) o.material = white2; else if (o.material === NPC_MAT.sash) o.material = GOLD; });
     pt(rig.arms[i], cy(0.02, 0.02, 1.5, 6), GOLD, 0, -0.5, 0);                // a slim gold staff
@@ -4792,36 +4807,51 @@ const ATTEND = (() => {
     return { rig, hx: x, hy: y, x, y, th, side: i ? 1 : -1, task: null, gait: 0 };
   });
 })();
-function diamondsLit(){ let n = 0; for (const c of z5Calves) if (c.slot < DIAMONDS && c.phase === 'dressed') n++; return n; }
+function diamondsLit(){ let n = 0; for (const c of z5Calves) if (c.slot < DIAMONDS && c.phase === 'dressed') n++; return n; }   // calves crowned on their diamonds
+function courtOpen(){ return diamondsLit() >= DIAMONDS && court.trio.every(t => t.inRing); }          // ...and the elders in the ring: the Starway is lit
 function calfToTrio(h, slot){
   // a calf joins the court. with a slot (a saved game) it's already there and dressed; otherwise it walks over
   if (!h || z5Calves.some(c => c.h === h)) return;
   const instant = slot !== undefined;
   if (pet.h === h){ pet.h = null; $('calfBtn').hidden = true; }
   HERD = HERD.filter(q => q !== h);
-  if (!instant){ const taken = new Set(z5Calves.map(c => c.slot)); slot = 0; while (taken.has(slot)) slot++; }
+  if (!instant) slot = freeSlot();
   const [sx, sy] = slotPos(slot), dress = dressMoose(h.rig, slot + 2);
   const c = { h, slot, sx, sy, phase: instant ? 'dressed' : 'walk', t: 0, pop: instant ? 1 : 0, dress, gait: 0, step: 0, side: 0, served: instant };
-  // keep clear of the observatory on the way
-  if (!instant && segDist(Z5_TEMPLE.x, Z5_TEMPLE.y, h.x, h.y, sx, sy) < 26) c.via = [Z5_TEMPLE.x - 26, Z5_TEMPLE.y - 30];
   h.sleep = false; h.returning = false;
-  if (instant){ h.x = sx; h.y = sy; h.th = facingTo(sx, sy, TRIO.x, TRIO.y); }
+  if (instant){ h.x = sx; h.y = sy; h.th = facingTo(sx, sy, RING6.x, RING6.y); }
   for (const o of [dress.drape, dress.crown]){ o.visible = instant; o.scale.setScalar(instant ? 1 : 0.01); }
-  z5Calves.push(c);
+  z5Calves.push(c); calfUI();
   if (!instant){ toast(slot < DIAMONDS ? 'Your calf leaves you for the crowned trio.' : 'Your calf joins the crowned court.'); music.chime(0.5); saveProgress(); }
 }
 function segDist(px, py, ax, ay, bx, by){
   const dx = bx - ax, dy = by - ay, u = Math.max(0, Math.min(1, ((px - ax)*dx + (py - ay)*dy) / Math.max(1e-6, dx*dx + dy*dy)));
   return Math.hypot(ax + dx*u - px, ay + dy*u - py);
 }
+function freeSlot(){ const taken = new Set(z5Calves.map(c => c.slot)); let k = 0; while (taken.has(k)) k++; return k; }
+function sendCalfHome(c){
+  const h = c.h; c.dress.drape.parent.remove(c.dress.drape); c.dress.crown.parent.remove(c.dress.crown);
+  h.x = h.hx; h.y = h.hy; h.sleep = h.role.includes('sleep'); h.returning = false; HERD.push(h);
+  for (const A of ATTEND) if (A.task === c){ A.task = null; }
+}
+// dev: set how many calves are with the court (instantly crowned on their spots, or sent home, newest first)
+function setCalvesCrowned(n){
+  while (z5Calves.length > n) sendCalfHome(z5Calves.pop());
+  while (z5Calves.length < n){ const h = HERD.find(q => q.calf && !q.returning) || pet.h; if (!h) break; calfToTrio(h, freeSlot()); }
+  calfUI(); saveProgress();
+}
+$('tCalf').addEventListener('input', e => setCalvesCrowned(+e.target.value));
+function calfUI(){
+  // the slider and readout, and the calf button: you can't send a calf home until every diamond is lit
+  $('tCalf').value = z5Calves.length; $('oCalf').textContent = z5Calves.length + ' (' + Math.min(DIAMONDS, diamondsLit()) + ' of ' + DIAMONDS + ' crowned)';
+  $('calfBtn').hidden = !pet.h || !courtOpen();
+}
 function returnZ5Calves(){
   // a full reset: every calf goes home to its herd, undressed, the diamonds go dark and the attendants go back
-  for (const c of z5Calves){
-    const h = c.h; c.dress.drape.parent.remove(c.dress.drape); c.dress.crown.parent.remove(c.dress.crown);
-    h.x = h.hx; h.y = h.hy; h.sleep = h.role.includes('sleep'); h.returning = false; HERD.push(h);
-  }
-  z5Calves.length = 0;
-  for (const d of court.diamonds){ d.lit = 0; d.mat.color.setHex(0x6c5a8e); }
+  for (const c of z5Calves) sendCalfHome(c);
+  z5Calves.length = 0; calfUI();
+  for (const d of court.diamonds){ d.lit = 0; d.mat.color.setHex(0x6c5a8e); if (d.elder){ d.show = 0; d.grp.visible = false; d.grp.scale.setScalar(0.01); } }
+  for (const t of court.trio){ t.x = t.bx; t.y = t.by; t.leg = 0; t.inRing = false; t.sol.x = t.x; t.sol.y = t.y; }
   for (const A of ATTEND){ A.task = null; A.x = A.hx; A.y = A.hy; }
 }
 function walkMoose(r, gait, amp){
@@ -4839,7 +4869,7 @@ function starwayHint(d, end){
   // skiing onto the Starway's dark ramp: say what it's waiting for
   if (Math.hypot(S.x - end.x, S.y - end.y) > 7 || performance.now() - starwayHintAt < 9000) return;
   starwayHintAt = performance.now();
-  const n = diamondsLit(); toast(n ? n + ' of 6 diamonds by the crowned trio glow. The Starway is dark until all six do.' : 'The Starway is dark. Six diamonds lie unlit beside the crowned trio.');
+  const n = diamondsLit(); toast(n >= DIAMONDS ? 'The elders are taking their places. Not long now.' : n ? n + ' of ' + DIAMONDS + ' calves crowned. The Starway is dark until the ring is complete.' : 'The Starway is dark. Bring calves to the crowned elders\' ring.');
 }
 function updateCourt(dt){
   const near = S.y > WORLD.y1 - 120;
@@ -4847,16 +4877,35 @@ function updateCourt(dt){
   for (const t of court.trio) t.rig.root.visible = near;
   for (const A of ATTEND) A.rig.root.visible = near;
   for (const c of z5Calves) c.h.rig.root.visible = near;
-  if (!near) return;
+  const called = diamondsLit() >= DIAMONDS;        // three calves crowned: the elders join them
+  if (!near){
+    // out of sight, everyone's simply where they belong
+    for (const t of court.trio){ if (called){ const [x, y] = t.path[t.path.length - 1]; t.x = x; t.y = y; t.leg = t.path.length; t.inRing = true; } else { t.x = t.bx; t.y = t.by; t.leg = 0; t.inRing = false; }
+      t.th = facingTo(t.x, t.y, RING6.x, RING6.y); t.sol.x = t.x; t.sol.y = t.y; t.rig.root.position.set(t.x, height(t.x, t.y), t.y); t.rig.root.rotation.y = -t.th; }
+    for (const D of court.diamonds) if (D.elder){ D.show = called ? 1 : 0; D.grp.visible = called; D.grp.scale.setScalar(called ? 1 : 0.01); }
+    return;
+  }
   const now = performance.now()/1000;
-  // the trio, idle, bowing one after another every so often
-  court.trio.forEach((t, i) => { const w = (now*0.12 + i*0.08) % 1, bow = w < 0.08 ? 0.5*Math.sin(w/0.08*Math.PI) : 0; idleMoose(t.rig, now, t.ph, bow); });
+  // the elders: idle and bowing in turn across the way; once called, along their path into the ring
+  court.trio.forEach((t, i) => {
+    let face = facingTo(t.x, t.y, RING6.x, RING6.y), moving = false;
+    if (called && t.leg < t.path.length){
+      const [tx, ty] = t.path[t.leg], dx = tx - t.x, dy = ty - t.y, dist = Math.hypot(dx, dy);
+      if (dist < 0.08){ t.leg++; if (t.leg === t.path.length){ t.inRing = true; music.chime(0.7 + i*0.1); if (court.trio.every(q => q.inRing)){ toast('The elders take their places in the ring. Out past the cliff, the Starway lights.'); music.chime(1, true); calfUI(); } } }
+      else { const sp = 1.6, st = Math.min(dist, sp*dt); t.x += dx/dist*st; t.y += dy/dist*st; face = Math.atan2(dx, -dy); moving = true; }
+    }
+    if (moving){ t.gait += 1.6*dt/1.3; walkMoose(t.rig, t.gait, 0.4); t.rig.head.rotation.x = 0; }
+    else { const w = (now*0.12 + i*0.08) % 1, bow = w < 0.08 ? 0.5*Math.sin(w/0.08*Math.PI) : 0; idleMoose(t.rig, now, t.ph, bow); }
+    let d = face - t.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; t.th += d*Math.min(1, dt*3);
+    t.sol.x = t.x; t.sol.y = t.y;
+    t.rig.root.position.set(t.x, height(t.x, t.y), t.y); t.rig.root.rotation.y = -t.th;
+  });
   // the calves: walk to their spot, wait to be dressed, then stay
   for (const c of z5Calves){
     const h = c.h, r = h.rig;
     if (c.phase === 'walk'){
-      const [tx, ty] = c.via || [c.sx, c.sy], dx = tx - h.x, dy = ty - h.y, dist = Math.hypot(dx, dy), sp = 4;
-      if (dist < 0.3){ if (c.via) c.via = null; else { c.phase = 'wait'; h.x = c.sx; h.y = c.sy; music.chime(0.6); } }
+      const [tx, ty] = [c.sx, c.sy], dx = tx - h.x, dy = ty - h.y, dist = Math.hypot(dx, dy), sp = 4;
+      if (dist < 0.3){ c.phase = 'wait'; h.x = c.sx; h.y = c.sy; music.chime(0.6); }
       else {
         const st = Math.min(dist, sp*dt); h.x += dx/dist*st; h.y += dy/dist*st;
         let d = Math.atan2(dx, -dy) - h.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; h.th += d*Math.min(1, dt*5);
@@ -4866,7 +4915,7 @@ function updateCourt(dt){
       }
     } else {
       // on its spot: turn to face the trio and stand
-      let d = facingTo(h.x, h.y, TRIO.x, TRIO.y) - h.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; h.th += d*Math.min(1, dt*3);
+      let d = (c.slot < DIAMONDS ? facingTo(h.x, h.y, RING6.x, RING6.y) : facingTo(h.x, h.y, 250, h.y)) - h.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; h.th += d*Math.min(1, dt*3);
       idleMoose(r, now, h.ph || 0, 0);
     }
     if (c.phase === 'wait' && c.served){
@@ -4876,8 +4925,8 @@ function updateCourt(dt){
         c.dress.drape.visible = c.dress.crown.visible = true;
         const n = diamondsLit() + (c.slot < DIAMONDS ? 1 : 0);
         c.phase = 'dressed';
-        if (c.slot < DIAMONDS && n === DIAMONDS){ toast('All six diamonds glow. Out past the cliff, the Starway lights.'); music.chime(1, true); }
-        else if (c.slot < DIAMONDS){ toast(n + ' of 6 diamonds glow.'); music.chime(n/DIAMONDS); }
+        if (c.slot < DIAMONDS && n === DIAMONDS){ toast('The third calf is crowned. Three more diamonds appear, and the elders step forward.'); music.chime(1, true); }
+        else if (c.slot < DIAMONDS){ toast(n + ' of ' + DIAMONDS + ' calves crowned.'); music.chime(n/DIAMONDS); }
         else { toast('Another calf is crowned.'); music.chime(0.8); }
         saveProgress();
       }
@@ -4891,7 +4940,12 @@ function updateCourt(dt){
   }
   // the diamonds light under a calf standing on them, with a slow shared pulse
   court.diamonds.forEach((D, k) => {
-    const c = z5Calves.find(q => q.slot === k), want = c && c.phase !== 'walk' ? (c.phase === 'dressed' ? 1 : 0.6) : 0;
+    if (D.elder){
+      // the elders' diamonds rise into view once they're called, and light as each elder steps onto its own
+      if (called && D.show < 1){ D.show = Math.min(1, D.show + dt/0.8); D.grp.visible = true; const u = D.show; D.grp.scale.setScalar(Math.max(0.01, 1 + 2.2*Math.pow(u - 1, 3) + 1.2*Math.pow(u - 1, 2))); }
+    }
+    const c = D.elder ? null : z5Calves.find(q => q.slot === CALF_D.indexOf(k)), t = D.elder ? court.trio.find(q => q.dk === k) : null;
+    const want = t ? (t.inRing ? 1 : 0) : c && c.phase !== 'walk' ? (c.phase === 'dressed' ? 1 : 0.6) : 0;
     D.lit += (want - D.lit)*Math.min(1, dt*2);
     const p = D.lit*(0.85 + 0.15*Math.sin(now*2 + k));
     D.mat.color.setRGB(0.42 + (0.78 - 0.42)*p, 0.35 + (0.52 - 0.35)*p, 0.56 + (1 - 0.56)*p);
@@ -4968,10 +5022,11 @@ const space = (() => {
 // ---- inside the planet: the Starway spirals down a glowing funnel into a black hole at its throat. a dark sphere in
 // a white-violet accretion disk and halo, the funnel's stripes streaming inward
 const blackHole = (() => {
-  const C0 = { x: 250, y: 4.5, z: 1250 };
+  const C0 = { x: 250, y: 0, z: 1250 };
   const canvasTex = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); return t; };
   // the funnel: a lathe just under the spiral deck (which drops ~1.07 m for every metre it closes in)
-  const prof = []; for (let k = 0; k <= 26; k++){ const r = 3.2 + k*2.05; prof.push(new THREE.Vector2(r, 1.43 + 1.0714*r - 3.4 - 2.6*Math.exp(-r/5))); }
+  // (the deck drops about 1.25 m per metre it closes in, ending 14 m out); inside that it curls down into the throat
+  const prof = []; for (let k = 0; k <= 28; k++){ const r = 3.2 + k*1.9; prof.push(new THREE.Vector2(r, r >= 14 ? 1.25*r - 10.9 : -1.5 + (r - 3.2)*0.75)); }
   const stripes = canvasTex(256, 128, (x, w, h) => {
     x.fillStyle = 'rgba(92,70,150,0.35)'; x.fillRect(0, 0, w, h);
     for (let i = 0; i < 10; i++){ const x0 = i/10*w; x.strokeStyle = i % 2 ? 'rgba(52,36,104,0.9)' : 'rgba(255,255,255,0.8)'; x.lineWidth = i % 2 ? 12 : 4;
@@ -4990,10 +5045,10 @@ const blackHole = (() => {
     for (let i = 0; i < 9; i++){ x.strokeStyle = 'rgba(0,0,0,0.45)'; x.lineWidth = 3 + (i % 3)*2; x.beginPath(); x.arc(w/2, w/2, w*(0.24 + i*0.028), i, i + 2.4); x.stroke(); }
   });
   const dm = new THREE.MeshBasicMaterial({ map: diskTex, transparent: true, opacity: 0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
-  const disk = new THREE.Mesh(new THREE.RingGeometry(3.4, 10, 64, 1), dm); disk.position.set(C0.x, C0.y, C0.z); disk.rotation.x = -Math.PI/2 + 0.22; space.world.add(disk);
+  const disk = new THREE.Mesh(new THREE.RingGeometry(3.4, 10.4, 64, 1), dm); disk.position.set(C0.x, C0.y, C0.z); disk.rotation.x = -Math.PI/2 + 0.12; space.world.add(disk);
   const haloTex = canvasTex(128, 128, (x, w) => { const g = x.createRadialGradient(w/2, w/2, w*0.18, w/2, w/2, w/2); g.addColorStop(0, 'rgba(240,232,255,0.9)'); g.addColorStop(0.3, 'rgba(169,147,214,0.35)'); g.addColorStop(1, 'rgba(169,147,214,0)'); x.fillStyle = g; x.fillRect(0, 0, w, w); });
   const hm = new THREE.SpriteMaterial({ map: haloTex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
-  const halo = new THREE.Sprite(hm); halo.position.set(C0.x, C0.y, C0.z); halo.scale.set(17, 17, 1); space.world.add(halo);
+  const halo = new THREE.Sprite(hm); halo.position.set(C0.x, C0.y, C0.z); halo.scale.set(20, 20, 1); space.world.add(halo);
   space.mats.push([fm, 0.9], [dm, 1], [hm, 0.8]);
   // drawn over the planet's shell, so only shown from inside it
   funnel.renderOrder = 1; disk.renderOrder = 2; halo.renderOrder = 2;
@@ -5018,14 +5073,16 @@ function confirmReset(){
 }
 function returnToObservatory(){
   SKY_ON = null; bhShown = false;
-  spawnAt(250, 839.5, 0);                                          // between the portal and the ring, facing the crowned trio's court
+  spawnAt(250, 821, Math.PI);                                      // at the foot of the hidden way, looking down the line
   toast('You are back at the observatory.');
 }
 function resetAll(){
   SKY_ON = null; bhShown = false;
   trialTimes = {}; try { localStorage.removeItem(TRIAL_KEY); } catch (e) {}
+  completions++; try { localStorage.setItem(COMPLETIONS_KEY, String(completions)); } catch (e) {}
   $('reset').click();                                              // back to the start, everything reset and saved
-  toast('Everything begins again.');
+  applyRegalia();
+  toast(completions === 1 ? 'Everything begins again, but you carry the crown.' : 'Everything begins again. Completions: ' + completions + '.');
 }
 function updateSpace(dt){
   const want = S.y > WORLD.y1 + 18 ? 1 : 0;
@@ -5128,6 +5185,19 @@ const body = {
   ski: { L: new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.025, 1.75), skiMat), R: new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.025, 1.75), skiMat) },
 };
 rig.add(body.head, body.hat, body.ski.L, body.ski.R);
+const regalia = (() => {
+  const gold = new THREE.MeshLambertMaterial({ color: 0xe6bf4f }); gold.flatShading = true;
+  const crown = new THREE.Group(); crown.position.y = 0.05; body.hat.add(crown);
+  { const g2 = gold.clone(); g2.side = THREE.DoubleSide; crown.add(new THREE.Mesh(new THREE.CylinderGeometry(0.122, 0.116, 0.06, 14, 1, true), g2)); }
+  for (let i = 0; i < 6; i++){ const a = i/6*Math.PI*2, s = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.06, 5), gold); s.position.set(Math.sin(a)*0.12, 0.055, -Math.cos(a)*0.12); crown.add(s); }
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), CRYSTAL_MAT.gem); gem.position.set(0, 0.005, -0.126); gem.scale.set(0.024, 0.036, 0.012); crown.add(gem);
+  const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.1335, 0.1335, 1, 16, 1, true), gold); belt.scale.y = 0.085; belt.position.y = -0.36; body.torso.add(belt);
+  return { crown, belt };
+})();
+function applyRegalia(){
+  const on = completions > 0; regalia.crown.visible = regalia.belt.visible = on;
+  if (on) skierMat.color.setHex(0x7b3fe0);
+}
 for (const k of ['L','R']) body.ski[k].geometry.translate(0, 0, -0.15);   // binding a little behind the ski's middle
 const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.45, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.16, depthWrite: false }));
 shadow.rotation.x = -Math.PI/2; shadow.scale.set(0.8, 1.3, 1); shadow.position.y = 0.04; scene.add(shadow);
@@ -5241,7 +5311,7 @@ function applyTheme(){
   readColors();
   const sky = new THREE.Color(C.sky);
   renderer.setClearColor(sky); scene.fog.color.copy(sky);
-  skierMat.color.set(C.skier);
+  skierMat.color.set(C.skier); if (typeof regalia !== 'undefined') applyRegalia();
   const dark = sky.getHSL({}).l < 0.3;
   hemi.intensity = dark ? 0.55 : 0.75; sun.intensity = dark ? 0.45 : 0.65;
   const tc = dark ? [0x2a231e, 0x1a2a26, 0x22352f] : [0x4d3f35, 0x2f4a43, 0x3e5c53];
@@ -6090,9 +6160,9 @@ function loop(t){
   }
   draw(); hud(); if (mapOpen) drawBigMap(); requestAnimationFrame(loop);
 }
-loadProgress();
+loadProgress(); applyRegalia(); calfUI();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

@@ -1279,7 +1279,14 @@ $('pGo').addEventListener('click', () => closePrompt(true));
 $('pNo').addEventListener('click', () => closePrompt(false));
 // what stopping at a kiosk or the altar offers, or null for nothing to say
 function kioskPrompt(K){
-  if (K.state === 'powered') return null;
+  if (K.state === 'powered'){
+    if (!gate4Open) return null;
+    if (trial.K === K) return kioskGot(K) < ORBS_PER_KIOSK ? { title: 'Time trial', body: 'Abandon this run? ' + fmtTime(trial.t) + ' so far, ' + kioskGot(K) + ' of 10 orbs.', go: 'Abandon', onGo: () => endTrial(false) } : null;
+    if (trial.K) return { title: 'Time trial', body: 'A time trial is already running at another terminal.', go: 'OK' };
+    const b = bestTimes(K);
+    return { title: 'Time trial', body: 'Collect the 10 orbs round this terminal\'s ' + Math.round(K.len) + ' m loop and get back here as fast as you can. '
+      + (b.length ? 'Best times: ' + b.map((t, i) => (i + 1) + '. ' + fmtTime(t)).join('   ') : 'No times yet.'), go: 'Start', onGo: () => startTrial(K) };
+  }
   if (K.state === 'dormant'){
     const other = activeKiosk();
     if (other) return { title: 'Terminal', body: 'Another terminal is already running. Collect its 10 orbs and power it on first.', go: 'OK' };
@@ -1306,6 +1313,7 @@ function altarPrompt(){
 function checkInteract(){
   if (promptCtx) return;
   for (const K of KIOSKS) if (K.state === 'active' && kioskGot(K) === ORBS_PER_KIOSK && Math.hypot(S.x - K.x, S.y - K.y) < 7){ powerKiosk(K); K.dismissed = true; }
+  if (trial.K && kioskGot(trial.K) === ORBS_PER_KIOSK && Math.hypot(S.x - trial.K.x, S.y - trial.K.y) < 7){ trial.K.dismissed = true; endTrial(true); }
   const spots = [...KIOSKS.map(K => [K, 7, () => kioskPrompt(K)]), [altar, 8, altarPrompt]];
   for (const [it, r, fn] of spots){
     const d = Math.hypot(S.x - it.x, S.y - it.y);
@@ -2429,7 +2437,7 @@ const treeMats = {
 // come back, and power the kiosk on. power every kiosk in a zone to open the way on (zone 1 the east gate, zone 2 the
 // bridge, zone 3 the south gate and the altar). only one kiosk runs at a time.
 const KIOSK_COUNT = { 1: 2, 2: 3, 3: 5 }, ORBS_PER_KIOSK = 10;
-const ANTENNA = { red: 0xd9534a, yellow: 0xf2c14e, green: 0x5cc87a };   // antenna lights: red incomplete, yellow in progress, green complete
+const ANTENNA = { red: 0xd9534a, yellow: 0xf2c14e, green: 0x5cc87a, purple: 0xa993d6 };   // purple: a time-trial terminal, the crystals' colour   // antenna lights: red incomplete, yellow in progress, green complete
 const ORB_COUNT = { 1: 20, 2: 30, 3: 50 }, ORB_R = 1.7;
 const ORB_COUNT_Z1 = ORB_COUNT[1];
 // a zone's trails as a graph: the junctions are the nodes, the stretches of trail between them the edges
@@ -2545,6 +2553,15 @@ const kiosksPowered = z => zoneKiosks(z).filter(K => K.state === 'powered').leng
 const zoneDone = z => zoneKiosks(z).length > 0 && kiosksPowered(z) === zoneKiosks(z).length;
 const activeKiosk = () => KIOSKS.find(K => K.state === 'active') || null;
 const kioskGot = K => K.orbs.filter(o => o.got).length;
+// ---- time trials: once the crystal gate is open, every terminal runs a time trial on its own loop. start it and its
+// 10 orbs light up and the clock runs (paused while a prompt is open); it stops when you get back to the terminal with
+// all 10. each terminal keeps its three best times, saved in this browser (a progress reset doesn't clear them)
+const TRIAL_KEY = 'skate-trials';
+let trialTimes = {}; try { trialTimes = JSON.parse(localStorage.getItem(TRIAL_KEY) || '{}') || {}; } catch (e) {}
+const trial = { K: null, t: 0 };
+const fmtTime = t => { const m = Math.floor(t/60), sec = t - m*60; return m + ':' + (sec < 10 ? '0' : '') + sec.toFixed(1); };
+const bestTimes = K => trialTimes[K.idx] || [];
+const orbLive = o => o.kiosk.state === 'active' || trial.K === o.kiosk;
 const orbGlowTex = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
   const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
@@ -2773,7 +2790,7 @@ function toast(msg){ const el = $('toast'); el.textContent = msg; el.classList.a
 function updateOrbs(dt){
   const now = performance.now();
   for (const o of orbs){
-    if (o.kiosk.state !== 'active'){ o.g.visible = false; continue; }   // lit only while their kiosk runs
+    if (!orbLive(o)){ o.g.visible = false; continue; }               // lit only while their terminal runs (or its trial)
     if (o.got){
       if (o.fade < 1){ o.fade = Math.min(1, o.fade + dt/0.45); const k = 1 + o.fade*1.6; o.g.scale.set(k, k, k); o.halo.material.opacity = 1 - o.fade; o.core.visible = o.fade < 0.3; o.g.position.y += dt*2; }
       else o.g.visible = false;
@@ -2793,12 +2810,30 @@ function updateOrbs(dt){
     if (Math.hypot(S.x - o.x, S.y - o.y) < ORB_R){
       const K = o.kiosk; o.got = true; o.fade = 0; const n = kioskGot(K);
       music.chime(n / ORBS_PER_KIOSK); saveProgress(); updateKioskLook(K);
-      toast(n === ORBS_PER_KIOSK ? 'All 10 orbs. Ski back to the terminal and it will power on.' : 'Orb ' + n + ' of 10');
+      toast(n === ORBS_PER_KIOSK ? (trial.K === K ? 'All 10 orbs. Back to the terminal to stop the clock!' : 'All 10 orbs. Ski back to the terminal and it will power on.') : 'Orb ' + n + ' of 10');
     }
   }
   if (toastT && now > toastT){ $('toast').classList.remove('on'); toastT = 0; }
 }
 // starting, finishing and powering kiosks. powering every kiosk in a zone opens its way onward
+function startTrial(K){
+  trial.K = K; trial.t = 0; checkpoint = { t: K.idx };
+  for (const o of K.orbs){ o.got = false; o.fade = 0; o.x = o.hx; o.y = o.hy; o.pull = 0; o.g.visible = true; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; }
+  updateKioskLook(K); music.chime(0.2); saveProgress();
+  toast('Go! Collect the 10 orbs and get back here.');
+}
+function endTrial(finished){
+  const K = trial.K; if (!K) return;
+  const t = trial.t; trial.K = null;
+  for (const o of K.orbs){ o.got = true; o.fade = 1; o.g.visible = false; }
+  updateKioskLook(K);
+  if (!finished){ toast('Time trial abandoned.'); return; }
+  const list = bestTimes(K).concat([t]).sort((a, b) => a - b).slice(0, 3); trialTimes[K.idx] = list;
+  try { localStorage.setItem(TRIAL_KEY, JSON.stringify(trialTimes)); } catch (e) {}
+  const rank = list.indexOf(t);
+  toast('Time ' + fmtTime(t) + (rank === 0 ? '. A new best!' : rank > 0 ? '. #' + (rank + 1) + ' on this terminal.' : '. Best is ' + fmtTime(list[0]) + '.'));
+  music.chime(1, true);
+}
 function startKiosk(K){
   checkpoint = { t: K.idx };
   K.state = 'active'; for (const T of KIOSKS) if (T !== K) updateKioskLook(T);
@@ -2842,6 +2877,7 @@ for (const z of [1, 2, 3]){
 }
 function resetOrbs(){
   for (const K of KIOSKS){ K.state = 'dormant'; K.dismissed = false; for (const o of K.orbs){ o.got = false; o.fade = 0; o.g.visible = false; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; } updateKioskLook(K); }
+  if (trial.K){ const K = trial.K; trial.K = null; updateKioskLook(K); }
   releasePet(); sleepGiant(); checkpoint = null; pet.lastDismissed = -1;
   setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; altar.state = 0; altar.dismissed = false; setCrystalsCollected(0); setCrystalsActive(false); updateAltarLook(); gate4Open = false; gate4.open = 0; bridgeWanted = false; bridgeDown = 0; animateGate(0);
   saveProgress();
@@ -3483,19 +3519,21 @@ for (const K of KIOSKS){
 }
 function updateKioskLook(K){
   const L = K.look; if (!L) return;
-  const c = KIOSK_LOOK[K.state]; L.screen.color.setHex(c);
+  const st = trial.K === K ? 'active' : K.state, c = KIOSK_LOOK[st]; L.screen.color.setHex(c);
   const n = kioskGot(K);
-  L.lights.forEach((m, k) => m.color.setHex(K.state === 'powered' ? KIOSK_LOOK.powered : K.state === 'active' && k < n ? KIOSK_LOOK.active : KIOSK_LOOK.dormant));
+  L.lights.forEach((m, k) => m.color.setHex(st === 'powered' ? KIOSK_LOOK.powered : st === 'active' && k < n ? KIOSK_LOOK.active : KIOSK_LOOK.dormant));
   // a dormant terminal's red light goes out while another terminal is running (you can't start it now); powered ones
   // stay green
   const busy = K.state === 'dormant' && !!activeKiosk();
-  const ant = K.state === 'powered' ? ANTENNA.green : K.state === 'active' ? ANTENNA.yellow : busy ? 0x2f3b48 : ANTENNA.red;
+  // once the crystal gate is open every terminal is a time trial, and its light turns crystal purple (pulsing while a run is on)
+  const tt = K.state === 'powered' && gate4Open;
+  const ant = tt ? ANTENNA.purple : st === 'powered' ? ANTENNA.green : st === 'active' ? ANTENNA.yellow : busy ? 0x2f3b48 : ANTENNA.red;
   L.beaconMat.color.setHex(ant); L.halo.material.color.setHex(ant); L.halo.visible = !busy;
 }
 function updateKiosks(){
   const now = performance.now()/1000;
   for (const K of KIOSKS){
-    const L = K.look, a = K.state === 'active';
+    const L = K.look, a = K.state === 'active' || trial.K === K;
     const k = a ? 2.4 + 0.5*Math.sin(now*3 + K.idx) : K.state === 'powered' ? 2.2 : 1.5;
     L.halo.scale.set(k, k, 1); L.halo.material.opacity = a ? 0.95 : 0.75;
   }
@@ -3813,7 +3851,7 @@ function updateAltar(){
   altar.gem.position.y = 3.5 + (altar.state ? 0.15*Math.sin(now*1.6) : 0);
 }
 function wakeAltar(){ checkpoint = { a: 1 }; altar.state = 1; updateAltarLook(); setCrystalsActive(true); music.chime(0.5, true); saveProgress(); toast('The altar wakes. 20 purple crystals have appeared beside landmarks in zones 1 to 3.'); }
-function finishAltar(){ checkpoint = { a: 1 }; altar.state = 2; updateAltarLook(); gate4Open = true; music.chime(1, true); saveProgress(); toast('The crystal gate in the southern divide is opening.'); }
+function finishAltar(){ checkpoint = { a: 1 }; altar.state = 2; updateAltarLook(); gate4Open = true; for (const K of KIOSKS) updateKioskLook(K); music.chime(1, true); saveProgress(); toast('The crystal gate in the southern divide is opening. Every terminal now runs a time trial.'); }
 const crystals = (() => {
   let seed = 8080; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const out = [];
@@ -3874,7 +3912,7 @@ function setCrystalsCollected(n){
   if (n > 0 || altar.state > 0) altar.state = n === CRYSTAL_TOTAL ? 2 : Math.max(1, Math.min(altar.state, 1));
   crystals.forEach((c, k) => { c.got = k < n; c.fade = c.got ? 1 : 0; c.g.scale.set(1, 1, 1); c.g.visible = crystalsActive && !c.got; });
   gate4Open = n === CRYSTAL_TOTAL;
-  updateAltarLook();
+  updateAltarLook(); for (const K of KIOSKS) updateKioskLook(K);
 }
 // the crystal gate: two tall pale pylons grown like the ruins, a lintel at 15 m, and two great doors seamed with purple
 // light that swing inward (south) once every crystal is in
@@ -4999,7 +5037,7 @@ function renderMapLayers(g, MAP, mx, my, mw, mh, sc){
   // the running terminal's orbs still out there, and the terminals themselves: red while dormant, yellow while running,
   // green once powered. the altar shows as a purple diamond once it can be woken
   g.fillStyle = C.orb;
-  for (const o of orbs) if (!o.got && o.kiosk.state === 'active'){ g.beginPath(); g.arc(mX(o.x), mY(o.y), 2, 0, Math.PI*2); g.fill(); }
+  for (const o of orbs) if (!o.got && orbLive(o)){ g.beginPath(); g.arc(mX(o.x), mY(o.y), 2, 0, Math.PI*2); g.fill(); }
   for (const K of KIOSKS){
     if (K.state === 'dormant' && activeKiosk()) continue;                     // dark while another runs, like its light
     g.fillStyle = K.state === 'active' ? '#f2c14e' : K.state === 'powered' ? '#5cc87a' : '#d9534a';   // like their antenna lights
@@ -5145,9 +5183,9 @@ function hud(){
   {
     // the counter shows what you're doing: a running kiosk's orbs, the crystals once the altar has woken them, or else
     // how many of this zone's kiosks are powered
-    const z = zoneAt(S.x, S.y), K = activeKiosk(), cry = !K && altar.state === 1;
+    const z = zoneAt(S.x, S.y), K = activeKiosk() || trial.K, cry = !K && altar.state === 1;
     let n = 0, tot = 0, label = '';
-    if (K){ n = kioskGot(K); tot = ORBS_PER_KIOSK; label = n === tot ? 'Back to the terminal' : 'Orbs'; }
+    if (K){ n = kioskGot(K); tot = ORBS_PER_KIOSK; label = trial.K === K ? fmtTime(trial.t) : n === tot ? 'Back to the terminal' : 'Orbs'; }
     else if (cry){ n = crystalsGot(); tot = CRYSTAL_TOTAL; label = n === tot ? 'Back to the altar' : 'Crystals'; }
     else if (z !== 4){ n = kiosksPowered(z); tot = KIOSK_COUNT[z]; label = n === tot ? (z === 1 ? (gateOpen ? 'Gate open' : 'Ski to the gate') : z === 2 ? (bridgeWanted ? 'Bridge down' : 'Ski to the bridge') : !gate2Open ? 'Ski to the south gate' : altar.state === 2 ? 'Crystal gate open' : 'South gate open') : 'Terminals'; }
     const txt = tot ? n + ' / ' + tot : 'Zone 4';
@@ -5250,6 +5288,7 @@ function loop(t){
   // a prompt interrupts the game: the skier holds still (keeping their speed) until it's answered
   if (!promptCtx){ const n = Math.max(1, Math.ceil(dt * 60 - 1e-6)); for (let k = 0; k < n; k++) step(dt/n); }
   updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updatePet(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract();
+  if (trial.K && !promptCtx) trial.t += dt;
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through
   const w = 3 / Math.max(0.05, P.cam);
@@ -5262,7 +5301,7 @@ function loop(t){
 }
 loadProgress();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

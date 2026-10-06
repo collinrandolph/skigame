@@ -515,7 +515,10 @@ function zone5Height(x, y){
   const plateau = Z5.h + 1.6*Math.sin(x/19)*Math.cos(y/13) + 0.8*Math.sin((x + y)/9);
   let h = ridge*(1 - t) + plateau*t;
   h += (ridge + 12 - h) * side;
-  return h - smooth01(Z5.cliff - 3, Z5.cliff + 16, y) * 360;
+  // a promontory: past its side walls the ground falls away too, so out in space you see one cliff face, not the map's edge
+  const sideK = smooth01(Z5.y0 + 10, Z5.y0 + 40, y);
+  const drop = Math.max(smooth01(Z5.cliff - 3, Z5.cliff + 30, y), smooth01(Z5.x0 - 22, Z5.x0 - 55, x)*sideK, smooth01(Z5.x1 + 22, Z5.x1 + 55, x)*sideK);
+  return h - drop * 2600;                                          // so deep the bottom is never seen
 }
 function heightNat(x, y){
   if (FLAT_GROUND) return 0;
@@ -4349,6 +4352,8 @@ const SKY = (() => {
     // the hidden way: from under the standing giant's belly, south over the mountains to zone 5
     g5: { ground: true, hidden: true, ...(() => { const v = new THREE.Vector3(); giant.rig.body.getWorldPosition(v); return { x: v.x, y: v.z }; })() },
     z5: { ground: true, hidden: true, x: 150, y: 853 },
+    // the Starway: out from the cliff into space, through the planet, and back to the cliff
+    s1: { ground: true, hidden: true, x: 165, y: 892 }, s2: { ground: true, hidden: true, x: 335, y: 892 },
   };
   for (const k in N){ const n = N[k]; n.id = k; if (n.ground) n.h = height(n.x, n.y) + 0.05; }
   // decks: node to node through control points [x, y, h] (h is a target; clearance over the terrain is added below)
@@ -4370,6 +4375,10 @@ const SKY = (() => {
     // over the ridge, and down onto the plateau
     { name: 'Hidden way', a: 'g5', b: 'z5', hidden: true, pts: [[134, 616, 1], [124, 640, 4], [140, 680, 10], [200, 722, 22], [270, 738, 33], [330, 748, 44], [372, 766, 55], [386, 796, 64],
       [362, 818, 52], [322, 830, 40], [278, 840, 28], [232, 847, 18], [188, 851, 9]] },
+    // the Starway: off the cliff's lip and out over the void, a long climb straight through the planet's heart, out
+    // the far side, round past its rings and back in to the cliff east of the observatory. no pylons out here
+    { name: 'Starway', a: 's1', b: 's2', hidden: true, space: true, pts: [[168, 912, 19], [180, 975, 26], [205, 1050, 35], [230, 1130, 46], [246, 1195, 55],
+      [250, 1250, 60], [254, 1305, 58], [275, 1365, 52], [320, 1400, 46], [375, 1385, 40], [412, 1320, 35], [420, 1230, 31], [405, 1130, 27], [375, 1030, 23], [350, 960, 20], [338, 915, 18]] },
   ];
   // sample each deck: a centripetal-ish Catmull-Rom through its control points, every ~2 m
   // the ground under a deck and a little way either side, so a deck crossing a ridge rides over it rather than through a cut
@@ -4543,7 +4552,7 @@ for (const d of SKY.decks){
   const pyMat = new THREE.MeshLambertMaterial({ color: 0xe3e8ec, transparent: true, opacity: 0 }), pyRing = new THREE.MeshBasicMaterial({ color: 0xa993d6, transparent: true, opacity: 0 });
   let next = 40;
   for (let i = 0; i < d.n; i++){
-    if (d.cum[i] < next || d.len - d.cum[i] < 30) continue;
+    if (d.space || d.cum[i] < next || d.len - d.cum[i] < 30) continue;
     const gh = height(d.X[i], d.Y[i]), clear = d.H[i] - gh;
     if (clear < 9){ continue; }
     next = d.cum[i] + 110;
@@ -4653,7 +4662,7 @@ const MUSICIANS = (() => {
     [T.x - 21, T.y - 8, 'drum'], [T.x - 23, T.y - 4, 'horn'], [T.x - 19, T.y - 2, 'harp'],
     [T.x + 21, T.y - 9, 'chimes'], [T.x + 23, T.y - 4, 'drum'], [T.x + 19, T.y - 1, 'horn'],
     [T.x - 6, T.y - 22, 'harp'], [T.x + 6, T.y - 22, 'chimes'],
-    [T.x - 45, Z5.cliff - 7, 'horn'], [T.x - 40, Z5.cliff - 6, 'drum'], [T.x + 42, Z5.cliff - 7, 'harp'],
+    [T.x - 40, Z5.cliff - 8, 'horn'], [T.x - 35, Z5.cliff - 7, 'drum'], [T.x + 38, Z5.cliff - 8, 'harp'],
   ];
   return spots.map(([x, y, kind], i) => {
     const rig = buildAlien(rnd), [ra, rb] = robes[i % robes.length];
@@ -4697,21 +4706,27 @@ const space = (() => {
     const gr = x.createLinearGradient(0, 0, 0, 256); [['#2b2350', 0], ['#5a4a8e', 0.2], ['#8e7cb0', 0.35], ['#c3b5dc', 0.48], ['#6c5a8e', 0.6], ['#a993d6', 0.75], ['#3f3550', 1]].forEach(([c0, k]) => gr.addColorStop(k, c0));
     x.fillStyle = gr; x.fillRect(0, 0, 64, 256); return new THREE.CanvasTexture(c); })();
   const pm = new THREE.MeshBasicMaterial({ map: planetTex, transparent: true, opacity: 0, fog: false, depthWrite: false });
-  const planet = new THREE.Mesh(new THREE.SphereGeometry(70, 40, 24), pm); planet.position.set(60, 95, 400); planet.rotation.z = 0.35; g.add(planet);
+  // the planet and its rings are real, out in the world past the cliff (the Starway runs right through it); seen from
+  // inside it glows violet all round
+  const world = new THREE.Group(); world.visible = false; scene.add(world);
+  pm.side = THREE.DoubleSide;
+  const planet = new THREE.Mesh(new THREE.SphereGeometry(70, 48, 28), pm); planet.position.set(250, 60, 1250); planet.rotation.z = 0.35; world.add(planet);
+  const inner = new THREE.Mesh(new THREE.SphereGeometry(69, 32, 20), new THREE.MeshBasicMaterial({ color: 0x8e7cb0, side: THREE.BackSide, transparent: true, opacity: 0, fog: false, depthWrite: false })); inner.position.copy(planet.position); world.add(inner);
   const rm = new THREE.MeshBasicMaterial({ color: 0xd8cff0, transparent: true, opacity: 0, side: THREE.DoubleSide, fog: false, depthWrite: false });
-  const ringM = new THREE.Mesh(new THREE.RingGeometry(92, 128, 64), rm); ringM.position.copy(planet.position); ringM.rotation.set(1.25, 0.15, 0.35); g.add(ringM);
+  const ringM = new THREE.Mesh(new THREE.RingGeometry(92, 128, 80), rm); ringM.position.copy(planet.position); ringM.rotation.set(1.25, 0.15, 0.35); world.add(ringM);
   const moonM = new THREE.MeshBasicMaterial({ color: 0xe7e3f2, transparent: true, opacity: 0, fog: false, depthWrite: false });
   for (const [x, y, z, r] of [[-170, 150, 360, 9], [220, 60, 330, 5]]){ const m = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), moonM); m.position.set(x, y, z); g.add(m); }
   for (const o of g.children) o.renderOrder = -1;
-  return { g, mats: [[stars.material, 1], [pm, 1], [rm, 0.55], [moonM, 1]], k: 0, deep: new THREE.Color(0x05060f), tmp: new THREE.Color() };
+  return { g, world, mats: [[stars.material, 1], [pm, 1], [rm, 0.55], [moonM, 1], [inner.material, 0.35]], k: 0, deep: new THREE.Color(0x05060f), tmp: new THREE.Color() };
 })();
 function updateSpace(dt){
   const want = S.y > WORLD.y1 + 18 ? 1 : 0;
   space.k += (want - space.k) * Math.min(1, dt*1.2);
-  if (space.k < 0.002 && !want){ if (space.g.visible){ space.g.visible = false; scene.fog.near = 55; scene.fog.far = 270; applySkyColour(1); } return; }
-  const k = space.k; space.g.visible = true; space.g.position.copy(camera.position);
+  if (space.k < 0.002 && !want){ if (space.g.visible){ space.g.visible = false; space.world.visible = false; scene.fog.near = 55; scene.fog.far = 270; camera.far = 600; camera.updateProjectionMatrix(); applySkyColour(1); } return; }
+  const k = space.k; space.g.visible = true; space.world.visible = true; space.g.position.copy(camera.position);
   for (const [m, o] of space.mats) m.opacity = k*o;
   scene.fog.near = 55 + k*2000; scene.fog.far = 270 + k*4000;
+  const far = 600 + Math.round(k*600); if (camera.far !== far){ camera.far = far; camera.updateProjectionMatrix(); }   // see the planet from anywhere out here
   applySkyColour(1 - k);
 }
 function applySkyColour(w){

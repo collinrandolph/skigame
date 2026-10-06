@@ -243,13 +243,13 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tTmin">Shortest throw (stick units)<output id="oTmin"></output><input id="tTmin" type="range" min="0.3" max="1.4" step="0.05" value="0.7"></label>
     <label for="tFedge">Flick needs (share of stick range)<output id="oFedge"></output><input id="tFedge" type="range" min="0.6" max="1" step="0.01" value="0.92"></label>
     <label for="tV1side">V1 hang side (triggers)<output id="oV1side"></output><input id="tV1side" type="range" min="0" max="1" step="1" value="1"></label>
+    <label for="tMagnet">Orb magnet range (m)<output id="oMagnet"></output><input id="tMagnet" type="range" min="0" max="20" step="0.5" value="7"></label>
     <label for="tRumble">Kick vibration on groomed snow (%)<output id="oRumble"></output><input id="tRumble" type="range" min="0" max="100" step="1" value="5"></label>
     <label for="tRumble2">Kick vibration on ungroomed snow (%)<output id="oRumble2"></output><input id="tRumble2" type="range" min="0" max="100" step="1" value="25"></label>
     <label for="tRumbleL">Buzz when a stroke starts loading (%)<output id="oRumbleL"></output><input id="tRumbleL" type="range" min="0" max="20" step="0.5" value="1"></label>
     <h4>Touch</h4>
-    <label for="tSwait">Swipe wait before a tap kicks (ms)<output id="oSwait"></output><input id="tSwait" type="range" min="0" max="200" step="10" value="90"></label>
-    <label for="tSpull">Slingshot pull (px)<output id="oSpull"></output><input id="tSpull" type="range" min="10" max="80" step="2" value="26"></label>
-    <label for="tSthrow">Slingshot throw (px)<output id="oSthrow"></output><input id="tSthrow" type="range" min="10" max="100" step="2" value="34"></label>
+    <label for="tSwait">Wait before a tap kicks, in case it's a swipe (ms)<output id="oSwait"></output><input id="tSwait" type="range" min="0" max="200" step="10" value="90"></label>
+    <label for="tSthrow">Swipe up distance for a loaded stroke (px)<output id="oSthrow"></output><input id="tSthrow" type="range" min="10" max="100" step="2" value="34"></label>
     <div class="btns"><button id="dbgToggle" type="button">Stick debug: off</button></div>
     <h4>Kicks and strides</h4>
     <label for="tPush">Push per kick (m/s)<output id="oPush"></output><input id="tPush" type="range" min="0.2" max="2.5" step="0.05" value="2.5"></label>
@@ -340,7 +340,7 @@ addEventListener('resize', resize);
 
 const $ = id => document.getElementById(id);
 const P = {};
-const tune = [['tRumble','oRumble','rumble',v=>v ? v.toFixed(0)+'%' : 'off'],['tRumble2','oRumble2','rumble2',v=>v ? v.toFixed(0)+'%' : 'off'],['tRumbleL','oRumbleL','rumbleL',v=>v ? v.toFixed(1)+'%' : 'off'],['tMarks','oMarks','marks',v=>v.toFixed(0)+'%'],['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tSwait','oSwait','swait',v=>v.toFixed(0)],['tSpull','oSpull','spull',v=>v.toFixed(0)],['tSthrow','oSthrow','sthrow',v=>v.toFixed(0)],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tBsnap','oBsnap','bsnap',v=>v ? v.toFixed(0) : 'off'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKfloor','oKfloor','kfloor',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
+const tune = [['tMagnet','oMagnet','magnet',v=>v ? v.toFixed(1) : 'off'],['tRumble','oRumble','rumble',v=>v ? v.toFixed(0)+'%' : 'off'],['tRumble2','oRumble2','rumble2',v=>v ? v.toFixed(0)+'%' : 'off'],['tRumbleL','oRumbleL','rumbleL',v=>v ? v.toFixed(1)+'%' : 'off'],['tMarks','oMarks','marks',v=>v.toFixed(0)+'%'],['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tSwait','oSwait','swait',v=>v.toFixed(0)],['tSthrow','oSthrow','sthrow',v=>v.toFixed(0)],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tBsnap','oBsnap','bsnap',v=>v ? v.toFixed(0) : 'off'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKfloor','oKfloor','kfloor',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
   ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tOffglide','oOffglide','offglide',v=>v.toFixed(0)+'%'],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -486,7 +486,7 @@ function divideHeight(x, y){
   const u = (y - divideY(x)) / 32; if (Math.abs(u) >= 1) return 0;
   const amp = 40 + 9*Math.sin(x/19 + 0.7) + 6*Math.sin(x/7.3) + 4*Math.sin(x/3.1 + y/9);
   let h = amp * 0.5*(1 + Math.cos(Math.PI*u)) * (1 + 0.12*Math.sin(x/9 + Math.sin(y/6)));
-  h *= smooth01(G4.hw + 3, G4.hw + 26, Math.abs(x - G4.x));                          // the notch, cut down to a flat floor
+  h *= smooth01(G4.hw + 2.5, G4.hw + 11, Math.abs(x - G4.x));                        // the notch: a flat floor between sheer walls
   return h;
 }
 // zone 4: broad open snowfields beyond the divide, long gentle swells
@@ -1291,12 +1291,23 @@ function altarPrompt(){
   if (n < CRYSTAL_TOTAL) return { title: 'Altar', body: n + ' of 20 crystals collected. Bring them all back here to open the crystal gate.', go: 'OK' };
   return { title: 'Altar', body: 'All 20 crystals. Open the crystal gate?', go: 'Open', onGo: finishAltar };
 }
-// come to a stop beside one and its prompt opens; it won't open again until you've moved away and come back.
-// a running kiosk whose 10 orbs are all in powers on by itself as soon as you get back to it, no stop or prompt
+// ski into range of a terminal or the altar and, when there's something to do there (start it, wake it, open the gate),
+// the prompt interrupts the game straight away, no need to slow down. anything else (another terminal is running, orbs
+// still out) is a short message instead. either way it won't come again until you've moved away and come back.
+// a running terminal whose 10 orbs are all in powers on by itself as soon as you get back to it, no prompt
 function checkInteract(){
   if (promptCtx) return;
-  const v = Math.hypot(S.vx, S.vy);
   for (const K of KIOSKS) if (K.state === 'active' && kioskGot(K) === ORBS_PER_KIOSK && Math.hypot(S.x - K.x, S.y - K.y) < 7){ powerKiosk(K); K.dismissed = true; }
+  const spots = [...KIOSKS.map(K => [K, 7, () => kioskPrompt(K)]), [altar, 8, altarPrompt]];
+  for (const [it, r, fn] of spots){
+    const d = Math.hypot(S.x - it.x, S.y - it.y);
+    if (d > r + 6) it.dismissed = false;
+    if (d < r && !it.dismissed){
+      const c = fn(); it.dismissed = true;
+      if (c && c.onGo){ openPrompt(c); return; }
+      if (c) toast(c.body);
+    }
+  }
   // ski up to a gate's or the bridge's control: with every terminal in its zone powered it opens; otherwise it says how
   // many are left (once each time you come up to it)
   for (const c of CONTROLS){
@@ -1305,12 +1316,6 @@ function checkInteract(){
     if (d > c.r || c.isOpen()) continue;
     if (zoneDone(c.zone)){ c.open(); music.chime(1, true); toast(c.msg); saveProgress(); }
     else if (!c.told){ c.told = true; toast(kiosksPowered(c.zone) + ' of ' + KIOSK_COUNT[c.zone] + ' terminals powered. Power them all to open the ' + c.name + '.'); }
-  }
-  const spots = [...KIOSKS.map(K => [K, 6, () => kioskPrompt(K)]), [altar, 7, altarPrompt]];
-  for (const [it, r, fn] of spots){
-    const d = Math.hypot(S.x - it.x, S.y - it.y);
-    if (d > r + 5) it.dismissed = false;
-    if (d < r && v < 0.9 && !it.dismissed){ const c = fn(); it.dismissed = true; if (c){ openPrompt(c); return; } }
   }
 }
 // ---- the controller: each stick is one leg (triggers kick too; see pollTwin).
@@ -1553,10 +1558,10 @@ addEventListener('keyup', e => {
   const leg = keyLeg(k); if (leg){ keyKickHeld[leg] = false; release(leg); }
 });
 addEventListener('blur', () => { held.L = held.R = false; });
-// touch pads, slingshot style. a tap is a normal kick. pull your thumb down the pad (load) and swipe it back up (throw)
-// for a loaded stroke: the same kick with the loaded boost, exactly like a loaded stick throw. letting go while pulled
-// back also fires it. so a tap isn't mistaken for the start of a pull, a tap's kick waits up to "swipe wait" ms for a
-// downward pull; lifting your thumb or moving any other way fires it straight away.
+// touch pads: a tap is a normal kick; a swipe up the pad is a loaded stroke (the same kick with the loaded boost, like a
+// loaded stick throw). so a tap isn't mistaken for the start of a swipe, a tap's kick waits up to "swipe wait" ms for
+// the finger to start moving up; lifting it or sliding any other way kicks straight away. a swipe fires as soon as it
+// has travelled the swipe distance, or on lifting if it got at least halfway
 const padTouch = { L: null, R: null };
 function padKick(leg, t){ if (t.timer){ clearTimeout(t.timer); t.timer = null; } if (t.state === 'wait'){ t.state = 'done'; kickInput(leg); } }
 function padLoaded(leg, t){
@@ -1569,28 +1574,25 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
   el.addEventListener('pointerdown', e => {
     e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch(_){} el.classList.add('on'); anyInputAt = performance.now();
     const old = padTouch[leg]; if (old) padKick(leg, old);
-    const t = padTouch[leg] = { id: e.pointerId, x0: e.clientX, y0: e.clientY, low: e.clientY, state: 'wait', timer: null, t0: performance.now() };
+    const t = padTouch[leg] = { id: e.pointerId, x0: e.clientX, y0: e.clientY, state: 'wait', timer: null, t0: performance.now() };
     if (P.swait > 0) t.timer = setTimeout(() => padKick(leg, t), P.swait); else padKick(leg, t);
   });
   el.addEventListener('pointermove', e => {
     const t = padTouch[leg]; if (!t || t.id !== e.pointerId) return;
-    const dx = e.clientX - t.x0, dy = e.clientY - t.y0;
+    const dx = e.clientX - t.x0, up = t.y0 - e.clientY;
     if (t.state === 'wait'){
-      if (dy > 8 && dy > Math.abs(dx)*0.7){ clearTimeout(t.timer); t.timer = null; t.state = 'pull'; el.classList.add('pull'); }
-      else if (Math.hypot(dx, dy) > 12) padKick(leg, t);   // a slide that isn't a pull: just the kick
+      if (up > 8 && up > Math.abs(dx)*0.6){ clearTimeout(t.timer); t.timer = null; t.state = 'swipe'; el.classList.add('pull'); }
+      else if (Math.hypot(dx, up) > 12) padKick(leg, t);     // a slide that isn't upward: just the kick
     }
-    if (t.state === 'pull' || t.state === 'armed'){
-      t.low = Math.max(t.low, e.clientY);
-      if (t.low - t.y0 >= P.spull){ t.state = 'armed'; el.classList.add('armed'); }
-      if (t.state === 'armed' && t.low - e.clientY >= P.sthrow){ el.classList.remove('pull','armed'); padLoaded(leg, t); }
-    }
+    if (t.state === 'swipe' && up >= P.sthrow){ el.classList.remove('pull'); padLoaded(leg, t); }
   });
   for (const ev of ['pointerup','pointercancel']) el.addEventListener(ev, e => {
     const t = padTouch[leg];
     if (t && t.id === e.pointerId){
-      if (t.state === 'armed' && ev === 'pointerup'){ padLoaded(leg, t); held[leg] = false; }   // let go of the pulled slingshot
-      else if (t.state === 'pull') { t.state = 'wait'; padKick(leg, t); }                       // a short pull: an ordinary kick
-      else padKick(leg, t);
+      if (t.state === 'swipe'){
+        if (ev === 'pointerup' && t.y0 - e.clientY >= P.sthrow/2){ padLoaded(leg, t); held[leg] = false; }   // a short flick up still counts
+        else { t.state = 'wait'; padKick(leg, t); }
+      } else padKick(leg, t);
       padTouch[leg] = null;
     }
     el.classList.remove('on','pull','armed'); release(leg);
@@ -2339,6 +2341,57 @@ const trees = (() => {
   }
   return out;
 })();
+// ---- ice boulders scattered through the open snow among the trees, the same faceted ice as round the zone 2 beacon:
+// lone boulders, clusters like the beacon's, upright shards and flat slabs, in three tints of ice, half sunk in the
+// snow. seeded, so they're the same every time; kept off trails and lawns, out of the buildings, water and the stadium.
+// drawn as instanced meshes. the bigger pieces are solid
+const BOULDERS = (() => {
+  const tb0 = performance.now();
+  let seed = 9191; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const tg = new Map(), key = (x, y) => Math.floor(x/6) + ',' + Math.floor(y/6);
+  for (const t of trees){ const k = key(t.x, t.y); if (!tg.has(k)) tg.set(k, []); tg.get(k).push(t); }
+  const nearTree = (x, y, r) => { for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++){ const g = tg.get((Math.floor(x/6) + a) + ',' + (Math.floor(y/6) + b)); if (g && g.some(t => Math.hypot(t.x - x, t.y - y) < r)) return true; } return false; };
+  const out = [];
+  for (let i = 0; i < 20000 && out.length < 520; i++){
+    const x = WORLD.x0 + 10 + rnd()*(WORLD.x1 - WORLD.x0 - 20), y = WORLD.y0 + 10 + rnd()*(WORLD.y1 - WORLD.y0 - 20);
+    const kind = rnd(), size = 0.6 + rnd()*rnd()*2.6;
+    if (obstacleSD(x, y, true) < 2 + size) continue;
+    if (nearestTrail(x, y).d < TRAIL_W/2 + 2.5 + size*1.5 || lawnSD(x, y) < 2 + size) continue;
+    if (Math.abs(y - riverY(x)) < RIVER_BANK + 2 || lakeQ(x, y) < 1.12 || Math.hypot(x, y) < 22) continue;
+    if (STRUCTS.some(o => Math.hypot(o.x - x, o.y - y) < o.r + 3 + size) || OUTCROPS.some(o => Math.hypot(o.x - x, o.y - y) < o.size*2 + 3)) continue;
+    if (nearHerd(x, y, 30) || nearTree(x, y, 1.6 + size) || out.some(b => Math.hypot(b.x - x, b.y - y) < 6 + (b.size + size)*1.5)) continue;
+    // the pieces: kind < .35 one boulder, < .7 a cluster of 3 or 4, < .85 an upright shard (with a chip), else a slab
+    const parts = [], n = kind < 0.35 ? 1 : kind < 0.7 ? 3 + (rnd() < 0.5 ? 1 : 0) : 2;
+    for (let k = 0; k < n; k++){
+      const a = rnd()*Math.PI*2, d = k ? size*(0.6 + rnd()*0.9) : 0, s0 = k ? size*(0.35 + rnd()*0.45) : size;
+      const shape = kind < 0.7 ? (rnd() < 0.7 ? 0 : 1) : kind < 0.85 ? (k ? 0 : 2) : (k ? 0 : 3);
+      parts.push({ x: x + Math.cos(a)*d, y: y + Math.sin(a)*d, s: shape === 2 || shape === 3 ? s0 : (k ? s0 : s0*0.8), shape, tint: (rnd()*3) | 0, rx: rnd()*3, ry: rnd()*6.3, rz: rnd()*3 });
+    }
+    out.push({ x, y, size, parts });
+  }
+  if (/[?&]debug\b/.test(location.search)) console.log('boulders', out.length, (performance.now() - tb0).toFixed(0) + ' ms');
+  return out;
+})();
+for (const b of BOULDERS) if (b.size > 1.1) SOLIDS.push({ x: b.x, y: b.y, r: b.size*0.85 });
+{
+  // shapes: rounded boulder, rougher boulder, tall shard, flat slab; tints: the beacon's ice, a deeper blue, a frosty white
+  const geos = [new THREE.DodecahedronGeometry(1, 0), new THREE.IcosahedronGeometry(1, 0), new THREE.OctahedronGeometry(1, 0), new THREE.DodecahedronGeometry(1, 0)];
+  const scaleOf = [[1, 0.8, 1], [1, 0.75, 0.9], [0.45, 1.8, 0.4], [1.4, 0.35, 1.1]];
+  const tints = [0xc3d4e0, 0xa9c9dc, 0xdfe9f0].map(c => { const m = new THREE.MeshLambertMaterial({ color: c }); m.flatShading = true; return m; });
+  const groups = new Map();
+  for (const b of BOULDERS) for (const p of b.parts){ const k = p.shape*3 + p.tint; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); }
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
+  for (const [k, list] of groups){
+    const shape = (k/3) | 0, mesh = new THREE.InstancedMesh(geos[shape], tints[k % 3], list.length), S0 = scaleOf[shape];
+    list.forEach((p, i) => {
+      e.set(shape === 2 ? p.rx*0.15 : p.rx, p.ry, shape === 2 ? p.rz*0.15 : p.rz); q.setFromEuler(e);
+      sc.set(S0[0]*p.s, S0[1]*p.s, S0[2]*p.s);
+      pos.set(p.x, height(p.x, p.y) + (shape === 2 ? S0[1]*p.s*0.55 : shape === 3 ? 0.05 : p.s*0.3) - 0.15, p.y);
+      mesh.setMatrixAt(i, m4.compose(pos, q, sc));
+    });
+    mesh.instanceMatrix.needsUpdate = true; mesh.frustumCulled = false; scene.add(mesh);
+  }
+}
 const treeMats = {
   trunk: new THREE.MeshLambertMaterial({ color: 0x4d3f35 }),
   low: new THREE.MeshLambertMaterial({ color: 0x2f4a43 }),
@@ -2471,7 +2524,7 @@ const KIOSKS = (() => {
         const at = (k + 1)/(ORBS_PER_KIOSK + 1) * L; let i = 1; while (i < qc.length - 1 && qc[i] < at) i++;
         const u = (at - qc[i-1]) / Math.max(1e-6, qc[i] - qc[i-1]), dx = Q[i*2] - Q[i*2-2], dy = Q[i*2+1] - Q[i*2-1], l = Math.hypot(dx, dy) || 1;
         const sd = sides[k % sides.length], x = Q[i*2-2] + dx*u - dy/l*sd, y = Q[i*2-1] + dy*u + dx/l*sd;
-        K.orbs.push({ x, y, zone, kiosk: K, got: false, fade: 0, ph: k*1.7 + zone + out.length });
+        K.orbs.push({ x, y, hx: x, hy: y, zone, kiosk: K, got: false, fade: 0, ph: k*1.7 + zone + out.length });
       }
       out.push(K);
     }
@@ -2719,7 +2772,16 @@ function updateOrbs(dt){
       continue;
     }
     const bob = Math.sin(now/600 + o.ph) * 0.12, pulse = 1.45 + Math.sin(now/380 + o.ph) * 0.12;
-    o.g.position.y = height(o.x, o.y) + 1.1 + bob; o.halo.scale.set(pulse, pulse, 1);
+    // magnet: within range an orb is drawn in to you, gently at the edge and faster as it closes, so you only need to
+    // pass near it. it rises toward your chest as it comes
+    const dm = Math.hypot(S.x - o.x, S.y - o.y);
+    if (dm < P.magnet || o.pull > 0){
+      o.pull = Math.min(1, (o.pull || 0) + dt*2);
+      const sp = (4 + 14*(1 - Math.min(1, dm / Math.max(1, P.magnet)))) * o.pull + Math.hypot(S.vx, S.vy);
+      const st = Math.min(dm, sp*dt); if (dm > 1e-3){ o.x += (S.x - o.x)/dm*st; o.y += (S.y - o.y)/dm*st; }
+    }
+    o.g.position.x = o.x; o.g.position.z = o.y;
+    o.g.position.y = height(o.x, o.y) + 1.1 + bob - 0.3*(o.pull || 0); o.halo.scale.set(pulse, pulse, 1);
     if (Math.hypot(S.x - o.x, S.y - o.y) < ORB_R){
       const K = o.kiosk; o.got = true; o.fade = 0; const n = kioskGot(K);
       music.chime(n / ORBS_PER_KIOSK); saveProgress(); updateKioskLook(K);
@@ -2730,15 +2792,15 @@ function updateOrbs(dt){
 }
 // starting, finishing and powering kiosks. powering every kiosk in a zone opens its way onward
 function startKiosk(K){
-  K.state = 'active';
-  for (const o of K.orbs){ o.got = false; o.fade = 0; o.g.visible = true; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; }
+  K.state = 'active'; for (const T of KIOSKS) if (T !== K) updateKioskLook(T);
+  for (const o of K.orbs){ o.got = false; o.fade = 0; o.x = o.hx; o.y = o.hy; o.pull = 0; o.g.visible = true; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; }
   updateKioskLook(K); music.chime(0.2); saveProgress();
   toast('10 orbs are lit on a loop that starts and ends here.');
 }
 function powerKiosk(K, quiet = false){
   K.state = 'powered';
   for (const o of K.orbs){ o.got = true; o.fade = 1; o.g.visible = false; }
-  updateKioskLook(K);
+  for (const T of KIOSKS) updateKioskLook(T);
   if (quiet) return;
   music.chime(1, true);
   const z = K.zone, left = zoneKiosks(z).length - kiosksPowered(z);
@@ -3414,8 +3476,11 @@ function updateKioskLook(K){
   const c = KIOSK_LOOK[K.state]; L.screen.color.setHex(c);
   const n = kioskGot(K);
   L.lights.forEach((m, k) => m.color.setHex(K.state === 'powered' ? KIOSK_LOOK.powered : K.state === 'active' && k < n ? KIOSK_LOOK.active : KIOSK_LOOK.dormant));
-  const ant = K.state === 'powered' ? ANTENNA.green : K.state === 'active' ? ANTENNA.yellow : ANTENNA.red;
-  L.beaconMat.color.setHex(ant); L.halo.material.color.setHex(ant);
+  // a dormant terminal's red light goes out while another terminal is running (you can't start it now); powered ones
+  // stay green
+  const busy = K.state === 'dormant' && !!activeKiosk();
+  const ant = K.state === 'powered' ? ANTENNA.green : K.state === 'active' ? ANTENNA.yellow : busy ? 0x2f3b48 : ANTENNA.red;
+  L.beaconMat.color.setHex(ant); L.halo.material.color.setHex(ant); L.halo.visible = !busy;
 }
 function updateKiosks(){
   const now = performance.now()/1000;
@@ -3805,10 +3870,14 @@ function setCrystalsCollected(n){
 // light that swing inward (south) once every crystal is in
 const gate4 = (() => {
   const g = new THREE.Group(), h0 = height(G4.x, G4.y); g.position.set(G4.x, h0, G4.y); scene.add(g);
-  const W = G4.hw, H = 15;
+  const W = G4.hw, H = 21;
   for (const sx of [-1, 1]){
     const p = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.6, H + 3, 9), SM.bone); p.position.set(sx*(W + 1.4), (H + 3)/2 - 0.5, 0); g.add(p);
-    for (let k = 0; k < 4; k++){ const r = new THREE.Mesh(new THREE.TorusGeometry(1.45 - k*0.1, 0.18, 6, 14), SM.bone2); r.rotation.x = Math.PI/2; r.position.set(sx*(W + 1.4), 3 + k*3.6, 0); g.add(r); }
+    for (let k = 0; k < 5; k++){ const r = new THREE.Mesh(new THREE.TorusGeometry(1.45 - k*0.08, 0.18, 6, 14), SM.bone2); r.rotation.x = Math.PI/2; r.position.set(sx*(W + 1.4), 3 + k*4.2, 0); g.add(r); }
+    // flanking walls from the pylon into the notch's sides, so nothing beyond shows past the gate: a tall ribbed slab,
+    // its foot sunk in the snow, running well into the rock
+    const wl = 26, wall = new THREE.Mesh(new THREE.BoxGeometry(wl, H + 6, 2.6), SM.bone); wall.position.set(sx*(W + 2.2 + wl/2), (H + 6)/2 - 3, 0.3); g.add(wall);
+    for (let k = 0; k < 6; k++){ const rib = new THREE.Mesh(new THREE.BoxGeometry(0.9, H + 4, 3.2), SM.bone2); rib.position.set(sx*(W + 4.5 + k*3.6), (H + 4)/2 - 3, 0.3); g.add(rib); }
     const sp = new THREE.Mesh(new THREE.ConeGeometry(0.7, 4, 7), SM.bone2); sp.position.set(sx*(W + 1.4), H + 4, 0); g.add(sp);
   }
   const lintel = new THREE.Mesh(new THREE.BoxGeometry(2*W + 6, 1.6, 2.2), SM.bone); lintel.position.set(0, H + 0.6, 0); g.add(lintel);
@@ -3819,7 +3888,7 @@ const gate4 = (() => {
     // each door hinges on its pylon and reaches the middle; a slab with ribs and a glowing seam
     const hinge = new THREE.Group(); hinge.position.set(sx*W, 0, 0); g.add(hinge);
     const slab = new THREE.Mesh(new THREE.BoxGeometry(W, H - 0.4, 0.7), SM.bone); slab.position.set(-sx*W/2, (H - 0.4)/2, 0); hinge.add(slab);
-    for (let k = 0; k < 5; k++){ const rib = new THREE.Mesh(new THREE.BoxGeometry(W - 0.6, 0.35, 0.95), SM.bone2); rib.position.set(-sx*W/2, 1.6 + k*2.8, 0); hinge.add(rib); }
+    for (let k = 0; k < 7; k++){ const rib = new THREE.Mesh(new THREE.BoxGeometry(W - 0.6, 0.35, 0.95), SM.bone2); rib.position.set(-sx*W/2, 1.6 + k*2.8, 0); hinge.add(rib); }
     const seam = new THREE.Mesh(new THREE.BoxGeometry(0.25, H - 1, 0.8), CRYSTAL_MAT.core); seam.position.set(-sx*(W - 0.2), (H - 0.4)/2, 0); hinge.add(seam);
     const glyph = new THREE.Mesh(new THREE.OctahedronGeometry(0.9, 0), CRYSTAL_MAT.gem2); glyph.scale.set(0.6, 1.4, 0.4); glyph.position.set(-sx*W*0.55, H*0.55, -0.45); hinge.add(glyph);
     doors.push({ hinge, sx });
@@ -4692,6 +4761,7 @@ function renderMapLayers(g, MAP, mx, my, mw, mh, sc){
   g.fillStyle = C.orb;
   for (const o of orbs) if (!o.got && o.kiosk.state === 'active'){ g.beginPath(); g.arc(mX(o.x), mY(o.y), 2, 0, Math.PI*2); g.fill(); }
   for (const K of KIOSKS){
+    if (K.state === 'dormant' && activeKiosk()) continue;                     // dark while another runs, like its light
     g.fillStyle = K.state === 'active' ? '#f2c14e' : K.state === 'powered' ? '#5cc87a' : '#d9534a';   // like their antenna lights
     g.fillRect(mX(K.x) - 3, mY(K.y) - 3, 6, 6);
   }
@@ -4937,7 +5007,8 @@ function loop(t){
   // the simulation runs in steps of at most 1/60 s however slowly the page draws (phones often manage 30 fps or less),
   // so movement, friction and glide come out the same on every device
   const dt = Math.min(0.1, (t-last)/1000); last = t; pollPad();
-  { const n = Math.max(1, Math.ceil(dt * 60 - 1e-6)); for (let k = 0; k < n; k++) step(dt/n); }
+  // a prompt interrupts the game: the skier holds still (keeping their speed) until it's answered
+  if (!promptCtx){ const n = Math.max(1, Math.ceil(dt * 60 - 1e-6)); for (let k = 0; k < n; k++) step(dt/n); }
   updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract();
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through

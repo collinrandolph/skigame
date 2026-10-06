@@ -2792,13 +2792,14 @@ function updateOrbs(dt){
 }
 // starting, finishing and powering kiosks. powering every kiosk in a zone opens its way onward
 function startKiosk(K){
+  checkpoint = { t: K.idx };
   K.state = 'active'; for (const T of KIOSKS) if (T !== K) updateKioskLook(T);
   for (const o of K.orbs){ o.got = false; o.fade = 0; o.x = o.hx; o.y = o.hy; o.pull = 0; o.g.visible = true; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; }
   updateKioskLook(K); music.chime(0.2); saveProgress();
   toast('10 orbs are lit on a loop that starts and ends here.');
 }
 function powerKiosk(K, quiet = false){
-  K.state = 'powered';
+  K.state = 'powered'; if (!quiet) checkpoint = { t: K.idx };
   for (const o of K.orbs){ o.got = true; o.fade = 1; o.g.visible = false; }
   for (const T of KIOSKS) updateKioskLook(T);
   if (quiet) return;
@@ -2833,6 +2834,7 @@ for (const z of [1, 2, 3]){
 }
 function resetOrbs(){
   for (const K of KIOSKS){ K.state = 'dormant'; K.dismissed = false; for (const o of K.orbs){ o.got = false; o.fade = 0; o.g.visible = false; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; } updateKioskLook(K); }
+  releasePet(); sleepGiant(); checkpoint = null;
   setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; altar.state = 0; altar.dismissed = false; setCrystalsCollected(0); setCrystalsActive(false); updateAltarLook(); gate4Open = false; gate4.open = 0; bridgeWanted = false; bridgeDown = 0; animateGate(0);
   saveProgress();
 }
@@ -3802,8 +3804,8 @@ function updateAltar(){
   altar.gem.rotation.y = now*(altar.state ? 0.8 : 0.1);
   altar.gem.position.y = 3.5 + (altar.state ? 0.15*Math.sin(now*1.6) : 0);
 }
-function wakeAltar(){ altar.state = 1; updateAltarLook(); setCrystalsActive(true); music.chime(0.5, true); saveProgress(); toast('The altar wakes. 20 purple crystals have appeared beside landmarks in zones 1 to 3.'); }
-function finishAltar(){ altar.state = 2; updateAltarLook(); gate4Open = true; music.chime(1, true); saveProgress(); toast('The crystal gate in the southern divide is opening.'); }
+function wakeAltar(){ checkpoint = { a: 1 }; altar.state = 1; updateAltarLook(); setCrystalsActive(true); music.chime(0.5, true); saveProgress(); toast('The altar wakes. 20 purple crystals have appeared beside landmarks in zones 1 to 3.'); }
+function finishAltar(){ checkpoint = { a: 1 }; altar.state = 2; updateAltarLook(); gate4Open = true; music.chime(1, true); saveProgress(); toast('The crystal gate in the southern divide is opening.'); }
 const crystals = (() => {
   let seed = 8080; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const out = [];
@@ -3957,7 +3959,7 @@ HERD = (() => {
       }
     });
   }
-  for (const h of out){ h.rig = buildMoose(h.calf); h.rig.root.scale.setScalar(h.scale); }
+  out.forEach((h, i) => { h.id = i; h.rig = buildMoose(h.calf); h.rig.root.scale.setScalar(h.scale); });
   return out;
 })();
 // the giant, asleep: a grown moose eleven times over, legs folded under, head down, breathing slow clouds of vapour.
@@ -3983,15 +3985,24 @@ const giant = (() => {
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: vapour, color: 0xf2f8fb, transparent: true, opacity: 0, depthWrite: false }));
     scene.add(sp); return { sp, t: 9 };
   });
-  return { rig, muzzle, puffs, foot, next: 0, K };
+  return { rig, muzzle, puffs, foot, lyingFoot: foot, next: 0, K, up: false, standT: 0 };
 })();
 function updateGiant(dt){
   const now = performance.now()/1000, r = giant.rig, far = Math.hypot(GIANT.x - S.x, GIANT.y - S.y) > 420;
   r.root.visible = !far; if (far) return;
   // one slow breath every seven seconds: the chest swells, then a cloud rolls out of the muzzle
   const br = Math.sin(now*2*Math.PI/7);
+  // standing up: once it's been woken by your calf it rises over about six seconds, front legs first, and stays up.
+  // when it's fully up its collision is read again from the standing pose: only the legs are solid, and you can ski
+  // under its belly
+  let stoodUp = false;
+  if (giant.up && giant.standT < 1){ giant.standT = Math.min(1, giant.standT + dt/6); stoodUp = giant.standT >= 1; }
+  const ease = x => x*x*(3 - 2*x), uF = ease(Math.min(1, giant.standT*1.4)), uB = ease(Math.max(0, giant.standT*1.4 - 0.4)), u = (uF + uB)/2;
+  r.body.position.y = -1.3*(1 - u); r.body.rotation.x = 0.12*(uF - uB);           // front end lifts a moment before the back
+  r.legs.forEach((L, i) => { const k = i < 2 ? uF : i < 4 ? u : uB; L.hip.rotation.x = 1.25*(1 - k); L.knee.rotation.x = -2.5*(1 - k); });
   r.body.scale.y = 1 + 0.03*br; r.body.scale.x = 1 + 0.015*br;
-  r.head.rotation.x = -0.3 + 0.02*br;
+  r.head.rotation.x = -0.3 + 0.5*u + 0.02*br; r.head.rotation.y = 0.45*(1 - u) + 0.25*u*Math.sin(now*0.3);
+  if (stoodUp) refootGiant();                                    // now that the standing pose is in place
   for (const T of r.tentacles) T.segs.forEach((g, k) => { g.rotation.x = 0.35 + 0.06*Math.sin(now*0.5 + T.phase + k*0.6); g.rotation.z = 0.05*Math.sin(now*0.35 + T.phase + k); });
   const exhale = Math.floor(now/7 + 0.5);
   if (exhale !== giant.next){
@@ -4004,6 +4015,106 @@ function updateGiant(dt){
     p.sp.scale.set(size, size*0.75, 1); p.sp.position.y += dt*1.2;
     p.sp.material.opacity = 0.55 * Math.sin(Math.PI*Math.min(1, u*1.4)) * (1 - u*0.4);
   }
+}
+function refootGiant(){
+  const e = SOLIDS.find(o => o.foot === giant.foot); giant.rig.root.updateMatrixWorld(true);
+  const f = buildFootprint({ model: giant.rig.root }); if (e) e.foot = f; giant.foot = f;
+}
+function wakeGiant(quiet){
+  if (giant.up) return; giant.up = true;
+  if (quiet){ giant.standT = 1; const r = giant.rig; r.body.position.y = 0; for (const L of r.legs){ L.hip.rotation.x = 0; L.knee.rotation.x = 0; } refootGiant(); return; }
+  toast('The giant rises to meet your calf.'); music.chime(1, true); saveProgress();
+}
+function sleepGiant(){
+  giant.up = false; giant.standT = 0; const r = giant.rig;
+  r.body.position.y = -1.3; r.body.rotation.x = 0; for (const L of r.legs){ L.hip.rotation.x = 1.25; L.knee.rotation.x = -2.5; }
+  const e = SOLIDS.find(o => o.foot === giant.foot); if (e) e.foot = giant.lyingFoot; giant.foot = giant.lyingFoot;
+}
+
+// ---- your calf: the first antlerless calf you come close to in zone 4 leaves its herd and follows you from then on,
+// everywhere. it walks in your tracks a few metres behind (a trail of breadcrumbs of where you've been), matching your
+// speed and closing the gap if it falls back; it never blocks you, and it stamps six-legged hoof prints in the snow.
+// bring it to the sleeping giant and the giant stands up
+const PET_FOLLOW = 3.2;
+const pet = { h: null, crumbs: [], s: 0, th: 0, gait: 0, step: 0, side: 0 };
+const hoofPrints = (() => {
+  const cap = 1200, geo = new THREE.CircleGeometry(1, 8); geo.rotateX(-Math.PI/2);
+  const mat = new THREE.MeshBasicMaterial({ color: 0x9fb4c6, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const mesh = new THREE.InstancedMesh(geo, mat, cap); mesh.count = 0; mesh.frustumCulled = false; scene.add(mesh);
+  return { mesh, cap, n: 0, m4: new THREE.Matrix4(), q: new THREE.Quaternion(), sc: new THREE.Vector3(0.075, 1, 0.1), pos: new THREE.Vector3() };
+})();
+function hoofPrint(x, y, th){
+  const H = hoofPrints, i = H.n % H.cap; H.n++;
+  H.pos.set(x, ground(x, y) + 0.032, y); H.q.setFromAxisAngle(UP_AXIS, -th);
+  H.mesh.setMatrixAt(i, H.m4.compose(H.pos, H.q, H.sc)); H.mesh.count = Math.min(H.n, H.cap); H.mesh.instanceMatrix.needsUpdate = true;
+  if (typeof trackRGB !== 'undefined' && trackRGB){ const t = trackRGB.track, b = trackRGB.surf[0]; H.mesh.material.color.setRGB(b[0] + (t[0] - b[0])*0.75, b[1] + (t[1] - b[1])*0.75, b[2] + (t[2] - b[2])*0.75); }
+}
+function petCrumbsReset(){
+  pet.crumbs = [{ x: S.x, y: S.y, s: 0 }];
+  // start it a little behind you, along your heading
+  pet.s = -PET_FOLLOW; pet.th = S.th;
+}
+function adoptPet(h, quiet){
+  if (!h || pet.h) return;
+  HERD = HERD.filter(q => q !== h);                     // no longer one of the herd, and no longer solid
+  pet.h = h; h.sleep = false; h.rig.root.visible = true;
+  petCrumbsReset();
+  if (!quiet){ toast('A calf has decided to follow you.'); music.chime(0.7); saveProgress(); }
+}
+function releasePet(){
+  const h = pet.h; if (!h) return;
+  pet.h = null; h.x = h.hx; h.y = h.hy; h.sleep = h.role.includes('sleep'); HERD.push(h);
+}
+function crumbAt(sx){
+  // position and heading at distance sx along your trail (before the first crumb: straight back from it along your heading)
+  const C = pet.crumbs;
+  if (sx <= C[0].s || C.length < 2){ const d = C[0].s - sx; return [C[0].x - Math.sin(pet.th)*d, C[0].y + Math.cos(pet.th)*d, pet.th]; }
+  let lo = 0, hi = C.length - 1;
+  while (hi - lo > 1){ const m = (lo + hi) >> 1; if (C[m].s < sx) lo = m; else hi = m; }
+  const a = C[lo], b = C[hi], u = Math.min(1, (sx - a.s) / Math.max(1e-6, b.s - a.s));
+  return [a.x + (b.x - a.x)*u, a.y + (b.y - a.y)*u, Math.atan2(b.x - a.x, -(b.y - a.y))];
+}
+function updatePet(dt){
+  if (!pet.h){
+    for (const h of HERD) if (h.calf && Math.hypot(h.x - S.x, h.y - S.y) < 8){ adoptPet(h); break; }
+    if (!pet.h) return;
+  }
+  const h = pet.h, r = h.rig, C = pet.crumbs, last = C[C.length - 1];
+  // lay breadcrumbs as you go (a jump, like a reset, starts the trail again)
+  const dd = Math.hypot(S.x - last.x, S.y - last.y);
+  if (dd > 25) petCrumbsReset();
+  else if (dd > 0.3){ C.push({ x: S.x, y: S.y, s: last.s + dd }); if (C.length > 1500) C.shift(); }
+  const L2 = C[C.length - 1], you = L2.s + Math.hypot(S.x - L2.x, S.y - L2.y), want = you - PET_FOLLOW;
+  // match your speed, plus a little to close the gap (or less to let it open back up to the buffer)
+  const v = Math.hypot(S.vx, S.vy);
+  const vc = Math.max(0, Math.min(v + 5, v + (want - pet.s)*2.2));
+  pet.s = Math.min(want + 0.2, pet.s + vc*dt);
+  if (pet.s < C[0].s - 30) pet.s = want;                 // fell hopelessly behind: catch up
+  const [x, y, th0] = crumbAt(pet.s);
+  let d = th0 - pet.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; pet.th += d*Math.min(1, dt*6);
+  h.x = x; h.y = y;
+  r.root.position.set(x, ground(x, y), y); r.root.rotation.y = -pet.th;
+  // gait: a walk that quickens to a bounding run, longer strides at speed
+  const stride = 0.75 + vc*0.09;
+  pet.gait += vc*dt / stride;
+  const ph = pet.gait*Math.PI*2, amp = Math.min(1, vc/1.2)*(0.4 + Math.min(0.35, vc*0.04));
+  for (const Lg of r.legs){ const q = ph + (Lg.set ? Math.PI : 0); Lg.hip.rotation.x = amp*Math.sin(q); Lg.knee.rotation.x = -Math.max(0, Math.cos(q))*amp*1.5; }
+  r.body.position.y = Math.abs(Math.sin(ph))*0.08*Math.min(1, vc); r.body.scale.y = 1;
+  const now = performance.now()/1000;
+  r.head.rotation.x = 0.06*Math.sin(ph*2) + (vc < 0.2 ? 0.1*Math.sin(now*0.6) : 0); r.head.rotation.y = vc < 0.2 ? 0.3*Math.sin(now*0.4) : 0;
+  for (const T of r.tentacles) T.segs.forEach((g, k) => { g.rotation.x = 0.15 + 0.25*Math.min(1, vc/4) + 0.15*Math.sin(now*2 + T.phase + k*0.7); g.rotation.z = 0.15*Math.sin(now*1.4 + T.phase + k*0.5); });
+  // hoof prints: each half stride, the three hooves of the planted tripod
+  pet.step += vc*dt;
+  if (pet.step > stride*0.5){
+    pet.step = 0; pet.side ^= 1;
+    const sc = h.scale, c = Math.cos(pet.th), sn = Math.sin(pet.th);
+    for (const [lz, lxs] of [[-0.95, 1], [0.1, -1], [1.1, 1]]){
+      const lx = (pet.side ? lxs : -lxs) * 0.55*sc, z = lz*sc;
+      hoofPrint(x + lx*c - z*sn, y + lx*sn + z*c, pet.th);
+    }
+  }
+  // the giant: come near it with your calf and it stands
+  if (!giant.up && Math.hypot(S.x - 137, S.y - 614) < 62) wakeGiant(false);
 }
 function updateHerd(dt){
   const now = performance.now()/1000;
@@ -4039,11 +4150,28 @@ function updateHerd(dt){
 
 // ---- progress: which orbs and crystals you've collected is kept in this browser, so the gates and the bridge stay open
 const PROGRESS_KEY = 'skate-progress';
+// the checkpoint: the terminal or altar you last used (started, powered, woke, opened). a new visit starts you there
+let checkpoint = null;      // { t: terminal index } or { a: 1 }
+function spawnAt(x, y, th){
+  Object.assign(S, { x, y, vx: 0, vy: 0, th, tgt: th, thv: 0, vis: th, visv: 0, travel: th });
+  camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L: null, R: null };
+}
+function spawnAtCheckpoint(){
+  if (!checkpoint) return;
+  if (checkpoint.t !== undefined){
+    const K = KIOSKS[checkpoint.t]; if (!K) return;
+    const q = K.loop, th = Math.atan2(q[2] - q[0], -(q[3] - q[1]));       // on the trail beside it, facing along its loop
+    spawnAt(K.tx, K.ty, th); K.dismissed = true;
+  } else if (checkpoint.a){
+    spawnAt(altar.x + 10, altar.y, Math.PI/2); altar.dismissed = true;     // on the dais, facing out of the circle
+  }
+  if (pet.h) petCrumbsReset();
+}
 function saveProgress(){
   // v2: each kiosk's state and orbs, the altar's state, and the crystals
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ v: 2,
     kiosks: KIOSKS.map(K => K.state[0]).join(''), korbs: orbs.map(o => o.got ? 1 : 0).join(''),
-    altar: altar.state, crystals: crystals.map(c => c.got ? 1 : 0).join(''), open: [gateOpen, bridgeWanted, gate2Open].map(b => b ? 1 : 0).join('') })); } catch (e) {}
+    altar: altar.state, crystals: crystals.map(c => c.got ? 1 : 0).join(''), open: [gateOpen, bridgeWanted, gate2Open].map(b => b ? 1 : 0).join(''), pet: pet.h ? pet.h.id : -1, giant: giant.up ? 1 : 0, cp: checkpoint })); } catch (e) {}
 }
 function loadProgress(){
   let p = null; try { p = JSON.parse(localStorage.getItem(PROGRESS_KEY) || 'null'); } catch (e) {}
@@ -4072,6 +4200,9 @@ function loadProgress(){
   crystals.forEach(c => { c.g.visible = crystalsActive && !c.got; });
   if (altar.state === 2){ gate4Open = true; gate4.open = 1; }
   for (const K of KIOSKS) updateKioskLook(K);
+  if (p.v === 2 && p.pet >= 0) adoptPet(HERD.find(h => h.id === p.pet), true);
+  if (p.v === 2 && p.giant) wakeGiant(true);
+  if (p.v === 2 && p.cp){ checkpoint = p.cp; spawnAtCheckpoint(); }
   updateAltarLook(); animateGate(0); animateGate4(0);
 }
 
@@ -5009,7 +5140,7 @@ function loop(t){
   const dt = Math.min(0.1, (t-last)/1000); last = t; pollPad();
   // a prompt interrupts the game: the skier holds still (keeping their speed) until it's answered
   if (!promptCtx){ const n = Math.max(1, Math.ceil(dt * 60 - 1e-6)); for (let k = 0; k < n; k++) step(dt/n); }
-  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract();
+  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updatePet(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract();
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through
   const w = 3 / Math.max(0.05, P.cam);
@@ -5022,7 +5153,7 @@ function loop(t){
 }
 loadProgress();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

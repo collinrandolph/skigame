@@ -409,7 +409,10 @@ const TILE_WORLD = { x0: WORLD.x0, x1: WORLD.x1, y0: WORLD.y0, y1: 1030 };
 // one notch through it, south of the broken circle, holds the great crystal gate
 function divideY(x){ return 470 + 8*Math.sin(x/53) + 5*Math.sin(x/23 + 1); }
 const DIVIDE_BAND = 22, G4 = { x: 100, hw: 9 };      // barrier half-width; the gate's opening half-width
-const RING = { x:-6, y:-58.5 };                                           // centre of zone 1's mountains
+const RING = { x:-6, y:-58.5 };
+// the energy bridges' on-ramp feet on open ground (zones 1-4): the ground is levelled round each, and it's kept clear
+const PORTAL_PADS = [{ id: 'z1', x: -2.5, y: -157.6 }, { id: 'z2', x: 430, y: -52 }, { id: 'z3', x: 430, y: 430 }, { id: 'z4', x: 268, y: 512 }];
+let padBusy = false;                                           // centre of zone 1's mountains
 const EDGE_WALL = 25;                                                     // the outer mountains stop you this far from the map edge
 function riverY(x){ return 150 + 10*Math.sin(x/47) + 6*Math.sin(x/23 + 1); }
 const RIVER_HW = 7, RIVER_BANK = 9.5;                                     // water half-width; you're stopped at the bank
@@ -544,6 +547,12 @@ function heightNat(x, y){
   // the lake: flattened to an ice sheet, the shore easing down to it
   const q = lakeQ(x, y);
   if (q < 1.35) h += (LAKE.h - h) * (1 - smooth01(0.98, 1.35, q));
+  // the portal pads: level at the height the ground had right under the portal
+  if (!padBusy) for (const P of PORTAL_PADS){
+    const d = Math.hypot(x - P.x, y - P.y); if (d > 20) continue;
+    if (P.h === undefined){ padBusy = true; P.h = heightNat(P.x, P.y); padBusy = false; }
+    h += (P.h - h) * (1 - smooth01(10, 20, d));
+  }
   return h;
 }
 // the switchbacks: below the saddle the mountainside is reshaped into an even slope, and each leg of the trail is cut
@@ -833,18 +842,26 @@ function walkTrail(p, i, u, dir, dist){
   }
   return [x, y];
 }
+// what trail assist can follow: the trails, or up on an energy bridge the deck you're on and the decks branching off
+// its junctions (each with its own width)
+function assistCands(){
+  if (!SKY_ON) return TRAILS;
+  const out = [SKY_ON.d];
+  for (const nd of [SKY_ON.d.A, SKY_ON.d.B]) if (!nd.ground) for (const d2 of nd.decks) if (!out.includes(d2)) out.push(d2);
+  return out;
+}
 function trailAssistTarget(x, y, heading, ahead, prefer, centring = 1){
   // the look-ahead bearing on whichever nearby trail (and direction along it) best matches where you're pointed
   let best = null;
-  for (const t of TRAILS){
-    const p = t.s; let bd = Infinity, bi = 0, bu = 0;
+  for (const t of assistCands()){
+    const p = t.s, W = t.w || TRAIL_W; let bd = Infinity, bi = 0, bu = 0;
     for (let i = 0; i < p.length/2 - 1; i++){
       const ax = p[i*2], ay = p[i*2+1], dx = p[i*2+2] - ax, dy = p[i*2+3] - ay, L2 = dx*dx + dy*dy;
       const u = L2 ? Math.max(0, Math.min(1, ((x-ax)*dx + (y-ay)*dy)/L2)) : 0;
       const d = Math.hypot(x - ax - u*dx, y - ay - u*dy);
       if (d < bd){ bd = d; bi = i; bu = u; }
     }
-    if (bd > TRAIL_W*1.5) continue;
+    if (bd > W*1.5) continue;
     for (const dir of [1, -1]){
       const wrap = a => a - Math.round(a/(2*Math.PI))*2*Math.PI;
       const bearing = (ax, ay, bx, by) => Math.atan2(bx - ax, -(by - ay));
@@ -868,7 +885,7 @@ function trailAssistTarget(x, y, heading, ahead, prefer, centring = 1){
       // drawn back through the middle rather than settling alongside it.
       const tl = Math.hypot(nx - cx, ny - cy), nrx = -(ny - cy)/tl, nry = (nx - cx)/tl;
       const lat = (x - cx)*nrx + (y - cy)*nry;
-      const shift = Math.max(-TRAIL_W/2, Math.min(TRAIL_W/2, -Math.max(-TRAIL_W/2, Math.min(TRAIL_W/2, lat)) * P.acenter * centring));
+      const shift = Math.max(-W/2, Math.min(W/2, -Math.max(-W/2, Math.min(W/2, lat)) * P.acenter * centring));
       const ax = tx + nrx*shift, ay = ty + nry*shift;
       const off = wrap(bearing(x, y, ax, ay) - heading), offRaw = wrap(bearing(x, y, tx, ty) - heading);
       // how far you are from lined up: judged against both the trail's direction where you are and the look-ahead
@@ -877,7 +894,7 @@ function trailAssistTarget(x, y, heading, ahead, prefer, centring = 1){
       // (judged on the trail itself, not the centring aim, so centring never sways which branch you take at a junction)
       const lineup = Math.min(Math.abs(offRaw), Math.abs(wrap(tanNear - heading)));
       const tan = Math.hypot(ux - tx, uy - ty) > 0.1 ? bearing(tx, ty, ux, uy) : bearing(x, y, tx, ty);
-      const c = { off, lineup, t, d: bd, tan, cx, cy, lx: tx, ly: ty };
+      const c = { off, lineup, t, d: bd, w: W, tan, cx, cy, lx: tx, ly: ty };
       // stick with the trail you were already following while it's still within reach, so passing a junction or
       // crossing another trail doesn't hand the assist to a different branch
       const capR = P.acap*Math.PI/180, ok = o => o <= capR, closer = lineup < (best ? best.lineup : Infinity);
@@ -895,7 +912,6 @@ let assistOff = 0, assistSwitch = false;   // for the HUD: how far (deg) the ass
 let assistPrev = null, assistTrail = null, assistQuietUntil = 0, assistSince = 0, assistW = 0, assistCx = 0, assistCy = 0, assistLx = 0, assistLy = 0;
 function trailAssist(dt){
   assistOff = 0; assistW = 0;
-  if (SKY_ON){ assistTrail = null; return; }            // no trails up on the bridges
   if (P.assist <= 0){ assistTrail = null; return; }
   // hands off while you lean and for a moment after, and forget which trail you were on: you're steering yourself
   const now = performance.now();
@@ -906,7 +922,7 @@ function trailAssist(dt){
   const ref = twinSkate ? S.tgt - camPending : S.tgt;               // the stride's centre line, not the ski you're on
   // centring: eased off within the junction zone (none right at a junction) and eased back in after changing trails,
   // so crossing from one trail to another never yanks you toward the new trail's far side
-  const jd = nearestJunction(S.x, S.y), jFade = P.ajunc > 0 ? smooth01(P.ajunc*0.35, P.ajunc, jd) : 1;
+  const jd = SKY_ON ? Math.min(...[SKY_ON.d.A, SKY_ON.d.B].filter(nd => !nd.ground).map(nd => Math.hypot(S.x - nd.x, S.y - nd.y)), 1e9) : nearestJunction(S.x, S.y), jFade = P.ajunc > 0 ? smooth01(P.ajunc*0.35, P.ajunc, jd) : 1;
   const cRamp = Math.min(1, (now - assistSince) / Math.max(1, P.aswitch));
   const tg = trailAssistTarget(S.x, S.y, ref, Math.max(4, v * P.alook), assistTrail, jFade * cRamp*cRamp);
   if (!tg){ assistTrail = null; return; }
@@ -927,7 +943,7 @@ function trailAssist(dt){
   const ramp = Math.min(1, (now - assistSince) / Math.max(1, rampMs));
   const fade = 1 - (a / cap)**2;                                    // full pull when nearly lined up, none at the edge
   // and it fades out toward the trail's edge, so arriving from off the trail is gentle too
-  const near = Math.max(0, Math.min(1, (TRAIL_W*1.5 - tg.d) / TRAIL_W));
+  const near = Math.max(0, Math.min(1, (tg.w*1.5 - tg.d) / tg.w));
   const pull = Math.max(-cap, Math.min(cap, tg.off));
   const r = pull * Math.min(1, P.assist * 2.5 * fade * ramp*ramp * near * dt);
   assistCx = tg.cx; assistCy = tg.cy; assistLx = tg.lx; assistLy = tg.ly;
@@ -1842,7 +1858,8 @@ function step(dt){
     // in a tuck or plow both skis run with the body, so as a lean carves the heading round they're re-set every couple
     // of degrees: the tracks bend through the turn as a chain of short straight pieces instead of running off straight
     const bend = mode ? Math.abs(Math.atan2(sk.dx*Math.cos(S.th) + sk.dy*Math.sin(S.th), sk.dx*Math.sin(S.th) - sk.dy*Math.cos(S.th))) : 0;
-    if (off > REACH || along < sk.len - 0.5 || (bend > 2*Math.PI/180 && sk.len > 0.05)){ sk.live = false; lastSki[k] = setParallel(sk.side); }
+    const reach = mode ? (mode === 'plow' ? PLOW_STANCE : STANCE) + 0.1 : REACH;   // parallel skis stay under you; only a skating V opens wide
+    if (off > reach || along < sk.len - 0.5 || (bend > 2*Math.PI/180 && sk.len > 0.05)){ sk.live = false; lastSki[k] = setParallel(sk.side); }
   }
   // coasting: if you stop kicking, the lifted ski is set down alongside and both leave parallel lines
   // ...but not while you're holding a glide: then you're balanced on one ski and the other stays in the air
@@ -2455,7 +2472,7 @@ const BOULDERS = (() => {
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
   for (const [k, list] of groups){
     const shape = (k/3) | 0, mesh = new THREE.InstancedMesh(geos[shape], tints[k % 3], list.length), S0 = scaleOf[shape];
-    list.forEach((p, i) => {
+    list.forEach((p, i) => { p.mesh = mesh; p.idx = i;
       e.set(shape === 2 ? p.rx*0.15 : p.rx, p.ry, shape === 2 ? p.rz*0.15 : p.rz); q.setFromEuler(e);
       sc.set(S0[0]*p.s, S0[1]*p.s, S0[2]*p.s);
       pos.set(p.x, height(p.x, p.y) + (shape === 2 ? S0[1]*p.s*0.55 : shape === 3 ? 0.05 : p.s*0.3) - 0.15, p.y);
@@ -4367,7 +4384,7 @@ const SKY = (() => {
   const rpt = (a, rOff) => { const t = a*Math.PI/180; return [RING.x + Math.cos(t)*rOff(t), RING.y + Math.sin(t)*rOff(t)]; };
   // nodes: ground ends (on-ramp feet) and junctions
   const N = {
-    z1: { ground: true, ...(() => { const [x, y] = rpt(272, t => ringIn(t) - 7); return { x, y }; })() },
+    z1: { ground: true, x: PORTAL_PADS[0].x, y: PORTAL_PADS[0].y },
     J1: { x: -118, y: 250, h: 30 }, z4: { ground: true, x: 268, y: 512 },
     J2: { x: ring(160)[0], y: ring(160)[1], h: 26 }, J3: { x: ring(320)[0], y: ring(320)[1], h: 26 }, J4: { x: ring(40)[0], y: ring(40)[1], h: 26 },
     z2: { ground: true, x: 430, y: -52 }, z3: { ground: true, x: 430, y: 430 },
@@ -4382,18 +4399,23 @@ const SKY = (() => {
   // decks: node to node through control points [x, y, h] (h is a target; clearance over the terrain is added below)
   // zone 1's ramp: round the inside foot of the mountain ring from the north to the south-west, climbing all the way
   const z1ramp = []; for (let a = 262; a >= 140; a -= 8){ const [x, y] = rpt(a, t => ringIn(t) - 6); z1ramp.push([x, y, 2 + (262 - a)/122*46]); }
-  const ringPts = (a0, a1) => { const out = []; const st = a1 > a0 ? 15 : -15; for (let a = a0 + st; st > 0 ? a < a1 : a > a1; a += st){ const [x, y] = ring(a); out.push([x, y, 26]); } return out; };
+  // (a point just off each end, so every ring deck leaves its junction along the ring's true tangent: no kink where they meet)
+  // a point beside the ring at angle a, o metres out from it (square to the ring)
+  const ringOff = (a, o) => { const [x, y] = ring(a), t = a*Math.PI/180, nx = Math.cos(t)/105, ny = Math.sin(t)/66, l = Math.hypot(nx, ny); return [x + nx/l*o, y + ny/l*o]; };
+  const ringPts = (a0, a1) => { const out = []; const st = a1 > a0 ? 15 : -15, add = a => { const [x, y] = ring(a); out.push([x, y, 26]); }; add(a0 + st*0.25); for (let a = a0 + st; st > 0 ? a < a1 - st*0.5 : a > a1 - st*0.5; a += st) add(a); add(a1 - st*0.25); return out; };
   const decks = [
     { name: 'Spine north', a: 'z1', b: 'J1', pts: [...z1ramp, [...rpt(130, t => ringCrest(t)), 50], [...rpt(125, t => ringOut(t) + 14), 44], [-118, 140, 34], [-120, 200, 31]] },
     // over the divide, then a long descent east along its south flank into zone 4
     { name: 'Spine south', a: 'J1', b: 'z4', pts: [[-117, 320, 36], [-114, 390, 45], [-108, 440, 51], [-105, 468, 54], [-88, 500, 50], [-45, 514, 44], [15, 519, 35], [75, 521, 26], [135, 516, 18], [190, 511, 10], [235, 510, 4]] },
-    { name: 'Connector', a: 'J1', b: 'J2', pts: [[-112, 268, 30], [-90, 290, 29], [-30, 314, 28], [30, 326, 27]] },
+    // the branches leave each junction running alongside the through deck, then curve away from it: a Y, never a T
+    { name: 'Connector', a: 'J1', b: 'J2', pts: [[-117.3, 258, 30], [-115.2, 265.7, 30], [-111.8, 272.9, 30], [-107.1, 279.4, 30], [-101.4, 284.9, 30], [-94.7, 289.4, 30], [-70, 300, 29], [-30, 309, 28], [10, 308, 27],
+      [38, 303.5, 26], [55, 301.5, 26], [66, 303.5, 26], [73.5, 308, 26], [...ringOff(170, 2.4), 26], [...ringOff(166, 0.9), 26], [...ringOff(163, 0.2), 26]] },
     { name: 'Lake Ring north', a: 'J2', b: 'J3', pts: ringPts(160, 320) },
     { name: 'Lake Ring east', a: 'J3', b: 'J4', pts: ringPts(320, 400) },
     { name: 'Lake Ring south', a: 'J4', b: 'J2', pts: ringPts(40, 160) },
     // the East Arc: over the river, then down along the foot of the east edge's mountains into zone 2
-    { name: 'East Arc', a: 'J3', b: 'z2', pts: [[300, 215, 28], [350, 190, 30], [405, 150, 29], [430, 95, 22], [434, 35, 13], [433, -15, 5]] },
-    { name: 'Zone 3 ramp', a: 'J4', b: 'z3', pts: [[300, 385, 21], [340, 398, 14], [380, 410, 7], [410, 422, 2]] },
+    { name: 'East Arc', a: 'J3', b: 'z2', pts: [[259.6, 252.1, 26], [255.2, 245.5, 26], [252.3, 238, 26], [251.1, 230.1, 26], [251.7, 222.2, 26], [254.1, 214.5, 26], [258, 207.6, 26], [282, 186, 28], [330, 168, 30], [395, 145, 29], [430, 95, 22], [434, 35, 13], [433, -15, 5]] },
+    { name: 'Zone 3 ramp', a: 'J4', b: 'z3', pts: [[...ringOff(37, 0.15), 26], [...ringOff(34, 0.8), 26], [...ringOff(31, 2.2), 26], [...ringOff(28, 4.5), 26], [294.5, 334.2, 26], [303.4, 336.2, 25.6], [311, 339.6, 25], [335, 358, 20], [365, 385, 12], [395, 410, 5]] },
     // the hidden way: out between the giant's legs toward its head, round and up along the south mountains' flank,
     // over the ridge, and down onto the plateau
     // the hidden way: out between the giant's legs, a long sweeping climb east and round over zone 4, up to the
@@ -4452,12 +4474,13 @@ const SKY = (() => {
     for (let i = 3; i < n - 3; i++) H[i] = Math.max(H[i], req[i]);
     // level at the junctions: the last 14 m into a junction is flat at its height, easing in over the 20 m before
     for (let i = 0; i < n; i++) for (const [nd, dist] of [[A, cum[i]], [B, cum[n-1] - cum[i]]]){
-      if (nd.ground || nd.blackhole || dist >= 34) continue;
-      const k = dist < 14 ? 0 : (dist - 14)/20, e = k*k*(3 - 2*k); H[i] = Math.max(req[i], nd.h + (H[i] - nd.h)*e);
+      if (nd.ground || nd.blackhole || dist >= 44) continue;
+      const k = dist < 24 ? 0 : (dist - 24)/20, e = k*k*(3 - 2*k); H[i] = Math.max(req[i], nd.h + (H[i] - nd.h)*e);
     }
     H[0] = A.h; H[n-1] = B.h;
     for (let i = 1; i < 3; i++){ H[i] = H[0] + (H[3] - H[0])*i/3; H[n-1-i] = H[n-1] + (H[n-4] - H[n-1])*i/3; }   // ease into the pinned ends
     Object.assign(d, { A, B, n, X, Y, H, cum, len: cum[n-1], w: SKY_W, op: 0 });
+    d.s = Array.from({ length: n*2 }, (_, k) => k % 2 ? Y[k >> 1] : X[k >> 1]);   // as a polyline, so trail assist can follow it like a trail
   }
   const nodes = Object.values(N);
   for (const nd of nodes) nd.decks = decks.filter(d => d.A === nd || d.B === nd);
@@ -4486,7 +4509,7 @@ function deckProj(d, x, y, hint, zRef){
 function skyGround(x, y){
   const o = SKY_ON, d = o.d, pr = deckProj(d, x, y, o.i, o.h);
   if (Math.abs(pr.lat) <= d.w/2 + 0.6 && pr.s >= -0.6 && pr.s <= d.len + 0.6) return pr.h;
-  const end = pr.s < 12 ? d.A : pr.s > d.len - 12 ? d.B : null;
+  const end = pr.s < 45 ? d.A : pr.s > d.len - 45 ? d.B : null;
   if (end && !end.ground) for (const d2 of end.decks){ if (d2 === d) continue;
     const q = deckProj(d2, x, y, d2.A === end ? 0 : d2.n - 2); if (Math.abs(q.lat) <= d2.w/2 + 0.6 && q.s >= -0.6 && q.s <= d2.len + 0.6) return q.h; }
   return null;
@@ -4507,15 +4530,20 @@ function skyStep(){
   const o = SKY_ON; let d = o.d, pr = deckProj(d, S.x, S.y, o.i, o.h);
   if (Math.abs(pr.lat) > d.w*1.5){ SKY_ON = null; return; }         // moved off it some other way (a reset): back on the ground
   // near a junction, ride whichever deck there you're on and heading along
-  const end = pr.s < 4 ? d.A : pr.s > d.len - 4 ? d.B : null;
+  // near a junction (the branches run alongside each other for the first stretch of a fork): ride whichever of its
+  // decks you're furthest inside and heading along, staying on the one you're on while that's still true of it
+  const end = pr.s < 40 ? d.A : pr.s > d.len - 40 ? d.B : null;
   if (end && !end.ground){
     const v = Math.hypot(S.vx, S.vy) || 1, vx = S.vx/v, vy = S.vy/v;
     let best = null, bs = -Infinity;
     for (const d2 of end.decks){
       const q = d2 === d ? pr : deckProj(d2, S.x, S.y, d2.A === end ? 0 : d2.n - 2), fromEnd = d2.A === end ? q.s : d2.len - q.s;
-      if (Math.abs(q.lat) > d2.w/2 + 0.2 || fromEnd < -1) continue;
+      if (Math.abs(q.lat) > d2.w/2 + 0.2 || fromEnd < -1 || fromEnd > 45) continue;
       const out = d2.A === end ? 1 : -1, al = (vx*q.tx + vy*q.ty)*out;    // heading away from the junction along it
-      if (al > bs){ bs = al; best = [d2, q]; }
+      if (fromEnd > 4 && al < 0.3) continue;                            // past the junction itself, only a deck you're heading along
+      if (d2 !== d && al <= 0) continue;                                // never onto another deck that's coming in to the junction
+      const sc = al - Math.abs(q.lat)/d2.w + (d2 === d ? 0.08 : 0);
+      if (sc > bs){ bs = sc; best = [d2, q]; }
     }
     if (best && best[0] !== d){ d = best[0]; pr = best[1]; o.d = d; }
   }
@@ -4550,8 +4578,29 @@ let skyEnterAt = 0;
       const L = grid.get(key(cx + a, cy + b)); if (!L) continue;
       for (const [d, i] of L) if (Math.hypot(d.X[i] - t.x, d.Y[i] - t.y) < d.w/2 + 1.6*t.s + 0.6 && d.H[i] - 1.2 < height(t.x, t.y) + 5.9*t.s){ hit = true; break; }
     }
+    if (!hit) hit = portalClear(t.x, t.y, 1.5);
     if (hit){ t.cut = true; for (const m of treeMeshes){ m.setMatrixAt(ti, zero); m.instanceMatrix.needsUpdate = true; } }
   });
+  for (const b of BOULDERS){
+    let hit = portalClear(b.x, b.y, b.size*1.5 + 1);
+    const cx = Math.floor(b.x/cell), cy = Math.floor(b.y/cell);
+    for (let a = -2; a <= 2 && !hit; a++) for (let c = -2; c <= 2 && !hit; c++){
+      const L = grid.get(key(cx + a, cy + c)); if (!L) continue;
+      for (const [d, i] of L) if (Math.hypot(d.X[i] - b.x, d.Y[i] - b.y) < d.w/2 + b.size*1.6 + 0.8 && d.H[i] - 1.2 < height(b.x, b.y) + b.size*1.4){ hit = true; break; }
+    }
+    if (hit){ b.cut = true; for (const q of b.parts){ q.mesh.setMatrixAt(q.idx, zero); q.mesh.instanceMatrix.needsUpdate = true; } }
+  }
+}
+// a ground portal's pad (12 m round) and the run-up to it (25 m straight back from the ramp, 5 m either side) stay clear
+function portalClear(x, y, r){
+  for (const n of SKY.nodes){
+    if (!n.ground || n.hidden) continue;
+    if (Math.hypot(x - n.x, y - n.y) < 12 + r) return true;
+    const d = n.decks[0], i = d.A === n ? 4 : d.n - 5, tx = d.X[i] - n.x, ty = d.Y[i] - n.y, l = Math.hypot(tx, ty) || 1;
+    const ux = -tx/l, uy = -ty/l, rx = x - n.x, ry = y - n.y, along = rx*ux + ry*uy, side = Math.abs(rx*uy - ry*ux);
+    if (along > 0 && along < 25 && side < 5 + r) return true;
+  }
+  return false;
 }
 // ---- the bridges' look: a pale glowing deck with a dark edge, railings of light with pulses running along them, and
 // a few slender white pylons where the deck is high over open ground (where it runs close over a mountain, the
@@ -4573,7 +4622,7 @@ for (const d of SKY.decks){
   const railMat = new THREE.MeshBasicMaterial({ map: skyRailTex.clone(), color: 0xa993d6, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
   railMat.map.needsUpdate = true; railMat.map.wrapS = THREE.RepeatWrapping;
   const L = i => { const j0 = Math.max(0, i - 1), j1 = Math.min(d.n - 1, i + 1), tx = d.X[j1] - d.X[j0], ty = d.Y[j1] - d.Y[j0], l = Math.hypot(tx, ty) || 1; return [ty/l, -tx/l]; };   // points to the right... see below
-  const inOther = (x, y) => [d.A, d.B].some(nd => !nd.ground && nd.decks.some(d2 => { if (d2 === d) return false; if (Math.hypot(x - nd.x, y - nd.y) > 30) return false; const q = deckProj(d2, x, y, d2.A === nd ? 0 : d2.n - 2); return Math.abs(q.lat) < d2.w/2 - 0.1 && q.s > 0.2 && q.s < d2.len - 0.2; }));
+  const inOther = (x, y) => [d.A, d.B].some(nd => !nd.ground && nd.decks.some(d2 => { if (d2 === d) return false; if (Math.hypot(x - nd.x, y - nd.y) > 45) return false; const q = deckProj(d2, x, y, d2.A === nd ? 0 : d2.n - 2); return Math.abs(q.lat) < d2.w/2 - 0.1 && q.s > 0.2 && q.s < d2.len - 0.2; }));
   for (let i = 0; i < d.n - 1; i++){
     const [ax, ay] = L(i), [bx2, by2] = L(i + 1), hw = d.w/2;
     const a1 = [d.X[i] - ax*hw, d.H[i], d.Y[i] - ay*hw], a2 = [d.X[i] + ax*hw, d.H[i], d.Y[i] + ay*hw];
@@ -6231,7 +6280,7 @@ function loop(t){
 }
 loadProgress(); applyRegalia(); calfUI();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { pollPad, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

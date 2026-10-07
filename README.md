@@ -86,7 +86,7 @@ The map is four times its old area and split into zones, each locked until you c
   - A controller-layout panel in the top right.
 - **Dev view:** the full HUD, Tuning and stick debug tools. Toggle it with the **Dev** button or the **`** key.
 
-- **Pixel look:** the 3D view is drawn in big, chunky pixels, like A Short Hike. It's rendered at a fraction of the screen's resolution and scaled up with hard edges, which also makes it lighter to draw. **Pixel size** in the Camera tuning sets the block size: 4 by default, up to 6, and 1 turns it off. The HUD, labels and map stay sharp.
+- **Pixel look:** the 3D view is drawn in big, chunky pixels, like A Short Hike. It's rendered at a fraction of the screen's resolution and scaled up with hard edges, which also makes it lighter to draw. **Pixel size** in the Camera tuning sets the block size on a big screen (about 1000 px on its short side): 4 by default, up to 6, and 1 turns it off. Smaller screens scale it down, so a phone gets about 2 px blocks and a tablet 3. The HUD, labels and map stay sharp.
 - **Checkpoints menu:** a **Checkpoints** button (top right, on phones too) opens a menu behind a password. Each stage starts from a full reset and includes everything the stages before it unlock:
   - **Start:** the trailhead, default outfit, everything reset.
   - **Zone 1:** at the east gate. Zone 1's terminals are powered and both gates are open.

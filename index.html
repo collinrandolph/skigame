@@ -365,9 +365,11 @@ function resize(){
   // each of its pixels is a chunky block (the same as snapping every screen pixel to a coarser grid and resampling;
   // the HUD and map, on their own canvas, stay sharp)
   if (typeof renderer !== 'undefined'){
-    const px = P.pixel > 1 ? P.pixel : 0;
-    renderer.setPixelRatio(px ? 1/px : dpr); renderer.setSize(W, H, false); camera.aspect = W/H; camera.updateProjectionMatrix();
-    renderer.domElement.style.imageRendering = px ? 'pixelated' : '';
+    // (the setting is the block size on a big screen, about 1000 px on its short side; smaller screens scale it down, so
+    // a phone gets finer blocks and the scene stays readable)
+    const px = P.pixel > 1 ? Math.max(1, Math.round(P.pixel*Math.min(W, H)/1000)) : 0;
+    renderer.setPixelRatio(px > 1 ? 1/px : dpr); renderer.setSize(W, H, false); camera.aspect = W/H; camera.updateProjectionMatrix();
+    renderer.domElement.style.imageRendering = px > 1 ? 'pixelated' : '';
   }
 }
 addEventListener('resize', resize);

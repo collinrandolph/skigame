@@ -87,9 +87,11 @@ The map is four times its old area and split into zones, each locked until you c
 - **Dev view:** the full HUD, Tuning and stick debug tools. Toggle it with the **Dev** button or the **`** key.
 
 - **Pixel look:** the 3D view is drawn in big, chunky pixels, like A Short Hike. It's rendered at a fraction of the screen's resolution and scaled up with hard edges, which also makes it lighter to draw. **Pixel size** in the Camera tuning sets the block size on a big screen (about 1000 px on its short side): 4 by default, up to 6, and 1 turns it off. Smaller screens scale it down (a tablet gets 3 px blocks), but never below 2 px while it's on, so phones in either orientation still get the look. The HUD, labels and map stay sharp.
-- **Settings (phones):** a gear button (top right, beside the map) holds **Music**, **Controller buttons** and **Checkpoints**. Phones don't show separate music and checkpoint buttons.
+- **Settings (phones):** a gear button (top left, with the calf button under it when a calf follows you) holds **Music**, **Controller buttons** and **Checkpoints**. Phones don't show separate music and checkpoint buttons.
   - **Controller buttons off:** the kick pads' panels and labels disappear (the two halves still kick).
-  - **Style switch:** the whole strip between the pads, from their top to the bottom of the screen, switches skate and classic. The setting is kept in your browser.
+  - **Style switch:** the whole strip between the pads, from their top to the bottom of the screen, switches skate and classic. It's invisible, like the pads.
+  - **Zone label:** it fits between the gear and the map, shortening its text if it has to. The setting is kept in your browser.
+- **Pinch to zoom (phones):** on the scene above the pads, two fingers set the camera distance: spread them to bring it closer, pinch them to pull it back (4 to 24 m, kept like the slider). One finger held on the scene is still the snow plow; a second finger lets the plow go.
 - **Checkpoints menu:** a **Checkpoints** button (top right, on phones too) opens a menu behind a password. Each stage starts from a full reset and includes everything the stages before it unlock:
   - **Start:** the trailhead, default outfit, everything reset.
   - **Zone 1:** at the east gate. Zone 1's terminals are powered and both gates are open.

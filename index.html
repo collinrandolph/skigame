@@ -189,16 +189,22 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 .setlist button{min-height:48px;font:700 15px/1.1 var(--display);letter-spacing:.06em;text-transform:uppercase;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;touch-action:manipulation;display:flex;justify-content:space-between;align-items:center;padding:0 14px}
 .setlist button b{font:600 13px var(--mono);letter-spacing:0;text-transform:none;color:var(--muted)}
 @media (pointer:coarse){
-  .gearbtn{display:inline-flex;position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);right:64px;z-index:7;width:40px;height:40px;padding:0;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(6px);box-sizing:border-box;touch-action:manipulation}
+  .gearbtn{display:inline-flex;position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);left:16px;z-index:7;width:40px;height:40px;padding:0;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(6px);box-sizing:border-box;touch-action:manipulation}
   .gearbtn svg{width:22px;height:22px}
   .musicbtn{display:none}
-  .calfbtn{left:16px}
+  /* the zone label sits between the gear (and calf button) on the left and the map on the right, shortening its
+     label if it has to */
+  .orbhud{max-width:calc(100vw - 2*64px)}
+  .calfbtn{left:16px;top:calc(env(safe-area-inset-top,0px) + 64px)}         /* under the gear */
+  .calfbtn{left:16px;top:calc(env(safe-area-inset-top,0px) + 64px)}         /* under the gear */
+  .orbhud span{overflow:hidden;text-overflow:ellipsis;min-width:0}
   /* controller buttons off: no pad panels or labels (the halves still kick), and the style switch is the whole strip
      between them, from the pads' top to the bottom of the screen */
   body.nopadui .pad::before{opacity:0 !important}
   body.nopadui .pad span{display:none}
   body.nopadui .pads .pad.l,body.nopadui .pads .pad.r{width:calc(50% - 44px)}
   body.nopadui .mtoggle{bottom:0;height:38%;width:88px;border-radius:0;border:0;background:transparent;backdrop-filter:none;align-items:flex-end;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 28px)}
+  body.nopadui .mtoggle svg{visibility:hidden}                                  /* (an invisible strip: nothing shows) */
 }
 .cpgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}
 .cpgrid button{min-height:44px;font:700 14px/1.1 var(--display);letter-spacing:.06em;text-transform:uppercase;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;touch-action:manipulation;padding:6px}
@@ -2363,15 +2369,32 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
     el.classList.remove('on','pull','armed'); release(leg);
   });
 }
-// snow plow on touch: press and hold anywhere on the scene above the pads; let go to stop
+// snow plow on touch: press and hold anywhere on the scene above the pads; let go to stop. a second finger makes it a
+// pinch instead (the plow lets go): spread to bring the camera closer, pinch to pull it back (the camera distance
+// setting, 4 to 24 m, kept like the slider)
 {
-  const gl = $('gl'); let plowPtr = null;
+  const gl = $('gl'); let plowPtr = null; const pts = new Map(); let pinch = null;
+  const span = () => { const [a, b] = [...pts.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
   gl.addEventListener('pointerdown', e => {
-    if (e.pointerType === 'mouse' || plowPtr !== null) return;
-    e.preventDefault(); try { gl.setPointerCapture(e.pointerId); } catch(_){} plowPtr = e.pointerId; anyInputAt = performance.now(); setPlow(true, 'touch');
+    if (e.pointerType === 'mouse') return;
+    e.preventDefault(); try { gl.setPointerCapture(e.pointerId); } catch(_){}
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); anyInputAt = performance.now();
+    if (pts.size === 2){
+      if (plowPtr !== null){ plowPtr = null; setPlow(false, 'touch'); }
+      pinch = { d0: Math.max(20, span()), c0: P.camd };
+    } else if (pts.size === 1 && plowPtr === null){ plowPtr = e.pointerId; setPlow(true, 'touch'); }
+  });
+  gl.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && pts.size === 2){
+      const el = $('tCamd'), lo = +el.min, hi = +el.max, st = +el.step || 0.5;
+      const v = Math.max(lo, Math.min(hi, Math.round(pinch.c0*pinch.d0/Math.max(20, span())/st)*st));
+      if (+el.value !== v){ el.value = v; el.dispatchEvent(new Event('input')); }
+    }
   });
   for (const ev of ['pointerup','pointercancel']) gl.addEventListener(ev, e => {
-    if (e.pointerId !== plowPtr) return; plowPtr = null; setPlow(false, 'touch');
+    pts.delete(e.pointerId); if (pts.size < 2) pinch = null;
+    if (e.pointerId === plowPtr){ plowPtr = null; setPlow(false, 'touch'); }
   });
 }
 // iOS Safari: no double-tap zoom or pinch zoom while playing (fast kicks would otherwise zoom the page)

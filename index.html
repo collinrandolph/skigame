@@ -2513,11 +2513,12 @@ const music = (() => {
   }
   // ---- sound effects, all synthesised: filtered noise for snow and wind, sine and triangle tones for everything else
   const live = () => fxOn && ctx && ctx.state === 'running';
-  function hit({ dur = 0.2, f0 = 1200, f1 = f0, q = 1, type = 'bandpass', g = 0.2, pan = 0, at = 0.01, delay = 0 }){
+  function hit({ dur = 0.2, f0 = 1200, f1 = f0, q = 1, type = 'bandpass', g = 0.2, pan = 0, at = 0.01, delay = 0, hp = 0 }){
     const t0 = ctx.currentTime + delay, n = ctx.createBufferSource(); n.buffer = noise; n.playbackRate.value = 0.8 + Math.random()*0.4;
     const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
     const e = ctx.createGain(); e.gain.setValueAtTime(0.0001, t0); e.gain.linearRampToValueAtTime(g, t0 + at); e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    n.connect(f); f.connect(e); let out = e;
+    if (hp){ const h = ctx.createBiquadFilter(); h.type = 'highpass'; h.frequency.value = hp; h.Q.value = 0.7; n.connect(h); h.connect(f); } else n.connect(f);
+    f.connect(e); let out = e;
     if (pan && ctx.createStereoPanner){ const pn = ctx.createStereoPanner(); pn.pan.value = pan; e.connect(pn); out = pn; }
     out.connect(fxGain); n.start(t0, Math.random()*1.5); n.stop(t0 + dur + 0.05);
   }
@@ -2543,8 +2544,9 @@ const music = (() => {
     get on(){ return fxOn; }, get vol(){ return fxVol; },
     set(v){ fxOn = v; try { localStorage.setItem('skate-sfx', v ? 'on' : 'off'); } catch(e){} if (fxGain) fxGain.gain.setTargetAtTime(fGain(), ctx.currentTime, 0.05); },
     volume(v){ fxVol = v; try { localStorage.setItem('skate-fxvol', v); } catch(e){} if (fxGain) fxGain.gain.setTargetAtTime(fGain(), ctx.currentTime, 0.05); },
-    // a skating push: a swish of snow, panned to the kicking ski
-    kick(leg, boost = 1){ if (!live()) return; hit({ dur: 0.24, f0: 2200, f1: 700, q: 1.1, g: 0.2*Math.min(1.5, boost), pan: leg === 'L' ? -0.35 : 0.35, at: 0.015 }); },
+    // a skating push: a light, airy swish of snow, panned to the kicking ski. high-passed and quiet: you hear it on
+    // every kick, so it sits in the background
+    kick(leg, boost = 1){ if (!live()) return; hit({ dur: 0.2, f0: 3200, f1: 1800, q: 0.9, g: 0.07*Math.min(1.4, boost), pan: leg === 'L' ? -0.3 : 0.3, at: 0.02, hp: 1500 }); },
     // pole plant: a sharp tick on the snow with a little thump
     pole(){ if (!live()) return; hit({ dur: 0.05, f0: 5000, type: 'highpass', q: 0.7, g: 0.12, at: 0.002 }); tone({ f0: 190, f1: 90, dur: 0.07, g: 0.1, at: 0.003 }); },
     // a loaded stroke: the swish rides up

@@ -2404,13 +2404,13 @@ function dualMove(){
     setSkateTuck(false); touchLean = 0; dual.act = 'pinch'; dual.s0 = span; dual.c0 = P.camd;
   }
   // sliding both thumbs the other way (measured from wherever they got to) switches between tuck and plow without
-  // lifting. leaving a tuck takes a long pull back (48 px), since thumbs wander while you lean, except right at the
+  // lifting. leaving a tuck takes a long pull back (96 px), since thumbs wander while you lean, except right at the
   // start (the first 400 ms, before any lean) when 24 px will do; leaving a plow takes 18 px
   if (dual.act === 'plow' || dual.act === 'tuck'){
     const tuck = dual.act === 'tuck', pa = tuck ? ua : -ua, pb = tuck ? ub : -ub;   // how far along the current direction
     dual.ea = Math.max(dual.ea ?? pa, pa); dual.eb = Math.max(dual.eb ?? pb, pb);
     const early = !dual.leaned && performance.now() - dual.t0 < 400;
-    const TS = tuck ? (early ? 24 : 48) : T;
+    const TS = tuck ? (early ? 24 : 96) : T;
     if (dual.ea - pa > TS && dual.eb - pb > TS){
       if (tuck){ setSkateTuck(false); dual.act = 'plow'; setPlow(true, 'dual'); touchLean = 0; }
       else { setPlow(false, 'dual'); dual.act = 'tuck'; setSkateTuck(true); dual.lx = mid; }
@@ -5905,7 +5905,9 @@ const MUSICIANS = (() => {
 // over and dress it in a drape and crown of its own, and there it stays for good. when the third calf is crowned the
 // other three diamonds appear, the elders walk into the ring onto them, and the Starway wakes. calves past the
 // third join the court too, standing to the east
-const TRIO = { x: 250, y: 903 }, RING6 = { x: 250, y: 891, r: 6.5 }, DIAMONDS = 3;
+// the ring sits midway between the hidden way's gate (y 880) and the Starway's (y 911), so there's room to step off
+// either bridge before reaching it; the elders wait between the ring and the Starway
+const TRIO = { x: 250, y: 907 }, RING6 = { x: 250, y: 895.5, r: 6.5 }, DIAMONDS = 3;
 const CALF_D = [0, 2, 4], ELDER_D = [1, 3, 5];     // diamond k sits at k × 60° round the ring (0 = east), so north and south stay open
 const GOLD = lam(0xe6bf4f); GOLD.flatShading = true; const GOLD_2S = GOLD.clone(); GOLD_2S.side = THREE.DoubleSide;
 const ROYAL = 0x7b3fe0, ROYAL_MAT = lam(ROYAL); ROYAL_MAT.flatShading = true;      // the trio's leader wears it, and so do you once you've been through the black hole
@@ -5970,7 +5972,7 @@ const court = (() => {
     g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xb8a35a }))); }
   // the elders: a little smaller than the herd's grown moose, across the way to the Starway, facing the ring. each
   // has its diamond in the ring and a way round the calves to it
-  const trio = [[-4.2, 0, 3, [[239, 899]]], [0, -1, 1, []], [4.2, 1, 5, [[261, 899], [260, 887]]]].map(([dx, k, dk, via], i) => {
+  const trio = [[-4.2, 0, 3, [[239, 903.5]]], [0, -1, 1, []], [4.2, 1, 5, [[261, 903.5], [260, 891.5]]]].map(([dx, k, dk, via], i) => {
     const rig = buildMoose(false), x = TRIO.x + dx, y = TRIO.y; rig.root.scale.setScalar(0.85);
     rig.root.position.set(x, height(x, y), y);
     const d = dressMoose(rig, k, k < 0 ? ROYAL_MAT : null); if (k < 0) d.crown.scale.setScalar(1.25);
@@ -5984,7 +5986,7 @@ const court = (() => {
 const ATTEND = (() => {
   let seed = 4040; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const white = lam(0xf1ece0), white2 = lam(0xd4ccba); white.flatShading = white2.flatShading = true;
-  return [[232, 891], [268, 891]].map(([x, y], i) => {
+  return [[232, 895.5], [268, 895.5]].map(([x, y], i) => {
     const rig = buildAlien(rnd);
     rig.root.traverse(o => { if (!o.isMesh) return; if (o.material === NPC_MAT.robe) o.material = white; else if (o.material === NPC_MAT.robe2) o.material = white2; else if (o.material === NPC_MAT.sash) o.material = GOLD; });
     pt(rig.arms[i], cy(0.02, 0.02, 1.5, 6), GOLD, 0, -0.5, 0);                // a slim gold staff

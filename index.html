@@ -2396,6 +2396,18 @@ function setSkateTuck(on){
 }
 function dualMove(){
   const { a, b } = dual, ua = a.y0 - a.y, ub = b.y0 - b.y, T = 18;
+  // once plowing or tucking, sliding both thumbs the other way (by the same distance, from wherever they got to)
+  // switches straight to the other one, without lifting
+  if (dual.act === 'plow' || dual.act === 'tuck'){
+    const tuck = dual.act === 'tuck', pa = tuck ? ua : -ua, pb = tuck ? ub : -ub;   // how far along the current direction
+    dual.ea = Math.max(dual.ea ?? pa, pa); dual.eb = Math.max(dual.eb ?? pb, pb);
+    if (dual.ea - pa > T && dual.eb - pb > T){
+      if (tuck){ setSkateTuck(false); dual.act = 'plow'; setPlow(true, 'dual'); }
+      else { setPlow(false, 'dual'); dual.act = 'tuck'; setSkateTuck(true); }
+      dual.ea = -pa; dual.eb = -pb;
+    }
+    return;
+  }
   if (!dual.act){
     const span = Math.abs(a.x - b.x);
     if (ua > T && ub > T){ dual.act = 'tuck'; setSkateTuck(true); }

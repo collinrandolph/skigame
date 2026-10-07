@@ -34,6 +34,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 .legs{display:flex;gap:6px;margin-top:2px}
 .leg{flex:1;text-align:center;font-size:11px;padding:4px 0;border:1px solid var(--line);border-radius:4px;color:var(--muted);transition:background .12s,color .12s}
 .leg.on{background:var(--skier);color:#fff;border-color:var(--skier)}
+@media (pointer:coarse){.glide{display:none!important}}
 .glide{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 .gbar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
 .gbar i{display:block;height:100%;width:0;background:var(--muted);opacity:.5}
@@ -193,6 +194,23 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 .setlist label{display:grid;grid-template-columns:1fr auto;text-align:left;gap:6px 8px;align-items:center;min-height:48px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);box-sizing:border-box;font:700 15px/1.1 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
 .setlist label b{font:600 13px var(--mono);letter-spacing:0;text-transform:none;color:var(--muted)}
 .setlist label input{grid-column:1/-1;width:100%;accent-color:var(--skier);touch-action:pan-x}
+.setvol{display:grid;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.setlist .setvol button{border:0;border-radius:0}
+.setvol input{margin:0 14px 12px;width:auto;accent-color:var(--skier);touch-action:pan-x}
+.setvol.off input{opacity:.35}
+/* the tutorial: a card just above the pads, with the thing to touch glowing; touches go straight through it */
+.tut{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--padh) + 14px);z-index:7;width:min(420px,calc(100vw - 32px));box-sizing:border-box;background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:10px;padding:12px 14px 10px;color:var(--ink);text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.16);pointer-events:none;transition:opacity .2s}
+.tut[hidden]{display:block;opacity:0;visibility:hidden}
+.tut p{margin:0 0 8px;font:600 17px/1.25 var(--display);letter-spacing:.02em}
+.tut p b{color:var(--skier)}
+.tut .tutfoot{display:flex;justify-content:space-between;align-items:center;font:500 11px var(--mono);color:var(--muted)}
+.tut button{pointer-events:auto;font:700 13px var(--display);letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:6px;padding:7px 12px;touch-action:manipulation}
+.tut button.go{background:var(--skier);color:#fff;border-color:var(--skier)}
+.tut.done p{color:var(--down)}
+.tuthl{animation:tutglow 1.1s ease-in-out infinite}
+@keyframes tutglow{0%,100%{box-shadow:inset 0 0 0 2px rgba(181,82,59,.25)}50%{box-shadow:inset 0 0 0 4px rgba(181,82,59,.85),inset 0 0 40px rgba(181,82,59,.25)}}
+.mtoggle.tuthl,.orbhud.tuthl{animation:tutglow2 1.1s ease-in-out infinite}
+@keyframes tutglow2{0%,100%{box-shadow:0 0 0 2px rgba(181,82,59,.25)}50%{box-shadow:0 0 0 5px rgba(181,82,59,.85)}}
 @media (pointer:coarse){
   .gearbtn{display:inline-flex;position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);left:16px;z-index:7;width:40px;height:40px;padding:0;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(6px);box-sizing:border-box;touch-action:manipulation}
   .gearbtn svg{width:22px;height:22px}
@@ -238,7 +256,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 <button class="gearbtn" id="gearBtn" type="button" aria-label="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/><circle cx="12" cy="12" r="6.6"/></svg></button>
 <div class="prompt" id="setMenu" role="dialog" aria-modal="true" aria-labelledby="setTitle" hidden><div class="pcard" style="width:min(380px,100%)">
   <h3 id="setTitle">Settings</h3>
-  <div class="setlist"><button id="setMusic" type="button">Music <b></b></button><button id="setPads" type="button">Controller buttons <b></b></button><label for="setPixel">Pixelation <b id="setPixelOut"></b><input id="setPixel" type="range" min="1" max="6" step="1"></label><button id="setCp" type="button">Checkpoints <b>›</b></button></div>
+  <div class="setlist"><div class="setvol"><button id="setMusic" type="button">Music <b></b></button><input id="setMusicVol" type="range" min="0" max="100" step="5" aria-label="Music volume"></div><div class="setvol"><button id="setFx" type="button">Sound effects <b></b></button><input id="setFxVol" type="range" min="0" max="100" step="5" aria-label="Sound effects volume"></div><button id="setPads" type="button">Controller buttons <b></b></button><label for="setPixel">Pixelation <b id="setPixelOut"></b><input id="setPixel" type="range" min="1" max="6" step="1"></label><button id="setTut" type="button">Tutorial <b>›</b></button><button id="setCp" type="button">Checkpoints <b>›</b></button></div>
   <div class="pbtns"><button id="setClose" type="button" class="ghostbtn">Close</button></div>
 </div></div>
 <div class="prompt" id="cpMenu" role="dialog" aria-modal="true" aria-labelledby="cpTitle" hidden><div class="pcard" style="width:min(440px,100%)">
@@ -385,6 +403,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
   <svg class="ic-skate" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 5l9 20 9-20"/></svg>
   <svg class="ic-classic" viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M10 5v20M20 5v20"/></svg>
 </button>
+<div class="tut" id="tut" hidden><p id="tutText"></p><div class="tutfoot"><button id="tutSkip" type="button">Skip</button><span id="tutN"></span><button id="tutGo" type="button" class="go" hidden>Got it</button></div></div>
 <div class="pads"><div class="pad l" id="padL"><span>Left kick</span></div><div class="pad r" id="padR"><span>Right kick</span></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1359,7 +1378,7 @@ function crownCollect(){
   const p = cityProj(CROWN_SPIRAL, S.x, S.y, CAVE_DECK.i);
   CROWN_SPIRAL.gems.forEach((g, k) => {
     if (crownHas(k) || Math.abs(p.s - g) > 1.8) return;
-    crownGot.push(k); saveCrown();
+    crownGot.push(k); saveCrown(); music.chime(crownGot.length/CROWN.n, crownGot.length === CROWN.n);
     toast(crownGot.length === CROWN.n ? 'All 30 crown crystals. The altar in the ring asks for them, and so does the ship waiting at the station.' : 'Crown crystal ' + crownGot.length + ' of ' + CROWN.n);
     if (caveDress.crownGems) caveDress.crownGems[k].visible = false;
   });
@@ -1793,12 +1812,13 @@ function classicPush(mult = 1){
   const eff = Math.max(0.08, 1 - speed/vmax);
   S.vx += Math.sin(S.th) * P.classic * eff * mult; S.vy += -Math.cos(S.th) * P.classic * eff * mult;
   lastPush = { dx: Math.sin(S.th), dy: -Math.cos(S.th), amt: P.classic * eff };
+  sfx.kick(classic.pos === 'A' ? 'R' : 'L', mult); sfx.pole();
   const now = performance.now(); kicks.push(now); kicks = kicks.filter(t => now - t < 4000); lastKickAt = now;
   legFlash[classic.pos === 'A' ? 'R' : 'L'] = 1;
   rumble(classic.pos === 'A' ? 'R' : 'L', kickBuzz(1));
 }   // both skis stay down until your next stroke
 function polePush(dir = S.th){
-  poleT = 1;
+  poleT = 1; sfx.pole();
   // double pole: both poles plant and drive you straight ahead, limited by the hill-adjusted top speed
   const speed = Math.hypot(S.vx, S.vy), vmax = P.max * slopeFactors(S.grade).max / 3.6;
   // the poles plant through loose snow just as well, so a double pole keeps its full push off the trail
@@ -1966,6 +1986,7 @@ function kick(leg, opt = {}){
   // a passive step puts the foot down without pushing: it doesn't count toward cadence or the same-leg power loss
   if (opt.passive){ streak = 0; return; }
   lastPushAt = now; armAt = now; armPending = false;   // for the animation: a passive step has no pole push
+  sfx.kick(leg, opt.boost || 1); if (opt.power !== undefined || strideStyle === 'v2') sfx.pole();
   kicks.push(now); kicks = kicks.filter(t => now - t < 4000);
   legFlash[leg] = 1;
 }
@@ -2023,11 +2044,11 @@ function openPrompt(c){
   $('pTitle').textContent = c.title; $('pBody').textContent = c.body;
   $('pGo').textContent = c.go; $('pNo').hidden = !c.onGo; $('pNo').textContent = c.no || 'Cancel';
   $('pHint').textContent = c.onGo ? 'Space or A: ' + c.go.toLowerCase() + ' · X or B: ' + (c.no || 'cancel').toLowerCase() : 'Space or A to close';
-  $('prompt').hidden = false;
+  $('prompt').hidden = false; sfx.promptOpen();
 }
 function closePrompt(go){
   const c = promptCtx; if (!c) return;
-  promptCtx = null; padHold = true; $('prompt').hidden = true;
+  promptCtx = null; padHold = true; $('prompt').hidden = true; if (go) sfx.promptGo(); else sfx.promptNo();
   if (go && c.onGo) c.onGo();
   else if (!go && c.onNo) c.onNo();
 }
@@ -2346,7 +2367,7 @@ addEventListener('blur', () => { held.L = held.R = false; });
 // rest of the held push grows to match). only the arms wait: they stay ready until it's clear whether this is a tap
 // (lifted, slid another way, or held still for "swipe wait" ms) or a swipe, then swing V1 or V2. a swipe counts once
 // it has travelled the swipe distance, or on lifting if it got at least halfway, as long as that's within 400 ms
-const padTouch = { L: null, R: null };
+const padTouch = { L: null, R: null }, padGlideTok = { L: 0, R: 0 };
 function padSettle(t){ if (t.timer){ clearTimeout(t.timer); t.timer = null; } if (t.state !== 'done'){ t.state = 'done'; if (t.kicked){ armPending = false; armAt = performance.now(); } } }
 function padKick(leg, t){ padSettle(t); }
 function padLoaded(leg, t){
@@ -2355,17 +2376,18 @@ function padLoaded(leg, t){
   if (!ok || P.lboost <= 1) return;
   kickTop = { dx: t.push.dx, dy: t.push.dy, amt: t.push.amt * (P.lboost - 1), left: 0.15 };
   if (kickDrive && kickDrive.leg === leg) kickDrive.base *= P.lboost;
-  if (!inClassic()) strideStyle = 'v2';
-  rumble(leg, kickBuzz(P.lboost));
+  if (!inClassic()){ strideStyle = 'v2'; sfx.pole(); }
+  rumble(leg, kickBuzz(P.lboost)); sfx.swipe(); tut.ev('loaded', leg);
 }
 for (const [id, leg] of [['padL','L'],['padR','R']]){
   const el = $(id);
   el.addEventListener('pointerdown', e => {
-    e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch(_){} el.classList.add('on'); anyInputAt = performance.now();
+    e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch(_){} el.classList.add('on'); anyInputAt = performance.now(); padGlideTok[leg]++;
     const old = padTouch[leg]; if (old) padKick(leg, old);
     const t = padTouch[leg] = { id: e.pointerId, x0: e.clientX, y0: e.clientY, state: 'wait', timer: null, t0: performance.now() };
     const before = lastKickAt; lastPush = null; kickInput(leg);
     t.kicked = lastKickAt !== before; t.push = lastPush;
+    if (t.kicked) tut.ev('kick', leg);
     if (t.kicked) armPending = true;
     if (P.swait > 0) t.timer = setTimeout(() => padKick(leg, t), P.swait); else padKick(leg, t);
   });
@@ -2387,7 +2409,10 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
       } else padKick(leg, t);
       padTouch[leg] = null;
     }
-    el.classList.remove('on','pull','armed'); release(leg);
+    el.classList.remove('on','pull','armed');
+    // no glide to hold on a phone: lifting your finger keeps the kick's full push and glide going as if you'd held it
+    const tok = ++padGlideTok[leg], left = Math.max(P.gwin, P.klen) - (performance.now() - glideStart);
+    if (left > 0 && glideLeg === leg) setTimeout(() => { if (padGlideTok[leg] === tok && !padTouch[leg]) release(leg); }, left); else release(leg);
   });
 }
 // snow plow on touch: press and hold anywhere on the scene above the pads; let go to stop. a second finger makes it a
@@ -2437,7 +2462,20 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
 // ---- background music: gapless Web Audio loop, starts on the first key / tap / controller press (browsers block autoplay)
 const music = (() => {
   let on = true; try { on = localStorage.getItem('skate-music') !== 'off'; } catch(e){}
-  let ctx = null, gain = null, src = null, buf = null, loading = null;
+  let ctx = null, gain = null, src = null, buf = null, loading = null, fxGain = null, noise = null;
+  const num = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : Math.max(0, Math.min(100, +v)); } catch(e){ return d; } };
+  let vol = num('skate-musicvol', 55), fxVol = num('skate-fxvol', 70), fxOn = true;
+  try { fxOn = localStorage.getItem('skate-sfx') !== 'off'; } catch(e){}
+  const mGain = () => on ? vol/100 : 0, fGain = () => fxOn ? fxVol/100 : 0;
+  // the audio context exists from the first touch even with the music off, so the sound effects can play
+  function ensure(){
+    if (!ctx){ const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return false;
+      ctx = new AC(); gain = ctx.createGain(); gain.gain.value = mGain(); gain.connect(ctx.destination);
+      fxGain = ctx.createGain(); fxGain.gain.value = fGain(); fxGain.connect(ctx.destination);
+      noise = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate); const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1; }
+    if (ctx.state !== 'running') ctx.resume();
+    return true;
+  }
   const btn = $('musicBtn');
   const show = () => btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   const load = () => loading || (loading = fetch('winter.wav').then(r => { if (!r.ok) throw 0; return r.arrayBuffer(); })
@@ -2447,27 +2485,25 @@ const music = (() => {
     src = ctx.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(gain); src.start();
   }
   function start(){
-    if (!on) return;
-    if (!ctx){ const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; ctx = new AC(); gain = ctx.createGain(); gain.gain.value = 0.55; gain.connect(ctx.destination); }
-    if (ctx.state !== 'running') ctx.resume();
+    if (!on || !ensure()) return;
     if (buf) play(); else load();
   }
   function set(v){
     on = v; show(); try { localStorage.setItem('skate-music', on ? 'on' : 'off'); } catch(e){}
-    if (on) { start(); if (gain) gain.gain.setTargetAtTime(0.55, ctx.currentTime, 0.08); }
+    if (on) { start(); if (gain) gain.gain.setTargetAtTime(mGain(), ctx.currentTime, 0.08); }
     else if (gain) gain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
   }
   show();
   btn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); set(!on); });
   btn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); e.stopPropagation(); set(!on); } });
-  const kick = () => { if (on && (!ctx || ctx.state !== 'running' || !src)) start(); };
+  const kick = () => { if (!ctx || ctx.state !== 'running') ensure(); if (on && !src) start(); };
   for (const ev of ['pointerdown','keydown','touchend']) addEventListener(ev, kick, { capture: true });
   addEventListener('keydown', e => { if ((e.key === 'm' || e.key === 'M') && !e.repeat && !e.target.closest?.('input,textarea,select')) set(!on); });
   setInterval(() => { if (!on || (ctx && ctx.state === 'running' && src)) return;
     for (const g of (navigator.getGamepads ? navigator.getGamepads() : [])) if (g && g.buttons.some(b => b.pressed)) { start(); break; } }, 300);
   // a soft bell for each orb, climbing a pentatonic scale as the count goes up; a little arpeggio when a gate opens
   function chime(frac, big = false){
-    if (!on || !ctx || ctx.state !== 'running') return;
+    if (!fxOn || !ctx || ctx.state !== 'running') return;
     const scale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24], base = 659.25;   // from E5
     const notes = big ? [0, 4, 7, 12].map(n => base * 2**(n/12)) : [base * 2**(scale[Math.min(scale.length - 1, Math.round(frac * (scale.length - 1)))]/12)];
     notes.forEach((f, i) => {
@@ -2475,12 +2511,95 @@ const music = (() => {
       o.type = 'sine'; o.frequency.value = f; o2.type = 'sine'; o2.frequency.value = f * 2.01;
       g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(big ? 0.16 : 0.12, t0 + 0.012); g.gain.exponentialRampToValueAtTime(0.0008, t0 + (big ? 1.4 : 0.7));
       const g2 = ctx.createGain(); g2.gain.value = 0.25;
-      o.connect(g); o2.connect(g2); g2.connect(g); g.connect(ctx.destination);
+      o.connect(g); o2.connect(g2); g2.connect(g); g.connect(fxGain);
       o.start(t0); o2.start(t0); o.stop(t0 + 1.5); o2.stop(t0 + 1.5);
     });
   }
-  return { set, chime, get on(){ return on; } };
+  // ---- sound effects, all synthesised: filtered noise for snow and wind, sine and triangle tones for everything else
+  const live = () => fxOn && ctx && ctx.state === 'running';
+  function hit({ dur = 0.2, f0 = 1200, f1 = f0, q = 1, type = 'bandpass', g = 0.2, pan = 0, at = 0.01, delay = 0 }){
+    const t0 = ctx.currentTime + delay, n = ctx.createBufferSource(); n.buffer = noise; n.playbackRate.value = 0.8 + Math.random()*0.4;
+    const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
+    const e = ctx.createGain(); e.gain.setValueAtTime(0.0001, t0); e.gain.linearRampToValueAtTime(g, t0 + at); e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    n.connect(f); f.connect(e); let out = e;
+    if (pan && ctx.createStereoPanner){ const pn = ctx.createStereoPanner(); pn.pan.value = pan; e.connect(pn); out = pn; }
+    out.connect(fxGain); n.start(t0, Math.random()*1.5); n.stop(t0 + dur + 0.05);
+  }
+  function tone({ f0 = 440, f1 = f0, dur = 0.2, type = 'sine', g = 0.1, at = 0.01, delay = 0 }){
+    const t0 = ctx.currentTime + delay, o = ctx.createOscillator(), e = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    e.gain.setValueAtTime(0.0001, t0); e.gain.linearRampToValueAtTime(g, t0 + at); e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(e); e.connect(fxGain); o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  // looping beds: the ski hiss (rises with speed), the snow plow scrape and the light bridge hum
+  let beds = null;
+  function bed(type, freq, q){ const n = ctx.createBufferSource(); n.buffer = noise; n.loop = true; const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const e = ctx.createGain(); e.gain.value = 0; n.connect(f); f.connect(e); e.connect(fxGain); n.start(); return { f, e }; }
+  function makeBeds(){
+    const hum = ctx.createGain(); hum.gain.value = 0; hum.connect(fxGain);
+    for (const [fr, ty] of [[220, 'sine'], [330.8, 'sine'], [441.5, 'triangle']]){ const o = ctx.createOscillator(); o.type = ty; o.frequency.value = fr; const g = ctx.createGain(); g.gain.value = ty === 'sine' ? 0.5 : 0.15; o.connect(g); g.connect(hum); o.start(); }
+    const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 5.5; lg.gain.value = 0.25; lfo.connect(lg); const trem = ctx.createGain(); trem.gain.value = 1; lg.connect(trem.gain); lfo.start();
+    hum.disconnect(); hum.connect(trem); trem.connect(fxGain);
+    beds = { hiss: bed('bandpass', 2400, 0.5), plow: bed('bandpass', 900, 0.8), hum: { e: hum } };
+  }
+  const setG = (node, v) => node.e.gain.setTargetAtTime(v, ctx.currentTime, 0.08);
+  const fx = {
+    get on(){ return fxOn; }, get vol(){ return fxVol; },
+    set(v){ fxOn = v; try { localStorage.setItem('skate-sfx', v ? 'on' : 'off'); } catch(e){} if (fxGain) fxGain.gain.setTargetAtTime(fGain(), ctx.currentTime, 0.05); },
+    volume(v){ fxVol = v; try { localStorage.setItem('skate-fxvol', v); } catch(e){} if (fxGain) fxGain.gain.setTargetAtTime(fGain(), ctx.currentTime, 0.05); },
+    // a skating push: a swish of snow, panned to the kicking ski
+    kick(leg, boost = 1){ if (!live()) return; hit({ dur: 0.24, f0: 2200, f1: 700, q: 1.1, g: 0.2*Math.min(1.5, boost), pan: leg === 'L' ? -0.35 : 0.35, at: 0.015 }); },
+    // pole plant: a sharp tick on the snow with a little thump
+    pole(){ if (!live()) return; hit({ dur: 0.05, f0: 5000, type: 'highpass', q: 0.7, g: 0.12, at: 0.002 }); tone({ f0: 190, f1: 90, dur: 0.07, g: 0.1, at: 0.003 }); },
+    // a loaded stroke: the swish rides up
+    swipe(){ if (!live()) return; hit({ dur: 0.2, f0: 700, f1: 2600, q: 1.4, g: 0.12, at: 0.03 }); },
+    tick(){ if (!live()) return; tone({ f0: 1400, f1: 1200, dur: 0.04, g: 0.05, at: 0.002 }); },
+    step(){ if (!live()) return; tone({ f0: 880, dur: 0.12, g: 0.08 }); tone({ f0: 1318.5, dur: 0.22, g: 0.08, delay: 0.08 }); },
+    promptOpen(){ if (!live()) return; tone({ f0: 587.3, dur: 0.16, g: 0.07, type: 'triangle' }); tone({ f0: 880, dur: 0.26, g: 0.07, type: 'triangle', delay: 0.07 }); },
+    promptGo(){ if (!live()) return; tone({ f0: 880, dur: 0.1, g: 0.07 }); tone({ f0: 1174.7, dur: 0.18, g: 0.07, delay: 0.05 }); },
+    promptNo(){ if (!live()) return; tone({ f0: 660, f1: 440, dur: 0.18, g: 0.06, type: 'triangle' }); },
+    // gates and bridges: a low grinding rumble under a slow rising tone
+    open(){ if (!live()) return; hit({ dur: 1.8, f0: 260, f1: 120, type: 'lowpass', q: 0.8, g: 0.28, at: 0.3 }); tone({ f0: 110, f1: 220, dur: 1.4, type: 'triangle', g: 0.05, at: 0.4 }); },
+    // through a portal: a rising sweep
+    warp(){ if (!live()) return; tone({ f0: 180, f1: 1500, dur: 0.8, g: 0.08, at: 0.1 }); hit({ dur: 0.8, f0: 300, f1: 5000, q: 2, g: 0.14, at: 0.2 }); },
+    bridgeOn(){ if (!live()) return; tone({ f0: 660, f1: 1320, dur: 0.3, g: 0.06 }); tone({ f0: 990, f1: 1980, dur: 0.35, g: 0.04, delay: 0.06 }); },
+    bridgeOff(){ if (!live()) return; tone({ f0: 1320, f1: 660, dur: 0.3, g: 0.05 }); },
+    whoosh(){ if (!live()) return; hit({ dur: 0.9, f0: 300, f1: 900, type: 'lowpass', q: 0.6, g: 0.12, at: 0.3 }); },
+    // the cosmic moose: a slow, wide chord swelling in
+    cosmic(){ if (!live()) return; for (const [f, d] of [[110, 0], [164.8, 0.3], [220, 0.6], [329.6, 0.9], [440, 1.2]]) tone({ f0: f, dur: 6, g: 0.045, at: 1.6, delay: d }); },
+    // per frame: the beds follow speed and what you're on
+    beds(speed, plow, bridge, space){
+      if (!live()){ if (beds) for (const b of [beds.hiss, beds.plow, beds.hum]) setG(b, 0); return; }
+      if (!beds) makeBeds();
+      const k = Math.min(1, speed/14);
+      setG(beds.hiss, bridge || space ? 0 : 0.05*k*k + (speed > 0.3 ? 0.006 : 0));
+      beds.hiss.f.frequency.setTargetAtTime(1500 + 2200*k, ctx.currentTime, 0.1);
+      setG(beds.plow, plow ? 0.22*Math.min(1, speed/5) : 0);
+      setG(beds.hum, bridge ? 0.018 + 0.02*k : 0);
+    }
+  };
+  function setVolume(v){ vol = v; try { localStorage.setItem('skate-musicvol', v); } catch(e){} if (gain) gain.gain.setTargetAtTime(mGain(), ctx.currentTime, 0.05); }
+  return { set, chime, setVolume, fx, get vol(){ return vol; }, get on(){ return on; }, get ctxState(){ return ctx && ctx.state; } };
 })();
+const sfx = music.fx;
+// sound effect cues for things that change in the world: watched each frame, so a reset or a checkpoint jump (which
+// sets everything at once) stays quiet
+const sfxWatch = { prev: null, quietUntil: 0 };
+function sfxQuiet(ms = 800){ sfxWatch.quietUntil = performance.now() + ms; }
+function updateSfx(){
+  const now = performance.now(), sp = Math.hypot(S.vx, S.vy);
+  const cur = { g1: gateOpen, g2: gate2Open, g4: gate4Open, b1: bridgeDown > 0.02, b2: bridge2Down > 0.02, crown: !!(typeof CROWN_GATE !== 'undefined' && CROWN_GATE.open),
+    ports: TRANSPORT.map(T => !!T.open).join(''), sky: !!(SKY_ON || CAVE_DECK), st: ONSTATION, under: UNDER, cos: cosK > 0.05 };
+  const p = sfxWatch.prev; sfxWatch.prev = cur;
+  if (p && now > sfxWatch.quietUntil && !promptCtx){
+    if ((cur.g1 && !p.g1) || (cur.g2 && !p.g2) || (cur.g4 && !p.g4) || (cur.b1 && !p.b1) || (cur.b2 && !p.b2) || (cur.crown && !p.crown) || cur.ports.split('').some((c, i) => c === '1' && p.ports[i] !== '1')) sfx.open();
+    if (cur.st !== p.st) sfx.warp();
+    else if (cur.under !== p.under) sfx.whoosh();
+    if (cur.sky && !p.sky) sfx.bridgeOn(); else if (!cur.sky && p.sky) sfx.bridgeOff();
+    if (cur.cos && !p.cos) sfx.cosmic();
+  }
+  sfx.beds(promptCtx ? 0 : sp, mode === 'plow', cur.sky, ONSTATION);
+}
 $('mToggle').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleClassic(); });
 $('reset').addEventListener('click', () => { glideLeg=null; Object.assign(S,{x:0,y:0,vx:0,vy:0,th:0,thv:0,tgt:0,vis:0,visv:0,travel:0,dist:0,grade:0,off:0,trail:null}); camTh=0; camVel=0; camH=null; clearTracks(); skis=[]; kicks=[]; lastTurn=null; lastLeg=null; streak=0; lastSki={L:null,R:null}; lastKickAt=0; kickDrive=null; weightLeg=null; camPending=0; mode=null; focus=null; resetOrbs(); });
 $('tracks').addEventListener('click', e => { showTracks = !showTracks; e.target.textContent = 'Tracks: ' + (showTracks?'on':'off'); });
@@ -6228,7 +6347,7 @@ function returnToObservatory(){
   toast('You are back at the observatory.');
 }
 // keepOutfit: through the black hole you keep the court's purple; leaving on the ship you go back to your own orange
-function resetAll(keepOutfit = true){
+function resetAll(keepOutfit = true){ sfxQuiet(1500);
   SKY_ON = null; bhShown = false; UNDER = false; ONSTATION = false; CAVE_DECK = null;
   if (!keepOutfit){ outfit = false; saveEnd(); }
   for (const T of TRANSPORT) T.open = false; savePortals();
@@ -6257,6 +6376,7 @@ const PROGRESS_KEY = 'skate-progress';
 // the checkpoint: the terminal or altar you last used (started, powered, woke, opened). a new visit starts you there
 let checkpoint = null;      // { t: terminal index } or { a: 1 }
 function spawnAt(x, y, th){
+  sfxQuiet();
   Object.assign(S, { x, y, vx: 0, vy: 0, th, tgt: th, thv: 0, vis: th, visv: 0, travel: th });
   camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L: null, R: null };
 }
@@ -8197,7 +8317,7 @@ function loop(t){
   const dt = Math.min(0.1, (t-last)/1000); last = t; pollPad();
   // a prompt interrupts the game: the skier holds still (keeping their speed) until it's answered
   if (!promptCtx){ const n = Math.max(1, Math.ceil(dt * 60 - 1e-6)); for (let k = 0; k < n; k++) step(dt/n); }
-  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updatePet(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract(); updateSky(dt); updateSpace(dt); updateZone5(dt); updateCourt(dt); updateBlackHole(dt); updateFireworks(dt); updateSkyMarks(); updateCave(dt);
+  updateTiles(); updateOrbs(dt); animateGate(dt); updateMoose(dt); updateNPCs(dt); updateCrystals(dt); animateGate4(dt); updateHerd(dt); updatePet(dt); updateGiant(dt); updateKiosks(); updateAltar(); updateControls(); checkInteract(); updateSky(dt); updateSpace(dt); updateZone5(dt); updateCourt(dt); updateBlackHole(dt); updateFireworks(dt); updateSkyMarks(); updateCave(dt); updateSfx(); tut.update(dt);
   if (trial.K && !promptCtx) trial.t += dt;
   // camera rotation rides a critically damped spring: it eases in and eases out, never snaps or overshoots,
   // and quick left-right kick sway is filtered out while sustained turns come through
@@ -8229,7 +8349,7 @@ $('caveCrown').addEventListener('click', () => caveSpawn('crown'));
 // ---- the checkpoint menu: behind a password; each stage is cumulative (everything the stages before it unlock), from
 // a full reset
 const CP_STAGES = ['Start', 'Zone 1', 'Zone 2', 'Zone 3', 'Crystals collected', 'Ceremony 1', 'Crown room', 'Space port', 'Ceremony 2', 'Ceremony 3'];
-function applyStage(n){
+function applyStage(n){ sfxQuiet(1500);
   if (promptCtx && !promptCtx.cp) closePrompt(false);
   SKY_ON = null; UNDER = false; ONSTATION = false; CAVE_DECK = null;
   $('reset').click();                                                  // a complete reset: every terminal, gate, crystal and calf
@@ -8263,7 +8383,8 @@ $('cpPass').addEventListener('keydown', e => { e.stopPropagation(); if (e.key ==
 let padUI = true; try { padUI = localStorage.getItem('skate-padui') !== 'off'; } catch (e) {}
 const applyPadUI = () => document.body.classList.toggle('nopadui', !padUI);
 applyPadUI();
-function setLabels(){ $('setPixel').value = $('tPixel').value; $('setPixelOut').textContent = $('oPixel').textContent; $('setMusic').querySelector('b').textContent = $('musicBtn').getAttribute('aria-pressed') === 'false' ? 'off' : 'on'; $('setPads').querySelector('b').textContent = padUI ? 'on' : 'off'; }
+function setLabels(){ $('setMusicVol').value = music.vol; $('setFxVol').value = sfx.vol; $('setFx').querySelector('b').textContent = sfx.on ? 'on' : 'off';
+  $('setMusicVol').parentNode.classList.toggle('off', !music.on); $('setFxVol').parentNode.classList.toggle('off', !sfx.on); $('setPixel').value = $('tPixel').value; $('setPixelOut').textContent = $('oPixel').textContent; $('setMusic').querySelector('b').textContent = $('musicBtn').getAttribute('aria-pressed') === 'false' ? 'off' : 'on'; $('setPads').querySelector('b').textContent = padUI ? 'on' : 'off'; }
 function openSettings(){ setLabels(); $('setMenu').hidden = false; promptCtx = promptCtx || { cp: true }; }
 function closeSettings(){ $('setMenu').hidden = true; if (promptCtx && promptCtx.cp) promptCtx = null; }
 $('gearBtn').addEventListener('click', openSettings);
@@ -8271,6 +8392,64 @@ $('setClose').addEventListener('click', closeSettings);
 $('setMusic').addEventListener('click', () => { $('musicBtn').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); setLabels(); });
 $('setPads').addEventListener('click', () => { padUI = !padUI; try { localStorage.setItem('skate-padui', padUI ? 'on' : 'off'); } catch (e) {} applyPadUI(); setLabels(); });
 $('setCp').addEventListener('click', () => { $('setMenu').hidden = true; openCpMenu(); });
+$('setFx').addEventListener('click', () => { sfx.set(!sfx.on); setLabels(); sfx.tick(); });
+$('setMusicVol').addEventListener('input', e => { music.setVolume(+e.target.value); });
+$('setFxVol').addEventListener('input', e => { sfx.volume(+e.target.value); });
+$('setFxVol').addEventListener('change', () => sfx.step());
+$('setTut').addEventListener('click', () => { closeSettings(); tut.start(); });
+for (const b of document.querySelectorAll('.setlist button')) b.addEventListener('click', () => { if (b.id !== 'setFx') sfx.tick(); });
+
+// ---- the tutorial (touch screens): one step at a time while you ski, each moving on once you've done it.
+// it runs by itself on a phone's first game, and Settings > Tutorial runs it again
+const tut = (() => {
+  const padName = l => padUI ? (l === 'L' ? '<b>Left kick</b>' : '<b>Right kick</b>') : (l === 'L' ? 'the <b>left side</b>' : 'the <b>right side</b>');
+  const pads = () => padUI ? 'pads' : 'sides';
+  const STEPS = [
+    { t: () => 'Tap ' + padName('L') + ' to push off', hl: ['padL'], kick: (l, st) => l === 'L' },
+    { t: () => 'Now ' + padName('R') + '. Keep alternating left and right to skate', hl: ['padL', 'padR'], need: 4, kick: (l, st) => { const ok = l !== st.last; st.last = l; return ok; }, init: st => { st.last = 'L'; } },
+    { t: () => 'To turn, tap the <b>same side twice</b>. Right turns left, left turns right', hl: ['padL', 'padR'], kick: () => !inClassic() && sideRun >= 2 },
+    { t: () => '<b>Swipe up</b> a ' + (padUI ? 'pad' : 'side') + ' for a stronger stroke', hl: ['padL', 'padR'], loaded: true },
+    { t: () => '<b>Press and hold</b> anywhere above the ' + pads() + ' to snow plow and slow down', poll: st => { if (mode !== 'plow'){ st.h = 0; return false; } st.h = st.h || performance.now(); return performance.now() - st.h > 600; } },
+    { t: () => '<b>Pinch</b> with two fingers to bring the camera closer or further away', poll: st => Math.abs(P.camd - st.c0) >= 1, init: st => { st.c0 = P.camd; } },
+    { t: () => padUI ? 'Tap the <b>middle button</b> to switch to classic' : 'Tap <b>between the sides</b> to switch to classic', hl: ['mToggle'], poll: () => inClassic() },
+    { t: () => 'Classic: <b>alternate</b> left and right to stride. A swipe up works here too', hl: ['padL', 'padR'], need: 3, kick: () => inClassic() },
+    { t: () => 'Tap the middle again to go back to skating', hl: ['mToggle'], poll: () => !inClassic() },
+    { t: () => 'The label at the top is your <b>goal</b>. Ski into a <b>terminal</b> to start it, then collect its orbs', hl: ['orbHud'], button: true },
+  ];
+  let i = -1, st = {}, n = 0, doneAt = 0, lit = [];
+  const el = $('tut');
+  function light(ids){ for (const e of lit) e.classList.remove('tuthl'); lit = ids.map(id => $(id)).filter(Boolean); for (const e of lit) e.classList.add('tuthl'); }
+  function show(){
+    const S_ = STEPS[i]; st = {}; n = 0; if (S_.init) S_.init(st);
+    el.classList.remove('done'); $('tutText').innerHTML = S_.t(); $('tutN').textContent = (i + 1) + ' / ' + STEPS.length;
+    $('tutGo').hidden = !S_.button; light(S_.hl || []);
+  }
+  function pass(){
+    const S_ = STEPS[i]; if (++n < (S_.need || 1)) return;
+    doneAt = performance.now(); el.classList.add('done'); $('tutText').innerHTML = i === STEPS.length - 1 ? 'You\'re set. Settings has this again any time' : 'Nice!'; light([]); sfx.step();
+  }
+  function stop(){ i = -1; light([]); el.hidden = true; try { localStorage.setItem('skate-tut', 'done'); } catch(e){} }
+  $('tutSkip').addEventListener('click', e => { e.stopPropagation(); stop(); sfx.tick(); });
+  $('tutGo').addEventListener('click', e => { e.stopPropagation(); if (i >= 0 && !doneAt) pass(); });
+  for (const b of [$('tutSkip'), $('tutGo')]) b.addEventListener('pointerdown', e => e.stopPropagation());
+  return {
+    get on(){ return i >= 0; }, get step(){ return i; },
+    start(){ i = 0; doneAt = 0; el.hidden = false; show(); },
+    ev(kind, leg){
+      if (i < 0 || doneAt || promptCtx) return; const S_ = STEPS[i];
+      if (kind === 'kick' && S_.kick && S_.kick(leg, st)) pass();
+      if (kind === 'loaded' && S_.loaded) pass();
+    },
+    update(dt){
+      if (i < 0) return;
+      el.hidden = !!promptCtx;
+      if (doneAt){ if (performance.now() - doneAt > (i === STEPS.length - 1 ? 2600 : 900)){ doneAt = 0; if (++i >= STEPS.length) stop(); else show(); } return; }
+      const S_ = STEPS[i]; if (S_.poll && !promptCtx && S_.poll(st, dt)) pass();
+    }
+  };
+})();
+// first game on a touch screen (nothing saved yet): start it once the page has settled
+try { if (matchMedia('(pointer:coarse)').matches && localStorage.getItem('skate-tut') !== 'done' && !localStorage.getItem(PROGRESS_KEY)) setTimeout(() => { if (!tut.on) tut.start(); }, 1500); } catch(e){}
 $('setPixel').addEventListener('input', () => { const el = $('tPixel'); el.value = $('setPixel').value; el.dispatchEvent(new Event('input')); $('setPixelOut').textContent = $('oPixel').textContent; });
 // exact positions, for reporting a spot: copy where you (and the camera) are; paste one back in to go there
 $('posCopy').addEventListener('click', () => {
@@ -8290,7 +8469,7 @@ $('caveRegalia').addEventListener('click', () => { outfit = !outfit; saveEnd(); 
 $('ceremonyBtn').addEventListener('click', () => { ceremony = (ceremony + 1) % 3; if (ceremony === 2) crownSpent = 'altar'; else if (crownSpent === 'altar') crownSpent = ''; saveCrown(); saveEnd(); calfUI(); regaliaBtn(); });
 regaliaBtn();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { applyStage, get gate4Open2(){ return gate4Open; }, giantUp(){ return giant.up; }, get checkpoint(){ return checkpoint; }, get promptCtx(){ return promptCtx; }, updateCourt, OBS_ALTAR, eldersIn, courtOpen, SHIP_SPOT, setCrownAll(){ crownGot = [...Array(CROWN.n).keys()]; crownSpent = ''; saveCrown(); }, get crownSpent(){ return crownSpent; }, get ceremony(){ return ceremony; }, get outfit(){ return outfit; }, set outfit(v){ outfit = v; }, get cosK(){ return cosK; }, camera, get toastText(){ return document.getElementById("toast").textContent; }, CAVE_BRIDGES, CROWN, CROWN_SPIRAL, get crownGot(){ return crownGot; }, crownReset, inCrownRoom, caveField, caveFloor, caveSD, CAVE_TRAILS, SHAFT, HALLS, ROOMS, SPOKES, STATION, TRANSPORT, PORTAL_X, stationD, cavePowered, get stationK(){ return stationK; }, caveDress, MINE, CAVE_BOX, caveTiles, caveSpawn, mineCut, mineRidge, heightNat, get UNDER(){ return UNDER; }, set UNDER(v){ UNDER = v; }, CITY_DECKS, get CAVE_DECK(){ return CAVE_DECK; }, set CAVE_DECK(v){ CAVE_DECK = v; }, cityStreetSD, ringLocal, stationFloor, get ONSTATION(){ return ONSTATION; }, set ONSTATION(v){ ONSTATION = v; }, CROWN_GATE, STATION_TRAILS, portalView, get caveK(){ return caveK; }, CAVE_SOLIDS, caveMask, pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get bridge2Down(){ return bridge2Down; }, SPUR_PASS, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { sfx, music, applyStage, get gate4Open2(){ return gate4Open; }, giantUp(){ return giant.up; }, get checkpoint(){ return checkpoint; }, get promptCtx(){ return promptCtx; }, updateCourt, OBS_ALTAR, eldersIn, courtOpen, SHIP_SPOT, setCrownAll(){ crownGot = [...Array(CROWN.n).keys()]; crownSpent = ''; saveCrown(); }, get crownSpent(){ return crownSpent; }, get ceremony(){ return ceremony; }, get outfit(){ return outfit; }, set outfit(v){ outfit = v; }, get cosK(){ return cosK; }, camera, get toastText(){ return document.getElementById("toast").textContent; }, CAVE_BRIDGES, CROWN, CROWN_SPIRAL, get crownGot(){ return crownGot; }, crownReset, inCrownRoom, caveField, caveFloor, caveSD, CAVE_TRAILS, SHAFT, HALLS, ROOMS, SPOKES, STATION, TRANSPORT, PORTAL_X, stationD, cavePowered, get stationK(){ return stationK; }, caveDress, MINE, CAVE_BOX, caveTiles, caveSpawn, mineCut, mineRidge, heightNat, get UNDER(){ return UNDER; }, set UNDER(v){ UNDER = v; }, CITY_DECKS, get CAVE_DECK(){ return CAVE_DECK; }, set CAVE_DECK(v){ CAVE_DECK = v; }, cityStreetSD, ringLocal, stationFloor, get ONSTATION(){ return ONSTATION; }, set ONSTATION(v){ ONSTATION = v; }, CROWN_GATE, STATION_TRAILS, portalView, get caveK(){ return caveK; }, CAVE_SOLIDS, caveMask, pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get bridge2Down(){ return bridge2Down; }, SPUR_PASS, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

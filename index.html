@@ -182,7 +182,24 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 
 /* ---- the checkpoint menu (password first): a button top right, a card listing every stage of the story ---- */
 .cpbtn{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);right:180px;z-index:7;height:40px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(6px);cursor:pointer;box-sizing:border-box;font:600 12px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;touch-action:manipulation}
-@media (pointer:coarse){.cpbtn{right:64px}}
+@media (pointer:coarse){.cpbtn{display:none}}
+/* ---- phones: one gear button (top right) for the settings: music, the on-screen controller buttons, checkpoints ---- */
+.gearbtn{display:none}
+.setlist{display:grid;gap:8px;margin:0 0 12px}
+.setlist button{min-height:48px;font:700 15px/1.1 var(--display);letter-spacing:.06em;text-transform:uppercase;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;touch-action:manipulation;display:flex;justify-content:space-between;align-items:center;padding:0 14px}
+.setlist button b{font:600 13px var(--mono);letter-spacing:0;text-transform:none;color:var(--muted)}
+@media (pointer:coarse){
+  .gearbtn{display:inline-flex;position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);right:64px;z-index:7;width:40px;height:40px;padding:0;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(6px);box-sizing:border-box;touch-action:manipulation}
+  .gearbtn svg{width:22px;height:22px}
+  .musicbtn{display:none}
+  .calfbtn{left:16px}
+  /* controller buttons off: no pad panels or labels (the halves still kick), and the style switch is the whole strip
+     between them, from the pads' top to the bottom of the screen */
+  body.nopadui .pad::before{opacity:0 !important}
+  body.nopadui .pad span{display:none}
+  body.nopadui .pads .pad.l,body.nopadui .pads .pad.r{width:calc(50% - 44px)}
+  body.nopadui .mtoggle{bottom:0;height:38%;width:88px;border-radius:0;border:0;background:transparent;backdrop-filter:none;align-items:flex-end;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 28px)}
+}
 .cpgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}
 .cpgrid button{min-height:44px;font:700 14px/1.1 var(--display);letter-spacing:.06em;text-transform:uppercase;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;touch-action:manipulation;padding:6px}
 .cpgrid button:focus-visible{outline:2px solid var(--skier);outline-offset:2px}
@@ -207,6 +224,12 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 <button class="mapbtn" id="mapBtn" type="button" aria-label="Open the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg></button>
 <div class="bigmap" id="bigMap" role="dialog" aria-label="Map"><canvas id="bigMapCv"></canvas><button class="close" id="mapClose" type="button" aria-label="Close the map">✕</button></div>
 <button class="cpbtn" id="cpBtn" type="button" aria-haspopup="dialog">Checkpoints</button>
+<button class="gearbtn" id="gearBtn" type="button" aria-label="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/><circle cx="12" cy="12" r="6.6"/></svg></button>
+<div class="prompt" id="setMenu" role="dialog" aria-modal="true" aria-labelledby="setTitle" hidden><div class="pcard" style="width:min(380px,100%)">
+  <h3 id="setTitle">Settings</h3>
+  <div class="setlist"><button id="setMusic" type="button">Music <b></b></button><button id="setPads" type="button">Controller buttons <b></b></button><button id="setCp" type="button">Checkpoints <b>›</b></button></div>
+  <div class="pbtns"><button id="setClose" type="button" class="ghostbtn">Close</button></div>
+</div></div>
 <div class="prompt" id="cpMenu" role="dialog" aria-modal="true" aria-labelledby="cpTitle" hidden><div class="pcard" style="width:min(440px,100%)">
   <h3 id="cpTitle">Checkpoints</h3>
   <p id="cpNote">Enter the password to jump to a stage of the story.</p>
@@ -367,7 +390,7 @@ function resize(){
   if (typeof renderer !== 'undefined'){
     // (the setting is the block size on a big screen, about 1000 px on its short side; smaller screens scale it down, so
     // a phone gets finer blocks and the scene stays readable)
-    const px = P.pixel > 1 ? Math.max(1, Math.round(P.pixel*Math.min(W, H)/1000)) : 0;
+    const px = P.pixel > 1 ? Math.max(2, Math.round(P.pixel*Math.min(W, H)/1000)) : 0;
     renderer.setPixelRatio(px > 1 ? 1/px : dpr); renderer.setSize(W, H, false); camera.aspect = W/H; camera.updateProjectionMatrix();
     renderer.domElement.style.imageRendering = px > 1 ? 'pixelated' : '';
   }
@@ -8171,6 +8194,18 @@ $('cpClose').addEventListener('click', closeCpMenu);
 const cpTry = () => { if ($('cpPass').value.trim() === '5k1'){ cpUnlocked = true; try { sessionStorage.setItem('skate-cp', '1'); } catch (e) {} showCpList(); } else { $('cpNote').textContent = 'That isn\'t the password.'; $('cpPass').select(); } };
 $('cpEnter').addEventListener('click', cpTry);
 $('cpPass').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') cpTry(); });
+// ---- settings (the gear, on phones): music, the on-screen controller buttons, and the checkpoints menu
+let padUI = true; try { padUI = localStorage.getItem('skate-padui') !== 'off'; } catch (e) {}
+const applyPadUI = () => document.body.classList.toggle('nopadui', !padUI);
+applyPadUI();
+function setLabels(){ $('setMusic').querySelector('b').textContent = $('musicBtn').getAttribute('aria-pressed') === 'false' ? 'off' : 'on'; $('setPads').querySelector('b').textContent = padUI ? 'on' : 'off'; }
+function openSettings(){ setLabels(); $('setMenu').hidden = false; promptCtx = promptCtx || { cp: true }; }
+function closeSettings(){ $('setMenu').hidden = true; if (promptCtx && promptCtx.cp) promptCtx = null; }
+$('gearBtn').addEventListener('click', openSettings);
+$('setClose').addEventListener('click', closeSettings);
+$('setMusic').addEventListener('click', () => { $('musicBtn').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); setLabels(); });
+$('setPads').addEventListener('click', () => { padUI = !padUI; try { localStorage.setItem('skate-padui', padUI ? 'on' : 'off'); } catch (e) {} applyPadUI(); setLabels(); });
+$('setCp').addEventListener('click', () => { $('setMenu').hidden = true; openCpMenu(); });
 // exact positions, for reporting a spot: copy where you (and the camera) are; paste one back in to go there
 $('posCopy').addEventListener('click', () => {
   const c = camera.position, t = JSON.stringify({ x: +S.x.toFixed(2), y: +S.y.toFixed(2), th: +S.th.toFixed(3), under: UNDER, station: ONSTATION, cam: [+c.x.toFixed(1), +c.y.toFixed(1), +c.z.toFixed(1)] });

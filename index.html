@@ -1792,6 +1792,7 @@ function classicPush(mult = 1){
   // classic is unaffected by ungroomed snow: the kick keeps its full power off the trail
   const eff = Math.max(0.08, 1 - speed/vmax);
   S.vx += Math.sin(S.th) * P.classic * eff * mult; S.vy += -Math.cos(S.th) * P.classic * eff * mult;
+  lastPush = { dx: Math.sin(S.th), dy: -Math.cos(S.th), amt: P.classic * eff };
   const now = performance.now(); kicks.push(now); kicks = kicks.filter(t => now - t < 4000); lastKickAt = now;
   legFlash[classic.pos === 'A' ? 'R' : 'L'] = 1;
   rumble(classic.pos === 'A' ? 'R' : 'L', kickBuzz(1));
@@ -1837,6 +1838,11 @@ function sameSideTurn(k, p = P){
 function sameLegPower(){ return Math.max(0.15, 1 - (P.decay/100) * (streak - 1)); }
 
 let kickDrive = null;   // the rest of the current kick, still being pushed out while the key is held
+// the instant part of the last push (its direction and size), so a touch kick that turns out to be a swipe can be
+// topped up to a loaded stroke afterwards; kickTop is that top-up, spread over a short time so it isn't a jolt
+let lastPush = null, kickTop = null;
+// the arms wait while a touch kick is still deciding whether it's a tap or a swipe, then swing from armAt
+let armAt = 0, armPending = false;
 
 function kick(leg, opt = {}){
   // leg 'L' pushes off the left ski: heading steps right (+). leg 'R' pushes off the right ski: steps left (-).
@@ -1935,6 +1941,7 @@ function kick(leg, opt = {}){
     const tap = P.tap / 100, push = P.push * (opt.boost || 1);    // a loaded stick stroke pushes harder (Loaded stroke boost)
     S.vx += Math.sin(ang) * push * eff * tap;
     S.vy += -Math.cos(ang) * push * eff * tap;
+    lastPush = { dx: Math.sin(ang), dy: -Math.cos(ang), amt: P.push * eff * tap };
     kickDrive = { leg, dx: Math.sin(ang), dy: -Math.cos(ang), base: push * (1 - 0.5*S.off) * sameLegPower() * (1 - tap), done: 0 };
   }
 
@@ -1958,7 +1965,7 @@ function kick(leg, opt = {}){
   lastLeg = leg; lastKickAt = now;
   // a passive step puts the foot down without pushing: it doesn't count toward cadence or the same-leg power loss
   if (opt.passive){ streak = 0; return; }
-  lastPushAt = now;   // for the animation: a passive step has no pole push
+  lastPushAt = now; armAt = now; armPending = false;   // for the animation: a passive step has no pole push
   kicks.push(now); kicks = kicks.filter(t => now - t < 4000);
   legFlash[leg] = 1;
 }
@@ -2334,16 +2341,22 @@ addEventListener('keyup', e => {
   const leg = keyLeg(k); if (leg){ keyKickHeld[leg] = false; release(leg); }
 });
 addEventListener('blur', () => { held.L = held.R = false; });
-// touch pads: a tap is a normal kick; a swipe up the pad is a loaded stroke (the same kick with the loaded boost, like a
-// loaded stick throw). so a tap isn't mistaken for the start of a swipe, a tap's kick waits up to "swipe wait" ms for
-// the finger to start moving up; lifting it or sliding any other way kicks straight away. a swipe fires as soon as it
-// has travelled the swipe distance, or on lifting if it got at least halfway
+// touch pads: the kick goes through the moment your finger touches down. if the finger then swipes up the pad, the
+// same kick is upgraded to a loaded stroke: the extra push of the loaded boost is added over the next 150 ms (and the
+// rest of the held push grows to match). only the arms wait: they stay ready until it's clear whether this is a tap
+// (lifted, slid another way, or held still for "swipe wait" ms) or a swipe, then swing V1 or V2. a swipe counts once
+// it has travelled the swipe distance, or on lifting if it got at least halfway, as long as that's within 400 ms
 const padTouch = { L: null, R: null };
-function padKick(leg, t){ if (t.timer){ clearTimeout(t.timer); t.timer = null; } if (t.state === 'wait'){ t.state = 'done'; kickInput(leg); } }
+function padSettle(t){ if (t.timer){ clearTimeout(t.timer); t.timer = null; } if (t.state !== 'done'){ t.state = 'done'; if (t.kicked){ armPending = false; armAt = performance.now(); } } }
+function padKick(leg, t){ padSettle(t); }
 function padLoaded(leg, t){
-  t.state = 'done';
-  if (inClassic()){ kickInput(leg, null, P.lboost); return; }    // in classic, a swipe is a stride kick with the same loaded boost
-  press(leg, P.lboost, null, t.t0); strideStyle = 'v2';
+  const ok = t.state !== 'done' && t.kicked && t.push && performance.now() - t.t0 < 400;
+  padSettle(t);
+  if (!ok || P.lboost <= 1) return;
+  kickTop = { dx: t.push.dx, dy: t.push.dy, amt: t.push.amt * (P.lboost - 1), left: 0.15 };
+  if (kickDrive && kickDrive.leg === leg) kickDrive.base *= P.lboost;
+  if (!inClassic()) strideStyle = 'v2';
+  rumble(leg, kickBuzz(P.lboost));
 }
 for (const [id, leg] of [['padL','L'],['padR','R']]){
   const el = $(id);
@@ -2351,13 +2364,16 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
     e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch(_){} el.classList.add('on'); anyInputAt = performance.now();
     const old = padTouch[leg]; if (old) padKick(leg, old);
     const t = padTouch[leg] = { id: e.pointerId, x0: e.clientX, y0: e.clientY, state: 'wait', timer: null, t0: performance.now() };
+    const before = lastKickAt; lastPush = null; kickInput(leg);
+    t.kicked = lastKickAt !== before; t.push = lastPush;
+    if (t.kicked) armPending = true;
     if (P.swait > 0) t.timer = setTimeout(() => padKick(leg, t), P.swait); else padKick(leg, t);
   });
   el.addEventListener('pointermove', e => {
     const t = padTouch[leg]; if (!t || t.id !== e.pointerId) return;
     const dx = e.clientX - t.x0, up = t.y0 - e.clientY;
     if (t.state === 'wait'){
-      if (up > 8 && up > Math.abs(dx)*0.6){ clearTimeout(t.timer); t.timer = null; t.state = 'swipe'; el.classList.add('pull'); }
+      if (up > 8 && up > Math.abs(dx)*0.6){ clearTimeout(t.timer); t.timer = setTimeout(() => padKick(leg, t), 400); t.state = 'swipe'; el.classList.add('pull'); }
       else if (Math.hypot(dx, up) > 12) padKick(leg, t);     // a slide that isn't upward: just the kick
     }
     if (t.state === 'swipe' && up >= P.sthrow){ el.classList.remove('pull'); padLoaded(leg, t); }
@@ -2366,8 +2382,8 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
     const t = padTouch[leg];
     if (t && t.id === e.pointerId){
       if (t.state === 'swipe'){
-        if (ev === 'pointerup' && t.y0 - e.clientY >= P.sthrow/2){ padLoaded(leg, t); held[leg] = false; }   // a short flick up still counts
-        else { t.state = 'wait'; padKick(leg, t); }
+        if (ev === 'pointerup' && t.y0 - e.clientY >= P.sthrow/2) padLoaded(leg, t);   // a short flick up still counts
+        else padKick(leg, t);
       } else padKick(leg, t);
       padTouch[leg] = null;
     }
@@ -2475,6 +2491,11 @@ function moveDir(){
 }
 
 function step(dt){
+  if (kickTop){
+    const f = Math.min(kickTop.left, dt) / 0.15; kickTop.left -= dt;
+    S.vx += kickTop.dx * kickTop.amt * f; S.vy += kickTop.dy * kickTop.amt * f;
+    if (kickTop.left <= 1e-6) kickTop = null;
+  }
   // finish the kick: the remaining push comes through over the kick length while the key stays down
   if (kickDrive){
     if (!held[kickDrive.leg] || mode) kickDrive = null;
@@ -6517,6 +6538,14 @@ function poseSkier(h0, arrowTh){
     if (tk < 0.5){ v2 = 'push'; vp = tk / 0.5; }
     else if (tk < 0.85){ v2 = 'recover'; vp = (tk - 0.5) / 0.35; }
   }
+  // the arms run the same cycle from armAt, and hold the glide pose while a touch kick is still undecided
+  if (armPending && now - lastPushAt > 500) armPending = false;
+  const tka = (now - armAt) / 1000;
+  let v2a = 'glide', vpa = 0;
+  if (!mode && !armPending){
+    if (tka < 0.5){ v2a = 'push'; vpa = tka / 0.5; }
+    else if (tka < 0.85){ v2a = 'recover'; vpa = (tka - 0.5) / 0.35; }
+  }
   const ease = x => x*x*(3 - 2*x);
   let crouch, leanDeg;
   if (mode === 'tuck'){ crouch = 0.42; leanDeg = 62; }
@@ -6598,6 +6627,7 @@ function poseSkier(h0, arrowTh){
   body.head.position.set(...hd); body.hat.position.set(hd[0], hd[1] + 0.01, hd[2]);
   // arms and poles
   for (const k of ['L','R']){
+    const v2 = v2a, vp = vpa;
     const sd = side[k];
     const s0 = [sh[0] + sd*0.2, sh[1] - 0.04, sh[2]];
     let hand, tip;

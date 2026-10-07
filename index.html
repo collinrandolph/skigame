@@ -138,7 +138,7 @@ summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid
 .pads{position:fixed;inset:auto 0 0 0;display:none;height:var(--padh);}
 .pad{position:absolute;bottom:0;top:0;width:50%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 20px);font-family:var(--display);font-size:18px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;touch-action:manipulation}
 .pad.l{left:0}.pad.r{right:0;border-left:1px dashed var(--line)}
-@media (pointer:coarse){.pads{display:block}details{bottom:calc(var(--padh) + 12px)}}
+@media (pointer:coarse){.pads{display:block}details{bottom:calc(var(--padh) + 12px)}.mtoggle{display:none!important}body.nopadui .pads{height:100%}}
 
 /* ---- interaction prompt: stop at a kiosk or the altar. covers everything and takes all input until answered ---- */
 .prompt{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;background:rgba(14,26,38,.42);backdrop-filter:blur(3px);touch-action:none}
@@ -2365,8 +2365,55 @@ addEventListener('blur', () => { held.L = held.R = false; });
 // same kick is upgraded to a loaded stroke: the extra push of the loaded boost is added over the next 150 ms (and the
 // rest of the held push grows to match). only the arms wait: they stay ready until it's clear whether this is a tap
 // (lifted, slid another way, or held still for "swipe wait" ms) or a swipe, then swing V1 or V2. a swipe counts once
-// it has travelled the swipe distance, or on lifting if it got at least halfway, as long as that's within 400 ms
+// it has travelled the swipe distance, or on lifting if it got at least halfway, as long as that's within 400 ms.
+// both thumbs down together (the second within 150 ms of the first) is a two-pad gesture instead, and the first
+// thumb's kick is taken back: both swiped back (down the screen) is a snow plow, both swiped forward (up) is a tuck,
+// spreading or closing them sideways moves the camera like a pinch. just tapping both does nothing. the plow and
+// tuck last until a thumb lifts
 const padTouch = { L: null, R: null };
+const DUAL_MS = 150;
+let dual = null;
+// everything a kick changes, so a kick that turns out to be half of a two-pad gesture can be undone
+function snapKick(){
+  return { vx: S.vx, vy: S.vy, tgt: S.tgt, camPending, streak, sideRun, kickPrevT, streakKmh, streakTrig, snapSkip, runTurn, turnRestart, lastTurn, lastTurnDeg,
+    kickDrive, kickTop, lastSki: { ...lastSki }, ski: ['L','R'].map(k => lastSki[k] && { live: lastSki[k].live, len: lastSki[k].len }), tail: skis[skis.length - 1],
+    weightLeg, lastLeg, lastKickAt, lastPushAt, kicks: kicks.slice(), glideLeg, glideStart, held: { ...held }, strideStyle, mode, armAt, armPending,
+    junctionTurnAt, assistQuietUntil, classic: { ...classic }, legFlash: { ...legFlash } };
+}
+function undoKick(q){
+  ({ camPending, streak, sideRun, kickPrevT, streakKmh, streakTrig, snapSkip, runTurn, turnRestart, lastTurn, lastTurnDeg, kickDrive, kickTop, weightLeg, lastLeg,
+     lastKickAt, lastPushAt, kicks, glideLeg, glideStart, strideStyle, mode, armAt, armPending, junctionTurnAt, assistQuietUntil } = q);
+  S.vx = q.vx; S.vy = q.vy; S.tgt = q.tgt;
+  for (let i = skis.indexOf(q.tail) + 1; i < skis.length; i++){ skis[i].len = 0; skis[i].live = false; skis[i].dirty = true; }   // the new prints vanish
+  lastSki = { ...q.lastSki }; ['L','R'].forEach((k, i) => { if (lastSki[k] && q.ski[i]){ lastSki[k].live = q.ski[i].live; lastSki[k].len = q.ski[i].len; lastSki[k].dirty = true; } });
+  Object.assign(held, q.held); Object.assign(classic, q.classic); Object.assign(legFlash, q.legFlash);
+}
+// tuck from skating (touch): held like the plow, back to skating when it ends
+let skateTuck = false;
+function setSkateTuck(on){
+  if (on && !promptCtx && !mode){ skateTuck = true; enterMode('tuck', false); }
+  else if (!on && skateTuck){ skateTuck = false; if (mode === 'tuck' && !tuckSrc) exitMode(); }
+}
+function dualMove(){
+  const { a, b } = dual, ua = a.y0 - a.y, ub = b.y0 - b.y, T = 18;
+  if (!dual.act){
+    const span = Math.abs(a.x - b.x);
+    if (ua > T && ub > T){ dual.act = 'tuck'; setSkateTuck(true); }
+    else if (ua < -T && ub < -T){ dual.act = 'plow'; setPlow(true, 'dual'); }
+    else if (Math.abs(span - dual.s0) > 30 && Math.abs(ua) < T*1.5 && Math.abs(ub) < T*1.5){ dual.act = 'pinch'; dual.s0 = span; dual.c0 = P.camd; }
+  }
+  if (dual.act === 'pinch'){
+    const el = $('tCamd'), lo = +el.min, hi = +el.max, st = +el.step || 0.5;
+    const v = Math.max(lo, Math.min(hi, Math.round(dual.c0*Math.max(40, dual.s0)/Math.max(40, Math.abs(a.x - b.x))/st)*st));
+    if (+el.value !== v){ el.value = v; el.dispatchEvent(new Event('input')); }
+  }
+}
+function dualEnd(){
+  if (!dual) return;
+  if (dual.act === 'plow') setPlow(false, 'dual');
+  if (dual.act === 'tuck') setSkateTuck(false);
+  dual = null;
+}
 function padSettle(t){ if (t.timer){ clearTimeout(t.timer); t.timer = null; } if (t.state !== 'done'){ t.state = 'done'; if (t.kicked){ armPending = false; armAt = performance.now(); } } }
 function padKick(leg, t){ padSettle(t); }
 function padLoaded(leg, t){
@@ -2379,11 +2426,23 @@ function padLoaded(leg, t){
   rumble(leg, kickBuzz(P.lboost)); sfx.swipe(); tut.ev('loaded', leg);
 }
 for (const [id, leg] of [['padL','L'],['padR','R']]){
-  const el = $(id);
+  const el = $(id), other = leg === 'L' ? 'R' : 'L';
   el.addEventListener('pointerdown', e => {
     e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch(_){} el.classList.add('on'); anyInputAt = performance.now();
-    const old = padTouch[leg]; if (old) padKick(leg, old);
-    const t = padTouch[leg] = { id: e.pointerId, x0: e.clientX, y0: e.clientY, state: 'wait', timer: null, t0: performance.now() };
+    const old = padTouch[leg]; if (old){ padKick(leg, old); if (old.dual) dualEnd(); }
+    const now = performance.now();
+    const t = padTouch[leg] = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, state: 'wait', timer: null, t0: now };
+    const o = padTouch[other];
+    if (o && !o.dual && !dual && now - o.t0 < DUAL_MS && Math.hypot(o.x - o.x0, o.y - o.y0) < 20 && !promptCtx){
+      // the second thumb: a two-pad gesture. take back the first thumb's kick
+      if (o.timer){ clearTimeout(o.timer); o.timer = null; }
+      if (o.kicked && o.snap){ undoKick(o.snap); kickTop = null; }
+      o.state = t.state = 'done'; o.kicked = false; o.dual = t.dual = true; armPending = false;
+      $(other === 'L' ? 'padL' : 'padR').classList.remove('pull');
+      dual = { a: o, b: t, act: null, s0: Math.abs(t.x - o.x), c0: P.camd };
+      return;
+    }
+    t.snap = snapKick();
     const before = lastKickAt; lastPush = null; kickInput(leg);
     t.kicked = lastKickAt !== before; t.push = lastPush;
     if (t.kicked) tut.ev('kick', leg);
@@ -2392,6 +2451,8 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
   });
   el.addEventListener('pointermove', e => {
     const t = padTouch[leg]; if (!t || t.id !== e.pointerId) return;
+    t.x = e.clientX; t.y = e.clientY;
+    if (t.dual){ if (dual) dualMove(); return; }
     const dx = e.clientX - t.x0, up = t.y0 - e.clientY;
     if (t.state === 'wait'){
       if (up > 8 && up > Math.abs(dx)*0.6){ clearTimeout(t.timer); t.timer = setTimeout(() => padKick(leg, t), 400); t.state = 'swipe'; el.classList.add('pull'); }
@@ -2402,7 +2463,8 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
   for (const ev of ['pointerup','pointercancel']) el.addEventListener(ev, e => {
     const t = padTouch[leg];
     if (t && t.id === e.pointerId){
-      if (t.state === 'swipe'){
+      if (t.dual) dualEnd();
+      else if (t.state === 'swipe'){
         if (ev === 'pointerup' && t.y0 - e.clientY >= P.sthrow/2) padLoaded(leg, t);   // a short flick up still counts
         else padKick(leg, t);
       } else padKick(leg, t);
@@ -8461,11 +8523,9 @@ const tut = (() => {
     { t: () => 'Now ' + padName('R') + '. Keep alternating left and right to skate', hl: ['padL', 'padR'], need: 4, kick: (l, st) => { const ok = l !== st.last; st.last = l; return ok; }, init: st => { st.last = 'L'; } },
     { t: () => 'To turn, tap the <b>same side twice</b>. Right turns left, left turns right', hl: ['padL', 'padR'], kick: () => !inClassic() && sideRun >= 2 },
     { t: () => '<b>Swipe up</b> a ' + (padUI ? 'pad' : 'side') + ' for a stronger stroke', hl: ['padL', 'padR'], loaded: true },
-    { t: () => '<b>Press and hold</b> anywhere above the ' + pads() + ' to snow plow and slow down', poll: st => { if (mode !== 'plow'){ st.h = 0; return false; } st.h = st.h || performance.now(); return performance.now() - st.h > 600; } },
-    { t: () => '<b>Pinch</b> with two fingers to bring the camera closer or further away', poll: st => Math.abs(P.camd - st.c0) >= 1, init: st => { st.c0 = P.camd; } },
-    { t: () => padUI ? 'Tap the <b>middle button</b> to switch to classic' : 'Tap <b>between the sides</b> to switch to classic', hl: ['mToggle'], poll: () => inClassic() },
-    { t: () => 'Classic: <b>alternate</b> left and right to stride. A swipe up works here too', hl: ['padL', 'padR'], need: 3, kick: () => inClassic() },
-    { t: () => 'Tap the middle again to go back to skating', hl: ['mToggle'], poll: () => !inClassic() },
+    { t: () => 'Put both thumbs down and <b>swipe both back</b> toward you to snow plow and slow down', hl: ['padL', 'padR'], poll: st => { if (mode !== 'plow'){ st.h = 0; return false; } st.h = st.h || performance.now(); return performance.now() - st.h > 400; } },
+    { t: () => '<b>Swipe both forward</b> to tuck and go faster downhill. Let go to stand up', hl: ['padL', 'padR'], poll: st => { if (mode !== 'tuck'){ st.h = 0; return false; } st.h = st.h || performance.now(); return performance.now() - st.h > 400; } },
+    { t: () => '<b>Spread or pinch</b> two fingers to bring the camera closer or further away', poll: st => Math.abs(P.camd - st.c0) >= 1, init: st => { st.c0 = P.camd; } },
     { t: () => 'The label at the top is your <b>goal</b>. Ski into a <b>terminal</b> to start it, then collect its orbs', hl: ['orbHud'], button: true },
   ];
   let i = -1, st = {}, n = 0, doneAt = 0, lit = [];

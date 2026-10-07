@@ -2455,6 +2455,104 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
   document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
 }
 
+// ---- sound effect definitions: every effect is a few layers of filtered noise (snow, wind, rumble) or tones.
+// noise layer: filter type, filter sweep f0 -> f1 (Hz), q, optional high-pass hp (Hz), peak gain g, attack at and
+// length dur (s), delay (s). tone layer: wave, pitch sweep f0 -> f1, g, at, dur, delay.
+// beds loop under the game: g is the level at full speed (14 m/s), floor the level when barely moving.
+const SFX_DEF = {
+  kick:      { label: 'Kick swish', when: 'Every skate or classic kick, panned to the kicking ski. ×1.4 on a loaded stroke.', layers: [
+    { kind: 'noise', filter: 'bandpass', f0: 5200, f1: 4000, q: 0.9, hp: 3500, g: 0.07, at: 0.02, dur: 0.2 } ] },
+  pole:      { label: 'Pole plant', when: 'V2 (swipe) strokes, double poles and classic strides.', layers: [
+    { kind: 'noise', filter: 'highpass', f0: 5000, f1: 5000, q: 0.7, g: 0.12, at: 0.002, dur: 0.05 },
+    { kind: 'tone', wave: 'sine', f0: 190, f1: 90, g: 0.1, at: 0.003, dur: 0.07 } ] },
+  swipe:     { label: 'Swipe whoosh', when: 'A swipe up a pad upgrades the kick to a loaded stroke.', layers: [
+    { kind: 'noise', filter: 'bandpass', f0: 3600, f1: 6500, q: 1.2, hp: 3500, g: 0.09, at: 0.03, dur: 0.2 } ] },
+  tick:      { label: 'UI tick', when: 'Settings buttons, tutorial Skip.', layers: [
+    { kind: 'tone', wave: 'sine', f0: 1400, f1: 1200, g: 0.05, at: 0.002, dur: 0.04 } ] },
+  step:      { label: 'Step done', when: 'Each tutorial step completed; releasing the effects volume slider.', layers: [
+    { kind: 'tone', wave: 'sine', f0: 880, f1: 880, g: 0.08, at: 0.01, dur: 0.12 },
+    { kind: 'tone', wave: 'sine', f0: 1318.5, f1: 1318.5, g: 0.08, at: 0.01, dur: 0.22, delay: 0.08 } ] },
+  promptOpen:{ label: 'Prompt opens', when: 'A full-screen prompt appears (terminal, altar, gate, portal, ship).', layers: [
+    { kind: 'tone', wave: 'triangle', f0: 587.3, f1: 587.3, g: 0.07, at: 0.01, dur: 0.16 },
+    { kind: 'tone', wave: 'triangle', f0: 880, f1: 880, g: 0.07, at: 0.01, dur: 0.26, delay: 0.07 } ] },
+  promptGo:  { label: 'Prompt accept', when: 'You answer a prompt with go / OK.', layers: [
+    { kind: 'tone', wave: 'sine', f0: 880, f1: 880, g: 0.07, at: 0.01, dur: 0.1 },
+    { kind: 'tone', wave: 'sine', f0: 1174.7, f1: 1174.7, g: 0.07, at: 0.01, dur: 0.18, delay: 0.05 } ] },
+  promptNo:  { label: 'Prompt cancel', when: 'You cancel a prompt.', layers: [
+    { kind: 'tone', wave: 'triangle', f0: 660, f1: 440, g: 0.06, at: 0.01, dur: 0.18 } ] },
+  open:      { label: 'Gate / bridge opens', when: 'A gate, drawbridge, portal or the crown door opens.', layers: [
+    { kind: 'noise', filter: 'lowpass', f0: 260, f1: 120, q: 0.8, g: 0.28, at: 0.3, dur: 1.8 },
+    { kind: 'tone', wave: 'triangle', f0: 110, f1: 220, g: 0.05, at: 0.4, dur: 1.4 } ] },
+  warp:      { label: 'Portal warp', when: 'Passing through a portal to or from the space station.', layers: [
+    { kind: 'tone', wave: 'sine', f0: 180, f1: 1500, g: 0.08, at: 0.1, dur: 0.8 },
+    { kind: 'noise', filter: 'bandpass', f0: 300, f1: 5000, q: 2, g: 0.14, at: 0.2, dur: 0.8 } ] },
+  bridgeOn:  { label: 'Light bridge on', when: 'Stepping onto any light bridge or magic carpet.', layers: [
+    { kind: 'tone', wave: 'sine', f0: 660, f1: 1320, g: 0.06, at: 0.01, dur: 0.3 },
+    { kind: 'tone', wave: 'sine', f0: 990, f1: 1980, g: 0.04, at: 0.01, dur: 0.35, delay: 0.06 } ] },
+  bridgeOff: { label: 'Light bridge off', when: 'Stepping off a light bridge.', layers: [
+    { kind: 'tone', wave: 'sine', f0: 1320, f1: 660, g: 0.05, at: 0.01, dur: 0.3 } ] },
+  whoosh:    { label: 'Mine whoosh', when: 'Entering or leaving the mine.', layers: [
+    { kind: 'noise', filter: 'lowpass', f0: 300, f1: 900, q: 0.6, g: 0.12, at: 0.3, dur: 0.9 } ] },
+  cosmic:    { label: 'Cosmic moose', when: 'The cosmic moose appear at the ceremony.', layers: [110, 164.8, 220, 329.6, 440].map((f, i) =>
+    ({ kind: 'tone', wave: 'sine', f0: f, f1: f, g: 0.045, at: 1.6, dur: 6, delay: i*0.3 })) },
+  hiss:      { label: 'Ski hiss (bed)', when: 'Loops while moving on snow; rises with speed. Off on light bridges and the station.', bed: true,
+    kind: 'noise', filter: 'bandpass', f: 3200, fk: 2000, q: 0.5, hp: 2500, g: 0.022, floor: 0.003 },
+  plow:      { label: 'Plow scrape (bed)', when: 'Loops while snow plowing; louder with speed (full at 5 m/s).', bed: true,
+    kind: 'noise', filter: 'bandpass', f: 900, fk: 0, q: 0.8, hp: 0, g: 0.22, floor: 0 },
+  hum:       { label: 'Light bridge hum (bed)', when: 'Loops while riding a light bridge; a little louder with speed.', bed: true,
+    kind: 'tones', freqs: [220, 330.8, 441.5], trem: 5.5, g: 0.02, floor: 0.018 },
+};
+// the engine: plays a definition through out (a gain node). opts: pan (-1..1), gmul (level multiplier)
+function makeSfxEngine(ctx, out, noise){
+  function layer(L, t0, pan, gm){
+    const e = ctx.createGain(), dur = L.dur, a = Math.min(L.at, dur*0.9);
+    e.gain.setValueAtTime(0.0001, t0); e.gain.linearRampToValueAtTime(Math.max(0.0002, L.g*gm), t0 + a); e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    let src, head;
+    if (L.kind === 'tone'){
+      src = ctx.createOscillator(); src.type = L.wave; src.frequency.setValueAtTime(L.f0, t0); src.frequency.exponentialRampToValueAtTime(Math.max(20, L.f1), t0 + dur); head = src;
+    } else {
+      src = ctx.createBufferSource(); src.buffer = noise; src.playbackRate.value = 0.8 + Math.random()*0.4;
+      const f = ctx.createBiquadFilter(); f.type = L.filter; f.Q.value = L.q; f.frequency.setValueAtTime(L.f0, t0); f.frequency.exponentialRampToValueAtTime(Math.max(20, L.f1), t0 + dur);
+      if (L.hp){ const h = ctx.createBiquadFilter(); h.type = 'highpass'; h.frequency.value = L.hp; h.Q.value = 0.7; src.connect(h); h.connect(f); } else src.connect(f);
+      head = f;
+    }
+    head.connect(e); let o = e;
+    if (pan && ctx.createStereoPanner){ const p = ctx.createStereoPanner(); p.pan.value = pan; e.connect(p); o = p; }
+    o.connect(out);
+    if (L.kind === 'tone') src.start(t0); else src.start(t0, Math.random()*1.5);
+    src.stop(t0 + dur + 0.05);
+  }
+  function play(name, opts = {}){
+    const d = SFX_DEF[name]; if (!d || d.bed) return;
+    const t = ctx.currentTime;
+    for (const L of d.layers) layer(L, t + (L.delay || 0), opts.pan || 0, opts.gmul || 1);
+  }
+  // a looping bed; set(level 0..1 of speed, on) each frame
+  function bed(name){
+    const d = SFX_DEF[name], e = ctx.createGain(); e.gain.value = 0; let f = null, h = null;
+    if (d.kind === 'tones'){
+      const sum = ctx.createGain(), trem = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+      d.freqs.forEach((fr, i) => { const o = ctx.createOscillator(); o.type = i === 2 ? 'triangle' : 'sine'; o.frequency.value = fr; const g = ctx.createGain(); g.gain.value = i === 2 ? 0.15 : 0.5; o.connect(g); g.connect(sum); o.start(); });
+      lfo.frequency.value = d.trem; lg.gain.value = 0.25; lfo.connect(lg); lg.connect(trem.gain); lfo.start();
+      sum.connect(trem); trem.connect(e);
+    } else {
+      const n = ctx.createBufferSource(); n.buffer = noise; n.loop = true;
+      f = ctx.createBiquadFilter(); f.type = d.filter; f.Q.value = d.q; f.frequency.value = d.f;
+      h = ctx.createBiquadFilter(); h.type = 'highpass'; h.frequency.value = d.hp || 10; h.Q.value = 0.7;
+      n.connect(h); h.connect(f); f.connect(e); n.start();
+    }
+    e.connect(out);
+    return {
+      set(k, on){
+        const D = SFX_DEF[name];
+        const lvl = !on ? 0 : name === 'hiss' ? D.g*k*k + (k > 0.02 ? D.floor : 0) : D.floor + D.g*k;
+        e.gain.setTargetAtTime(lvl, ctx.currentTime, 0.08);
+        if (f){ f.frequency.setTargetAtTime(D.f + (D.fk || 0)*k, ctx.currentTime, 0.1); f.Q.value = D.q; h.frequency.value = D.hp || 10; }
+      }
+    };
+  }
+  return { play, bed };
+}
 // ---- background music: gapless Web Audio loop, starts on the first key / tap / controller press (browsers block autoplay)
 const music = (() => {
   let on = true; try { on = localStorage.getItem('skate-music') !== 'off'; } catch(e){}
@@ -2511,71 +2609,27 @@ const music = (() => {
       o.start(t0); o2.start(t0); o.stop(t0 + 1.5); o2.stop(t0 + 1.5);
     });
   }
-  // ---- sound effects, all synthesised: filtered noise for snow and wind, sine and triangle tones for everything else
+  // ---- sound effects (definitions and engine in SFX_DEF / makeSfxEngine, shared with the soundboard)
   const live = () => fxOn && ctx && ctx.state === 'running';
-  function hit({ dur = 0.2, f0 = 1200, f1 = f0, q = 1, type = 'bandpass', g = 0.2, pan = 0, at = 0.01, delay = 0, hp = 0 }){
-    const t0 = ctx.currentTime + delay, n = ctx.createBufferSource(); n.buffer = noise; n.playbackRate.value = 0.8 + Math.random()*0.4;
-    const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
-    const e = ctx.createGain(); e.gain.setValueAtTime(0.0001, t0); e.gain.linearRampToValueAtTime(g, t0 + at); e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    if (hp){ const h = ctx.createBiquadFilter(); h.type = 'highpass'; h.frequency.value = hp; h.Q.value = 0.7; n.connect(h); h.connect(f); } else n.connect(f);
-    f.connect(e); let out = e;
-    if (pan && ctx.createStereoPanner){ const pn = ctx.createStereoPanner(); pn.pan.value = pan; e.connect(pn); out = pn; }
-    out.connect(fxGain); n.start(t0, Math.random()*1.5); n.stop(t0 + dur + 0.05);
-  }
-  function tone({ f0 = 440, f1 = f0, dur = 0.2, type = 'sine', g = 0.1, at = 0.01, delay = 0 }){
-    const t0 = ctx.currentTime + delay, o = ctx.createOscillator(), e = ctx.createGain();
-    o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
-    e.gain.setValueAtTime(0.0001, t0); e.gain.linearRampToValueAtTime(g, t0 + at); e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(e); e.connect(fxGain); o.start(t0); o.stop(t0 + dur + 0.05);
-  }
-  // looping beds: the ski hiss (rises with speed), the snow plow scrape and the light bridge hum
-  let beds = null;
-  function bed(type, freq, q){ const n = ctx.createBufferSource(); n.buffer = noise; n.loop = true; const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
-    const e = ctx.createGain(); e.gain.value = 0; n.connect(f); f.connect(e); e.connect(fxGain); n.start(); return { f, e }; }
-  function makeBeds(){
-    const hum = ctx.createGain(); hum.gain.value = 0; hum.connect(fxGain);
-    for (const [fr, ty] of [[220, 'sine'], [330.8, 'sine'], [441.5, 'triangle']]){ const o = ctx.createOscillator(); o.type = ty; o.frequency.value = fr; const g = ctx.createGain(); g.gain.value = ty === 'sine' ? 0.5 : 0.15; o.connect(g); g.connect(hum); o.start(); }
-    const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 5.5; lg.gain.value = 0.25; lfo.connect(lg); const trem = ctx.createGain(); trem.gain.value = 1; lg.connect(trem.gain); lfo.start();
-    hum.disconnect(); hum.connect(trem); trem.connect(fxGain);
-    beds = { hiss: bed('bandpass', 2400, 0.5), plow: bed('bandpass', 900, 0.8), hum: { e: hum } };
-  }
-  const setG = (node, v) => node.e.gain.setTargetAtTime(v, ctx.currentTime, 0.08);
+  let eng = null, beds = null;
+  const E = () => eng || (eng = makeSfxEngine(ctx, fxGain, noise));
   const fx = {
     get on(){ return fxOn; }, get vol(){ return fxVol; },
     set(v){ fxOn = v; try { localStorage.setItem('skate-sfx', v ? 'on' : 'off'); } catch(e){} if (fxGain) fxGain.gain.setTargetAtTime(fGain(), ctx.currentTime, 0.05); },
     volume(v){ fxVol = v; try { localStorage.setItem('skate-fxvol', v); } catch(e){} if (fxGain) fxGain.gain.setTargetAtTime(fGain(), ctx.currentTime, 0.05); },
-    // a skating push: a light, airy swish of snow, panned to the kicking ski. high-passed and quiet: you hear it on
-    // every kick, so it sits in the background
-    kick(leg, boost = 1){ if (!live()) return; hit({ dur: 0.2, f0: 4200, f1: 2800, q: 0.9, g: 0.07*Math.min(1.4, boost), pan: leg === 'L' ? -0.3 : 0.3, at: 0.02, hp: 2500 }); },
-    // pole plant: a sharp tick on the snow with a little thump
-    pole(){ if (!live()) return; hit({ dur: 0.05, f0: 5000, type: 'highpass', q: 0.7, g: 0.12, at: 0.002 }); tone({ f0: 190, f1: 90, dur: 0.07, g: 0.1, at: 0.003 }); },
-    // a loaded stroke: the swish rides up
-    swipe(){ if (!live()) return; hit({ dur: 0.2, f0: 3600, f1: 6500, q: 1.2, g: 0.09, at: 0.03, hp: 3500 }); },
-    tick(){ if (!live()) return; tone({ f0: 1400, f1: 1200, dur: 0.04, g: 0.05, at: 0.002 }); },
-    step(){ if (!live()) return; tone({ f0: 880, dur: 0.12, g: 0.08 }); tone({ f0: 1318.5, dur: 0.22, g: 0.08, delay: 0.08 }); },
-    promptOpen(){ if (!live()) return; tone({ f0: 587.3, dur: 0.16, g: 0.07, type: 'triangle' }); tone({ f0: 880, dur: 0.26, g: 0.07, type: 'triangle', delay: 0.07 }); },
-    promptGo(){ if (!live()) return; tone({ f0: 880, dur: 0.1, g: 0.07 }); tone({ f0: 1174.7, dur: 0.18, g: 0.07, delay: 0.05 }); },
-    promptNo(){ if (!live()) return; tone({ f0: 660, f1: 440, dur: 0.18, g: 0.06, type: 'triangle' }); },
-    // gates and bridges: a low grinding rumble under a slow rising tone
-    open(){ if (!live()) return; hit({ dur: 1.8, f0: 260, f1: 120, type: 'lowpass', q: 0.8, g: 0.28, at: 0.3 }); tone({ f0: 110, f1: 220, dur: 1.4, type: 'triangle', g: 0.05, at: 0.4 }); },
-    // through a portal: a rising sweep
-    warp(){ if (!live()) return; tone({ f0: 180, f1: 1500, dur: 0.8, g: 0.08, at: 0.1 }); hit({ dur: 0.8, f0: 300, f1: 5000, q: 2, g: 0.14, at: 0.2 }); },
-    bridgeOn(){ if (!live()) return; tone({ f0: 660, f1: 1320, dur: 0.3, g: 0.06 }); tone({ f0: 990, f1: 1980, dur: 0.35, g: 0.04, delay: 0.06 }); },
-    bridgeOff(){ if (!live()) return; tone({ f0: 1320, f1: 660, dur: 0.3, g: 0.05 }); },
-    whoosh(){ if (!live()) return; hit({ dur: 0.9, f0: 300, f1: 900, type: 'lowpass', q: 0.6, g: 0.12, at: 0.3 }); },
-    // the cosmic moose: a slow, wide chord swelling in
-    cosmic(){ if (!live()) return; for (const [f, d] of [[110, 0], [164.8, 0.3], [220, 0.6], [329.6, 0.9], [440, 1.2]]) tone({ f0: f, dur: 6, g: 0.045, at: 1.6, delay: d }); },
+    play(name, opts){ if (live()) E().play(name, opts); },
+    kick(leg, boost = 1){ fx.play('kick', { pan: leg === 'L' ? -0.3 : 0.3, gmul: Math.min(1.4, boost) }); },
     // per frame: the beds follow speed and what you're on
     beds(speed, plow, bridge, space){
-      if (!live()){ if (beds) for (const b of [beds.hiss, beds.plow, beds.hum]) setG(b, 0); return; }
-      if (!beds) makeBeds();
+      if (!live()){ if (beds) for (const b of Object.values(beds)) b.set(0, false); return; }
+      if (!beds) beds = { hiss: E().bed('hiss'), plow: E().bed('plow'), hum: E().bed('hum') };
       const k = Math.min(1, speed/14);
-      setG(beds.hiss, bridge || space ? 0 : 0.05*k*k + (speed > 0.3 ? 0.006 : 0));
-      beds.hiss.f.frequency.setTargetAtTime(1500 + 2200*k, ctx.currentTime, 0.1);
-      setG(beds.plow, plow ? 0.22*Math.min(1, speed/5) : 0);
-      setG(beds.hum, bridge ? 0.018 + 0.02*k : 0);
+      beds.hiss.set(k, !bridge && !space && speed > 0.3);
+      beds.plow.set(Math.min(1, speed/5), plow);
+      beds.hum.set(k, bridge);
     }
   };
+  for (const n of ['pole','swipe','tick','step','promptOpen','promptGo','promptNo','open','warp','bridgeOn','bridgeOff','whoosh','cosmic']) fx[n] = () => fx.play(n);
   function setVolume(v){ vol = v; try { localStorage.setItem('skate-musicvol', v); } catch(e){} if (gain) gain.gain.setTargetAtTime(mGain(), ctx.currentTime, 0.05); }
   return { set, chime, setVolume, fx, get vol(){ return vol; }, get on(){ return on; }, get ctxState(){ return ctx && ctx.state; } };
 })();

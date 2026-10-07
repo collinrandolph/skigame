@@ -1,0 +1,253 @@
+<title>Skate Ski Soundboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+/* layout: one column of sound strips, grouped like the game's mixer (skiing, ui, world, beds); controls open inline */
+:root{
+  --bg:#eef2f5; --panel:#ffffff; --ink:#1d2a36; --muted:#5d7083; --line:#d3dde6; --accent:#b5523b; --accent-ink:#ffffff; --soft:#e3eaf0; --on:#2f7a5a;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#141b22; --panel:#1c252e; --ink:#e4ebf1; --muted:#93a4b3; --line:#2c3843; --accent:#d9715a; --accent-ink:#141b22; --soft:#24303a; --on:#5fb38c; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#141b22; --panel:#1c252e; --ink:#e4ebf1; --muted:#93a4b3; --line:#2c3843; --accent:#d9715a; --accent-ink:#141b22; --soft:#24303a; --on:#5fb38c; color-scheme:dark }
+body{background:var(--bg);color:var(--ink);font:400 14px/1.5 var(--body)}
+.wrap{max-width:760px;margin:0 auto;padding-inline:16px;padding-block:24px 64px;display:grid;gap:22px}
+header{display:grid;gap:10px}
+h1{font:700 34px/1 var(--display);letter-spacing:.03em;text-transform:uppercase;margin:0;text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:62ch}
+.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;position:sticky;top:env(safe-area-inset-top,0px);z-index:2}
+.bar label{display:flex;gap:8px;align-items:center;font:600 13px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.bar input[type=range]{width:140px;accent-color:var(--accent)}
+.bar .sp{flex:1}
+button{font:700 13px var(--display);letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:7px;padding:8px 12px;cursor:pointer;touch-action:manipulation}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button[aria-pressed="true"]{background:var(--on);border-color:var(--on);color:var(--accent-ink)}
+h2{font:600 15px var(--display);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.group{display:grid;gap:8px}
+.snd{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:8px}
+.snd.changed{border-color:var(--accent)}
+.top{display:flex;gap:12px;align-items:center}
+.top .play{min-width:64px}
+.nm{flex:1;min-width:0}
+.nm b{display:block;font:600 19px/1.1 var(--display);letter-spacing:.03em}
+.nm span{display:block;color:var(--muted);font-size:13px}
+.key{font:500 11px var(--mono);color:var(--muted)}
+.edit{display:grid;gap:10px;border-top:1px dashed var(--line);padding-top:10px}
+.layer{display:grid;gap:6px}
+.layer h3{margin:0;font:500 11px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
+.fields label{display:grid;gap:2px;font:500 11px var(--mono);color:var(--muted)}
+.fields input,.fields select{font:500 13px var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:5px 6px;width:100%;box-sizing:border-box;min-width:0}
+.bedrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font:500 12px var(--mono);color:var(--muted)}
+.bedrow input{accent-color:var(--accent);width:160px}
+.out{display:grid;gap:8px}
+.out textarea{font:500 12px/1.45 var(--mono);color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px;min-height:120px;width:100%;box-sizing:border-box;resize:vertical}
+.toast{font:500 12px var(--mono);color:var(--on)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+<div class="wrap">
+<header>
+  <h1>Skate Ski Soundboard</h1>
+  <p>Every sound effect in the game, built by the same code the game uses. Press Play to hear one in isolation, open Edit to change its numbers, then copy your changes and paste them into the chat so I can put them in the game.</p>
+</header>
+<div class="bar">
+  <label for="master">Effects volume <input id="master" type="range" min="0" max="100" step="5" value="70"></label>
+  <span class="sp"></span>
+  <button id="stopAll" type="button">Stop loops</button>
+  <button id="resetAll" type="button">Reset all</button>
+</div>
+<div id="groups"></div>
+<section class="out">
+  <h2>Your changes</h2>
+  <textarea id="diff" readonly aria-label="Changed sound settings" placeholder="Nothing changed yet. Edit a sound and its new numbers appear here."></textarea>
+  <div class="top"><button id="copy" class="pri" type="button">Copy changes</button><span class="toast" id="toast"></span></div>
+</section>
+</div>
+<script>
+// ---- sound effect definitions: every effect is a few layers of filtered noise (snow, wind, rumble) or tones.
+// noise layer: filter type, filter sweep f0 -> f1 (Hz), q, optional high-pass hp (Hz), peak gain g, attack at and
+// length dur (s), delay (s). tone layer: wave, pitch sweep f0 -> f1, g, at, dur, delay.
+// beds loop under the game: g is the level at full speed (14 m/s), floor the level when barely moving.
+const SFX_DEF = {
+  kick:      { label: 'Kick swish', when: 'Every skate or classic kick, panned to the kicking ski. ×1.4 on a loaded stroke.', layers: [
+    { kind: 'noise', filter: 'bandpass', f0: 5200, f1: 4000, q: 0.9, hp: 3500, g: 0.07, at: 0.02, dur: 0.2 } ] },
+  pole:      { label: 'Pole plant', when: 'V2 (swipe) strokes, double poles and classic strides.', layers: [
+    { kind: 'noise', filter: 'highpass', f0: 5000, f1: 5000, q: 0.7, g: 0.12, at: 0.002, dur: 0.05 },
+    { kind: 'tone', wave: 'sine', f0: 190, f1: 90, g: 0.1, at: 0.003, dur: 0.07 } ] },
+  swipe:     { label: 'Swipe whoosh', when: 'A swipe up a pad upgrades the kick to a loaded stroke.', layers: [
+    { kind: 'noise', filter: 'bandpass', f0: 3600, f1: 6500, q: 1.2, hp: 3500, g: 0.09, at: 0.03, dur: 0.2 } ] },
+  tick:      { label: 'UI tick', when: 'Settings buttons, tutorial Skip.', layers: [
+    { kind: 'tone', wave: 'sine', f0: 1400, f1: 1200, g: 0.05, at: 0.002, dur: 0.04 } ] },
+  step:      { label: 'Step done', when: 'Each tutorial step completed; releasing the effects volume slider.', layers: [
+    { kind: 'tone', wave: 'sine', f0: 880, f1: 880, g: 0.08, at: 0.01, dur: 0.12 },
+    { kind: 'tone', wave: 'sine', f0: 1318.5, f1: 1318.5, g: 0.08, at: 0.01, dur: 0.22, delay: 0.08 } ] },
+  promptOpen:{ label: 'Prompt opens', when: 'A full-screen prompt appears (terminal, altar, gate, portal, ship).', layers: [
+    { kind: 'tone', wave: 'triangle', f0: 587.3, f1: 587.3, g: 0.07, at: 0.01, dur: 0.16 },
+    { kind: 'tone', wave: 'triangle', f0: 880, f1: 880, g: 0.07, at: 0.01, dur: 0.26, delay: 0.07 } ] },
+  promptGo:  { label: 'Prompt accept', when: 'You answer a prompt with go / OK.', layers: [
+    { kind: 'tone', wave: 'sine', f0: 880, f1: 880, g: 0.07, at: 0.01, dur: 0.1 },
+    { kind: 'tone', wave: 'sine', f0: 1174.7, f1: 1174.7, g: 0.07, at: 0.01, dur: 0.18, delay: 0.05 } ] },
+  promptNo:  { label: 'Prompt cancel', when: 'You cancel a prompt.', layers: [
+    { kind: 'tone', wave: 'triangle', f0: 660, f1: 440, g: 0.06, at: 0.01, dur: 0.18 } ] },
+  open:      { label: 'Gate / bridge opens', when: 'A gate, drawbridge, portal or the crown door opens.', layers: [
+    { kind: 'noise', filter: 'lowpass', f0: 260, f1: 120, q: 0.8, g: 0.28, at: 0.3, dur: 1.8 },
+    { kind: 'tone', wave: 'triangle', f0: 110, f1: 220, g: 0.05, at: 0.4, dur: 1.4 } ] },
+  warp:      { label: 'Portal warp', when: 'Passing through a portal to or from the space station.', layers: [
+    { kind: 'tone', wave: 'sine', f0: 180, f1: 1500, g: 0.08, at: 0.1, dur: 0.8 },
+    { kind: 'noise', filter: 'bandpass', f0: 300, f1: 5000, q: 2, g: 0.14, at: 0.2, dur: 0.8 } ] },
+  bridgeOn:  { label: 'Light bridge on', when: 'Stepping onto any light bridge or magic carpet.', layers: [
+    { kind: 'tone', wave: 'sine', f0: 660, f1: 1320, g: 0.06, at: 0.01, dur: 0.3 },
+    { kind: 'tone', wave: 'sine', f0: 990, f1: 1980, g: 0.04, at: 0.01, dur: 0.35, delay: 0.06 } ] },
+  bridgeOff: { label: 'Light bridge off', when: 'Stepping off a light bridge.', layers: [
+    { kind: 'tone', wave: 'sine', f0: 1320, f1: 660, g: 0.05, at: 0.01, dur: 0.3 } ] },
+  whoosh:    { label: 'Mine whoosh', when: 'Entering or leaving the mine.', layers: [
+    { kind: 'noise', filter: 'lowpass', f0: 300, f1: 900, q: 0.6, g: 0.12, at: 0.3, dur: 0.9 } ] },
+  cosmic:    { label: 'Cosmic moose', when: 'The cosmic moose appear at the ceremony.', layers: [110, 164.8, 220, 329.6, 440].map((f, i) =>
+    ({ kind: 'tone', wave: 'sine', f0: f, f1: f, g: 0.045, at: 1.6, dur: 6, delay: i*0.3 })) },
+  hiss:      { label: 'Ski hiss (bed)', when: 'Loops while moving on snow; rises with speed. Off on light bridges and the station.', bed: true,
+    kind: 'noise', filter: 'bandpass', f: 3200, fk: 2000, q: 0.5, hp: 2500, g: 0.022, floor: 0.003 },
+  plow:      { label: 'Plow scrape (bed)', when: 'Loops while snow plowing; louder with speed (full at 5 m/s).', bed: true,
+    kind: 'noise', filter: 'bandpass', f: 900, fk: 0, q: 0.8, hp: 0, g: 0.22, floor: 0 },
+  hum:       { label: 'Light bridge hum (bed)', when: 'Loops while riding a light bridge; a little louder with speed.', bed: true,
+    kind: 'tones', freqs: [220, 330.8, 441.5], trem: 5.5, g: 0.02, floor: 0.018 },
+};
+// the engine: plays a definition through out (a gain node). opts: pan (-1..1), gmul (level multiplier)
+function makeSfxEngine(ctx, out, noise){
+  function layer(L, t0, pan, gm){
+    const e = ctx.createGain(), dur = L.dur, a = Math.min(L.at, dur*0.9);
+    e.gain.setValueAtTime(0.0001, t0); e.gain.linearRampToValueAtTime(Math.max(0.0002, L.g*gm), t0 + a); e.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    let src, head;
+    if (L.kind === 'tone'){
+      src = ctx.createOscillator(); src.type = L.wave; src.frequency.setValueAtTime(L.f0, t0); src.frequency.exponentialRampToValueAtTime(Math.max(20, L.f1), t0 + dur); head = src;
+    } else {
+      src = ctx.createBufferSource(); src.buffer = noise; src.playbackRate.value = 0.8 + Math.random()*0.4;
+      const f = ctx.createBiquadFilter(); f.type = L.filter; f.Q.value = L.q; f.frequency.setValueAtTime(L.f0, t0); f.frequency.exponentialRampToValueAtTime(Math.max(20, L.f1), t0 + dur);
+      if (L.hp){ const h = ctx.createBiquadFilter(); h.type = 'highpass'; h.frequency.value = L.hp; h.Q.value = 0.7; src.connect(h); h.connect(f); } else src.connect(f);
+      head = f;
+    }
+    head.connect(e); let o = e;
+    if (pan && ctx.createStereoPanner){ const p = ctx.createStereoPanner(); p.pan.value = pan; e.connect(p); o = p; }
+    o.connect(out);
+    if (L.kind === 'tone') src.start(t0); else src.start(t0, Math.random()*1.5);
+    src.stop(t0 + dur + 0.05);
+  }
+  function play(name, opts = {}){
+    const d = SFX_DEF[name]; if (!d || d.bed) return;
+    const t = ctx.currentTime;
+    for (const L of d.layers) layer(L, t + (L.delay || 0), opts.pan || 0, opts.gmul || 1);
+  }
+  // a looping bed; set(level 0..1 of speed, on) each frame
+  function bed(name){
+    const d = SFX_DEF[name], e = ctx.createGain(); e.gain.value = 0; let f = null, h = null;
+    if (d.kind === 'tones'){
+      const sum = ctx.createGain(), trem = ctx.createGain(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+      d.freqs.forEach((fr, i) => { const o = ctx.createOscillator(); o.type = i === 2 ? 'triangle' : 'sine'; o.frequency.value = fr; const g = ctx.createGain(); g.gain.value = i === 2 ? 0.15 : 0.5; o.connect(g); g.connect(sum); o.start(); });
+      lfo.frequency.value = d.trem; lg.gain.value = 0.25; lfo.connect(lg); lg.connect(trem.gain); lfo.start();
+      sum.connect(trem); trem.connect(e);
+    } else {
+      const n = ctx.createBufferSource(); n.buffer = noise; n.loop = true;
+      f = ctx.createBiquadFilter(); f.type = d.filter; f.Q.value = d.q; f.frequency.value = d.f;
+      h = ctx.createBiquadFilter(); h.type = 'highpass'; h.frequency.value = d.hp || 10; h.Q.value = 0.7;
+      n.connect(h); h.connect(f); f.connect(e); n.start();
+    }
+    e.connect(out);
+    return {
+      set(k, on){
+        const D = SFX_DEF[name];
+        const lvl = !on ? 0 : name === 'hiss' ? D.g*k*k + (k > 0.02 ? D.floor : 0) : D.floor + D.g*k;
+        e.gain.setTargetAtTime(lvl, ctx.currentTime, 0.08);
+        if (f){ f.frequency.setTargetAtTime(D.f + (D.fk || 0)*k, ctx.currentTime, 0.1); f.Q.value = D.q; h.frequency.value = D.hp || 10; }
+      }
+    };
+  }
+  return { play, bed };
+}
+
+const ORIG = JSON.parse(JSON.stringify(SFX_DEF));
+const GROUPS = [['Skiing', ['kick','pole','swipe']], ['Beds (loops)', ['hiss','plow','hum']], ['Interface', ['tick','step','promptOpen','promptGo','promptNo']], ['World', ['open','warp','bridgeOn','bridgeOff','whoosh','cosmic']]];
+try { const saved = JSON.parse(localStorage.getItem('sb-edits') || '{}'); for (const k in saved) if (SFX_DEF[k]) SFX_DEF[k] = Object.assign(SFX_DEF[k], saved[k]); } catch(e){}
+let ctx = null, out = null, eng = null; const beds = {};
+function audio(){
+  if (!ctx){ const AC = window.AudioContext || window.webkitAudioContext; ctx = new AC(); out = ctx.createGain(); out.gain.value = $('master').value/100; out.connect(ctx.destination);
+    const noise = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate), d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
+    eng = makeSfxEngine(ctx, out, noise); }
+  if (ctx.state !== 'running') ctx.resume();
+}
+const $ = id => document.getElementById(id);
+const NUM = ['f0','f1','q','hp','g','at','dur','delay','f','fk','floor','trem'];
+const HINT = { f0:'start Hz', f1:'end Hz', q:'Q', hp:'high-pass Hz', g:'gain', at:'attack s', dur:'length s', delay:'delay s', f:'centre Hz', fk:'+Hz at speed', floor:'gain slow', trem:'tremolo Hz', filter:'filter', wave:'wave' };
+function field(obj, key, onCh){
+  const lab = document.createElement('label'); lab.textContent = HINT[key] || key;
+  let inp;
+  if (key === 'filter' || key === 'wave'){
+    inp = document.createElement('select');
+    for (const o of key === 'filter' ? ['bandpass','lowpass','highpass'] : ['sine','triangle','square','sawtooth']) inp.add(new Option(o, o, false, obj[key] === o));
+    inp.onchange = () => { obj[key] = inp.value; onCh(); };
+  } else {
+    inp = document.createElement('input'); inp.type = 'number'; inp.step = 'any'; inp.value = obj[key] ?? 0; inp.inputMode = 'decimal';
+    inp.oninput = () => { const v = parseFloat(inp.value); if (!isNaN(v)){ obj[key] = v; onCh(); } };
+  }
+  lab.append(inp); return lab;
+}
+function diff(){
+  const ch = {};
+  for (const k in SFX_DEF){ if (JSON.stringify(SFX_DEF[k]) !== JSON.stringify(ORIG[k])){ const { label, when, ...rest } = SFX_DEF[k]; ch[k] = rest; } }
+  $('diff').value = Object.keys(ch).length ? JSON.stringify(ch, null, 1) : '';
+  try { localStorage.setItem('sb-edits', JSON.stringify(ch)); } catch(e){}
+  document.querySelectorAll('.snd').forEach(el => el.classList.toggle('changed', !!ch[el.dataset.k]));
+}
+function strip(k){
+  const d = SFX_DEF[k], el = document.createElement('div'); el.className = 'snd'; el.dataset.k = k;
+  const top = document.createElement('div'); top.className = 'top';
+  const play = document.createElement('button'); play.type = 'button'; play.className = 'play pri';
+  const nm = document.createElement('div'); nm.className = 'nm'; nm.innerHTML = '<b></b><span></span>'; nm.querySelector('b').textContent = d.label; nm.querySelector('span').textContent = d.when;
+  const key = document.createElement('span'); key.className = 'key'; key.textContent = k;
+  const ed = document.createElement('button'); ed.type = 'button'; ed.textContent = 'Edit'; ed.setAttribute('aria-expanded', 'false');
+  top.append(play, nm, key, ed); el.append(top);
+  const edit = document.createElement('div'); edit.className = 'edit'; edit.hidden = true; el.append(edit);
+  let speed = null;
+  if (d.bed){
+    play.textContent = 'Loop'; play.classList.remove('pri'); play.setAttribute('aria-pressed', 'false');
+    const row = document.createElement('div'); row.className = 'bedrow';
+    const id = 'sp-' + k; row.innerHTML = '<label for="' + id + '">speed</label>';
+    speed = document.createElement('input'); speed.type = 'range'; speed.id = id; speed.min = 0; speed.max = 14; speed.step = 0.5; speed.value = k === 'plow' ? 4 : 8;
+    const lbl = document.createElement('span'); const upd = () => { lbl.textContent = (+speed.value).toFixed(1) + ' m/s (' + Math.round(speed.value*3.6) + ' km/h)'; };
+    speed.oninput = () => { upd(); setBed(); }; upd(); row.append(speed, lbl); el.insertBefore(row, edit);
+    const setBed = () => { const b = beds[k]; if (!b) return; const on = play.getAttribute('aria-pressed') === 'true', v = +speed.value;
+      b.set(k === 'plow' ? Math.min(1, v/5) : Math.min(1, v/14), on && (k !== 'hiss' || v > 0.3)); };
+    el._setBed = setBed;
+    play.onclick = () => { audio(); if (!beds[k]) beds[k] = eng.bed(k); play.setAttribute('aria-pressed', play.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); setBed(); };
+    const L = document.createElement('div'); L.className = 'layer'; L.innerHTML = '<h3>' + (d.kind === 'tones' ? 'tones ' + d.freqs.join(' / ') + ' Hz' : 'noise') + '</h3>';
+    const F = document.createElement('div'); F.className = 'fields';
+    for (const f of (d.kind === 'tones' ? ['g','floor','trem'] : ['filter','f','fk','q','hp','g','floor'])) F.append(field(d, f, () => { diff(); setBed(); }));
+    L.append(F); edit.append(L);
+  } else {
+    play.textContent = 'Play';
+    const extra = k === 'kick' ? { pan: -0.3 } : {};
+    play.onclick = () => { audio(); eng.play(k, extra); };
+    d.layers.forEach((Ly, i) => {
+      const L = document.createElement('div'); L.className = 'layer'; L.innerHTML = '<h3>layer ' + (i + 1) + ' · ' + Ly.kind + '</h3>';
+      const F = document.createElement('div'); F.className = 'fields';
+      for (const f of (Ly.kind === 'tone' ? ['wave','f0','f1','g','at','dur','delay'] : ['filter','f0','f1','q','hp','g','at','dur','delay'])) F.append(field(Ly, f, diff));
+      L.append(F); edit.append(L);
+    });
+  }
+  const rs = document.createElement('button'); rs.type = 'button'; rs.textContent = 'Reset this sound'; rs.style.justifySelf = 'start';
+  rs.onclick = () => { SFX_DEF[k] = JSON.parse(JSON.stringify(ORIG[k])); const n = strip(k); el.replaceWith(n); if (beds[k]){ beds[k].set(0, false); delete beds[k]; } n.querySelector('.edit').hidden = false; n.querySelector('[aria-expanded]').setAttribute('aria-expanded','true'); diff(); };
+  edit.append(rs);
+  ed.onclick = () => { edit.hidden = !edit.hidden; ed.setAttribute('aria-expanded', String(!edit.hidden)); };
+  return el;
+}
+for (const [name, keys] of GROUPS){
+  const g = document.createElement('section'); g.className = 'group'; const h = document.createElement('h2'); h.textContent = name; g.append(h);
+  for (const k of keys) g.append(strip(k));
+  $('groups').append(g);
+}
+$('groups').style.display = 'grid'; $('groups').style.gap = '22px';
+$('master').oninput = () => { if (out) out.gain.setTargetAtTime($('master').value/100, ctx.currentTime, 0.03); };
+$('stopAll').onclick = () => { document.querySelectorAll('.snd [aria-pressed="true"]').forEach(b => { b.setAttribute('aria-pressed','false'); b.closest('.snd')._setBed(); }); };
+$('resetAll').onclick = () => { for (const k in ORIG) SFX_DEF[k] = JSON.parse(JSON.stringify(ORIG[k])); $('stopAll').click(); for (const k in beds){ beds[k].set(0,false); delete beds[k]; } document.querySelectorAll('.snd').forEach(el => el.replaceWith(strip(el.dataset.k))); diff(); };
+$('copy').onclick = () => { const t = $('diff').value; if (!t){ $('toast').textContent = 'Nothing to copy yet'; return; }
+  const sel = () => { $('diff').focus(); $('diff').select(); $('toast').textContent = 'Selected. Copy it from the box'; };
+  try { navigator.clipboard.writeText(t).then(() => { $('toast').textContent = 'Copied'; }, sel); } catch(e){ sel(); } };
+diff();
+</script>

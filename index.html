@@ -19,7 +19,8 @@
 :root[data-theme="dark"]{
   --snow:#0b1218; --grid:#1d2a37; --grid-major:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4;
   --skier:#d9785c; --track:#4a6378; --shade:#000; --contour:#7d6a52; --groomed:#1d2c3a; --cord:#192734; --sky:#0a1118; --trail-edge:#2c3e50; --d-green:#4cc27a; --d-blue:#5b9cf0; --d-black:#e3ebf2; --map-bg:rgba(18,28,38,.9); --up:#ff9a6b; --down:#6fd3a5; --panel:rgba(18,28,38,.88); --line:#2a3a4a; --rock:#3a4652; --water:#1d3b52; --water2:#163045; --ice:#2a4256; --orb:#ffc64a; --lake:#24394c; --lake2:#1d3142; color-scheme:dark}
-html,body{height:100%;touch-action:manipulation;-webkit-text-size-adjust:100%}
+html,body{height:100%;touch-action:manipulation;-webkit-text-size-adjust:100%;overscroll-behavior:none}
+@media (pointer:coarse){html,body{position:fixed;inset:0;overflow:hidden}}
 *{-webkit-tap-highlight-color:transparent}
 body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 input,textarea,select{-webkit-user-select:auto;user-select:auto}
@@ -48,7 +49,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 .gradebig span{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
 .gradebig[data-dir="up"] b{color:var(--up)}.gradebig[data-dir="down"] b{color:var(--down)}
 @media (max-width:760px){.gradebig{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 190px);left:auto;right:16px;transform:none;padding:6px 10px}.gradebig b{font-size:22px}}
-@media (pointer:coarse) and (min-width:761px){.gradebig{bottom:calc(38% + 12px)}}
+@media (pointer:coarse) and (min-width:761px){.gradebig{bottom:calc(var(--padh) + 12px)}}
 .dbg{position:fixed;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 150px);width:min(520px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:grid;gap:8px;font-size:11px;backdrop-filter:blur(6px)}
 .dbgHead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.dbgHead b{font-family:var(--display);font-size:15px;letter-spacing:.06em;text-transform:uppercase}.dbgHead span{color:var(--muted)}
 .dbg pre{margin:0;max-height:150px;overflow:auto;white-space:pre-wrap;font:inherit;line-height:1.45}
@@ -133,10 +134,12 @@ summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid
 .dm{display:inline-block;width:9px;height:9px;flex:none}.dm.green{background:var(--d-green);border-radius:50%}.dm.blue{background:var(--d-blue)}.dm.black{background:var(--d-black);transform:rotate(45deg) scale(.85)}
 .grd[data-dir="up"]{color:var(--up)}.grd[data-dir="down"]{color:var(--down)}
 .btns button{flex:1;font:inherit;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px;cursor:pointer}
-.pads{position:fixed;inset:auto 0 0 0;display:none;height:38%;}
+:root{--padh:38%}
+@media (pointer:coarse) and (orientation:landscape){:root{--padh:50%}}      /* sideways: the pads reach halfway up */
+.pads{position:fixed;inset:auto 0 0 0;display:none;height:var(--padh);}
 .pad{position:absolute;bottom:0;top:0;width:50%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 20px);font-family:var(--display);font-size:18px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;touch-action:manipulation}
 .pad.l{left:0}.pad.r{right:0;border-left:1px dashed var(--line)}
-@media (pointer:coarse){.pads{display:block}details{bottom:calc(38% + 12px)}}
+@media (pointer:coarse){.pads{display:block}details{bottom:calc(var(--padh) + 12px)}}
 
 /* ---- interaction prompt: stop at a kiosk or the altar. covers everything and takes all input until answered ---- */
 .prompt{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;background:rgba(14,26,38,.42);backdrop-filter:blur(3px);touch-action:none}
@@ -188,6 +191,9 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 .setlist{display:grid;gap:8px;margin:0 0 12px}
 .setlist button{min-height:48px;font:700 15px/1.1 var(--display);letter-spacing:.06em;text-transform:uppercase;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;touch-action:manipulation;display:flex;justify-content:space-between;align-items:center;padding:0 14px}
 .setlist button b{font:600 13px var(--mono);letter-spacing:0;text-transform:none;color:var(--muted)}
+.setlist label{display:grid;grid-template-columns:1fr auto;text-align:left;gap:6px 8px;align-items:center;min-height:48px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);box-sizing:border-box;font:700 15px/1.1 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--ink)}
+.setlist label b{font:600 13px var(--mono);letter-spacing:0;text-transform:none;color:var(--muted)}
+.setlist label input{grid-column:1/-1;width:100%;accent-color:var(--skier);touch-action:pan-x}
 @media (pointer:coarse){
   .gearbtn{display:inline-flex;position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);left:16px;z-index:7;width:40px;height:40px;padding:0;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(6px);box-sizing:border-box;touch-action:manipulation}
   .gearbtn svg{width:22px;height:22px}
@@ -203,7 +209,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
   body.nopadui .pad::before{opacity:0 !important}
   body.nopadui .pad span{display:none}
   body.nopadui .pads .pad.l,body.nopadui .pads .pad.r{width:calc(50% - 44px)}
-  body.nopadui .mtoggle{bottom:0;height:38%;width:88px;border-radius:0;border:0;background:transparent;backdrop-filter:none;align-items:flex-end;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 28px)}
+  body.nopadui .mtoggle{bottom:0;height:var(--padh);width:88px;border-radius:0;border:0;background:transparent;backdrop-filter:none;align-items:flex-end;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 28px)}
   body.nopadui .mtoggle svg{visibility:hidden}                                  /* (an invisible strip: nothing shows) */
 }
 .cpgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}
@@ -233,7 +239,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 <button class="gearbtn" id="gearBtn" type="button" aria-label="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/><circle cx="12" cy="12" r="6.6"/></svg></button>
 <div class="prompt" id="setMenu" role="dialog" aria-modal="true" aria-labelledby="setTitle" hidden><div class="pcard" style="width:min(380px,100%)">
   <h3 id="setTitle">Settings</h3>
-  <div class="setlist"><button id="setMusic" type="button">Music <b></b></button><button id="setPads" type="button">Controller buttons <b></b></button><button id="setCp" type="button">Checkpoints <b>›</b></button></div>
+  <div class="setlist"><button id="setMusic" type="button">Music <b></b></button><button id="setPads" type="button">Controller buttons <b></b></button><label for="setPixel">Pixelation <b id="setPixelOut"></b><input id="setPixel" type="range" min="1" max="6" step="1"></label><button id="setCp" type="button">Checkpoints <b>›</b></button></div>
   <div class="pbtns"><button id="setClose" type="button" class="ghostbtn">Close</button></div>
 </div></div>
 <div class="prompt" id="cpMenu" role="dialog" aria-modal="true" aria-labelledby="cpTitle" hidden><div class="pcard" style="width:min(440px,100%)">
@@ -2407,6 +2413,9 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
   for (const el of document.querySelectorAll('.pad,.mtoggle,#gl,.calfbtn')) el.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
   document.addEventListener('touchend', e => { const n = Date.now(); if (n - lastTouchEnd < 350) e.preventDefault(); lastTouchEnd = n; }, { passive: false });
   for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault(), { passive: false });
+  // no page scrolling from a swipe anywhere in the game (it would bring Safari's bars back), except inside the panels
+  // that scroll: the tuning and controller panels, the dialogs, the map
+  document.addEventListener('touchmove', e => { if (!(e.target.closest && e.target.closest('details,.padpanel,.pcard,.dbg'))) e.preventDefault(); }, { passive: false });
   document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
 }
 
@@ -8221,7 +8230,7 @@ $('cpPass').addEventListener('keydown', e => { e.stopPropagation(); if (e.key ==
 let padUI = true; try { padUI = localStorage.getItem('skate-padui') !== 'off'; } catch (e) {}
 const applyPadUI = () => document.body.classList.toggle('nopadui', !padUI);
 applyPadUI();
-function setLabels(){ $('setMusic').querySelector('b').textContent = $('musicBtn').getAttribute('aria-pressed') === 'false' ? 'off' : 'on'; $('setPads').querySelector('b').textContent = padUI ? 'on' : 'off'; }
+function setLabels(){ $('setPixel').value = $('tPixel').value; $('setPixelOut').textContent = $('oPixel').textContent; $('setMusic').querySelector('b').textContent = $('musicBtn').getAttribute('aria-pressed') === 'false' ? 'off' : 'on'; $('setPads').querySelector('b').textContent = padUI ? 'on' : 'off'; }
 function openSettings(){ setLabels(); $('setMenu').hidden = false; promptCtx = promptCtx || { cp: true }; }
 function closeSettings(){ $('setMenu').hidden = true; if (promptCtx && promptCtx.cp) promptCtx = null; }
 $('gearBtn').addEventListener('click', openSettings);
@@ -8229,6 +8238,7 @@ $('setClose').addEventListener('click', closeSettings);
 $('setMusic').addEventListener('click', () => { $('musicBtn').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); setLabels(); });
 $('setPads').addEventListener('click', () => { padUI = !padUI; try { localStorage.setItem('skate-padui', padUI ? 'on' : 'off'); } catch (e) {} applyPadUI(); setLabels(); });
 $('setCp').addEventListener('click', () => { $('setMenu').hidden = true; openCpMenu(); });
+$('setPixel').addEventListener('input', () => { const el = $('tPixel'); el.value = $('setPixel').value; el.dispatchEvent(new Event('input')); $('setPixelOut').textContent = $('oPixel').textContent; });
 // exact positions, for reporting a spot: copy where you (and the camera) are; paste one back in to go there
 $('posCopy').addEventListener('click', () => {
   const c = camera.position, t = JSON.stringify({ x: +S.x.toFixed(2), y: +S.y.toFixed(2), th: +S.th.toFixed(3), under: UNDER, station: ONSTATION, cam: [+c.x.toFixed(1), +c.y.toFixed(1), +c.z.toFixed(1)] });

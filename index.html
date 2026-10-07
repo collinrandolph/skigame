@@ -143,6 +143,9 @@ summary:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid
 /* ---- interaction prompt: stop at a kiosk or the altar. covers everything and takes all input until answered ---- */
 .prompt{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;background:rgba(14,26,38,.42);backdrop-filter:blur(3px);touch-action:none}
 .prompt[hidden]{display:none}
+/* dialogs taller than the screen (settings on a landscape phone) scroll inside their card */
+.prompt .pcard{max-height:100%;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+@media (orientation:landscape) and (max-height:500px){.prompt{padding:10px}.prompt .pcard{padding:12px 16px 10px}.setlist{gap:6px}.setlist button{min-height:40px}}
 .pcard{width:min(380px,100%);box-sizing:border-box;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 20px 14px;text-align:center;color:var(--ink);box-shadow:0 10px 40px rgba(0,0,0,.18)}
 .pcard h3{margin:0 0 8px;font:700 22px/1.1 var(--display);letter-spacing:.08em;text-transform:uppercase}
 .pcard p{margin:0 0 16px;font-size:15px;line-height:1.45;color:var(--muted)}
@@ -218,8 +221,8 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
   /* the zone label sits between the gear (and calf button) on the left and the map on the right, shortening its
      label if it has to */
   .orbhud{max-width:calc(100vw - 2*64px)}
-  .calfbtn{left:16px;top:calc(env(safe-area-inset-top,0px) + 64px)}         /* under the gear */
-  .calfbtn{left:16px;top:calc(env(safe-area-inset-top,0px) + 64px)}         /* under the gear */
+  .calfbtn{left:64px;top:calc(env(safe-area-inset-top,0px) + 16px)}         /* in line with the gear */
+  body:has(#calfBtn:not([hidden])) .orbhud{max-width:calc(100vw - 2*112px)}
   .orbhud span{overflow:hidden;text-overflow:ellipsis;min-width:0}
   /* controller buttons off: no pad panels or labels (the halves still kick), and the style switch is the whole strip
      between them, from the pads' top to the bottom of the screen */
@@ -256,7 +259,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 <button class="gearbtn" id="gearBtn" type="button" aria-label="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/><circle cx="12" cy="12" r="6.6"/></svg></button>
 <div class="prompt" id="setMenu" role="dialog" aria-modal="true" aria-labelledby="setTitle" hidden><div class="pcard" style="width:min(380px,100%)">
   <h3 id="setTitle">Settings</h3>
-  <div class="setlist"><div class="setvol"><button id="setMusic" type="button">Music <b></b></button><input id="setMusicVol" type="range" min="0" max="100" step="5" aria-label="Music volume"></div><div class="setvol"><button id="setFx" type="button">Sound effects <b></b></button><input id="setFxVol" type="range" min="0" max="100" step="5" aria-label="Sound effects volume"></div><button id="setPads" type="button">Controller buttons <b></b></button><label for="setPixel">Pixelation <b id="setPixelOut"></b><input id="setPixel" type="range" min="1" max="6" step="1"></label><button id="setTut" type="button">Tutorial <b>›</b></button><button id="setCp" type="button">Checkpoints <b>›</b></button></div>
+  <div class="setlist"><div class="setvol"><button id="setMusic" type="button">Music <b></b></button><input id="setMusicVol" type="range" min="0" max="100" step="5" aria-label="Music volume"></div><div class="setvol"><button id="setFx" type="button">Sound effects <b></b></button><input id="setFxVol" type="range" min="0" max="100" step="5" aria-label="Sound effects volume"></div><button id="setPads" type="button">Controller buttons <b></b></button><label for="setPixel">Pixelation <b id="setPixelOut"></b><input id="setPixel" type="range" min="1" max="6" step="1"></label><button id="setTilt" type="button">Tilt to lean <b></b></button><button id="setTut" type="button">Tutorial <b>›</b></button><button id="setCp" type="button">Checkpoints <b>›</b></button></div>
   <div class="pbtns"><button id="setClose" type="button" class="ghostbtn">Close</button></div>
 </div></div>
 <div class="prompt" id="cpMenu" role="dialog" aria-modal="true" aria-labelledby="cpTitle" hidden><div class="pcard" style="width:min(440px,100%)">
@@ -1235,7 +1238,7 @@ function caveSD(x, y){
 function caveStep(px, py, dt){
   if (!ONSTATION){
     const sm = mineS(S.x), sPrev = mineS(px), inWay = Math.abs(S.y - MINE.y) < MINE.hw;
-    if (!UNDER && sPrev <= 0 && sm > 0 && inWay) UNDER = true;
+    if (!UNDER && sPrev <= 0 && sm > 0 && inWay && !SKY_ON) UNDER = true;   // (a light bridge overhead doesn't take you in)
     else if (UNDER && sm <= 0) UNDER = false;
   }
   if (UNDER && !ONSTATION && px <= PORTAL_X && S.x > PORTAL_X && TRANSPORT.some(T => T.open && Math.abs(S.y - T.y) < PORTAL_HW)) ONSTATION = true;
@@ -1625,7 +1628,7 @@ function trailAssist(dt){
   if (P.assist <= 0){ assistTrail = null; return; }
   // hands off while you lean and for a moment after, and forget which trail you were on: you're steering yourself
   const now = performance.now();
-  if (lean || keySteer.q || keySteer.e || Math.abs(mouseLean) > 0.1 || touchLean){ assistQuietUntil = now + 800; assistTrail = null; return; }
+  if (lean || keySteer.q || keySteer.e || Math.abs(mouseLean) > 0.1 || touchLean || tiltLean){ assistQuietUntil = now + 800; assistTrail = null; return; }
   if (now < assistQuietUntil){ assistTrail = null; return; }
   const v = Math.hypot(S.vx, S.vy); if (v < 0.5) return;
   const twinSkate = P.scheme === 1 && !mode;
@@ -1794,6 +1797,8 @@ function doublePoleInput(){
 // keyboard steering: Q leans/steers left, E right (classic and tuck)
 const keySteer = { q: 0, e: 0 };
 let touchLean = 0;   // phones: both thumbs slid left or right while tucking (-1..1)
+let tiltLean = 0;    // phones: tilting the phone left or right while tucking (-1..1), when Tilt to lean is on (Settings)
+let tuckDeep = 0;    // phones: both thumbs pushed further forward while tucking (0..1): a deeper tuck, up to half the remaining drag gone
 const classic = { pos: null, rest: 0, dp: false, downSince: 0, trigLast: null, at: 0 };
 // how far the stride's stance is still showing: held while a stick holds it, otherwise easing back to centre (weight
 // over both skis) about half a second after a kick
@@ -1813,13 +1818,13 @@ function classicPush(mult = 1){
   const eff = Math.max(0.08, 1 - speed/vmax);
   S.vx += Math.sin(S.th) * P.classic * eff * mult; S.vy += -Math.cos(S.th) * P.classic * eff * mult;
   lastPush = { dx: Math.sin(S.th), dy: -Math.cos(S.th), amt: P.classic * eff };
-  sfx.kick(classic.pos === 'A' ? 'R' : 'L', mult); sfx.pole();
+  sfx.kick(classic.pos === 'A' ? 'R' : 'L');
   const now = performance.now(); kicks.push(now); kicks = kicks.filter(t => now - t < 4000); lastKickAt = now;
   legFlash[classic.pos === 'A' ? 'R' : 'L'] = 1;
   rumble(classic.pos === 'A' ? 'R' : 'L', kickBuzz(1));
 }   // both skis stay down until your next stroke
 function polePush(dir = S.th){
-  poleT = 1; sfx.pole();
+  poleT = 1; sfx.play('kick');
   // double pole: both poles plant and drive you straight ahead, limited by the hill-adjusted top speed
   const speed = Math.hypot(S.vx, S.vy), vmax = P.max * slopeFactors(S.grade).max / 3.6;
   // the poles plant through loose snow just as well, so a double pole keeps its full push off the trail
@@ -1987,7 +1992,7 @@ function kick(leg, opt = {}){
   // a passive step puts the foot down without pushing: it doesn't count toward cadence or the same-leg power loss
   if (opt.passive){ streak = 0; return; }
   lastPushAt = now; armAt = now; armPending = false;   // for the animation: a passive step has no pole push
-  sfx.kick(leg, opt.boost || 1); if (opt.power !== undefined || strideStyle === 'v2') sfx.pole();
+  sfx.kick(leg);   // one skiing sound for every stroke: the same swish, same level, whatever the style or boost
   kicks.push(now); kicks = kicks.filter(t => now - t < 4000);
   legFlash[leg] = 1;
 }
@@ -2403,21 +2408,22 @@ function dualMove(){
   if (dual.act === 'tuck' && !dual.leaned && Math.abs(span - dual.s0) > 40 && Math.abs(mid - dual.lx) < 15 && Math.abs(ua) < T*1.5 && Math.abs(ub) < T*1.5){
     setSkateTuck(false); touchLean = 0; dual.act = 'pinch'; dual.s0 = span; dual.c0 = P.camd;
   }
-  // sliding both thumbs the other way (measured from wherever they got to) switches between tuck and plow without
-  // lifting. leaving a tuck takes a long pull back (96 px), since thumbs wander while you lean, except right at the
-  // start (the first 400 ms, before any lean) when 24 px will do; leaving a plow takes 18 px
+  // pulling both thumbs back switches a tuck to a plow, and pushing them forward again switches back, without lifting.
+  // a tuck turns into a plow only once both thumbs are well behind where the tuck began (72 px; 24 px in the first
+  // 400 ms, before any lean): wandering while you lean, or easing out of a deep tuck, never counts. a plow turns back
+  // into a tuck after 18 px forward from wherever the thumbs got to
   if (dual.act === 'plow' || dual.act === 'tuck'){
-    const tuck = dual.act === 'tuck', pa = tuck ? ua : -ua, pb = tuck ? ub : -ub;   // how far along the current direction
-    dual.ea = Math.max(dual.ea ?? pa, pa); dual.eb = Math.max(dual.eb ?? pb, pb);
-    const early = !dual.leaned && performance.now() - dual.t0 < 400;
-    const TS = tuck ? (early ? 24 : 96) : T;
-    if (dual.ea - pa > TS && dual.eb - pb > TS){
-      if (tuck){ setSkateTuck(false); dual.act = 'plow'; setPlow(true, 'dual'); touchLean = 0; }
-      else { setPlow(false, 'dual'); dual.act = 'tuck'; setSkateTuck(true); dual.lx = mid; }
-      dual.ea = -pa; dual.eb = -pb;
+    if (dual.act === 'tuck'){
+      const early = !dual.leaned && performance.now() - dual.t0 < 400, TS = early ? 24 : 72;
+      if (a.y - dual.ay > TS && b.y - dual.by > TS){ setSkateTuck(false); dual.act = 'plow'; setPlow(true, 'dual'); touchLean = 0; tuckDeep = 0; dual.ea = -ua; dual.eb = -ub; }
+    } else {
+      const pa = -ua, pb = -ub;                                           // how far back the thumbs are
+      dual.ea = Math.max(dual.ea ?? pa, pa); dual.eb = Math.max(dual.eb ?? pb, pb);
+      if (dual.ea - pa > T && dual.eb - pb > T){ setPlow(false, 'dual'); dual.act = 'tuck'; setSkateTuck(true); dual.lx = mid; dual.fy = (a.y + b.y)/2; dual.ay = a.y; dual.by = b.y; }
     }
     // while tucking, sliding both thumbs left or right leans that way (full lean at 60 px from where the tuck began)
-    if (dual.act === 'tuck'){ const d = mid - dual.lx; touchLean = Math.abs(d) < 6 ? 0 : Math.max(-1, Math.min(1, d/60)); if (Math.abs(d) > 15) dual.leaned = true; }
+    if (dual.act === 'tuck'){ const d = mid - dual.lx; touchLean = Math.abs(d) < 6 ? 0 : Math.max(-1, Math.min(1, d/60)); if (Math.abs(d) > 15) dual.leaned = true;
+      tuckDeep = Math.max(0, Math.min(1, (dual.fy - (a.y + b.y)/2 - 10)/110)); }   // pushing further forward: a deeper tuck (full at 120 px)
     return;
   }
   if (dual.act === 'pinch'){
@@ -2430,7 +2436,7 @@ function dualEnd(){
   if (!dual) return;
   if (dual.act === 'plow') setPlow(false, 'dual');
   if (dual.act === 'tuck') setSkateTuck(false);
-  dual = null; touchLean = 0;
+  dual = null; touchLean = 0; tuckDeep = 0;
 }
 function padSettle(t){ if (t.timer){ clearTimeout(t.timer); t.timer = null; } if (t.state !== 'done'){ t.state = 'done'; if (t.kicked){ armPending = false; armAt = performance.now(); } } }
 function padKick(leg, t){ padSettle(t); }
@@ -2440,8 +2446,8 @@ function padLoaded(leg, t){
   if (!ok || P.lboost <= 1) return;
   kickTop = { dx: t.push.dx, dy: t.push.dy, amt: t.push.amt * (P.lboost - 1), left: 0.15 };
   if (kickDrive && kickDrive.leg === leg) kickDrive.base *= P.lboost;
-  if (!inClassic()){ strideStyle = 'v2'; sfx.pole(); }
-  rumble(leg, kickBuzz(P.lboost)); sfx.swipe(); tut.ev('loaded', leg);
+  if (!inClassic()) strideStyle = 'v2';
+  rumble(leg, kickBuzz(P.lboost)); tut.ev('loaded', leg);   // (no extra sound: the kick's swish already played)
 }
 for (const [id, leg] of [['padL','L'],['padR','R']]){
   const el = $(id), other = leg === 'L' ? 'R' : 'L';
@@ -2457,7 +2463,7 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
       if (o.kicked && o.snap){ undoKick(o.snap); kickTop = null; }
       o.state = t.state = 'done'; o.kicked = false; o.dual = t.dual = true; armPending = false;
       $(other === 'L' ? 'padL' : 'padR').classList.remove('pull');
-      dual = { a: o, b: t, act: 'tuck', s0: Math.abs(t.x - o.x), c0: P.camd, lx: (t.x + o.x)/2, t0: now, leaned: false, ea: 0, eb: 0 };
+      dual = { a: o, b: t, act: 'tuck', s0: Math.abs(t.x - o.x), c0: P.camd, lx: (t.x + o.x)/2, fy: (t.y + o.y)/2, ay: o.y, by: t.y, t0: now, leaned: false };
       setSkateTuck(true);                       // both thumbs down: tuck straight away
       return;
     }
@@ -2541,12 +2547,12 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
 // length dur (s), delay (s). tone layer: wave, pitch sweep f0 -> f1, g, at, dur, delay.
 // beds loop under the game: g is the level at full speed (14 m/s), floor the level when barely moving.
 const SFX_DEF = {
-  kick:      { label: 'Kick swish', when: 'Every skate or classic kick, panned to the kicking ski. ×1.4 on a loaded stroke.', layers: [
+  kick:      { label: 'Kick swish', when: 'Every stroke of every style (skate kick, swipe, classic stride, double pole), always the same level; panned to the kicking ski.', layers: [
     { kind: 'noise', filter: 'bandpass', f0: 5200, f1: 4000, q: 0.9, hp: 3500, g: 0.07, at: 0.02, dur: 0.2 } ] },
-  pole:      { label: 'Pole plant', when: 'V2 (swipe) strokes, double poles and classic strides.', layers: [
+  pole:      { label: 'Pole plant', when: 'Not used at the moment (strokes all use the kick swish).', layers: [
     { kind: 'noise', filter: 'highpass', f0: 5000, f1: 5000, q: 0.7, g: 0.12, at: 0.002, dur: 0.05 },
     { kind: 'tone', wave: 'sine', f0: 190, f1: 90, g: 0.1, at: 0.003, dur: 0.07 } ] },
-  swipe:     { label: 'Swipe whoosh', when: 'A swipe up a pad upgrades the kick to a loaded stroke.', layers: [
+  swipe:     { label: 'Swipe whoosh', when: 'Not used at the moment (a swipe keeps the kick swish only).', layers: [
     { kind: 'noise', filter: 'bandpass', f0: 3600, f1: 6500, q: 1.2, hp: 3500, g: 0.09, at: 0.03, dur: 0.2 } ] },
   tick:      { label: 'UI tick', when: 'Settings buttons, tutorial Skip.', layers: [
     { kind: 'tone', wave: 'sine', f0: 1400, f1: 1200, g: 0.05, at: 0.002, dur: 0.04 } ] },
@@ -2699,7 +2705,7 @@ const music = (() => {
     set(v){ fxOn = v; try { localStorage.setItem('skate-sfx', v ? 'on' : 'off'); } catch(e){} if (fxGain) fxGain.gain.setTargetAtTime(fGain(), ctx.currentTime, 0.05); },
     volume(v){ fxVol = v; try { localStorage.setItem('skate-fxvol', v); } catch(e){} if (fxGain) fxGain.gain.setTargetAtTime(fGain(), ctx.currentTime, 0.05); },
     play(name, opts){ if (live()) E().play(name, opts); },
-    kick(leg, boost = 1){ fx.play('kick', { pan: leg === 'L' ? -0.3 : 0.3, gmul: Math.min(1.4, boost) }); },
+    kick(leg){ fx.play('kick', { pan: leg === 'L' ? -0.3 : 0.3 }); },
     // per frame: the beds follow speed and what you're on
     beds(speed, plow, bridge, space){
       if (!live()){ if (beds) for (const b of Object.values(beds)) b.set(0, false); return; }
@@ -2765,7 +2771,7 @@ function step(dt){
   // (a lean carves on moving skis, so it fades out below about 10 km/h and does nothing standing still)
   mouseLean *= Math.exp(-dt * 2.5);                            // the mouse lean eases back to centre
   if (Math.abs(mouseLean) < 0.02) mouseLean = 0;
-  const ks = keySteer.e - keySteer.q, steer = ks || lean || mouseLean || touchLean;   // Q/E, the stick, or the mouse
+  const ks = keySteer.e - keySteer.q, steer = ks || lean || mouseLean || touchLean || tiltLean;   // Q/E, the stick, or the mouse
   if ((mode === 'tuck' || mode === 'classic') && steer) S.tgt += steer * P.lean * Math.PI/180 * dt * Math.min(1, Math.hypot(S.vx, S.vy) / 3);
   if (mode !== 'tuck' && mode !== 'classic') lean = 0;
   // ease toward the kick's heading over the ski-set time; the total turn is exactly the step
@@ -2826,7 +2832,7 @@ function step(dt){
     const gpull = G * (hx*fx + hy*fy) * dt;
     if (!(SKY_ON || CAVE_DECK) || gpull*fwd < 0 || Math.abs(fwd) < 0.05) fwd -= gpull;
     // tuck: crouched low with skis together, so air drag drops
-    fwd *= Math.exp(-P.glide * surf * S.slick * (mode === 'tuck' ? 1 - P.tuck/100 : 1) * dt);
+    fwd *= Math.exp(-P.glide * surf * S.slick * (mode === 'tuck' ? 1 - P.tuck/100 - (1 - P.tuck/100)*0.5*tuckDeep : 1) * dt);
     const dec = (P.fric * f.fric * surf * S.slick + (mode === 'plow' ? P.plow : 0)) * dt;
     fwd = Math.abs(fwd) <= dec ? 0 : fwd - Math.sign(fwd) * dec;
   }
@@ -3271,7 +3277,7 @@ const STRUCTS = (() => {
   put('dome', -35, -88, 1); put('tower', 35, -95, 1); put('pad', 34, 16, 1);
   put('plant', 325, -105, 2); put('excavator', 352, -130, 2); put('greenhouse', 300, 38, 2); put('biolab', 312, 80, 2); put('comms', 395, -88, 2);
   // zone 3: the great ruins around the lake, and a camp or village beside a couple of them
-  put('ribs', 398, 300, 3); put('watcher', 62, 296, 3); put('circle', 100, 396, 3);
+  put('ribs', 398, 300, 3); put('watcher', 62, 272, 3); put('circle', 100, 396, 3);   // (the watcher is clear of the Connector bridge, which runs past at 26 m up)
   put('shacks', 392, 250, 3); put('shacks', 20, 250, 3);
   {
     // the spine arch stands right over Bridge Road, its feet either side of the trail
@@ -3999,7 +4005,7 @@ $('cpAltar').addEventListener('click', () => { checkpoint = { a: 1 }; altar.dism
 function resetOrbs(){
   for (const K of KIOSKS){ K.state = 'dormant'; K.dismissed = false; for (const o of K.orbs){ o.got = false; o.fade = 0; o.g.visible = false; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; } updateKioskLook(K); }
   if (trial.K){ const K = trial.K; trial.K = null; updateKioskLook(K); }
-  releasePet(); returnZ5Calves(); sleepGiant(); checkpoint = null; ceremony = 0; saveEnd(); crownReset(); CROWN_GATE.open = false; pet.lastDismissed = -1; SKY_ON = null; bhShown = false;
+  releasePet(); returnZ5Calves(); sleepGiant(); checkpoint = null; ceremony = 0; saveEnd(); crownReset(); CROWN_GATE.open = false; pet.lastDismissed = -1; SKY_ON = null; bhShown = false; bhLatch = false;
   setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; altar.state = 0; altar.dismissed = false; setCrystalsCollected(0); setCrystalsActive(false); updateAltarLook(); gate4Open = false; gate4.open = 0; bridgeWanted = bridge2Wanted = false; bridgeDown = bridge2Down = 0; animateGate(0);
   saveProgress();
 }
@@ -5250,7 +5256,8 @@ function dismissPrompt(){
   if (!pet.h || promptCtx || !eldersIn()) return;
   openPrompt({ title: 'Your calf', body: 'Send your calf back to its herd? The next calf you come across will follow you instead.', go: 'Send back', onGo: dismissPet });
 }
-$('calfBtn').addEventListener('click', dismissPrompt);
+// (pointerdown: the button's touchstart is cancelled so it can't zoom the page, and on iOS that also swallows the click)
+$('calfBtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); dismissPrompt(); });
 // after a jump (a checkpoint at the start of a visit, a reset) the calf starts a little way off and runs in
 function petArrive(){
   if (!pet.h) return;
@@ -5261,7 +5268,7 @@ function petArrive(){
 function crumbAt(sx){
   // position and heading at distance sx along your trail (before the first crumb: straight back from it along your heading)
   const C = pet.crumbs;
-  if (sx <= C[0].s || C.length < 2){ const d = C[0].s - sx; return [C[0].x - Math.sin(pet.th0)*d, C[0].y + Math.cos(pet.th0)*d, pet.th0]; }
+  if (sx <= C[0].s || C.length < 2){ const d = C[0].s - sx; return [C[0].x - Math.sin(pet.th0)*d, C[0].y + Math.cos(pet.th0)*d, pet.th0, null]; }   // (no height: on the ground. leaving it undefined put the calf at NaN, so it vanished and popped back)
   let lo = 0, hi = C.length - 1;
   while (hi - lo > 1){ const m = (lo + hi) >> 1; if (C[m].s < sx) lo = m; else hi = m; }
   const a = C[lo], b = C[hi], u = Math.min(1, (sx - a.s) / Math.max(1e-6, b.s - a.s));
@@ -5656,7 +5663,7 @@ function skyStep(){
   }
   o.i = pr.i; o.h = pr.h;
   // the end of the line: the edge of the black hole holds you, and asks what you'd like to do
-  if (d.B.blackhole) bhWant = Math.max(0, Math.min(1, (pr.s - (d.len - BH_SWALLOW))/(BH_SWALLOW - 6)));
+  if (d.B.blackhole){ bhWant = Math.max(0, Math.min(1, (pr.s - (d.len - BH_SWALLOW))/(BH_SWALLOW - 6))); if (bhWant > 0) bhLatch = true; }
   if (d.B.blackhole && pr.s > d.len - 6){
     S.vx *= 0.92; S.vy *= 0.92;
     if (pr.s > d.len - 2){ const back = pr.s - (d.len - 2); S.x -= pr.tx*back; S.y -= pr.ty*back; S.vx = S.vy = 0; }
@@ -5794,6 +5801,7 @@ const skyPortals = SKY.nodes.filter(n => n.ground).map(n => {
   for (const sx of [-1, 1]){ const p = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 6.5, 8), post); p.position.set(sx*(SKY_W/2 + 0.6), 3.25, 0); g.add(p);
     const c = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), lite); c.position.set(sx*(SKY_W/2 + 0.6), 6.7, 0); g.add(c); lit.push(c); }
   const arch = new THREE.Mesh(new THREE.TorusGeometry(SKY_W/2 + 0.6, 0.12, 6, 24, Math.PI), lite); arch.position.set(0, 6.5, 0); g.add(arch); lit.push(arch);
+  const gem = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), lite); gem.scale.set(0.3, 0.5, 0.12); gem.position.set(0, 6.5 + SKY_W/2 + 0.6 + 0.55, 0); g.add(gem); lit.push(gem);   // a small diamond at the crown of the arch
   const pad = new THREE.Mesh(new THREE.CircleGeometry(SKY_W/2 + 1, 24), new THREE.MeshBasicMaterial({ color: 0xa993d6, transparent: true, opacity: 0, depthWrite: false }));
   pad.rotation.x = -Math.PI/2; pad.position.y = 0.06; g.add(pad);
   SOLIDS.push({ x: n.x - Math.cos(g.rotation.y)*(SKY_W/2 + 0.6), y: n.y + Math.sin(g.rotation.y)*(SKY_W/2 + 0.6), r: 0.4 });
@@ -5905,9 +5913,9 @@ const MUSICIANS = (() => {
 // over and dress it in a drape and crown of its own, and there it stays for good. when the third calf is crowned the
 // other three diamonds appear, the elders walk into the ring onto them, and the Starway wakes. calves past the
 // third join the court too, standing to the east
-// the ring sits midway between the hidden way's gate (y 880) and the Starway's (y 911), so there's room to step off
-// either bridge before reaching it; the elders wait between the ring and the Starway
-const TRIO = { x: 250, y: 907 }, RING6 = { x: 250, y: 895.5, r: 6.5 }, DIAMONDS = 3;
+// the ring sits midway between the hidden way's gate (y 880) and the Starway's (y 911), wide enough that its edge
+// meets both gates; the elders wait just outside it to the east, the attendants to the west
+const TRIO = { x: 276, y: 895.5 }, RING6 = { x: 250, y: 895.5, r: 15.5 }, DIAMONDS = 3;
 const CALF_D = [0, 2, 4], ELDER_D = [1, 3, 5];     // diamond k sits at k × 60° round the ring (0 = east), so north and south stay open
 const GOLD = lam(0xe6bf4f); GOLD.flatShading = true; const GOLD_2S = GOLD.clone(); GOLD_2S.side = THREE.DoubleSide;
 const ROYAL = 0x7b3fe0, ROYAL_MAT = lam(ROYAL); ROYAL_MAT.flatShading = true;      // the trio's leader wears it, and so do you once you've been through the black hole
@@ -5972,8 +5980,8 @@ const court = (() => {
     g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xb8a35a }))); }
   // the elders: a little smaller than the herd's grown moose, across the way to the Starway, facing the ring. each
   // has its diamond in the ring and a way round the calves to it
-  const trio = [[-4.2, 0, 3, [[239, 903.5]]], [0, -1, 1, []], [4.2, 1, 5, [[261, 903.5], [260, 891.5]]]].map(([dx, k, dk, via], i) => {
-    const rig = buildMoose(false), x = TRIO.x + dx, y = TRIO.y; rig.root.scale.setScalar(0.85);
+  const trio = [[-1, -8.5, 0, 5, []], [1, 0, -1, 3, [[271, 901.5], [258, 900.5]]], [-1, 8.5, 1, 1, []]].map(([dx, dy, k, dk, via], i) => {
+    const rig = buildMoose(false), x = TRIO.x + dx, y = TRIO.y + dy; rig.root.scale.setScalar(0.85);
     rig.root.position.set(x, height(x, y), y);
     const d = dressMoose(rig, k, k < 0 ? ROYAL_MAT : null); if (k < 0) d.crown.scale.setScalar(1.25);
     const sol = { x, y, r: 1.9 }; SOLIDS.push(sol);
@@ -5986,7 +5994,7 @@ const court = (() => {
 const ATTEND = (() => {
   let seed = 4040; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const white = lam(0xf1ece0), white2 = lam(0xd4ccba); white.flatShading = white2.flatShading = true;
-  return [[232, 895.5], [268, 895.5]].map(([x, y], i) => {
+  return [[229, 885], [229, 906]].map(([x, y], i) => {
     const rig = buildAlien(rnd);
     rig.root.traverse(o => { if (!o.isMesh) return; if (o.material === NPC_MAT.robe) o.material = white; else if (o.material === NPC_MAT.robe2) o.material = white2; else if (o.material === NPC_MAT.sash) o.material = GOLD; });
     pt(rig.arms[i], cy(0.02, 0.02, 1.5, 6), GOLD, 0, -0.5, 0);                // a slim gold staff
@@ -6122,9 +6130,9 @@ function updateCourt(dt){
     if (called && t.leg < t.path.length){
       const [tx, ty] = t.path[t.leg], dx = tx - t.x, dy = ty - t.y, dist = Math.hypot(dx, dy);
       if (dist < 0.08){ t.leg++; if (t.leg === t.path.length){ t.inRing = true; music.chime(0.7 + i*0.1); if (court.trio.every(q => q.inRing)){ toast(outfit ? 'The elders take their places in the ring.' : 'The elders take their places in the ring, and the attendants turn to you.'); music.chime(1, true); calfUI(); } } }
-      else { const sp = 1.6, st = Math.min(dist, sp*dt); t.x += dx/dist*st; t.y += dy/dist*st; face = Math.atan2(dx, -dy); moving = true; }
+      else { const sp = 2.6, st = Math.min(dist, sp*dt); /* (the wider ring is a longer walk) */ t.x += dx/dist*st; t.y += dy/dist*st; face = Math.atan2(dx, -dy); moving = true; }
     }
-    if (moving){ t.gait += 1.6*dt/1.3; walkMoose(t.rig, t.gait, 0.4); t.rig.head.rotation.x = 0; }
+    if (moving){ t.gait += 2.6*dt/1.3; walkMoose(t.rig, t.gait, 0.4); t.rig.head.rotation.x = 0; }
     else { const w = (now*0.12 + i*0.08) % 1, bow = w < 0.08 ? 0.5*Math.sin(w/0.08*Math.PI) : 0; idleMoose(t.rig, now, t.ph, bow); }
     let d = face - t.th; d -= Math.round(d/(2*Math.PI))*2*Math.PI; t.th += d*Math.min(1, dt*3);
     t.sol.x = t.x; t.sol.y = t.y;
@@ -6225,7 +6233,7 @@ function updateCourt(dt){
 const PARTY = (() => {
   // staged to be watched from the ring: each loop winds back and forth between the ring and the cliff, beside the
   // observatory, on its own side of the way through (never within 10 m of the centre line)
-  const W = [[238, 904], [222, 899], [206, 906], [190, 900], [174, 907], [160, 903], [150, 915], [154, 930], [168, 944], [184, 953], [200, 945], [216, 954], [229, 946], [236, 928], [240, 915]];
+  const W = [[228, 906], [222, 899], [206, 906], [190, 900], [174, 907], [160, 903], [150, 915], [154, 930], [168, 944], [184, 953], [200, 945], [216, 954], [229, 946], [236, 928], [240, 915]];
   const mk = pts => { const c = new THREE.CatmullRomCurve3(pts.map(([x, y]) => new THREE.Vector3(x, 0, y)), true, 'centripetal'), N = 600; return { P: c.getSpacedPoints(N), N, len: c.getLength() }; };
   return { on: false, k: 0, t: 0, told: false, members: [], lines: [mk(W), mk(W.map(([x, y]) => [500 - x, y]).reverse())], cosmic: null };
 })();
@@ -6408,10 +6416,12 @@ let insidePlanet = false;      // you're inside the planet (on the funnel): no f
 // the screen goes black. bhWant is set by the ride; it eases back out when you've gone (back to the observatory, or
 // back to the start)
 const BH_SWALLOW = 46;
-let bhK = 0, bhWant = 0;
+let bhK = 0, bhWant = 0, bhLatch = false;   // once the swallow starts it carries on and asks, wherever you go
 function updateBlackHole(dt){
-  if (!(SKY_ON && SKY_ON.d.final)) bhWant = 0;
+  if (bhLatch) bhWant = Math.max(bhWant, Math.min(1, bhK + dt*0.5) + 0.05);
+  else if (!(SKY_ON && SKY_ON.d.final)) bhWant = 0;
   bhK += (bhWant - bhK) * Math.min(1, dt*(bhWant > bhK ? 3 : 1.2));
+  if (bhLatch && !promptCtx && !bhShown && bhK > 0.97){ bhShown = true; blackHolePrompt(); }
   { const k = bhK, g = 1 + k*k*11; blackHole.hole.scale.setScalar(g); blackHole.disk.scale.setScalar(1 + k*k*7); blackHole.halo.scale.set(20 + k*k*160, 20 + k*k*160, 1);
     $('bhVeil').style.opacity = String(Math.max(0, Math.min(1, (k - 0.55)/0.4))); }
   if (!space.world.visible) return;
@@ -6477,13 +6487,13 @@ function confirmReset(){
     go: 'Erase it all', onGo: () => resetAll(true), no: 'Go back', onNo: blackHolePrompt });
 }
 function returnToObservatory(){
-  SKY_ON = null; bhShown = false;
+  SKY_ON = null; bhShown = false; bhLatch = false;
   spawnAt(250, 881, Math.PI);                                      // at the foot of the hidden way, looking down the line
   toast('You are back at the observatory.');
 }
 // keepOutfit: through the black hole you keep the court's purple; leaving on the ship you go back to your own orange
 function resetAll(keepOutfit = true){ sfxQuiet(1500);
-  SKY_ON = null; bhShown = false; UNDER = false; ONSTATION = false; CAVE_DECK = null;
+  SKY_ON = null; bhShown = false; bhLatch = false; UNDER = false; ONSTATION = false; CAVE_DECK = null;
   if (!keepOutfit){ outfit = false; saveEnd(); }
   for (const T of TRANSPORT) T.open = false; savePortals();
   trialTimes = {}; try { localStorage.removeItem(TRIAL_KEY); } catch (e) {}
@@ -6803,7 +6813,7 @@ function poseSkier(h0, arrowTh){
   }
   const ease = x => x*x*(3 - 2*x);
   let crouch, leanDeg;
-  if (mode === 'tuck'){ crouch = 0.42; leanDeg = 62; }
+  if (mode === 'tuck'){ crouch = 0.42 + 0.06*tuckDeep; leanDeg = 62 + 8*tuckDeep; }
   else if (mode === 'plow'){ crouch = 0.14; leanDeg = 8; }
   else if (mode === 'classic'){ crouch = 0.1; leanDeg = 18; }
   else if (ld.both){ crouch = 0.04 + 0.04*ld.depth; leanDeg = 10 + 6*ld.depth; }          // double-pole load: tall
@@ -6992,10 +7002,11 @@ function draw(){
   // (and it holds that framing all along the Starway)
   { let want = (!SKY_ON && S.y > Z5.y0 + 10) || (SKY_ON && SKY_ON.d.final) ? 1 : 0;
     // the same low, upward-looking framing as you come up to the great landmarks: the crystal gate, the crown door,
-    // and the waiting ship at the space port
+    // the waiting ship at the space port, and the moose giant
     if (!SKY_ON){
       const near = (x, y, r0, r1) => smooth01(r0, r1, Math.hypot(S.x - x, S.y - y));
       if (!UNDER) want = Math.max(want, near(G4.x, divideY(G4.x), 70, 30));
+      if (!UNDER) want = Math.max(want, near(GIANT.x, GIANT.y, 85, 45));          // and the moose giant
       else if (!ONSTATION) want = Math.max(want, near(CROWN.fx - 6, CROWN.y, 55, 25));
       else want = Math.max(want, near(SHIP_SPOT.x, SHIP_SPOT.y, 34, 14));
     }
@@ -7180,7 +7191,7 @@ function drawPlayKeys(){
   ctx.globalAlpha = cl ? 1 : 0.35;
   ctx.strokeStyle = C.line; ctx.lineWidth = 3; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(x0, by); ctx.lineTo(x0 + bw, by); ctx.stroke();
-  const lv = (keySteer.e - keySteer.q) || mouseLean || touchLean;
+  const lv = (keySteer.e - keySteer.q) || mouseLean || touchLean || tiltLean;
   ctx.fillStyle = Math.abs(lv) > 0.05 ? C.down : C.muted;
   ctx.beginPath(); ctx.arc(cx + lv * bw/2, by, 5, 0, Math.PI*2); ctx.fill();
   ctx.globalAlpha = 1;
@@ -7555,7 +7566,7 @@ function hud(){
     const ld = loadState();
     $('pSub').textContent = mode === 'plow' ? 'Snow plow' : mode === 'tuck' ? 'Tuck' : (ld.leg || ld.both) ? 'Loading' : '';
   }
-  const lean = (keySteer.e - keySteer.q) || globalLean() || mouseLean || touchLean;
+  const lean = (keySteer.e - keySteer.q) || globalLean() || mouseLean || touchLean || tiltLean;
   $('arow').textContent = Math.abs(assistOff) < 0.3 ? '—' : (assistOff > 0 ? 'pulling right ' : 'pulling left ') + Math.abs(assistOff).toFixed(0) + '°';
   $('vrow').textContent = splayNow().toFixed(0) + '°';
   { const ld = loadState(); if (!mode && (ld.leg || ld.both)){ $('mode').textContent = ld.both ? 'Loading double pole' : 'Loading ' + (ld.leg === 'L' ? 'left' : 'right') + ' leg'; } else
@@ -8089,6 +8100,7 @@ function buildCaveDressing(){
         for (const sx of [-1, 1]){ const p = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 6.5, 8), post); p.position.set(sx*w, 3.25, 0); pg.add(p);
           const c = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), lite); c.position.set(sx*w, 6.7, 0); pg.add(c); lit.push(c); }
         const arch = new THREE.Mesh(new THREE.TorusGeometry(w, 0.12, 6, 24, Math.PI), lite); arch.position.set(0, 6.5, 0); pg.add(arch); lit.push(arch);
+        const gem = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), lite); gem.scale.set(0.3, 0.5, 0.12); gem.position.set(0, 6.5 + w + 0.55, 0); pg.add(gem); lit.push(gem);
         const pad = new THREE.Mesh(new THREE.CircleGeometry(w + 0.4, 24), new THREE.MeshBasicMaterial({ color: 0xa993d6, transparent: true, opacity: 0, depthWrite: false }));
         pad.rotation.x = -Math.PI/2; pad.position.y = 0.08; pg.add(pad);
         const r = pg.rotation.y; CAVE_SOLIDS.push({ x: d.X[i] - Math.cos(r)*w, y: d.Y[i] + Math.sin(r)*w, r: 0.4 }, { x: d.X[i] + Math.cos(r)*w, y: d.Y[i] - Math.sin(r)*w, r: 0.4 });
@@ -8354,7 +8366,7 @@ function updateCave(dt){
     for (const T of TRANSPORT) if (T.open) stWant = Math.max(stWant, 0.4*smooth01(40, 2, Math.hypot(S.x - PORTAL_X, S.y - T.y)));
   } else {
     const sm = mineS(S.x), lat = Math.abs(S.y - MINE.y);
-    if (sm > -36 && lat < 14) camWant = smooth01(-30, -4, sm);
+    if (sm > -36 && lat < 14 && !SKY_ON) camWant = smooth01(-30, -4, sm);   // (not from a light bridge passing high over the mine)
   }
   // through a transport room's portal (either way) the camera comes in close and low, as it does at the mine, so it
   // follows you through the doorway instead of looking over the wall
@@ -8518,12 +8530,13 @@ $('cpPass').addEventListener('keydown', e => { e.stopPropagation(); if (e.key ==
 let padUI = true; try { padUI = localStorage.getItem('skate-padui') !== 'off'; } catch (e) {}
 const applyPadUI = () => document.body.classList.toggle('nopadui', !padUI);
 applyPadUI();
-function setLabels(){ $('setMusicVol').value = music.vol; $('setFxVol').value = sfx.vol; $('setFx').querySelector('b').textContent = sfx.on ? 'on' : 'off';
+function setLabels(){ $('setTilt').querySelector('b').textContent = typeof tilt !== 'undefined' && tilt.on ? 'on' : 'off'; $('setMusicVol').value = music.vol; $('setFxVol').value = sfx.vol; $('setFx').querySelector('b').textContent = sfx.on ? 'on' : 'off';
   $('setMusicVol').parentNode.classList.toggle('off', !music.on); $('setFxVol').parentNode.classList.toggle('off', !sfx.on); $('setPixel').value = $('tPixel').value; $('setPixelOut').textContent = $('oPixel').textContent; $('setMusic').querySelector('b').textContent = $('musicBtn').getAttribute('aria-pressed') === 'false' ? 'off' : 'on'; $('setPads').querySelector('b').textContent = padUI ? 'on' : 'off'; }
 function openSettings(){ setLabels(); $('setMenu').hidden = false; promptCtx = promptCtx || { cp: true }; }
 function closeSettings(){ $('setMenu').hidden = true; if (promptCtx && promptCtx.cp) promptCtx = null; }
 $('gearBtn').addEventListener('click', openSettings);
 $('setClose').addEventListener('click', closeSettings);
+$('setMenu').addEventListener('click', e => { if (e.target === $('setMenu')) closeSettings(); });   // tapping outside the card closes it too
 $('setMusic').addEventListener('click', () => { $('musicBtn').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true })); setLabels(); });
 $('setPads').addEventListener('click', () => { padUI = !padUI; try { localStorage.setItem('skate-padui', padUI ? 'on' : 'off'); } catch (e) {} applyPadUI(); setLabels(); });
 $('setCp').addEventListener('click', () => { $('setMenu').hidden = true; openCpMenu(); });
@@ -8532,6 +8545,31 @@ $('setMusicVol').addEventListener('input', e => { music.setVolume(+e.target.valu
 $('setFxVol').addEventListener('input', e => { sfx.volume(+e.target.value); });
 $('setFxVol').addEventListener('change', () => sfx.step());
 $('setTut').addEventListener('click', () => { closeSettings(); tut.start(); });
+// tilt to lean: while you tuck, tipping the phone left or right leans that way, measured from how you held it when the
+// tuck began (a 3° dead zone, full lean at 20°). off by default; iOS asks for motion access when it's turned on.
+// (pages shown inside some viewers, like a sandboxed frame, never get motion events: then it says so and stays off)
+const tilt = { on: false, roll: null, base: null, heard: 0 };
+try { tilt.on = localStorage.getItem('skate-tilt') === 'on'; } catch(e){}
+function screenRoll(e){
+  const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  if (e.gamma === null || e.beta === null) return null;
+  return ang === 90 ? e.beta : (ang === -90 || ang === 270) ? -e.beta : ang === 180 ? -e.gamma : e.gamma;
+}
+addEventListener('deviceorientation', e => {
+  const r = screenRoll(e); if (r === null) return; tilt.roll = r; tilt.heard = performance.now();
+  if (!tilt.on || mode !== 'tuck'){ tilt.base = null; tiltLean = 0; return; }
+  if (tilt.base === null) tilt.base = r;
+  const d = r - tilt.base; tiltLean = Math.abs(d) < 3 ? 0 : Math.max(-1, Math.min(1, (d - Math.sign(d)*3)/17));
+});
+async function setTilt(on){
+  if (on && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
+    try { if (await DeviceOrientationEvent.requestPermission() !== 'granted'){ toast('Motion access was turned down, so tilt can\'t lean you.'); on = false; } } catch(e){ on = false; toast('Tilt isn\'t available here.'); }
+  }
+  tilt.on = on; tilt.base = null; tiltLean = 0; try { localStorage.setItem('skate-tilt', on ? 'on' : 'off'); } catch(e){}
+  setLabels();
+  if (on){ const t0 = performance.now(); setTimeout(() => { if (tilt.on && tilt.heard < t0){ toast('No motion data from this device or page, so tilt is off.'); tilt.on = false; try { localStorage.setItem('skate-tilt', 'off'); } catch(e){} setLabels(); } }, 1500); }
+}
+$('setTilt').addEventListener('click', () => setTilt(!tilt.on));
 for (const b of document.querySelectorAll('.setlist button')) b.addEventListener('click', () => { if (b.id !== 'setFx') sfx.tick(); });
 
 // ---- the tutorial (touch screens): one step at a time while you ski, each moving on once you've done it.
@@ -8541,8 +8579,12 @@ const tut = (() => {
   const pads = () => padUI ? 'pads' : 'sides';
   const STEPS = [
     { t: () => 'Tap ' + padName('L') + ' to push off', hl: ['padL'], kick: (l, st) => l === 'L' },
-    { t: () => 'Now ' + padName('R') + '. Keep alternating left and right to skate', hl: ['padL', 'padR'], need: 4, kick: (l, st) => { const ok = l !== st.last; st.last = l; return ok; }, init: st => { st.last = 'L'; } },
-    { t: () => 'To turn, tap the <b>same side twice</b>. Right turns left, left turns right', hl: ['padL', 'padR'], kick: () => !inClassic() && sideRun >= 2 },
+    // alternating: only the side to tap next glows, starting with the right, and it swaps after each correct tap
+    { t: () => '<b>Alternate</b> right and left to skate: tap whichever side glows', hl: ['padR'], need: 5,
+      kick: (l, st) => { if (l !== st.next) return false; st.next = l === 'L' ? 'R' : 'L'; light([st.next === 'L' ? 'padL' : 'padR']); return true; }, init: st => { st.next = 'R'; } },
+    // the kick turn: the first side you tap is the one that counts (the other stops glowing), five times
+    { t: () => 'To turn, tap the <b>same side</b> five times. Left turns you right, right turns you left', hl: ['padL', 'padR'], need: 5,
+      kick: (l, st) => { if (inClassic()) return false; if (!st.side){ st.side = l; light([l === 'L' ? 'padL' : 'padR']); } return l === st.side; } },
     { t: () => '<b>Swipe up</b> a ' + (padUI ? 'pad' : 'side') + ' for a stronger stroke', hl: ['padL', 'padR'], loaded: true },
     { t: () => 'Hold <b>both thumbs down</b> to tuck and go faster downhill. Let go to stand up', hl: ['padL', 'padR'], poll: st => { if (mode !== 'tuck'){ st.h = 0; return false; } st.h = st.h || performance.now(); return performance.now() - st.h > 500; } },
     { t: () => 'While tucking, slide both thumbs <b>left or right</b> to lean and steer', hl: ['padL', 'padR'], poll: st => { if (mode !== 'tuck' || Math.abs(touchLean) < 0.4){ st.h = 0; return false; } st.h = st.h || performance.now(); return performance.now() - st.h > 300; } },
@@ -8561,7 +8603,7 @@ const tut = (() => {
     $('tutGo').hidden = !S_.button; light(S_.hl || []);
   }
   function pass(){
-    const S_ = STEPS[i]; if (++n < (S_.need || 1)) return;
+    const S_ = STEPS[i]; if (++n < (S_.need || 1)){ $('tutN').textContent = (i + 1) + ' / ' + STEPS.length + ' · ' + n + ' of ' + S_.need; return; }
     doneAt = performance.now(); el.classList.add('done'); $('tutText').innerHTML = i === STEPS.length - 1 ? 'You\'re set. Settings has this again any time' : 'Nice!'; light([]); sfx.step();
   }
   function stop(){ i = -1; light([]); el.hidden = true; try { localStorage.setItem('skate-tut', 'done'); } catch(e){} }

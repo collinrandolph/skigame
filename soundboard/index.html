@@ -68,12 +68,12 @@ h2{font:600 15px var(--display);letter-spacing:.14em;text-transform:uppercase;co
 // length dur (s), delay (s). tone layer: wave, pitch sweep f0 -> f1, g, at, dur, delay.
 // beds loop under the game: g is the level at full speed (14 m/s), floor the level when barely moving.
 const SFX_DEF = {
-  kick:      { label: 'Kick swish', when: 'Every skate or classic kick, panned to the kicking ski. ×1.4 on a loaded stroke.', layers: [
+  kick:      { label: 'Kick swish', when: 'Every stroke of every style (skate kick, swipe, classic stride, double pole), always the same level; panned to the kicking ski.', layers: [
     { kind: 'noise', filter: 'bandpass', f0: 5200, f1: 4000, q: 0.9, hp: 3500, g: 0.07, at: 0.02, dur: 0.2 } ] },
-  pole:      { label: 'Pole plant', when: 'V2 (swipe) strokes, double poles and classic strides.', layers: [
+  pole:      { label: 'Pole plant', when: 'Not used at the moment (strokes all use the kick swish).', layers: [
     { kind: 'noise', filter: 'highpass', f0: 5000, f1: 5000, q: 0.7, g: 0.12, at: 0.002, dur: 0.05 },
     { kind: 'tone', wave: 'sine', f0: 190, f1: 90, g: 0.1, at: 0.003, dur: 0.07 } ] },
-  swipe:     { label: 'Swipe whoosh', when: 'A swipe up a pad upgrades the kick to a loaded stroke.', layers: [
+  swipe:     { label: 'Swipe whoosh', when: 'Not used at the moment (a swipe keeps the kick swish only).', layers: [
     { kind: 'noise', filter: 'bandpass', f0: 3600, f1: 6500, q: 1.2, hp: 3500, g: 0.09, at: 0.03, dur: 0.2 } ] },
   tick:      { label: 'UI tick', when: 'Settings buttons, tutorial Skip.', layers: [
     { kind: 'tone', wave: 'sine', f0: 1400, f1: 1200, g: 0.05, at: 0.002, dur: 0.04 } ] },

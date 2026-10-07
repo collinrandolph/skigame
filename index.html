@@ -1624,7 +1624,7 @@ function trailAssist(dt){
   if (P.assist <= 0){ assistTrail = null; return; }
   // hands off while you lean and for a moment after, and forget which trail you were on: you're steering yourself
   const now = performance.now();
-  if (lean || keySteer.q || keySteer.e || Math.abs(mouseLean) > 0.1){ assistQuietUntil = now + 800; assistTrail = null; return; }
+  if (lean || keySteer.q || keySteer.e || Math.abs(mouseLean) > 0.1 || touchLean){ assistQuietUntil = now + 800; assistTrail = null; return; }
   if (now < assistQuietUntil){ assistTrail = null; return; }
   const v = Math.hypot(S.vx, S.vy); if (v < 0.5) return;
   const twinSkate = P.scheme === 1 && !mode;
@@ -1792,6 +1792,7 @@ function doublePoleInput(){
 }
 // keyboard steering: Q leans/steers left, E right (classic and tuck)
 const keySteer = { q: 0, e: 0 };
+let touchLean = 0;   // phones: both thumbs slid left or right while tucking (-1..1)
 const classic = { pos: null, rest: 0, dp: false, downSince: 0, trigLast: null, at: 0 };
 // how far the stride's stance is still showing: held while a stick holds it, otherwise easing back to centre (weight
 // over both skis) about half a second after a kick
@@ -2402,15 +2403,17 @@ function dualMove(){
     const tuck = dual.act === 'tuck', pa = tuck ? ua : -ua, pb = tuck ? ub : -ub;   // how far along the current direction
     dual.ea = Math.max(dual.ea ?? pa, pa); dual.eb = Math.max(dual.eb ?? pb, pb);
     if (dual.ea - pa > T && dual.eb - pb > T){
-      if (tuck){ setSkateTuck(false); dual.act = 'plow'; setPlow(true, 'dual'); }
-      else { setPlow(false, 'dual'); dual.act = 'tuck'; setSkateTuck(true); }
+      if (tuck){ setSkateTuck(false); dual.act = 'plow'; setPlow(true, 'dual'); touchLean = 0; }
+      else { setPlow(false, 'dual'); dual.act = 'tuck'; setSkateTuck(true); dual.lx = (a.x + b.x)/2; }
       dual.ea = -pa; dual.eb = -pb;
     }
+    // while tucking, sliding both thumbs left or right leans that way (full lean at 60 px from where the tuck began)
+    if (dual.act === 'tuck'){ const d = (a.x + b.x)/2 - dual.lx; touchLean = Math.abs(d) < 6 ? 0 : Math.max(-1, Math.min(1, d/60)); }
     return;
   }
   if (!dual.act){
     const span = Math.abs(a.x - b.x);
-    if (ua > T && ub > T){ dual.act = 'tuck'; setSkateTuck(true); }
+    if (ua > T && ub > T){ dual.act = 'tuck'; setSkateTuck(true); dual.lx = (a.x + b.x)/2; }
     else if (ua < -T && ub < -T){ dual.act = 'plow'; setPlow(true, 'dual'); }
     else if (Math.abs(span - dual.s0) > 30 && Math.abs(ua) < T*1.5 && Math.abs(ub) < T*1.5){ dual.act = 'pinch'; dual.s0 = span; dual.c0 = P.camd; }
   }
@@ -2424,7 +2427,7 @@ function dualEnd(){
   if (!dual) return;
   if (dual.act === 'plow') setPlow(false, 'dual');
   if (dual.act === 'tuck') setSkateTuck(false);
-  dual = null;
+  dual = null; touchLean = 0;
 }
 function padSettle(t){ if (t.timer){ clearTimeout(t.timer); t.timer = null; } if (t.state !== 'done'){ t.state = 'done'; if (t.kicked){ armPending = false; armAt = performance.now(); } } }
 function padKick(leg, t){ padSettle(t); }
@@ -2758,7 +2761,7 @@ function step(dt){
   // (a lean carves on moving skis, so it fades out below about 10 km/h and does nothing standing still)
   mouseLean *= Math.exp(-dt * 2.5);                            // the mouse lean eases back to centre
   if (Math.abs(mouseLean) < 0.02) mouseLean = 0;
-  const ks = keySteer.e - keySteer.q, steer = ks || lean || mouseLean;   // Q/E, the stick, or the mouse
+  const ks = keySteer.e - keySteer.q, steer = ks || lean || mouseLean || touchLean;   // Q/E, the stick, or the mouse
   if ((mode === 'tuck' || mode === 'classic') && steer) S.tgt += steer * P.lean * Math.PI/180 * dt * Math.min(1, Math.hypot(S.vx, S.vy) / 3);
   if (mode !== 'tuck' && mode !== 'classic') lean = 0;
   // ease toward the kick's heading over the ski-set time; the total turn is exactly the step
@@ -7171,7 +7174,7 @@ function drawPlayKeys(){
   ctx.globalAlpha = cl ? 1 : 0.35;
   ctx.strokeStyle = C.line; ctx.lineWidth = 3; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(x0, by); ctx.lineTo(x0 + bw, by); ctx.stroke();
-  const lv = (keySteer.e - keySteer.q) || mouseLean;
+  const lv = (keySteer.e - keySteer.q) || mouseLean || touchLean;
   ctx.fillStyle = Math.abs(lv) > 0.05 ? C.down : C.muted;
   ctx.beginPath(); ctx.arc(cx + lv * bw/2, by, 5, 0, Math.PI*2); ctx.fill();
   ctx.globalAlpha = 1;
@@ -7546,7 +7549,7 @@ function hud(){
     const ld = loadState();
     $('pSub').textContent = mode === 'plow' ? 'Snow plow' : mode === 'tuck' ? 'Tuck' : (ld.leg || ld.both) ? 'Loading' : '';
   }
-  const lean = (keySteer.e - keySteer.q) || globalLean() || mouseLean;
+  const lean = (keySteer.e - keySteer.q) || globalLean() || mouseLean || touchLean;
   $('arow').textContent = Math.abs(assistOff) < 0.3 ? '—' : (assistOff > 0 ? 'pulling right ' : 'pulling left ') + Math.abs(assistOff).toFixed(0) + '°';
   $('vrow').textContent = splayNow().toFixed(0) + '°';
   { const ld = loadState(); if (!mode && (ld.leg || ld.both)){ $('mode').textContent = ld.both ? 'Loading double pole' : 'Loading ' + (ld.leg === 'L' ? 'left' : 'right') + ' leg'; } else

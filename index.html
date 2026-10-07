@@ -2546,11 +2546,11 @@ const music = (() => {
     volume(v){ fxVol = v; try { localStorage.setItem('skate-fxvol', v); } catch(e){} if (fxGain) fxGain.gain.setTargetAtTime(fGain(), ctx.currentTime, 0.05); },
     // a skating push: a light, airy swish of snow, panned to the kicking ski. high-passed and quiet: you hear it on
     // every kick, so it sits in the background
-    kick(leg, boost = 1){ if (!live()) return; hit({ dur: 0.2, f0: 3200, f1: 1800, q: 0.9, g: 0.07*Math.min(1.4, boost), pan: leg === 'L' ? -0.3 : 0.3, at: 0.02, hp: 1500 }); },
+    kick(leg, boost = 1){ if (!live()) return; hit({ dur: 0.2, f0: 4200, f1: 2800, q: 0.9, g: 0.07*Math.min(1.4, boost), pan: leg === 'L' ? -0.3 : 0.3, at: 0.02, hp: 2500 }); },
     // pole plant: a sharp tick on the snow with a little thump
     pole(){ if (!live()) return; hit({ dur: 0.05, f0: 5000, type: 'highpass', q: 0.7, g: 0.12, at: 0.002 }); tone({ f0: 190, f1: 90, dur: 0.07, g: 0.1, at: 0.003 }); },
     // a loaded stroke: the swish rides up
-    swipe(){ if (!live()) return; hit({ dur: 0.2, f0: 700, f1: 2600, q: 1.4, g: 0.12, at: 0.03 }); },
+    swipe(){ if (!live()) return; hit({ dur: 0.2, f0: 3600, f1: 6500, q: 1.2, g: 0.09, at: 0.03, hp: 3500 }); },
     tick(){ if (!live()) return; tone({ f0: 1400, f1: 1200, dur: 0.04, g: 0.05, at: 0.002 }); },
     step(){ if (!live()) return; tone({ f0: 880, dur: 0.12, g: 0.08 }); tone({ f0: 1318.5, dur: 0.22, g: 0.08, delay: 0.08 }); },
     promptOpen(){ if (!live()) return; tone({ f0: 587.3, dur: 0.16, g: 0.07, type: 'triangle' }); tone({ f0: 880, dur: 0.26, g: 0.07, type: 'triangle', delay: 0.07 }); },

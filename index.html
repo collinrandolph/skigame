@@ -34,7 +34,6 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 .legs{display:flex;gap:6px;margin-top:2px}
 .leg{flex:1;text-align:center;font-size:11px;padding:4px 0;border:1px solid var(--line);border-radius:4px;color:var(--muted);transition:background .12s,color .12s}
 .leg.on{background:var(--skier);color:#fff;border-color:var(--skier)}
-@media (pointer:coarse){.glide{display:none!important}}
 .glide{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
 .gbar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
 .gbar i{display:block;height:100%;width:0;background:var(--muted);opacity:.5}
@@ -2367,7 +2366,7 @@ addEventListener('blur', () => { held.L = held.R = false; });
 // rest of the held push grows to match). only the arms wait: they stay ready until it's clear whether this is a tap
 // (lifted, slid another way, or held still for "swipe wait" ms) or a swipe, then swing V1 or V2. a swipe counts once
 // it has travelled the swipe distance, or on lifting if it got at least halfway, as long as that's within 400 ms
-const padTouch = { L: null, R: null }, padGlideTok = { L: 0, R: 0 };
+const padTouch = { L: null, R: null };
 function padSettle(t){ if (t.timer){ clearTimeout(t.timer); t.timer = null; } if (t.state !== 'done'){ t.state = 'done'; if (t.kicked){ armPending = false; armAt = performance.now(); } } }
 function padKick(leg, t){ padSettle(t); }
 function padLoaded(leg, t){
@@ -2382,7 +2381,7 @@ function padLoaded(leg, t){
 for (const [id, leg] of [['padL','L'],['padR','R']]){
   const el = $(id);
   el.addEventListener('pointerdown', e => {
-    e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch(_){} el.classList.add('on'); anyInputAt = performance.now(); padGlideTok[leg]++;
+    e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch(_){} el.classList.add('on'); anyInputAt = performance.now();
     const old = padTouch[leg]; if (old) padKick(leg, old);
     const t = padTouch[leg] = { id: e.pointerId, x0: e.clientX, y0: e.clientY, state: 'wait', timer: null, t0: performance.now() };
     const before = lastKickAt; lastPush = null; kickInput(leg);
@@ -2409,10 +2408,7 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
       } else padKick(leg, t);
       padTouch[leg] = null;
     }
-    el.classList.remove('on','pull','armed');
-    // no glide to hold on a phone: lifting your finger keeps the kick's full push and glide going as if you'd held it
-    const tok = ++padGlideTok[leg], left = Math.max(P.gwin, P.klen) - (performance.now() - glideStart);
-    if (left > 0 && glideLeg === leg) setTimeout(() => { if (padGlideTok[leg] === tok && !padTouch[leg]) release(leg); }, left); else release(leg);
+    el.classList.remove('on','pull','armed'); release(leg);
   });
 }
 // snow plow on touch: press and hold anywhere on the scene above the pads; let go to stop. a second finger makes it a

@@ -2403,7 +2403,9 @@ function dualMove(){
   if (dual.act === 'plow' || dual.act === 'tuck'){
     const tuck = dual.act === 'tuck', pa = tuck ? ua : -ua, pb = tuck ? ub : -ub;   // how far along the current direction
     dual.ea = Math.max(dual.ea ?? pa, pa); dual.eb = Math.max(dual.eb ?? pb, pb);
-    if (dual.ea - pa > T && dual.eb - pb > T){
+    // leaving a tuck takes a much longer pull back (48 px) than leaving a plow (18 px): thumbs wander while you lean
+    const TS = tuck ? 48 : T;
+    if (dual.ea - pa > TS && dual.eb - pb > TS){
       if (tuck){ setSkateTuck(false); dual.act = 'plow'; setPlow(true, 'dual'); touchLean = 0; }
       else { setPlow(false, 'dual'); dual.act = 'tuck'; setSkateTuck(true); dual.lx = (a.x + b.x)/2; }
       dual.ea = -pa; dual.eb = -pb;

@@ -198,8 +198,9 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 .setvol input{margin:0 14px 12px;width:auto;accent-color:var(--skier);touch-action:pan-x}
 .setvol.off input{opacity:.35}
 /* the tutorial: a card just above the pads, with the thing to touch glowing; touches go straight through it */
-.tut{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--padh) + 14px);z-index:7;width:min(420px,calc(100vw - 32px));box-sizing:border-box;background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:10px;padding:12px 14px 10px;color:var(--ink);text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.16);pointer-events:none;transition:opacity .2s}
+.tut{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--padh) + 14px);z-index:21;width:min(420px,calc(100vw - 32px));box-sizing:border-box;background:var(--panel);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:10px;padding:12px 14px 10px;color:var(--ink);text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.16);pointer-events:none;transition:opacity .2s}
 .tut[hidden]{display:block;opacity:0;visibility:hidden}
+.tut.onmap{bottom:calc(env(safe-area-inset-bottom,0px) + 16px)}
 .tut p{margin:0 0 8px;font:600 17px/1.25 var(--display);letter-spacing:.02em}
 .tut p b{color:var(--skier)}
 .tut .tutfoot{display:flex;justify-content:space-between;align-items:center;font:500 11px var(--mono);color:var(--muted)}
@@ -208,7 +209,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 .tut.done p{color:var(--down)}
 .tuthl{animation:tutglow 1.1s ease-in-out infinite}
 @keyframes tutglow{0%,100%{box-shadow:inset 0 0 0 2px rgba(181,82,59,.25)}50%{box-shadow:inset 0 0 0 4px rgba(181,82,59,.85),inset 0 0 40px rgba(181,82,59,.25)}}
-.mtoggle.tuthl,.orbhud.tuthl{animation:tutglow2 1.1s ease-in-out infinite}
+.mtoggle.tuthl,.orbhud.tuthl,.mapbtn.tuthl{animation:tutglow2 1.1s ease-in-out infinite}
 @keyframes tutglow2{0%,100%{box-shadow:0 0 0 2px rgba(181,82,59,.25)}50%{box-shadow:0 0 0 5px rgba(181,82,59,.85)}}
 @media (pointer:coarse){
   .gearbtn{display:inline-flex;position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);left:16px;z-index:7;width:40px;height:40px;padding:0;align-items:center;justify-content:center;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(6px);box-sizing:border-box;touch-action:manipulation}
@@ -8540,7 +8541,10 @@ const tut = (() => {
     { t: () => '<b>Swipe up</b> a ' + (padUI ? 'pad' : 'side') + ' for a stronger stroke', hl: ['padL', 'padR'], loaded: true },
     { t: () => 'Put both thumbs down and <b>swipe both back</b> toward you to snow plow and slow down', hl: ['padL', 'padR'], poll: st => { if (mode !== 'plow'){ st.h = 0; return false; } st.h = st.h || performance.now(); return performance.now() - st.h > 400; } },
     { t: () => '<b>Swipe both forward</b> to tuck and go faster downhill. Let go to stand up', hl: ['padL', 'padR'], poll: st => { if (mode !== 'tuck'){ st.h = 0; return false; } st.h = st.h || performance.now(); return performance.now() - st.h > 400; } },
+    { t: () => 'While tucking, slide both thumbs <b>left or right</b> to lean and steer', hl: ['padL', 'padR'], poll: st => { if (mode !== 'tuck' || Math.abs(touchLean) < 0.4){ st.h = 0; return false; } st.h = st.h || performance.now(); return performance.now() - st.h > 300; } },
     { t: () => '<b>Spread or pinch</b> two fingers to bring the camera closer or further away', poll: st => Math.abs(P.camd - st.c0) >= 1, init: st => { st.c0 = P.camd; } },
+    { t: () => 'Tap the <b>map</b> button in the top right corner. Your goals are marked on it', hl: ['mapBtn'], poll: () => mapOpen },
+    { t: () => '<b>Red squares</b> are terminals waiting to start, yellow is running, green is done. Find the nearest red one: that\'s your first terminal. Then close the map', poll: () => !mapOpen },
     { t: () => 'The label at the top is your <b>goal</b>. Ski into a <b>terminal</b> to start it, then collect its orbs', hl: ['orbHud'], button: true },
   ];
   let i = -1, st = {}, n = 0, doneAt = 0, lit = [];
@@ -8569,7 +8573,7 @@ const tut = (() => {
     },
     update(dt){
       if (i < 0) return;
-      el.hidden = !!promptCtx;
+      el.hidden = !!promptCtx; el.classList.toggle('onmap', mapOpen);
       if (doneAt){ if (performance.now() - doneAt > (i === STEPS.length - 1 ? 2600 : 900)){ doneAt = 0; if (++i >= STEPS.length) stop(); else show(); } return; }
       const S_ = STEPS[i]; if (S_.poll && !promptCtx && S_.poll(st, dt)) pass();
     }

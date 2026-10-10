@@ -6214,7 +6214,7 @@ function updateCourt(dt){
   const waitAt = A => {
     if (nextK >= DIAMONDS || eldersIn()) return [A.hx, A.hy];
     const [ex, ey] = diamondPos(CALF_D[nextK]), ox = (ex - RING6.x)/RING6.r, oy = (ey - RING6.y)/RING6.r;
-    return [ex + ox*3.2 - oy*1.7*A.side, ey + oy*3.2 + ox*1.7*A.side];
+    return [ex + ox*3.2 + oy*1.7*A.side, ey + oy*3.2 - ox*1.7*A.side];   // (each on the side of the calf it dresses from, so they never cross)
   };
   if (!attendPlaced){ attendPlaced = true; for (const A of ATTEND) if (!A.task && !A.conga){ [A.x, A.y] = waitAt(A); } }
   for (const A of ATTEND){

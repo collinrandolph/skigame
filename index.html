@@ -6549,7 +6549,7 @@ function updateParty(dt){
 // the cosmic moose: six of them, translucent and faintly shifting in colour, standing still out in space, three
 // either side of the planet, spread across the sky like a fan and all facing the ring. each stands well apart from
 // the next (about 24 degrees apart as seen from the ring) so they read as six separate figures
-let cosK = 0;
+let cosK = 0, cosZ5 = 0;
 function updateCosmic(dt){
   const P = PARTY;
   cosK += (((ceremony >= 2 && eldersIn()) || P.on ? 1 : 0) - cosK)*Math.min(1, dt*0.4);
@@ -6566,13 +6566,17 @@ function updateCosmic(dt){
       return { rig, mat, ph: i*1.3 };
     });
   }
-  const show = space.world.visible && cosK > 0.01 && !insidePlanet, now = performance.now()/1000;
+  // (only in zone 5 itself or up the Starway, and only once the sky there has turned to space: against the daytime
+  // sky their added light would show as white shapes)
+  const inZ5 = (!SKY_ON && S.y > Z5.y0 + 10) || !!(SKY_ON && SKY_ON.d.final), skyK = smooth01(0.85, 1, space.k);
+  cosZ5 += ((inZ5 ? 1 : 0) - cosZ5)*Math.min(1, dt*0.8);
+  const show = space.world.visible && cosK > 0.01 && cosZ5 > 0.01 && skyK > 0.01 && !insidePlanet, now = performance.now()/1000;
   for (const M of P.cosmic){
     M.rig.root.visible = show; if (!show) continue;
     const r = M.rig;
     r.head.rotation.x = 0.04*Math.sin(now*0.25 + M.ph); r.head.rotation.y = 0.06*Math.sin(now*0.17 + M.ph);
     for (const T of r.tentacles) T.segs.forEach((g, k) => { g.rotation.x = 0.12 + 0.15*Math.sin(now*0.5 + T.phase + k*0.7); g.rotation.z = 0.12*Math.sin(now*0.4 + T.phase + k*0.5); });
-    M.mat.opacity = 0.24*cosK*space.k;
+    M.mat.opacity = 0.24*cosK*skyK*cosZ5;
     M.mat.color.setHSL((0.72 + 0.08*Math.sin(now*0.15 + M.ph)) % 1, 0.7, 0.72);
   }
 }

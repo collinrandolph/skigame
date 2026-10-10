@@ -5809,7 +5809,7 @@ const skyPortals = SKY.nodes.filter(n => n.ground).map(n => {
     const c = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), lite); c.position.set(sx*(SKY_W/2 + 0.6), 6.7, 0); g.add(c); lit.push(c); }
   const arch = new THREE.Mesh(new THREE.TorusGeometry(SKY_W/2 + 0.6, 0.12, 6, 24, Math.PI), lite); arch.position.set(0, 6.5, 0); g.add(arch); lit.push(arch);
   const gem = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), lite); gem.scale.set(0.3, 0.5, 0.12); gem.position.set(0, 6.5 + SKY_W/2 + 0.6 + 0.55, 0); g.add(gem); lit.push(gem);   // a small diamond at the crown of the arch
-  const pad = new THREE.Mesh(portalArrowGeo(n.decks.some(q => q.loop), SKY_W/2 + 1), new THREE.MeshBasicMaterial({ color: 0xa993d6, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+  const pad = new THREE.Mesh(portalArrowGeo(n.decks.some(q => q.loop && q.A === n), SKY_W/2 + 1), new THREE.MeshBasicMaterial({ color: 0xa993d6, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
   pad.rotation.x = -Math.PI/2; pad.position.y = 0.06; g.add(pad);
   SOLIDS.push({ x: n.x - Math.cos(g.rotation.y)*(SKY_W/2 + 0.6), y: n.y + Math.sin(g.rotation.y)*(SKY_W/2 + 0.6), r: 0.4 });
   SOLIDS.push({ x: n.x + Math.cos(g.rotation.y)*(SKY_W/2 + 0.6), y: n.y - Math.sin(g.rotation.y)*(SKY_W/2 + 0.6), r: 0.4 });

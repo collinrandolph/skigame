@@ -1,6 +1,6 @@
 # Skate Ski
 
-**Version 1.0** is tagged `v1.0` in git, and a frozen copy lives in `v1/` (play it from `v1/index.html`). Work on 2.0, a rebuilt underground, continues in `index.html`.
+**Version 1.0** is tagged `v1.0` in git, and a frozen copy lives in `v1/` (play it from `v1/index.html`). 2.0, a rebuilt underground, is in `index.html`.
 
 A cross-country skiing game prototype that runs in the browser, built with three.js. You don't hold a key to accelerate. You ski the way you would on snow: shifting your weight from ski to ski, and timing your kicks and pole pushes.
 
@@ -145,64 +145,35 @@ The map is four times its old area and split into zones, each locked until you c
 - `cave/index.html` now just forwards to the game (the underground was built there as a sandbox, and has been merged in).
 - `prototypes/top-down-2d.html` is the earlier top-down canvas version.
 
-## The underground and the space station
+## The underground and the space station (2.0)
 
-The underground was built in a sandbox copy of the game and is now merged into it, west of the map. Its 3D models and lighting are still placeholders to be refined.
+2.0 replaces 1.0's whole underground except the crown room. Its 3D models and lighting are still placeholders to be refined.
 
-- **The miners' things:** across the ungroomed floor of every room (thickest round the transport rooms) lie the mine's leavings, all solid except the lamps. The mine has been worked out: there are no crystals anywhere underground except in the crown room (its pillar, the clusters round it and on its walls, and the 30 on the spiral) and on the crown door's columns. They never sit on a course, under a bridge, in the street's building rows or in the crown room:
-  - drill rigs, empty ore carts, and empty conveyor sections;
-  - crate stacks, barrels and cable reels;
-  - prefab huts and compressors;
-  - lamp posts and striped barriers.
-- **Seen from the surface:** the cave is drawn only round the mine's entrance (so you can see into the tunnel), and then only its parts near the entrance. Anywhere else on the surface, its rooms and roofs (under and beyond the map's edge) are hidden. Past each wall, the cave's floor and roof surfaces part by at most a few metres. They used to keep climbing, which left spikes up to 240 m tall poking through the ground near the mine.
-- **Lights:** the cave has a couple of dozen light spots, but only a fixed pool of six real lights. The crown room keeps just two gentle ones (its pillar, lanterns and crystals glow on their own). Each frame they take the places of the nearest spots, which keeps every graphics card responsive (the crown room used to freeze some).
-- **Landmark camera:** coming up to the crystal gate, the crown door or the cargo bin at the space port, the camera eases into zone 5's low, upward-looking framing.
-
-- **The mine:** a rocky ridge on the empty west side of zone 3, reached by the green **Mine Road** from the Watcher Climb. A cut leads into its east face, to a timber portal. The cut's floor has exactly the tunnel's cross-section where they meet, so you ski straight through the portal and underground, with no loading or teleport.
-- **The mine shaft:** a horseshoe tunnel (about 8 m wide, 5.6 m high, steel arches and lamps). It winds down under the ridge (up to about 18%), then runs west under the map's west mountains and straight through the gap in the village loop to the hub, about 540 m in all. It never touches the ring.
-- **Layout (west of the map):** the hub is the high point, with five spoke rooms round it. The village loop, the low point, wanders round everything except the east, where the shaft comes in. Every room except the crown room has a hall to the hub and another to the ring, and the halls run smoothly between the heights of the rooms at their two ends.
-- **The three skills parks:** each drops about 28 m from its hub end to its ring end. They use the normal snow physics (the earlier icy, low-friction snow is gone), so only the slope sets your speed.
-  - **Roller Coaster:** big rollers down the descent.
-  - **Berm Run:** a slalom line on a level trail, with a raised berm beside it on the outside of every turn (rising from about 2 m off the line, highest at the apex) to carry you round.
-  - **Half-pipe Chute:** a deep trough down the descent to weave up and down.
-  - There are no jumps or drops anywhere.
-- **Lift & Slalom:** a magic carpet up one side, and a slalom down the other with red and blue gates on a weaving line, a turn every 18 m.
-- **Magic carpets:** every skills park has one up its side, from the village loop to the hub (about 200 m and a 36 m climb), in its own tall tunnels at each end. Each is a light bridge like the others: a portal at each end, getting on only through a portal heading in, a deck of light that shows only while you ride it, railings of light, and a climb that costs no speed. The carpets are always open.
-  - **The grade:** it's even, about 22–27%, with gentle changes. It starts and finishes level at the portals and never dips. It's the lowest steady climb that clears the floor everywhere, so where the floor drops away it floats on pylons.
-  - **Tested:** all four ride end to end in both directions.
-- **The crown room:** a tall round room (46 m across, 72 m to the roof) that opens only onto the village loop. Its **crown door** stands right on the street's inner edge, in a stone facade flush with the dwellings on either side and running from the floor up into the roof. The door is a floor-to-ceiling slab of dark violet stone, 13 m wide and 24 m tall, with gold edging and a great gold crown on it. In front of the facade are observatory-style columns capped with glowing crystal: a tall pair flanking the door under a great arch with a crystal keystone, and smaller arches over dark recesses to either side. Lights wash the facade. Behind the door is a grand hall about 14 m wide and 27 m high.
-  - **Opening:** the door is sealed (you're told so if you come close) unless you're wearing the purple reward outfit. Ski up to it in the outfit and it sinks into the floor. It seals again once you've taken the outfit off and gone.
-  - **Inside:** at the centre stands an enormous glowing crystal pillar rising from the floor into the roof, with crystals clustered round its foot. Round it, a stone path (the **Crystal Spiral**) winds up through 2¾ turns, widening as it climbs like the black hole's funnel in reverse. It's walled both sides and lit by lanterns, and climbs about 40 m at roughly 9%. You get on at its foot (a short straight lead-in heading north) and it carries on up. The top is a closed lookout high under the roof, so you come back down the way you went up.
-  - **The 30 crown crystals:** they're spaced evenly up the spiral, and you pick one up by skiing through it. While you're in the room, the HUD shows **n / 30 Crown crystals**. They're saved in your browser.
-- **The village loop (cave city):** a long, organic cavern (like the mountain range round zone 1), about 50 m wide with a 38 m roof. It's lined on both walls with abandoned adobe dwellings in terraced rows, three deep and climbing the walls, with doorways and windows facing the street. Its two ends, either side of the shaft, come into the transport rooms. It has two skiable levels:
-  - **The street:** straight and level down the middle, between the first rows of buildings (the Village Loop course).
-  - **The terraces:** two light bridges, the North Terrace and the South Terrace (about 550 m each), 7.5 m up. Each runs along the first row of buildings and winds from wall to wall over the street. Each has on and off ramps at every skills park entrance:
-    - **End ramps:** one at each end. The Roller Coaster / Half-pipe end rises along the outer side, clear of that park's carpet; the crown-room end runs along the inner side.
-    - **Off-ramps:** two in the middle by the Lift & Slalom (south) or Berm Run (north) entrance, forking off the terrace, one for each direction.
-    - **Junctions:** at a junction you ride whichever deck you steer onto, and the deck you can carry on to shows as you come up to it. They follow the same rules as the light bridges up top:
-    - **Portals:** each ramp's foot has a portal, two white posts that gain caps of light and an arch once the bridges are lit. That happens when the Crystal Gate opens, or with the **Energy bridges on** testing switch.
-    - **Getting on and off:** you get on only through a portal, heading in along the ramp (within about 55°), never backwards or over the side. You come off at the far foot, and that portal ignores you until you've skied 10 m clear of it.
-    - **The deck:** it shows only while you're riding it, fading in as you get on and out as you leave. White pylons hold it up over open floor, though never in the middle of the street.
-    - **Clearance:** any dwelling whose footprint comes under a bridge is cut down to sit beneath it, so nothing pokes through the deck.
-    - **Riding:** railings of light hold you and a climb costs no speed. Street skiers ski under the bridges.
-
-    Tested: both bridges ride end to end in both directions, and a side approach doesn't board.
-- **Transport rooms and portals:** each has two generators and a steel wall across its east end, with a doorway. Each portal (north and south) opens like a gate:
-  - **Controls:** a post stands beside the doorway on each side, one in the transport room and one on the station by the portal arm. Each has five lights, one per zone 3 terminal (red, then green once powered), and an antenna light that turns green once the portal is open.
-  - **Label:** "NORTH PORTAL · 3 / 5 TERMINALS", or "OPEN".
-  - **Opening:** ski up to either post. If zone 3's terminals aren't all powered, it tells you how many are. Once they are, the portal opens: the dark membrane starts to glow and you ski straight through.
-  - **Saving:** open portals are saved.
-  - The terminals also bring up the cave's lamps and lights, which are dim until then.
-- **The space station:** built from the concept art (models and lighting still to be refined). There's a domed hub with a band of light and a spire, and a 9 m metal walkway ring round it. A raised deck runs round the hub's outside, 8 m up, reached by a spiral ramp that leaves the walkway and arrives on the deck centred on each, level wherever it overlaps them. Eight dock arms each have a walkway on both sides of a docked ship, joined in a loop round the ship's nose so each dock is a loop out and back; the ship waiting for crystals is bigger, at the east dock. Every deck has depth (steel sides and underside), the walkways are trimmed to meet the round walkway cleanly, and the railings break wherever another deck joins. Two portal arms run out to the two portals, each framed by a ring. Far below is the ice planet you ski on, with snowfields, frozen seas and cloud, and a blue rim of atmosphere. The decks are metal plates with light strips, all railed, and glide like groomed trail. The cave and station form a figure eight. The station is a world of its own: from the cave you see it only through the two doorways, and from the station you see only space, the planet and, through the doorways, the cave. So it can sit on the entrance side, overlapping the shaft and the map on the map, without either showing from the other.
-- **Underground:** below ground, the floor, walls and trails are the cave's own, and the surface (its buildings, people and trails) doesn't count. The light and fog fade from daylight to the cave's dark violet over the first 25 m of the shaft. The camera comes in close and low in the halls and never goes through a wall or the roof.
-- **How it's built:** each room is a chain of overlapping circles and each hall a tunnel along a centre line. Every shape gives its own floor (curving up into its walls) and roof (curving down to meet them); the cave's floor is the lowest of them and its roof the highest, so halls cut cleanly through room walls. A 16 m lookup grid means each point only checks the shapes near it. The floor and roof are built in tiles that stream in round you like the surface's, with the same snow and groomed-trail texturing. Where the shaft meets the ridge's face, the surface ground isn't drawn inside the tunnel's outline, so you see into the mine. Near a portal the view is drawn in two passes: the far world first, masked to the doorways and clipped to its own side of the portals' wall, then this side over it (with the doorways' true depth laid down first, so nothing from the far world shows through this side's floor). Your ski tracks belong to the cave only. Within about 30 m of a powered doorway the camera comes in close behind you, as at the mine's entrance, and it never swings round through the wall, so you look through the doorway rather than over it.
-- **Map:** the cave's floor plan and the station's decks show as a faint fill with their courses dashed; underground, the corner map switches to the cave.
-- **Testing:** **Cave: the mine**, **Cave: the hub**, **Cave: the station** and **Cave: the crown door** in dev view's Testing group. **Reward outfit (opens the crown door): on/off** is the outfit toggle, and **Reset crown crystals** puts the 30 crystals back. **Checkpoint: village loop** and **Checkpoint: station** set your checkpoint there (kept between visits, so the page starts you there) and put you there. The **Zone 3 terminals powered** slider (max) powers the generators and opens the portals.
+- **The mine's gate:** the timber portal on the mine's ridge now has a barred steel gate. It stays shut (you're told so if you come close) until all of zone 3's terminals are powered, then its two halves slide back into the ridge. The label over the portal reads "THE MINE · 2 / 3 TERMINALS" (however many are powered), then "OPEN".
+- **The mine shaft:** from the portal it winds down under the ridge at a steady grade to Plateau 1.
+- **Layout:** three hills step down between four plateaus, each hill dropping 70 m (about 21%, like 1.0's skills parks), so runs come out at 20–27 km/h:
+  - **Plateau 1:** where the shaft comes in, with the miners' camps and a few aliens.
+  - **Hill 1:** down from Plateau 1 to Plateau 2. Its west half is a slalom with gates, its east half a plain descent.
+  - **Plateau 2:** has two levels. The lower one is the foot of Hill 1 and the top of Hill 2. The upper level, behind a sheer step, holds the crown room. Only the **Crown Ramp** (a light bridge, always on) climbs the step, straight to the crown door.
+  - **Hill 2:** big rollers down the middle, with a berm path weaving down beside them.
+  - **Plateau 3:** at its foot, with the village's houses and ruins.
+  - **Hill 3:** a half-pipe.
+  - **The Basement:** at the bottom, with the haul trucks and the teleporter.
+- **The crown room:** unchanged from 1.0 (the spiral, the 30 crown crystals and the giant crystal), moved to Plateau 2's upper level. The door still opens only for the reward outfit.
+- **The teleporter (Basement → station):** a steel wall with a massive ring and its generators. Its control post opens it once zone 3's terminals are powered, and you ski straight through onto the station.
+- **The far teleporter (station → surface):** a new arm off the far side of the station ends in a ring inside a short steel passage, 14 m straight, a 90° bend, then 14 m to its mouth. An identical passage is dug into the hillside beside the mine's entrance, angled away from it so it doesn't compete with the mine, and close enough for repeat runs. Partway along the straight, out of sight of either mouth, you're carried from one copy to the other with the same position, heading and speed.
+  - **Unlocking:** the surface ring is dark at first ("TELEPORTER · DARK"), and it tells you it can only be woken from the far side. Ride the far teleporter out from the station once and it wakes for good ("TELEPORTER · TO THE STATION"). Then skiing into it from the surface takes you back onto the station. This is saved in your browser.
+  - Trees, boulders and outcrops are kept out of the passage's cut.
+- **Map:** the big map shows the cave's floor plan and courses (or, while you're on the station, the station's instead, since the two overlap), and the passage beside the mine (purple once it's awake). Underground, the corner map zooms to the cave.
+- **Checkpoints:** **Zone 3** starts you at the mine's (now open) gate, **Crown room** on Plateau 2 lined up with the Crown Ramp, and **Space port** by the Basement teleporter.
+- **Unchanged from 1.0:** the station (a world of its own, seen only through the teleporter's doorway), the portal rendering, the camera rules underground and the ship's cargo bin.
+- **Testing:** **Cave: the mine**, **Cave: Plateau 1**, **Cave: the station** and **Cave: the crown door** in dev view's Testing group. **Checkpoint: Plateau 2** and **Checkpoint: station** set your checkpoint there.
+- **Coming next (story):** the crystal altar triggered from the cave, and the giant's loop ramp kept straight under the giant until it clears his legs.
 
 ### End game
 
 - **The ceremony:** bring 3 calves to the observatory. Once the elders have taken their places in the ring and you're near it, the two attendants in white walk over, stand either side of you with their arms raised, and dress you in the court's purple (the reward outfit). An altar like zone 3's, but larger, then rises from the snow in the middle of the ring and asks for 30 purple crystals to complete the ceremony. The Starway stays dark until then.
-- **The crown room:** the purple outfit opens the crown door in the village loop, and the 30 crown crystals are up the spiral inside. You carry them until you spend them.
+- **The crown room:** the purple outfit opens the crown door on Plateau 2's upper level, and the 30 crown crystals are up the spiral inside. You carry them until you spend them.
 - **Spending the 30, one of two ways:**
   - **At the altar:** offer them to complete the ceremony. The altar sinks away, the cosmic moose appear out in space (you no longer need every calf for them) and the Starway lights.
   - **On the ship:** the ship waits at the station's big east dock (Dock 1), its engines glowing red, with a crowd of crew along the dock. Its cargo bin stands on a bracket off the main walkway's outer edge at Dock 1, right behind the ship's engines: open, glowing purple inside, the court's gold diamond on its sides, with a column of light above it. Ski the main walkway past the bin and the crew ask for the crystals: the old mine is stripped bare and the new one is still being dug, so they're stranded. Give them the crystals and leave the planet, and everything begins again in your own orange. Or stay on the station. Once you've given the crystals to the court, the crew are still stranded.
@@ -220,4 +191,4 @@ The underground was built in a sandbox copy of the game and is now merged into i
 
 ### Story notes (not built yet)
 
-- In the village loop: abandoned villages inspired by the Mesa Verde cliff dwellings, set in alcoves up the ring's tall outer wall, with broken pottery and artifacts around, and evidence of strip mining (stepped benches cut into the walls, abandoned equipment).
+- Underground: abandoned villages inspired by the Mesa Verde cliff dwellings, set in alcoves up the ring's tall outer wall, with broken pottery and artifacts around, and evidence of strip mining (stepped benches cut into the walls, abandoned equipment).

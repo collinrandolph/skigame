@@ -394,7 +394,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <div class="btns"><button id="copySet" type="button">Copy settings</button><button id="defSet" type="button">Restore defaults</button></div>
     <p class="note" id="setNote">Your slider changes are kept in this browser.</p>
     <h4>Testing</h4>
-    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button><button id="arrowBtn" type="button">Heading arrow: off</button><button id="cpAltar" type="button">Checkpoint: altar</button><button id="cpZ5" type="button">Checkpoint: zone 5</button><button id="caveMouth" type="button">Cave: the mine</button><button id="caveHall" type="button">Cave: the hub</button><button id="caveStation" type="button">Cave: the station</button><button id="caveCrown" type="button">Cave: the crown door</button><button id="caveRegalia" type="button">Reward outfit: off</button><button id="crownReset" type="button">Reset crown crystals</button><button id="ceremonyBtn" type="button">Ceremony: not yet</button><button id="cpRing" type="button">Checkpoint: village loop</button><button id="cpStation" type="button">Checkpoint: station</button></div>
+    <div class="btns"><button id="reset" type="button">Reset skier</button><button id="tracks" type="button">Tracks: on</button><button id="arrowBtn" type="button">Heading arrow: off</button><button id="cpAltar" type="button">Checkpoint: altar</button><button id="cpZ5" type="button">Checkpoint: zone 5</button><button id="caveMouth" type="button">Cave: the mine</button><button id="caveHall" type="button">Cave: Plateau 1</button><button id="caveStation" type="button">Cave: the station</button><button id="caveCrown" type="button">Cave: the crown door</button><button id="caveRegalia" type="button">Reward outfit: off</button><button id="crownReset" type="button">Reset crown crystals</button><button id="ceremonyBtn" type="button">Ceremony: not yet</button><button id="cpRing" type="button">Checkpoint: Plateau 2</button><button id="cpStation" type="button">Checkpoint: station</button></div>
     <label for="tOrb1">Zone 1 terminals powered<output id="oOrb1"></output><input id="tOrb1" type="range" min="0" max="2" step="1" value="0"></label>
     <label for="tOrb2">Zone 2 terminals powered<output id="oOrb2"></output><input id="tOrb2" type="range" min="0" max="3" step="1" value="0"></label>
     <label for="tOrb3">Zone 3 terminals powered<output id="oOrb3"></output><input id="tOrb3" type="range" min="0" max="3" step="1" value="0"></label>
@@ -516,6 +516,8 @@ let padBusy = false;                                           // centre of zone
 // cross-section: a flat floor 2 x flat wide, walls rising over wallW to edgeH, where they meet a roof H high at the middle
 const MINE = { x: -24, y: 296, F0: 4, hw: 4.2, flat: 2.6, wallW: 1.6, edgeH: 3.8, H: 5.6,
   ridge: [[-30, 295], [-50, 286], [-56, 262], [-52, 240], [-64, 224]], ridgeR: 30, ridgeH: 11 };
+// the mine's gate: barred, until zone 3's terminals power it; then its two halves slide back into the ridge (k: 0 shut, 1 open)
+const MINE_GATE = { k: 0, hint: -1e9, mesh: null };
 // ---- the teleporter vestibule (see the far teleporter, with the station): its shape and frames
 // the vestibule's centre line in its own frame: u out from the ring, v across. 14 m straight, a 90° bend (so the mouth
 // can't be seen from the straight, where the switch happens), 14 m to its mouth
@@ -826,6 +828,7 @@ function obstacleSD0(x, y, terrainOnly = false){
   // the mine's portal: the face of the ridge either side of the way in (the way in itself takes you underground)
   { const sm = mineS(x), lat = Math.abs(y - MINE.y); d = Math.min(d, Math.max(-sm, sm - 3, 4.0 - lat, lat - 16)); }
   if (terrainOnly) return d;
+  if (MINE_GATE.k < 0.85){ const sm = mineS(x), lat = Math.abs(y - MINE.y); d = Math.min(d, Math.max(0.3 - sm, sm - 4, lat - MINE.hw - 0.4)); }   /* (solid all the way back, so nothing slips through) */
   // buildings and equipment
   for (const o of SOLIDS){ const q = o.foot ? footSD(o.foot, x, y) : Math.hypot(x - o.x, y - o.y) - o.r; if (q < d) d = q; }
   for (const m of MOOSE){ const q = Math.hypot(x - m.x, y - m.y) - 1.4; if (q < d) d = q; }
@@ -1346,13 +1349,19 @@ function caveStep(px, py, dt){
   if (!UNDER && !TPC_OPEN){ const [u, v] = vLocal(VFR.surf, S.x, S.y), [dc, sv] = vProj(u, v); if (dc < VEST.hw && sv < 6 && performance.now() - vest.hint > 15000){ vest.hint = performance.now(); toast('This teleporter is dark. It can only be woken from the far side, out at the space station.'); } }
   if (!ONSTATION){
     const sm = mineS(S.x), sPrev = mineS(px), inWay = Math.abs(S.y - MINE.y) < MINE.hw;
-    if (!UNDER && sPrev <= 0 && sm > 0 && inWay && !SKY_ON) UNDER = true;   // (a light bridge overhead doesn't take you in)
+    if (!UNDER && sPrev <= 0 && sm > 0 && inWay && !SKY_ON && MINE_GATE.k >= 0.85) UNDER = true;   // (a light bridge overhead doesn't take you in)
     else if (UNDER && sm <= 0) UNDER = false;
   }
   if (UNDER && !ONSTATION && px <= PORTAL_X && S.x > PORTAL_X && TRANSPORT.some(T => T.open && Math.abs(S.y - T.y) < PORTAL_HW)) ONSTATION = true;
   else if (ONSTATION && S.x <= PORTAL_X) ONSTATION = false;
   caveDeckStep();
   vestStep();
+  { // the mine's gate opens with zone 3's power (at once if you're far off, as after a checkpoint)
+    const G = MINE_GATE, want = cavePowered() ? 1 : 0, far = Math.hypot(S.x - MINE.x, S.y - MINE.y);
+    G.k = far > 90 ? want : G.k + Math.sign(want - G.k)*Math.min(Math.abs(want - G.k), dt*0.35);
+    if (G.mesh){ G.mesh[0].position.z = -G.k*4.4; G.mesh[1].position.z = G.k*4.4; }
+    if (!UNDER && !want && far < 12 && performance.now() - G.hint > 15000){ G.hint = performance.now(); toast("The mine's gate is shut. It runs on power from zone 3's terminals."); }
+  }
   // the crown door sinks away for you once you come up to it in the reward outfit (and seals again behind you if you
   // take it off and leave)
   if (UNDER && !ONSTATION){
@@ -6073,7 +6082,7 @@ const YOU = { h: { get x(){ return S.x; }, get y(){ return S.y; }, get th(){ ret
 function obsAltarPrompt(){
   const n = crownCarried();
   if (n >= CROWN.n) return { title: 'The altar', body: 'The altar asks for 30 purple crystals to complete the ceremony. Offer the 30 you carry?', go: 'Offer them', onGo: completeCeremony, no: 'Not yet' };
-  return { title: 'The altar', body: 'The altar asks for 30 purple crystals to complete the ceremony (' + n + ' of 30). Wearing the court\'s purple, you can open the crown door in the mine\'s village loop.' };
+  return { title: 'The altar', body: 'The altar asks for 30 purple crystals to complete the ceremony (' + n + ' of 30). Wearing the court\'s purple, you can open the crown door on the upper level of Plateau 2, deep in the mine.' };
 }
 function completeCeremony(){
   crownSpent = 'altar'; saveCrown(); ceremony = 2; saveEnd(); calfUI(); music.chime(1, true);
@@ -7175,7 +7184,12 @@ function draw(){
   {
     const d = Math.hypot(MINE.x - S.x, MINE.y - S.y);
     const p = d < 140 && project(MINE.x, MINE.y, MINE.F0 + 8.2);
-    if (p){ ctx.globalAlpha = Math.min(1, (140 - d) / 40); ctx.fillStyle = C.ink; ctx.fillText('THE MINE', p[0], p[1]); }
+    if (p){ ctx.globalAlpha = Math.min(1, (140 - d) / 40); ctx.fillStyle = cavePowered() ? C.orb : C.ink; ctx.fillText('THE MINE · ' + (cavePowered() ? 'OPEN' : kiosksPowered(3) + ' / ' + KIOSK_COUNT[3] + ' TERMINALS'), p[0], p[1]); }
+  }
+  { // the teleporter beside it: dark until it's woken from the station's side
+    const m = vWorld(VFR.surf, ...VEST.pts[VEST.pts.length - 1]), d = Math.hypot(m[0] - S.x, m[1] - S.y);
+    const p = !UNDER && d < 110 && project(m[0], m[1], VFR.surf.h + 11.5);
+    if (p){ ctx.globalAlpha = Math.min(1, (110 - d) / 40); ctx.fillStyle = TPC_OPEN ? '#8e7cb0' : C.ink; ctx.fillText('TELEPORTER · ' + (TPC_OPEN ? 'TO THE STATION' : 'DARK'), p[0], p[1]); }
   }
   }
   // the portals' labels, like the gates': open, or how many of zone 3's terminals are powered
@@ -7443,8 +7457,12 @@ function renderMapLayers(g, MAP, mx, my, mw, mh, sc){
   // the mine and the cavern underneath: its floor plan as a faint fill, and its courses dashed
   { const M = caveMask(); g.save(); g.imageSmoothingEnabled = true; g.drawImage(M.cv, mX(CAVE_MAP_BOX.x0), mY(CAVE_MAP_BOX.y0), M.cv.width*M.st*sc, M.cv.height*M.st*sc);
     g.setLineDash([4, 3]); g.lineWidth = 2;
-    for (const t of [...CAVE_TRAILS, ...STATION_TRAILS, ...CAVE_BRIDGES.map(d => d.trail), CROWN_SPIRAL.trail]){ g.strokeStyle = C[t.diff]; g.beginPath(); g.moveTo(mX(t.s[0]), mY(t.s[1])); for (let i = 2; i < t.s.length; i += 2) g.lineTo(mX(t.s[i]), mY(t.s[i+1])); g.stroke(); }
+    for (const t of ONSTATION ? STATION_TRAILS : [...CAVE_TRAILS, ...CAVE_BRIDGES.map(d => d.trail), CROWN_SPIRAL.trail]){ g.strokeStyle = C[t.diff]; g.beginPath(); g.moveTo(mX(t.s[0]), mY(t.s[1])); for (let i = 2; i < t.s.length; i += 2) g.lineTo(mX(t.s[i]), mY(t.s[i+1])); g.stroke(); }
     g.restore(); }
+  // the teleporter beside the mine: its passage, and the ring at its end (purple once it's awake)
+  { g.save(); g.strokeStyle = TPC_OPEN ? '#8e7cb0' : C.muted; g.lineWidth = Math.max(2, VEST.hw*sc); g.globalAlpha = 0.7; g.beginPath();
+    VEST.pts.forEach((q, i) => { const [x, y] = vWorld(VFR.surf, q[0], q[1]); i ? g.lineTo(mX(x), mY(y)) : g.moveTo(mX(x), mY(y)); }); g.stroke();
+    g.globalAlpha = 1; g.lineWidth = 2; g.beginPath(); g.arc(mX(VFR.surf.x), mY(VFR.surf.y), 4, 0, Math.PI*2); g.stroke(); g.restore(); }
   // the divide (a rock band) with the crystal gate, and the crystals once they're out (purple diamonds)
   g.globalAlpha = 0.35; g.strokeStyle = C.rock; g.lineWidth = Math.max(3, DIVIDE_BAND*2*sc);
   g.beginPath(); for (let x = WORLD.x0; x <= WORLD.x1; x += 8){ x === WORLD.x0 ? g.moveTo(mX(x), mY(divideY(x))) : g.lineTo(mX(x), mY(divideY(x))); } g.stroke();
@@ -8402,6 +8420,12 @@ function buildCaveDressing(){
   }
   add(new THREE.BoxGeometry(0.9, 0.8, 11.2), wood, 0, 6.1, 0);
   add(new THREE.BoxGeometry(0.95, 0.12, 11.4), dark, 0, 6.55, 0);
+  // the gate: two barred halves just inside the posts, sliding apart into the ridge once there's power
+  const steel = new THREE.MeshLambertMaterial({ color: 0x59626e }), bar = new THREE.CylinderGeometry(0.07, 0.07, 5.6, 6);
+  MINE_GATE.mesh = [-1, 1].map(sd => { const h = new THREE.Group(); h.position.x = -0.6; g.add(h);
+    for (let k = 0; k < 7; k++){ const m = new THREE.Mesh(bar, steel); m.position.set(0, 2.8, sd*(0.25 + k*0.65)); h.add(m); }
+    for (const y of [0.6, 2.8, 5.0]){ const m = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 4.4), steel); m.position.set(0, y, sd*2.2); h.add(m); }
+    return h; });
 }
 // ---- portal rendering. the station is a world of its own: from the cave you see it only through the two doorways,
 // and from the station you see the cave (and nothing else of the map) only through them. layers: 0 the world (map
@@ -8580,19 +8604,20 @@ function caveCamClamp(){
 }
 // the map: the cave's floor plan, as a faint fill (built once, the first time the map is drawn), and the station's decks
 let caveMapMask = null;
-const CAVE_MAP_BOX = { x0: -790, x1: 60, y0: -20, y1: 620 };
+const CAVE_MAP_BOX = { x0: -520, x1: 60, y0: 20, y1: 590 };
 function caveMask(){
   if (caveMapMask) return caveMapMask;
   const st = 3, B = CAVE_MAP_BOX, w = Math.ceil((B.x1 - B.x0)/st), h = Math.ceil((B.y1 - B.y0)/st);
-  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-  const cx = cv.getContext('2d'), im = cx.createImageData(w, h), f = {};
+  // two of them: the cave, and the station (a world of its own, drawn instead of the cave while you're on it)
+  const mk = () => { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const cx = cv.getContext('2d'); return { cv, cx, im: cx.createImageData(w, h) }; };
+  const A = mk(), Bm = mk(), f = {};
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++){
     const x = B.x0 + (i + 0.5)*st, y = B.y0 + (j + 0.5)*st, o = (j*w + i)*4;
-    if (stationD(x, y) < 0){ im.data[o] = 160; im.data[o+1] = 130; im.data[o+2] = 230; im.data[o+3] = 120; }
-    else if (x <= MINE.x && !pastPortal(x, y) && caveField(x, y, f).d < 0){ im.data[o] = 120; im.data[o+1] = 130; im.data[o+2] = 150; im.data[o+3] = 110; }
+    if (stationD(x, y) < 0){ const d = Bm.im.data; d[o] = 160; d[o+1] = 130; d[o+2] = 230; d[o+3] = 120; }
+    if (x <= MINE.x && !pastPortal(x, y) && caveField(x, y, f).d < 0){ const d = A.im.data; d[o] = 120; d[o+1] = 130; d[o+2] = 150; d[o+3] = 110; }
   }
-  cx.putImageData(im, 0, 0);
-  return (caveMapMask = { cv, st });
+  A.cx.putImageData(A.im, 0, 0); Bm.cx.putImageData(Bm.im, 0, 0);
+  return (caveMapMask = { cave: A.cv, stn: Bm.cv, get cv(){ return ONSTATION ? this.stn : this.cave; }, st });
 }
 function loop(t){
   if (innerWidth !== W || innerHeight !== H) resize();
@@ -8783,7 +8808,7 @@ $('posGo').addEventListener('click', () => {
 });
 $('crownReset').addEventListener('click', () => { crownReset(); toast('Crown crystals put back.'); });
 // checkpoints in the cave: kept like the others, so a new visit starts you there
-for (const [id, where, msg] of [['cpRing', 'ring', 'Checkpoint set in the village loop.'], ['cpStation', 'station', 'Checkpoint set on the space station.']])
+for (const [id, where, msg] of [['cpRing', 'ring', 'Checkpoint set on Plateau 2.'], ['cpStation', 'station', 'Checkpoint set on the space station.']])
   $(id).addEventListener('click', () => { checkpoint = { cave: where }; saveProgress(); caveSpawn(where); toast(msg); });
 // testing: put the reward outfit on or off (it's what opens the crown gate)
 const regaliaBtn = () => { $('caveRegalia').textContent = 'Reward outfit (opens the crown door): ' + (outfit ? 'on' : 'off'); $('ceremonyBtn').textContent = 'Ceremony: ' + ['not yet', 'altar waiting', 'complete'][ceremony]; };
@@ -8791,7 +8816,7 @@ $('caveRegalia').addEventListener('click', () => { outfit = !outfit; saveEnd(); 
 $('ceremonyBtn').addEventListener('click', () => { ceremony = (ceremony + 1) % 3; if (ceremony === 2) crownSpent = 'altar'; else if (crownSpent === 'altar') crownSpent = ''; saveCrown(); saveEnd(); calfUI(); regaliaBtn(); });
 regaliaBtn();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { sfx, music, applyStage, get gate4Open2(){ return gate4Open; }, giantUp(){ return giant.up; }, get checkpoint(){ return checkpoint; }, get promptCtx(){ return promptCtx; }, updateCourt, OBS_ALTAR, eldersIn, courtOpen, SHIP_SPOT, setCrownAll(){ crownGot = [...Array(CROWN.n).keys()]; crownSpent = ''; saveCrown(); }, get crownSpent(){ return crownSpent; }, get ceremony(){ return ceremony; }, get outfit(){ return outfit; }, set outfit(v){ outfit = v; }, get cosK(){ return cosK; }, camera, get toastText(){ return document.getElementById("toast").textContent; }, CAVE_BRIDGES, CROWN, CROWN_SPIRAL, get crownGot(){ return crownGot; }, crownReset, inCrownRoom, caveField, caveFloor, caveSD, CAVE_TRAILS, SHAFT, HALLS, ROOMS, SPOKES, STATION, TRANSPORT, PORTAL_X, stationD, cavePowered, get stationK(){ return stationK; }, caveDress, MINE, CAVE_BOX, caveTiles, caveSpawn, mineCut, mineRidge, heightNat, get UNDER(){ return UNDER; }, set UNDER(v){ UNDER = v; }, CITY_DECKS, get CAVE_DECK(){ return CAVE_DECK; }, set CAVE_DECK(v){ CAVE_DECK = v; }, cityStreetSD, HILLS, LV, VILLAGE, villageSD, P2C, FAR_TP, VFR, VEST, vestMeshes, get TPC_OPEN(){ return TPC_OPEN; }, stationFloor, get ONSTATION(){ return ONSTATION; }, set ONSTATION(v){ ONSTATION = v; }, CROWN_GATE, STATION_TRAILS, portalView, get caveK(){ return caveK; }, CAVE_SOLIDS, caveMask, pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get bridge2Down(){ return bridge2Down; }, SPUR_PASS, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { sfx, music, applyStage, get gate4Open2(){ return gate4Open; }, giantUp(){ return giant.up; }, get checkpoint(){ return checkpoint; }, get promptCtx(){ return promptCtx; }, updateCourt, OBS_ALTAR, eldersIn, courtOpen, SHIP_SPOT, setCrownAll(){ crownGot = [...Array(CROWN.n).keys()]; crownSpent = ''; saveCrown(); }, get crownSpent(){ return crownSpent; }, get ceremony(){ return ceremony; }, get outfit(){ return outfit; }, set outfit(v){ outfit = v; }, get cosK(){ return cosK; }, camera, get toastText(){ return document.getElementById("toast").textContent; }, CAVE_BRIDGES, CROWN, CROWN_SPIRAL, get crownGot(){ return crownGot; }, crownReset, inCrownRoom, caveField, caveFloor, caveSD, CAVE_TRAILS, SHAFT, HALLS, ROOMS, SPOKES, STATION, TRANSPORT, PORTAL_X, stationD, cavePowered, get stationK(){ return stationK; }, caveDress, MINE, CAVE_BOX, caveTiles, caveSpawn, mineCut, mineRidge, heightNat, get UNDER(){ return UNDER; }, set UNDER(v){ UNDER = v; }, CITY_DECKS, get CAVE_DECK(){ return CAVE_DECK; }, set CAVE_DECK(v){ CAVE_DECK = v; }, cityStreetSD, HILLS, LV, VILLAGE, villageSD, P2C, FAR_TP, VFR, VEST, vestMeshes, MINE_GATE, get TPC_OPEN(){ return TPC_OPEN; }, stationFloor, get ONSTATION(){ return ONSTATION; }, set ONSTATION(v){ ONSTATION = v; }, CROWN_GATE, STATION_TRAILS, portalView, get caveK(){ return caveK; }, CAVE_SOLIDS, caveMask, pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get bridge2Down(){ return bridge2Down; }, SPUR_PASS, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

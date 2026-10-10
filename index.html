@@ -981,7 +981,15 @@ function smoothPts(c){
   return out;
 }
 const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0)/k; return Math.min(a, b) - h*h*k/4; };
-const CAVE_C = { x: -470, y: 300 }, HUB_LEVEL = -4, RING_LEVEL = -40, CAVE_LEVEL = RING_LEVEL;
+// ---- 2.0: the mine is a downhill ski area on three levels. from the surface a narrow tunnel slopes steadily down to
+// Plateau 1 (a camp of tents); Hill 1 runs north from it (a flat descent on its east half, a slalom on its west) to
+// Plateau 2 (a village on two levels, the crown door up on the higher one); Hill 2 runs back south on the far side of
+// a rock wall (rollers, with a winding banked berm path down the middle) to Plateau 3 (ruined dwellings, abandoned
+// gear); Hill 3, a narrow half-pipe, runs north again to the Basement (trucks, carts, conveyors) and its great ring
+// teleporter, the way through to the space station. each run is about 330 m, dropping 70 m (about 21%, like 1.0's
+// skills parks). levels (floor heights):
+const LV = { P1: -24, H1: [-26, -96], P2: -98, LEDGE: -89, H2: [-100, -170], P3: -172, H3: [-174, -244], BASE: -246 };
+const CAVE_C = { x: -250, y: 510 }, HUB_LEVEL = LV.P1, RING_LEVEL = LV.BASE, CAVE_LEVEL = RING_LEVEL;   // (RING_LEVEL: the basement and the station's deck)
 const rad = a => a*Math.PI/180;
 const polar = (a, r) => [CAVE_C.x + Math.cos(rad(a))*r, CAVE_C.y + Math.sin(rad(a))*r];
 // the story ring's centre line wanders in and out, and its width varies, like the mountains round zone 1
@@ -989,18 +997,18 @@ const ringR = a => 232 + 14*Math.sin(3*rad(a) + 0.7) + 8*Math.sin(5*rad(a) + 2);
 const ringW = a => 26 + 5*Math.sin(4*rad(a) + 1);
 const ringPt = a => polar(a, ringR(a));
 const RING_A0 = 22, RING_A1 = 338;                               // the ring runs all the way round except the east
-const PORTAL_X = -213;                                           // the portals' wall: east of it (through the doorways) is space
-const TRANSPORT = [{ x: -235, y: 245, name: 'north portal' }, { x: -235, y: 355, name: 'south portal' }];
+const PORTAL_X = -400;                                           // the teleporter's wall in the basement: east of it (through the ring) is space
+const TRANSPORT = [{ x: -440, y: 90, name: 'the teleporter' }];
 // each portal opens like a gate: once zone 3's terminals are powered, ski up to its control (one each side) and it opens
 const PORTALS_KEY = 'skate-portals';
 try { const o = JSON.parse(localStorage.getItem(PORTALS_KEY) || '[]'); TRANSPORT.forEach((T, k) => { T.open = !!o[k]; }); } catch (e) {}
 const savePortals = () => { try { localStorage.setItem(PORTALS_KEY, JSON.stringify(TRANSPORT.map(T => T.open ? 1 : 0))); } catch (e) {} };
 const portalAt = y => TRANSPORT.reduce((a, b) => Math.abs(b.y - y) < Math.abs(a.y - y) ? b : a);
-const PORTAL_HW = 4.5;
+const PORTAL_HW = 6;          // the doorway inside the ring: 12 m wide
 // the space station (from the concept): a domed hub, a walkway ring round it, a raised deck round the hub's outside
 // reached by a spiral ramp, eight dock arms (a walkway each side of a docked ship) and two portal arms out to the
 // portals. all metal decks, all railed. pieces at deck level are straight walkways: [ax, ay, bx, by, half-width]
-const STATION = { x: PORTAL_X + 190, y: 300, h: RING_LEVEL, R: 95, hw: 4.5, hubR: 40, deckR: 46, deckHW: 3.5, deckUp: 8, armIn: 96, armOut: 185, walkHW: 2.5 };
+const STATION = { x: PORTAL_X + 190, y: TRANSPORT[0].y, h: RING_LEVEL, R: 95, hw: 4.5, hubR: 40, deckR: 46, deckHW: 3.5, deckUp: 8, armIn: 96, armOut: 185, walkHW: 2.5 };
 STATION.walks = []; STATION.docks = []; STATION.arms = []; STATION.loops = [];
 for (let k = 0; k < 8; k++){
   const a = k*Math.PI/4, ux = Math.cos(a), uy = Math.sin(a), big = k === 0, off = big ? 13 : 10, out = big ? STATION.armOut + 15 : STATION.armOut;
@@ -1014,7 +1022,7 @@ for (let k = 0; k < 8; k++){
 }
 for (const T of TRANSPORT){
   const x1 = STATION.x - Math.sqrt((STATION.R + STATION.hw - 0.6)**2 - (T.y - STATION.y)**2);
-  const arm = [PORTAL_X, T.y, x1, T.y, PORTAL_HW, T.y < STATION.y ? 'North Portal Arm' : 'South Portal Arm']; STATION.arms.push(arm); STATION.walks.push(arm);
+  const arm = [PORTAL_X, T.y, x1, T.y, PORTAL_HW, 'Teleporter Arm']; STATION.arms.push(arm); STATION.walks.push(arm);
 }
 // the spiral ramp, from the walkway ring's inside edge up to the hub deck: a third of a turn, rising 8 m
 STATION.ramp = (() => {
@@ -1026,57 +1034,83 @@ STATION.ramp = (() => {
   return { X, Y, H, cum, n: X.length, hw: STATION.deckHW };
 })();
 let ONSTATION = false;       // on the space station (a world of its own, reached through the portals)
-// ---- the rooms. each spoke room's floor drops from its hub end to its ring end; its theme shapes the floor along its
-// own axis (a: along, out from the hub; lat: across). slick: how much of the usual drag and friction its snow has
-const SPOKE_R = 125, SPOKE_TOP = -8, SPOKE_BOT = -36, LIFT_LAT = 22;
-const SPOKES = [
-  { a: 36,  theme: 'rollers',  name: 'Roller Coaster',  slick: 1 },
-  { a: 108, theme: 'lift',     name: 'Lift & Slalom',   slick: 1 },
-  { a: 180, theme: 'crown',    name: 'Crown Room',      slick: 1 },
-  { a: 252, theme: 'berms',    name: 'Berm Run',        slick: 1 },
-  { a: 324, theme: 'halfpipe', name: 'Half-pipe Chute', slick: 1 },
+// ---- the rooms (each a cluster of circles smoothed together) and the halls between them
+const SPOKES = [];                                               // (1.0's skills parks: gone)
+const HILLS = [
+  { name: 'Hill 1', key: 'h1', x: -250, y0: 470, y1: 140, hw: 36, h: LV.H1, theme: 'slalom' },
+  { name: 'Hill 2', key: 'h2', x: -340, y0: 140, y1: 470, hw: 36, h: LV.H2, theme: 'rollers' },
+  { name: 'Hill 3', key: 'h3', x: -420, y0: 470, y1: 140, hw: 19, h: LV.H3, theme: 'halfpipe' },
 ];
-for (const s of SPOKES){ [s.x, s.y] = polar(s.a, SPOKE_R); s.ux = Math.cos(rad(s.a)); s.uy = Math.sin(rad(s.a)); s.edge = s.theme === 'crown' ? 28 : 38; }
-// the crown room: round and tall, an enormous crystal pillar at its heart and a stone path spiralling up round it,
-// widening as it climbs (a funnel, like the black hole's, but you go up). its door stands right on the village loop's
-// street, in a stone facade flush with the dwellings either side: floor to ceiling, a gold crown on it
-const CROWN = { R: 46, H: 72, pillarR: 8, r0: 19, r1: 33, turns: 2.75, rise: 40, lead: 14, n: 30,
-  fx: CAVE_C.x - (ringR(180) - ringW(180) + 12.5), y: CAVE_C.y, dhw: 6.5, dH: 24, span: 18 };
-const local = (s, a, lat) => [s.x + s.ux*a - s.uy*lat, s.y + s.uy*a + s.ux*lat];
-const BERM_A = 10;                                               // the berm run's line: how far it swings either side
-const SLALOM = a => -6 + 5.5*Math.sin(2*Math.PI*a/36);          // the slalom's line across the lift room: a turn every 18 m
-function spokeFeature(s, a, lat){
-  switch (s.theme){
-    case 'rollers': return 1.0*Math.sin(2*Math.PI*a/16);
-    case 'berms': {                                              // a slalom line, and a berm round the outside of every turn: a
-      // bank rising beside the trail (from 2 m off its line) that carries you round, highest at the apex of the turn
-      const w = 2*Math.PI/44, sn = Math.sin(w*a), c = BERM_A*sn*smooth01(38, 24, Math.abs(a)), out = (lat - c)*Math.sign(sn);
-      return 3.4*Math.pow(Math.abs(sn), 0.7)*smooth01(2, 7, out)*smooth01(13, 9, out);
-    }
-    case 'halfpipe': return 5.5*Math.min(1, Math.abs(lat)/15)**2 * smooth01(46, 34, Math.abs(a));
+for (const hl of HILLS){ hl.dir = Math.sign(hl.y1 - hl.y0); hl.L = Math.abs(hl.y1 - hl.y0); }
+// a hill's own coordinates: a, how far down it from its top; lat, across it (east positive)
+const hillLocal = (hl, x, y) => [(y - hl.y0)*hl.dir, x - hl.x];
+const hillGrade = (hl, a) => { const t = Math.max(0, Math.min(1, a/hl.L)); return hl.h[0] + (hl.h[1] - hl.h[0])*(0.75*t + 0.25*t*t*(3 - 2*t)); };
+const SLALOM = a => -16 + 6*Math.sin(2*Math.PI*a/36);           // Hill 1's slalom line, on its west half: a turn every 18 m
+const BERM_A = 11, BERM_W = 60;                                  // Hill 2's berm path: how far it swings either side, and its wavelength
+const bermPath = (hl, a) => BERM_A*Math.sin(2*Math.PI*a/BERM_W)*smooth01(0, 25, a)*smooth01(hl.L, hl.L - 25, a);
+function hillFeature(hl, a, lat){
+  const fe = smooth01(0, 25, a)*smooth01(hl.L, hl.L - 25, a);
+  if (hl.theme === 'rollers'){
+    // rollers everywhere except the berm path down the middle; a bank round the outside of each of its turns
+    const sn = Math.sin(2*Math.PI*a/BERM_W), c = bermPath(hl, a), q = Math.abs(lat - c), out = (lat - c)*Math.sign(sn);
+    const berm = 3.4*Math.pow(Math.abs(sn), 0.7)*smooth01(2, 7, out)*smooth01(13, 9, out)*fe;
+    return berm + 1.1*Math.sin(2*Math.PI*a/17)*smooth01(9, 14, q)*fe;
   }
+  if (hl.theme === 'halfpipe') return 6*Math.min(1, Math.abs(lat)/17)**2*smooth01(0, 30, a)*smooth01(hl.L, hl.L - 30, a);
   return 0;
 }
+// the crown room: round and tall, an enormous crystal pillar at its heart and a stone path spiralling up round it,
+// widening as it climbs. its door is on the upper level of Plateau 2's village (a ledge along the east wall, reached
+// only by a light bridge), floor to ceiling in a stone facade, a gold crown on it
+const CROWN = { R: 46, H: 72, pillarR: 8, r0: 19, r1: 33, turns: 2.75, rise: 40, lead: 14, n: 30, fx: -206, y: 80, dhw: 6.5, dH: 24, span: 18, lv: LV.LEDGE };
+CROWN.s = { x: CROWN.fx + 12 + CROWN.R, y: CROWN.y };
+const LEDGE_X = -228;                                            // Plateau 2's upper level: everything east of this line, 9 m up
+const P2C = { x: -250, y: 100, r: 44 };
 const ROOMS = [];
-ROOMS.push({ name: 'The Hub', circles: [[CAVE_C.x, CAVE_C.y, 32], [CAVE_C.x - 6, CAVE_C.y + 10, 26]], k: 12, H: 24, wallW: 9, edgeH: 7, slick: 1, base: () => HUB_LEVEL });
-for (const s of SPOKES){
-  const crown = s.theme === 'crown';
-  ROOMS.push({ name: s.name, spoke: s, k: 14, H: crown ? CROWN.H : 22, wallW: 9, edgeH: 7, slick: s.slick,
-    circles: crown ? [[s.x, s.y, CROWN.R]] : [[s.x - s.ux*14, s.y - s.uy*14, 36], [s.x + s.ux*14, s.y + s.uy*14, 36]],
-    // (the features fade out toward the walls, and round where the halls come in, so a hall arrives on level floor)
-    base: (x, y, d) => {
-      if (crown) return RING_LEVEL;
-      const dx = x - s.x, dy = y - s.y, a = dx*s.ux + dy*s.uy, lat = -dx*s.uy + dy*s.ux;
-      return SPOKE_TOP + (SPOKE_BOT - SPOKE_TOP)*smooth01(-55, 55, a) + spokeFeature(s, a, lat)*smooth01(-10, -20, d)*smooth01(6, 16, Math.hypot(Math.abs(a) - s.edge, lat));
-    } });
+ROOMS.push({ name: 'Plateau 1', key: 'p1', circles: [[-250, 510, 40], [-232, 492, 26]], k: 12, H: 26, wallW: 9, edgeH: 6, slick: 1, base: () => LV.P1 });
+ROOMS.push({ name: 'Plateau 2', key: 'p2', circles: [[P2C.x, P2C.y, P2C.r], [-320, 100, 40]], k: 14, H: 34, wallW: 9, edgeH: 6, slick: 1,
+  base: (x, y) => LV.P2 + (Math.hypot(x - P2C.x, y - P2C.y) < P2C.r + 6 ? (LV.LEDGE - LV.P2)*smooth01(LEDGE_X - 1.2, LEDGE_X + 0.2, x) : 0) });
+ROOMS.push({ name: 'Plateau 3', key: 'p3', circles: [[-340, 510, 38], [-380, 514, 34], [-420, 510, 36]], k: 14, H: 26, wallW: 9, edgeH: 6, slick: 1, base: () => LV.P3 });
+for (const hl of HILLS){
+  const circles = []; for (let y = Math.min(hl.y0, hl.y1); y <= Math.max(hl.y0, hl.y1) + 1e-6; y += 10) circles.push([hl.x, y, hl.hw]);
+  const pipe = hl.theme === 'halfpipe';
+  ROOMS.push({ name: hl.name, key: hl.key, hill: hl, circles, k: 10, H: pipe ? 22 : 26, wallW: pipe ? 4 : 7, edgeH: pipe ? 4 : 5, slick: 1,
+    base: (x, y, d) => { const [a, lat] = hillLocal(hl, x, y); return hillGrade(hl, a) + hillFeature(hl, a, lat)*(pipe ? 1 : smooth01(-5, -12, d)); } });
 }
+ROOMS.push({ name: 'The Basement', key: 'base', transport: TRANSPORT[0], circles: [[-440, 90, 46], [-418, 62, 28], [-418, 118, 28]], k: 14, H: 38, wallW: 9, edgeH: 6, slick: 1, base: () => LV.BASE });
+ROOMS.push({ name: 'Crown Room', key: 'crown', crown: true, circles: [[CROWN.s.x, CROWN.s.y, CROWN.R]], k: 14, H: CROWN.H, wallW: 9, edgeH: 7, slick: 1, base: () => CROWN.lv });
+const roomByKey = k => ROOMS.find(R => R.key === k);
+// ---- what stands on the plateaus, laid out here so it's solid from the start (the meshes come with the dressing):
+// boxes { x, y, a (facing, rad), w (across its face), d (deep), h, base, kind }
+const VILLAGE = [];
 {
-  const circles = [];
-  for (let a = RING_A0; a <= RING_A1 + 1e-6; a += 2.5){ const [x, y] = ringPt(a); circles.push([x, y, ringW(a)]); }
-  ROOMS.push({ name: 'The Village Loop', ring: true, circles, k: 20, H: 38, wallW: 12, edgeH: 9, slick: 1, base: (x, y) => RING_LEVEL + 1.5*Math.sin(x/37)*Math.cos(y/41) });
+  let seed = 7717; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const ring = (cx, cy, r, a0, a1, step, base, kind, hMin, hMax) => {
+    for (let a = a0; a <= a1; a += step){
+      const w = 6 + rnd()*4, d = 6 + rnd()*3, ar = a*Math.PI/180, rr = r - d/2 - 1.5;
+      VILLAGE.push({ x: cx + Math.cos(ar)*rr, y: cy + Math.sin(ar)*rr, a: ar + Math.PI, w, d, h: hMin + rnd()*(hMax - hMin), base, kind });
+    }
+  };
+  // Plateau 2's lower level: round the north and west of both its halves (the south stays open for Hill 1 coming in
+  // and for the way on to Hill 2; the light bridge's line stays clear)
+  ring(P2C.x, P2C.y, P2C.r, 196, 304, 13, LV.P2, 'house', 4, 9);
+  ring(-320, 100, 40, 168, 300, 13, LV.P2, 'house', 4, 8);
+  // the upper level, on the ledge south of the crown door: smaller dwellings, unreachable but for the light bridge
+  for (const [x, y, w] of [[-216, 101, 7], [-218, 113, 6], [-221, 125, 5]]) VILLAGE.push({ x, y, a: Math.PI, w, d: 6, h: 4 + rnd()*3, base: LV.LEDGE, kind: 'house' });
+  // Plateau 3's far (south) wall: the old dwellings, crumbled to their foundations
+  for (const [cx, r, a0, a1] of [[-340, 38, 40, 140], [-420, 36, 40, 150]]) ring(cx, 510, r, a0, a1, 16, LV.P3, 'ruin', 0.5, 1.6);
 }
-for (const T of TRANSPORT) ROOMS.push({ name: 'Transport Room', transport: T, circles: [[T.x, T.y, 30]], k: 12, H: 30, wallW: 8, edgeH: 7, slick: 1, base: () => RING_LEVEL });
-const RING_ROOM = ROOMS.find(r => r.ring), ringBase = (x, y) => RING_ROOM.base(x, y);
+function villageSD(x, y){
+  let d = 99;
+  for (const b of VILLAGE){
+    const dx = x - b.x, dy = y - b.y; if (dx*dx + dy*dy > 120) continue;
+    const c = Math.cos(b.a), sn = Math.sin(b.a), u = dx*c + dy*sn, v = -dx*sn + dy*c;   // u: out of its face, v: along it
+    const qx = Math.abs(u) - b.d/2, qy = Math.abs(v) - b.w/2;
+    d = Math.min(d, Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0));
+  }
+  return d;
+}
+
 // ---- the halls: a centre line, and a floor that runs smoothly from one end's height to the other's. the climb or drop
 // happens between the rooms (from where the hall leaves one room to where it enters the next), so a hall arrives
 // level with the room it opens into. a hall can also pass through heights on the way (anchors: [distance, height])
@@ -1090,19 +1124,19 @@ function addHall(name, pts, hS, hE, opt = {}){
   const h = { name, X, Y, cum, n: X.length, L: cum[cum.length - 1], mine: !!opt.mine, slick: opt.slick || 1,
     hw: opt.hw || MINE.hw, H: opt.H || MINE.H, wallW: opt.wallW || MINE.wallW, edgeH: opt.edgeH || MINE.edgeH };
   // where it leaves the room it starts in, and enters the room it ends in
-  // (or, for a hall that runs down into the story ring, all the way from its start to where it reaches the ring, so it
-  // arrives at the ring's level before it meets the ring's curving wall)
   let sA = opt.start || 0, sB = h.L;
-  if (opt.full){
-    for (let i = 0; i < h.n; i++){ let r = Infinity; for (const c of RING_ROOM.circles) r = smin(r, Math.hypot(X[i] - c[0], Y[i] - c[1]) - c[2], RING_ROOM.k); if (r < 0){ sB = cum[i]; break; } }
-  } else {
-    if (!opt.start){ for (let i = 0; i < h.n; i++) if (roomsD(X[i], Y[i]) > -2){ sA = cum[i]; break; } }
-    for (let i = h.n - 1; i >= 0; i--) if (roomsD(X[i], Y[i]) > -2){ sB = cum[i]; break; }
-  }
+  if (!opt.start){ for (let i = 0; i < h.n; i++) if (roomsD(X[i], Y[i]) > -2){ sA = cum[i]; break; } }
+  for (let i = h.n - 1; i >= 0; i--) if (roomsD(X[i], Y[i]) > -2){ sB = cum[i]; break; }
   h.sA = sA; h.sB = sB;
-  const A = [[sA, hS], ...(opt.via || []), [sB, hE]];
-  // slopes for a smooth curve through the anchors: level at the two ends, in between the average of either side
-  h.A = A.map((p, k) => [p[0], p[1], k === 0 || k === A.length - 1 ? 0 : (A[k+1][1] - A[k-1][1])/(A[k+1][0] - A[k-1][0])]);
+  if (opt.steady){
+    // a steady grade all the way, easing in and out over its first and last 25 m
+    const m = (hE - hS)/(sB - sA), e = Math.min(25, (sB - sA)/4);
+    h.A = [[sA, hS, 0], [sA + e, hS + m*e/2, m], [sB - e, hE - m*e/2, m], [sB, hE, 0]];
+  } else {
+    const A = [[sA, hS], ...(opt.via || []), [sB, hE]];
+    // slopes for a smooth curve through the anchors: level at the two ends, in between the average of either side
+    h.A = A.map((p, k) => [p[0], p[1], k === 0 || k === A.length - 1 ? 0 : (A[k+1][1] - A[k-1][1])/(A[k+1][0] - A[k-1][0])]);
+  }
   HALLS.push(h); return h;
 }
 function hallBase(h, s){
@@ -1115,34 +1149,11 @@ function hallBase(h, s){
   return A[A.length-1][1];
 }
 const hallAt = (h, s) => { let i = 0; while (i < h.n - 2 && h.cum[i+1] < s) i++; const u = (s - h.cum[i])/(h.cum[i+1] - h.cum[i]); return [h.X[i] + (h.X[i+1] - h.X[i])*u, h.Y[i] + (h.Y[i+1] - h.Y[i])*u, h.X[i+1] - h.X[i], h.Y[i+1] - h.Y[i]]; };
-const SHAFT_PTS = [[MINE.x, MINE.y],[-34,296],[-44,296],[-52,289],[-55,276],[-50,262],[-48,248],[-54,234],[-66,224],[-82,219],[-102,222],[-150,262],[-200,296],[-260,300],[-340,300],[CAVE_C.x, CAVE_C.y]];
-const SHAFT = addHall('Mine Shaft', SHAFT_PTS, MINE.F0, HUB_LEVEL, { start: 6, mine: true, via: [[140, -14]] });
-let CROWN_HALL = null, LIFT_SPOKE = null;
-for (const s of SPOKES){
-  const R = ROOMS.find(q => q.spoke === s), lv = p => R.base(p[0], p[1], roomsD(p[0], p[1]));   // the room's floor where a hall opens into it
-  // (each park's magic carpet runs up one side, cs: +1 / -1, in tunnels of its own; its hall to the hub swings the other way)
-  // (the carpets' tops stay clear of where the shaft comes into the hub)
-  s.cs = s.a < 180 ? 1 : -1;
-  const ringIn = polar(s.a, ringR(s.a) - ringW(s.a) + 15), edge = s.edge, away = -s.cs;
-  s.inPts = [[CAVE_C.x, CAVE_C.y], polar(s.a + 9*away, 62), local(s, -edge, 0)];
-  s.outPts = [local(s, edge, 0), polar(s.a - 4, 182), ringPt(s.a)];
-  if (s.theme !== 'crown') addHall(s.name + ' (in)', s.inPts, HUB_LEVEL, lv(s.inPts[2]), { slick: s.slick });
-  if (s.theme === 'crown'){
-    // a grand hall, tall and wide, straight in from the door on the street
-    CROWN.s = s;
-    CROWN_HALL = addHall('Crown Hall', [[CROWN.fx - 8, CROWN.y], [CROWN.fx + 12, CROWN.y], [s.x - CROWN.R + 6, CROWN.y]], ringBase(CROWN.fx, CROWN.y), RING_LEVEL, { hw: 7.2, H: 27, wallW: 1.2, edgeH: 3 });
-    continue;
-  }
-  addHall(s.name + ' (out)', [local(s, edge, 0), s.outPts[1], ringIn], lv(local(s, edge, 0)), ringBase(...ringIn), { full: true, slick: s.slick });
-  if (s.theme === 'lift') LIFT_SPOKE = s;
-  // the magic carpet's own tunnels, alongside: up to the hub, and down to the ring
-  { const aR = ringR(s.a) - ringW(s.a) + 15 - SPOKE_R, c = s.cs;
-    s.liftUp = [local(s, -edge, LIFT_LAT*c), local(s, -80, 18*c), local(s, -110, 9*c)];
-    s.liftDown = [local(s, edge, LIFT_LAT*c), local(s, 65, LIFT_LAT*c), local(s, aR, LIFT_LAT*c)];
-    // (tall, so the carpet can float clear of the floor at an even grade)
-    addHall(s.name + ' carpet (upper)', s.liftUp, lv(s.liftUp[0]), HUB_LEVEL, { H: 14, wallW: 2.4 });
-    addHall(s.name + ' carpet (lower)', s.liftDown, lv(s.liftDown[0]), ringBase(...s.liftDown[2]), { full: true, H: 14, wallW: 2.4 }); }
-}
+// the entrance tunnel: narrow, sloping steadily down from the portal to Plateau 1
+const SHAFT_PTS = [[MINE.x, MINE.y], [-34, 296], [-46, 304], [-62, 336], [-86, 382], [-118, 428], [-160, 470], [-196, 496], [-226, 506], [-250, 510]];
+const SHAFT = addHall('Mine Shaft', SHAFT_PTS, MINE.F0, LV.P1, { start: 6, mine: true, steady: true });
+const CROWN_HALL = addHall('Crown Hall', [[CROWN.fx - 8, CROWN.y], [CROWN.fx + 12, CROWN.y], [CROWN.s.x - CROWN.R + 6, CROWN.y]], CROWN.lv, CROWN.lv, { hw: 7.2, H: 27, wallW: 1.2, edgeH: 3 });
+const LIFT_SPOKE = null;
 // the crown door, in the facade on the street. k: how far it has sunk into the floor (0 shut, 1 open)
 const CROWN_GATE = { x: CROWN.fx, y: CROWN.y, tx: 1, ty: 0, open: false, k: 0, hint: -1e9 };
 const wearingRegalia = () => outfit;
@@ -1235,7 +1246,7 @@ function caveSD(x, y){
   if (ONSTATION) return -(stationD(x, y) + 0.35);
   if (CAVE_DECK) return deckSD(x, y);
   const f = caveField(x, y); let d = f.sd;
-  d = Math.min(d, cityStreetSD(x, y), cityRampSD(x, y, f.floor), crownFootSD(x, y, f.floor));
+  d = Math.min(d, ledgeSD(x, y), villageSD(x, y), cityRampSD(x, y, f.floor), crownFootSD(x, y, f.floor));
   for (const o of CAVE_SOLIDS){ const q = Math.hypot(x - o.x, y - o.y) - o.r; if (q < d) d = q; }
   // the transport rooms' east walls: solid, except each doorway once the generators are running
   if (x > PORTAL_X - 30 && x < PORTAL_X + 30) for (const T of TRANSPORT) if (Math.abs(y - T.y) < 34 && !(T.open && Math.abs(y - T.y) < PORTAL_HW)) d = Math.min(d, PORTAL_X - 0.4 - x);
@@ -1269,22 +1280,11 @@ function caveStep(px, py, dt){
   }
   { const G = CROWN_GATE, want = G.open ? 1 : 0; G.k += (want - G.k)*Math.min(1, dt*0.9); if (Math.abs(want - G.k) < 0.002) G.k = want; }
 }
-// ---- the cave city in the village loop: terraced dwellings carved into both walls with a street down the middle, and a
-// second level: light bridges along the first row of buildings, winding from wall to wall over the street, with a
-// ramp up from the street at one end and down at the other (two, one each side of the crown room). like the other
-// light bridges they're dark until the crystal gate opens (or the testing switch is on)
-let CAVE_DECK = null;          // the terrace you're skiing on, if any: { d: deck, i: sample hint }
-function ringLocal(x, y){ const dx = x - CAVE_C.x, dy = y - CAVE_C.y; let a = Math.atan2(dy, dx)*180/Math.PI; if (a < 0) a += 360; return [a, Math.hypot(dx, dy) - ringR(a), ringW(a)]; }
-const TERR_H = RING_LEVEL + 7.5, TERR_SET = 11, STREET_EDGE = 12.5;   // terrace top; how far in from the ring's edge it runs; the street's edge
-// where the ring's inner wall stays open (the halls' mouths) and the ends near the transport rooms
-const CITY_GAPS_IN = SPOKES.map(s => s.theme === 'crown' ? [175, 185] : s.cs > 0 ? [s.a - 10, s.a + 16] : [s.a - 16, s.a + 10]);   // (the crown room's facade fills its own gap)
-function cityBuilt(a, side){ if (a < 34 || a > 326) return false; if (side < 0) for (const g of CITY_GAPS_IN) if (a > g[0] && a < g[1]) return false; return true; }
-// the first row of buildings either side stands in the way: the street runs between them
-function cityStreetSD(x, y){
-  const [a, lat, W] = ringLocal(x, y); if (Math.abs(lat) > W + 4) return 99;
-  if (!cityBuilt(a, lat > 0 ? 1 : -1)) return 99;
-  return (W - STREET_EDGE) - Math.abs(lat);
-}
+let CAVE_DECK = null;          // the light bridge you're riding underground, if any: { d: deck, i: sample hint }
+// (1.0's village loop and its streets are gone: these stand in for its old helpers)
+const cityStreetSD = () => 99, cityBuilt = () => false, CITY_DECKS = [];
+// Plateau 2's upper level is a sheer step: solid along its edge from both sides (only the light bridge crosses it)
+function ledgeSD(x, y){ if (Math.abs(x - LEDGE_X) > 3 || Math.hypot(x - P2C.x, y - P2C.y) > P2C.r + 2) return 99; return Math.abs(x - LEDGE_X) - 0.7; }
 // ---- the cave's light bridges: the two terraces, their ramps, and a magic carpet up every skills park. they all
 // follow the energy bridges' rules: portals at their feet, on only through a portal heading in, the deck of light shown
 // only while you ride it, railings of light, a climb costs no speed. ends: { ground } at a portal, or a junction where a
@@ -1308,75 +1308,27 @@ function keyedH(X, Y, ctrl){
   for (let k = 0; k < keyed.length - 1; k++){ const [i0, h0] = keyed[k], [i1, h1] = keyed[k+1]; for (let i = i0; i <= i1; i++) H[i] = h0 + (h1 - h0)*smooth01(cum[i0], cum[i1], cum[i]); }
   return H;
 }
-const terrPt = (mir, a, f) => { const A = mir > 0 ? a : 360 - a, lat = f*(ringW(A) - TERR_SET); return polar(A, ringR(A) + lat); };
-const CITY_DECKS = [], CAVE_BRIDGES = [];
-for (const mir of [1, -1]){
-  // [angle round the ring, across (+1 the outer wall's terrace, -1 the inner's), 's' street level / 't' terrace level]
-  // (the ramps rise along the inner side of the street, clear of its middle; the inner terraces keep away from the
-  // halls' mouths)
-  // (the first ramp rises along the outer side, clear of the end park's carpet, then crosses over)
-  const spec = [[40,0.55,'s'],[46,0.85],[52,1,'t'],[58,1,'t'],[66,-1,'t'],[80,-1,'t'],[88,1,'t'],[128,1,'t'],[136,-1,'t'],[156,-1,'t'],[162,-0.85],[168,-0.55,'s']];
-  const ctrl = spec.map(([a, f, kind]) => { const [x, y] = terrPt(mir, a, f); return { x, y, kind }; });
-  const [X, Y] = flatXY(smoothPts(ctrl.map(c => [c.x, c.y])));
-  const T = mkDeck(mir > 0 ? 'South Terrace' : 'North Terrace', X, Y, keyedH(X, Y, ctrl), 3, { kind: 'terrace' });
-  CITY_DECKS.push(T); CAVE_BRIDGES.push(T);
-  // where the terrace crosses away over the street, an off-ramp carries straight on along the inner side and down to
-  // the street by the skills park's mouth (one from each direction): [junction, ..., foot]
-  const park = SPOKES.find(q => q.a === (mir > 0 ? 108 : 252));
-  for (const rs of [[[76,-1],[84,-1,'t'],[93,-0.85],[100,-0.62,'s']], [[140,-1],[132,-1,'t'],[124,-0.85],[118,-0.62,'s']]]){
-    const [jx, jy] = terrPt(mir, rs[0][0], rs[0][1]); let mi = 0, bd = Infinity;
-    for (let i = 0; i < T.n; i++){ const q = Math.hypot(T.X[i] - jx, T.Y[i] - jy); if (q < bd){ bd = q; mi = i; } }
-    const dir = rs[1][0] > rs[0][0] ? 1 : -1, m2 = mi + 8*dir;
-    const rc = [{ x: T.X[mi], y: T.Y[mi], kind: T.H[mi] }, { x: T.X[m2], y: T.Y[m2] }, ...rs.slice(1).map(([a, f, kind]) => { const [x, y] = terrPt(mir, a, f); return { x, y, kind }; })];
-    const [RX, RY] = flatXY(smoothPts(rc.map(c => [c.x, c.y])));
-    const R = mkDeck(park.name + ' ' + (rs[0][0] < 100 ? 'east' : 'west') + ' ramp (' + T.name + ')', RX, RY, keyedH(RX, RY, rc), 3, { kind: 'ramp', e0: { ground: false } });
-    R.joins.push({ o: T, my: 0, oi: mi, oneWay: false }); T.joins.push({ o: R, my: mi, oi: 0, oneWay: true });
-    CAVE_BRIDGES.push(R);
-  }
-}
-// the magic carpets: from the village loop up each skills park's side to the hub, in tunnels of their own. level across
-// and smooth along, always climbing (never a bump), a little above the floor; open to ride whenever
-for (const s of SPOKES){
-  if (s.theme === 'crown') continue;
-  // its line, resampled every metre
-  // (its foot is just inside its tunnel's mouth, clear of the village loop's street)
-  let aF = s.edge; while (aF < 200){ const [rx, ry] = local(s, aF + 1, LIFT_LAT*s.cs), [, la, Wr] = ringLocal(rx, ry); if (Math.abs(la) < Wr + 3) break; aF += 1; }
-  const [X0, Y0] = flatXY(smoothPts([local(s, aF, LIFT_LAT*s.cs), local(s, s.edge, LIFT_LAT*s.cs), local(s, 0, LIFT_LAT*s.cs), ...s.liftUp])), c0 = [0], f = {};
-  for (let i = 1; i < X0.length; i++) c0.push(c0[i-1] + Math.hypot(X0[i] - X0[i-1], Y0[i] - Y0[i-1]));
-  const L = c0[c0.length - 1], n = Math.round(L) + 1, ds = L/(n - 1), X = [], Y = [], cum = [];
-  for (let k = 0, j = 0; k < n; k++){ const c = k*ds; while (j < X0.length - 2 && c0[j+1] < c) j++; const u = Math.min(1, (c - c0[j])/(c0[j+1] - c0[j] || 1)); X.push(X0[j] + (X0[j+1] - X0[j])*u); Y.push(Y0[j] + (Y0[j+1] - Y0[j])*u); cum.push(c); }
-  const fl = X.map((x, i) => caveField(x, Y[i], f).floor);
-  // the profile: the lowest climb from the foot's portal to the top's that never steepens (a concave line over the
-  // floor, clearing it by 0.7 m), its bends rounded off over 24 m, and easing in from level over its first and last
-  // 14 m, so it starts and finishes flat at the portals. it only ever climbs, its grade changes only gently, and where
-  // the floor drops away it floats clear like any bridge (on pylons). the top finishes level with the floor there
-  const E = 14, h0 = fl[0] + 0.02; let hTop = -Infinity; for (let i = 0; i < n; i++) if (L - cum[i] < 20) hTop = Math.max(hTop, fl[i] + 0.02);
-  const pts = [[0, h0]]; let run = -Infinity;
-  for (let i = 1; i < n - 1; i++){ run = Math.max(run, fl[i] + 0.7*smooth01(4, 16, Math.min(cum[i], L - cum[i]))); if (cum[i] > 4 && L - cum[i] > 4) pts.push([cum[i], Math.min(run, cum[i] > L/2 ? hTop : Infinity)]); }
-  pts.push([L, hTop]);
-  const hull = []; for (const q of pts){ while (hull.length >= 2){ const [o, a] = [hull[hull.length-2], hull[hull.length-1]]; if ((a[0] - o[0])*(q[1] - o[1]) - (a[1] - o[1])*(q[0] - o[0]) >= 0) hull.pop(); else break; } hull.push(q); }
-  let H = cum.map(c => { let k = 0; while (k < hull.length - 2 && hull[k+1][0] < c) k++; const [x0, y0] = hull[k], [x1, y1] = hull[k+1]; return y0 + (y1 - y0)*(c - x0)/(x1 - x0 || 1); });
-  { const w = Math.round(12/ds), o = H.slice(); for (let i = 1; i < n - 1; i++){ const m = Math.min(w, i, n - 1 - i); let t = 0; for (let k = i - m; k <= i + m; k++) t += H[k]; o[i] = t/(2*m + 1); } H = o; }
-  const herm = (u, ha, ma, hb, mb, D) => { const u2 = u*u, u3 = u2*u; return (2*u3 - 3*u2 + 1)*ha + (u3 - 2*u2 + u)*D*ma + (-2*u3 + 3*u2)*hb + (u3 - u2)*D*mb; };
-  { const iE = Math.round(E/ds), hE = H[iE], mE = (H[iE+1] - H[iE-1])/(2*ds), jE = n - 1 - iE, hJ = H[jE], mJ = (H[jE+1] - H[jE-1])/(2*ds);
-    for (let i = 0; i <= iE; i++) H[i] = herm(cum[i]/E, h0, 0, hE, mE, E);
-    for (let i = jE; i < n; i++) H[i] = herm((cum[i] - cum[jE])/(L - cum[jE]), hJ, mJ, hTop, 0, L - cum[jE]); }
-  for (let i = 1; i < n; i++) H[i] = Math.max(H[i], H[i-1]);
-  const C = mkDeck(s.name + ' Magic Carpet', X, Y, Float64Array.from(H), 2, { kind: 'carpet', always: true, diff: 'green' });
-  s.carpet = C; CAVE_BRIDGES.push(C);
+const CAVE_BRIDGES = [];
+// the light bridge up to Plateau 2's upper level: straight at the crown door, its two gates in line with it. open to
+// ride whenever (like a magic carpet), on only through its gates
+{
+  const x0 = CROWN.fx - 62, x1 = CROWN.fx - 11, n = 52, X = [], Y = [], H = [];
+  for (let i = 0; i < n; i++){ const u = i/(n - 1), x = x0 + (x1 - x0)*u; X.push(x); Y.push(CROWN.y);
+    H.push(LV.P2 + 0.02 + (LV.LEDGE - LV.P2)*smooth01(0.08, 0.86, u)); }
+  CAVE_BRIDGES.push(mkDeck('Crown Ramp', X, Y, Float64Array.from(H), 3, { kind: 'ramp', always: true, diff: 'blue' }));
 }
 // the crown room's spiral: a stone path from the floor up round the pillar, widening as it climbs. ride onto its foot
 // and it carries on up (railed both sides); its top is closed, a lookout high under the roof, and you come back down
 // the way you went up. thirty crystals lie along it
 const CROWN_SPIRAL = (() => {
-  const s = CROWN.s, X = [], Y = [], cum = [0], turn = CROWN.turns*2*Math.PI, th0 = Math.PI;
+  const s = CROWN.s, X = [], Y = [], cum = [0], turn = CROWN.turns*2*Math.PI, th0 = Math.PI;   // (on the crown room's floor, at the upper level)
   // a straight lead-in from the floor, heading north to the spiral's west side, then round (anticlockwise on the map)
   for (let k = 0; k < CROWN.lead; k++){ X.push(s.x - CROWN.r0); Y.push(s.y + CROWN.lead - k); }
   const N = 900;
   for (let k = 0; k <= N; k++){ const u = k/N, th = th0 + turn*u, r = CROWN.r0 + (CROWN.r1 - CROWN.r0)*u; X.push(s.x + Math.cos(th)*r); Y.push(s.y + Math.sin(th)*r); }
   for (let i = 1; i < X.length; i++) cum.push(cum[i-1] + Math.hypot(X[i] - X[i-1], Y[i] - Y[i-1]));
   const n = X.length, L = cum[n-1], a = 12, m = CROWN.rise/(L - a/2), H = new Float64Array(n);
-  for (let i = 0; i < n; i++){ const q = cum[i]; H[i] = RING_LEVEL + (q < a ? m*q*q/(2*a) : m*(q - a/2)); }
+  for (let i = 0; i < n; i++){ const q = cum[i]; H[i] = CROWN.lv + (q < a ? m*q*q/(2*a) : m*(q - a/2)); }
   // (an end to get on at, its foot on the floor; its top is closed; no junctions)
   const d = { name: 'Crystal Spiral', X, Y, H, cum, n, L, hw: 2.8, cap: true, always: true, kind: 'spiral', ends: [{ ground: true }, { ground: false }], joins: [], box: [s.x - CROWN.r1 - 6, s.y - CROWN.r1 - 6, s.x + CROWN.r1 + 6, s.y + CROWN.r1 + 6] };
   const sp = []; for (let i = 0; i < n; i += 3) sp.push(X[i], Y[i]);
@@ -1493,18 +1445,23 @@ function cityRampSD(x, y, floor){
 // ---- the courses
 const STATION_TRAILS = [], CAVE_TRAILS = [];
 CAVE_TRAILS.push({ name: 'Mine Shaft', diff: 'blue', pts: SHAFT_PTS });
-for (const s of SPOKES){
-  let line;
-  if (s.theme === 'berms'){ line = [local(s, -s.edge, 0)]; for (let a = -32; a <= 32; a += 4) line.push(local(s, a, BERM_A*Math.sin(2*Math.PI/44*a)*smooth01(38, 24, Math.abs(a)))); line.push(local(s, s.edge, 0)); }
-  else if (s.theme === 'lift'){ line = [local(s, -s.edge, 0)]; for (let a = -32; a <= 32; a += 3) line.push(local(s, a, SLALOM(a)*smooth01(38, 24, Math.abs(a)))); line.push(local(s, s.edge, 0)); }
-  else if (s.theme === 'crown'){ CAVE_TRAILS.push({ name: s.name, diff: 'green', pts: [ringPt(s.a), [CROWN.fx - 3, CROWN.y], [CROWN.fx + 14, CROWN.y], [s.x - CROWN.R + 8, CROWN.y + 6], [CROWN_SPIRAL.X[0], CROWN_SPIRAL.Y[0]]] }); continue; }
-  else line = [local(s, -s.edge, 0), local(s, 0, 0), local(s, s.edge, 0)];
-  CAVE_TRAILS.push({ name: s.name, diff: s.theme === 'lift' ? 'blue' : 'black', pts: [...s.inPts.slice(0, 2), ...line, ...s.outPts.slice(1)] });
+{
+  const H1 = HILLS[0], H2 = HILLS[1], H3 = HILLS[2], along = (hl, a, lat) => [hl.x + lat, hl.y0 + hl.dir*a];
+  // Hill 1: the flat descent down its east half, the slalom down its west
+  const desc = [[-250, 505], along(H1, -20, 12)]; for (let a = 0; a <= H1.L; a += 30) desc.push(along(H1, a, 14)); desc.push(along(H1, H1.L + 22, 6), [P2C.x - 4, P2C.y + 6]);
+  CAVE_TRAILS.push({ name: 'Hill 1 Descent', diff: 'green', pts: desc });
+  const sl = [[-262, 500], along(H1, -18, -16)]; for (let a = 0; a <= H1.L; a += 4.5) sl.push(along(H1, a, SLALOM(a)*smooth01(0, 18, a)*smooth01(H1.L, H1.L - 18, a) + (1 - smooth01(0, 18, a)*smooth01(H1.L, H1.L - 18, a))*-16));
+  sl.push(along(H1, H1.L + 20, -16), [P2C.x - 14, P2C.y + 4]);
+  CAVE_TRAILS.push({ name: 'Hill 1 Slalom', diff: 'blue', pts: sl });
+  // across Plateau 2 to the top of Hill 2, and the berm path down it (Hill 2 runs south)
+  const bp = [[P2C.x - 14, P2C.y + 4], [-300, 112], along(H2, -18, 0)]; for (let a = 0; a <= H2.L; a += 5) bp.push(along(H2, a, bermPath(H2, a))); bp.push(along(H2, H2.L + 22, 0), [-372, 512]);
+  CAVE_TRAILS.push({ name: 'Hill 2 Berm Path', diff: 'black', pts: bp });
+  // across Plateau 3 and down the half-pipe to the basement and its teleporter
+  const hp = [[-372, 512], [-410, 508], along(H3, -20, 0)]; for (let a = 0; a <= H3.L; a += 30) hp.push(along(H3, a, 0)); hp.push(along(H3, H3.L + 24, 0), [-440, 90], [PORTAL_X - 4, TRANSPORT[0].y]);
+  CAVE_TRAILS.push({ name: 'Hill 3 Half-pipe', diff: 'black', pts: hp });
+  // the crown room, from the ramp's top (on the ledge) through the door to the spiral's foot
+  CAVE_TRAILS.push({ name: 'Crown Room', diff: 'green', pts: [[CROWN.fx - 12, CROWN.y], [CROWN.fx + 14, CROWN.y], [CROWN.s.x - CROWN.R + 8, CROWN.y + 6], [CROWN_SPIRAL.X[0], CROWN_SPIRAL.Y[0]]] });
 }
-{ const pts = [[PORTAL_X, TRANSPORT[0].y], [TRANSPORT[0].x, TRANSPORT[0].y]];
-  for (let a = RING_A1 - 6; a >= RING_A0 + 6; a -= 8) pts.push(ringPt(a));
-  pts.push([TRANSPORT[1].x, TRANSPORT[1].y], [PORTAL_X, TRANSPORT[1].y]);
-  CAVE_TRAILS.push({ name: 'Village Loop', diff: 'green', pts }); }
 { const circle = (R, name, w) => { const pts = []; for (let k = 0; k <= 72; k++){ const t = k/72*2*Math.PI; pts.push([STATION.x + Math.cos(t)*R, STATION.y + Math.sin(t)*R]); } STATION_TRAILS.push({ name, diff: 'green', pts, w }); };
   circle(STATION.R, 'Main Walkway', 2*STATION.hw); circle(STATION.deckR, 'Hub Deck', 2*STATION.deckHW);
   for (const w of STATION.arms) STATION_TRAILS.push({ name: w[5], diff: 'green', pts: [[w[0], w[1]], [(w[0] + w[2])/2, (w[1] + w[3])/2], [w[2], w[3]]], w: 2*w[4] });
@@ -1528,7 +1485,7 @@ for (const t of [...CAVE_TRAILS, ...STATION_TRAILS]){
 }
 const layerTrails = () => UNDER ? (ONSTATION ? STATION_TRAILS : CAVE_DECK ? [CAVE_DECK.d.trail] : CAVE_TRAILS) : TRAILS;
 // where the courses meet (centring eases off near these)
-const CAVE_JUNCTION_PTS = [[CAVE_C.x, CAVE_C.y], ...SPOKES.map(s => ringPt(s.a)), ...TRANSPORT.map(T => [PORTAL_X, T.y])];
+const CAVE_JUNCTION_PTS = [[CAVE_C.x, CAVE_C.y], [P2C.x, P2C.y], [-372, 512], ...TRANSPORT.map(T => [PORTAL_X, T.y])];
 const STATION_JUNCTION_PTS = [...STATION.walks.map(w => [w[0], w[1]]), ...STATION.arms.map(w => [w[2], w[3]]), [STATION.ramp.X[0], STATION.ramp.Y[0]], [STATION.ramp.X[STATION.ramp.n-1], STATION.ramp.Y[STATION.ramp.n-1]]];
 // ================= end of the cavern's ground =================
 // distance from a point to the nearest groomed centre line
@@ -7831,10 +7788,10 @@ function buildCaveDressing(){
   }
   // a light over each room
   for (const R of ROOMS){
-    const pts = R.ring ? [RING_A0 + 25, 80, 130, 180, 230, 280, RING_A1 - 25].map(a => ringPt(a)) : [[R.circles[0][0], R.circles[0][1]]];
+    const pts = R.hill ? R.circles.filter((c, i) => i % 7 === 3).map(c => [c[0], c[1]]) : R.circles.slice(0, 2).map(c => [c[0], c[1]]);
     for (const [x, y] of pts){
       caveField(x, y, f);
-      const L = new THREE.PointLight(R.transport ? 0xcfd8ff : 0xa58cf0, 0, R.ring ? 90 : 85, 1.2); L.position.set(x, f.floor + Math.min(14, (f.ceil - f.floor)*0.6), y); scene.add(L);
+      const L = new THREE.PointLight(R.transport ? 0xcfd8ff : R.hill ? 0xffc68a : 0xa58cf0, 0, R.hill ? 70 : 85, 1.2); L.position.set(x, f.floor + Math.min(14, (f.ceil - f.floor)*0.6), y); scene.add(L);
       caveLights.push({ L, k: R.transport ? 0.9 : 0.8 });
     }
   }
@@ -7866,11 +7823,11 @@ function buildCaveDressing(){
       if (k % 15 === 0){ const L = new THREE.PointLight(0xffb468, 0, 26, 1.4); L.position.set(cx, f.ceil - 0.8, cy); scene.add(L); caveLights.push({ L, k: 1.1 }); }
     }
   }
-  // the slalom: gates of two poles, alternating red and blue, at each turn of its line
-  { const s = LIFT_SPOKE, poleG = new THREE.CylinderGeometry(0.05, 0.05, 1.9, 6), mats = [new THREE.MeshLambertMaterial({ color: 0xd9463e }), new THREE.MeshLambertMaterial({ color: 0x2f6fd6 })];
+  // the slalom down Hill 1's west half: gates of two poles, alternating red and blue, at each turn of its line
+  { const hl = HILLS[0], poleG = new THREE.CylinderGeometry(0.05, 0.05, 1.9, 6), mats = [new THREE.MeshLambertMaterial({ color: 0xd9463e }), new THREE.MeshLambertMaterial({ color: 0x2f6fd6 })];
     let k = 0;
-    for (let a = -27; a <= 27; a += 18, k++) for (const sd of [-1, 1]){
-      const [x, y] = local(s, a, SLALOM(a)*smooth01(38, 24, Math.abs(a)) + sd*2.2); caveField(x, y, f);
+    for (let a = 27; a <= hl.L - 20; a += 18, k++) for (const sd of [-1, 1]){
+      const x = hl.x + SLALOM(a) + sd*2.2, y = hl.y0 + hl.dir*a; caveField(x, y, f);
       const m = new THREE.Mesh(poleG, mats[k % 2]); m.position.set(x, f.floor + 0.95, y); scene.add(m);
       const fl = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.45), mats[k % 2]); fl.material.side = THREE.DoubleSide; fl.position.set(x, f.floor + 1.6, y); scene.add(fl);
     } }
@@ -7878,7 +7835,7 @@ function buildCaveDressing(){
   // a floor-to-ceiling door in it bearing a great gold crown; columns capped with glowing crystal and arches across
   // its face, like the observatory's gateway. the door sinks into the floor when it opens
   {
-    const fx = CROWN.fx, y0 = CROWN.y, b = ringBase(fx, y0), sp = CROWN.span, dhw = CROWN.dhw, dH = CROWN.dH;
+    const fx = CROWN.fx, y0 = CROWN.y, b = CROWN.lv, sp = CROWN.span, dhw = CROWN.dhw, dH = CROWN.dH;
     const stone = new THREE.MeshLambertMaterial({ color: 0xc4ad8c, flatShading: true, side: THREE.DoubleSide }), stoneD = new THREE.MeshLambertMaterial({ color: 0x8c7458, flatShading: true });
     const boneM = new THREE.MeshLambertMaterial({ color: 0xe6dccb, flatShading: true }), boneM2 = new THREE.MeshLambertMaterial({ color: 0xd2c4ad, flatShading: true });
     let top = b + 30; for (let u = -sp; u <= sp; u += 3){ caveField(fx + 0.5, y0 + u, f); top = Math.max(top, f.ceil + 4); }
@@ -7912,7 +7869,7 @@ function buildCaveDressing(){
   }
   // the great crystal: a pillar from the floor into the roof, glowing, with crystals clustered round its foot
   {
-    const s = CROWN.s, b = RING_LEVEL;
+    const s = CROWN.s, b = CROWN.lv;
     const pm = new THREE.MeshLambertMaterial({ color: 0x9479d6, emissive: 0x4b2f8f, flatShading: true });
     const pg = new THREE.Group(); pg.position.set(s.x, b, s.y); scene.add(pg);
     pt(pg, cy(CROWN.pillarR*0.55, CROWN.pillarR, CROWN.H + 4, 6), pm, 0, (CROWN.H + 4)/2 - 1, 0);
@@ -7956,18 +7913,23 @@ function buildCaveDressing(){
   const wallMat = new THREE.MeshLambertMaterial({ color: 0x4a5462, side: THREE.DoubleSide }), frameMat = new THREE.MeshBasicMaterial({ color: 0xb79cff });
   const genMat = new THREE.MeshLambertMaterial({ color: 0x5d6876 });
   for (const T of TRANSPORT){
-    const b = RING_LEVEL, DH = 7.5;
+    const b = RING_LEVEL, DH = 12;
     const sh = new THREE.Shape(); sh.moveTo(-34, -4); sh.lineTo(34, -4); sh.lineTo(34, 36); sh.lineTo(-34, 36); sh.lineTo(-34, -4);
     const hole = new THREE.Path(); hole.moveTo(-PORTAL_HW, 0); hole.lineTo(-PORTAL_HW, DH); hole.lineTo(PORTAL_HW, DH); hole.lineTo(PORTAL_HW, 0); hole.lineTo(-PORTAL_HW, 0); sh.holes.push(hole);
     const toWorld = (geo, dx = 0) => { const p = geo.attributes.position; for (let v = 0; v < p.count; v++){ const u = p.getX(v), h = p.getY(v); p.setXYZ(v, PORTAL_X + dx, b + h, T.y + u); } geo.computeVertexNormals(); geo.computeBoundingSphere(); return geo; };
     scene.add(new THREE.Mesh(toWorld(new THREE.ShapeGeometry(sh), -0.08), wallMat));
+    // the great ring round the doorway: a massive torus of dark steel with a band of light inside it
+    { const ring = new THREE.Mesh(new THREE.TorusGeometry(11, 1.6, 14, 64), new THREE.MeshLambertMaterial({ color: 0x4a5462, emissive: 0x121620 }));
+      ring.rotation.y = Math.PI/2; ring.position.set(PORTAL_X - 0.6, b + 8.5, T.y); scene.add(bothWorlds(ring));
+      const glow = new THREE.Mesh(new THREE.TorusGeometry(9.6, 0.25, 8, 64), frameMat); glow.rotation.y = Math.PI/2; glow.position.set(PORTAL_X - 1.2, b + 8.5, T.y); scene.add(bothWorlds(glow));
+      for (const sd of [-1, 1]){ const leg = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 3), new THREE.MeshLambertMaterial({ color: 0x3b4654 })); leg.position.set(PORTAL_X - 1.2, b + 1.5, T.y + sd*8.6); scene.add(leg); } }
     for (const [w, h, u, v] of [[0.5, DH + 0.5, -PORTAL_HW - 0.25, DH/2], [0.5, DH + 0.5, PORTAL_HW + 0.25, DH/2], [2*PORTAL_HW + 1, 0.5, 0, DH + 0.25]]){
       const m = new THREE.Mesh(new THREE.BoxGeometry(0.6, h, w), frameMat); m.position.set(PORTAL_X - 0.4, b + v, T.y + u); scene.add(bothWorlds(m));
     }
     const mem = new THREE.Mesh(toWorld(new THREE.PlaneGeometry(2*PORTAL_HW, DH).translate(0, DH/2, 0), -0.2), new THREE.MeshBasicMaterial({ color: 0x2c2238, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false }));
     scene.add(bothWorlds(mem)); caveDress.membranes.push(mem);
     for (const sd of [-1, 1]){
-      const gx = PORTAL_X - 10, gy = T.y + sd*12; caveField(gx, gy, f);
+      const gx = PORTAL_X - 12, gy = T.y + sd*20; caveField(gx, gy, f);
       const g = new THREE.Group(); g.position.set(gx, f.floor, gy); scene.add(g);
       const body = new THREE.Mesh(new THREE.CylinderGeometry(3, 3.3, 8, 20), genMat); body.position.y = 4; g.add(body);
       const band = new THREE.Mesh(new THREE.CylinderGeometry(3.05, 3.05, 0.6, 20), new THREE.MeshBasicMaterial({ color: 0x3a3048 })); band.position.y = 6.2; g.add(band);
@@ -7999,9 +7961,10 @@ function buildCaveDressing(){
         return 3.4; },
       lamp: g => { Cy(g, 0.07, 0.09, 4.2, M.steel, 0, 2.1, 0); B(g, 0.9, 0.08, 0.08, M.steel, 0.4, 4.15, 0); const l = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), lampMat); l.position.set(0.8, 3.95, 0); g.add(l); B(g, 0.5, 0.2, 0.5, M.dark, 0, 0.1, 0); return 0.5; },
       reel: g => { Cy(g, 0.9, 0.9, 0.12, M.wood, 0, 0.9, -0.45, Math.PI/2); Cy(g, 0.9, 0.9, 0.12, M.wood, 0, 0.9, 0.45, Math.PI/2); Cy(g, 0.6, 0.6, 0.8, M.dark, 0, 0.9, 0, Math.PI/2); return 1.0; },
+      bin: g => { B(g, 3.2, 1.6, 2.2, M.rust, 0, 1.0, 0); B(g, 3.0, 0.1, 2.0, M.dark, 0, 1.82, 0); for (const x of [-1.4, 1.4]) for (const z of [-0.9, 0.9]) B(g, 0.2, 0.4, 0.2, M.steel, x, 0.2, z); return 2.0; },
       barrier: g => { for (const x of [-1.4, 1.4]) Cy(g, 0.06, 0.06, 1.1, M.steel, x, 0.55, 0); for (let k = 0; k < 6; k++) B(g, 0.5, 0.22, 0.06, k % 2 ? M.white : M.red, -1.25 + k*0.5, 1.0, 0); return 1.5; },
     };
-    const kinds = Object.keys(KIT), near = ['hut', 'compressor', 'reel', 'crates', 'barrels', 'lamp', 'cart', 'conveyor'];
+    const kinds = Object.keys(KIT), near = ['compressor', 'reel', 'crates', 'barrels', 'lamp', 'cart', 'cart', 'conveyor', 'conveyor', 'bin', 'bin', 'drill'];
     const src = new THREE.Group(), placed = [];
     const clearOfBridges = (x, y, r) => [...CAVE_BRIDGES, CROWN_SPIRAL].every(d => x < d.box[0] - r || x > d.box[2] + r || y < d.box[1] - r || y > d.box[3] + r || cityProj(d, x, y, null).dist > d.hw + r + 1.5);
     const tryPut = (kind, x, y) => {
@@ -8010,7 +7973,7 @@ function buildCaveDressing(){
       if (sl > 0.45) return false;
       if (placed.some(p => Math.hypot(p[0] - x, p[1] - y) < p[2] + 4)) return false;
       if (CAVE_SOLIDS.some(o => Math.hypot(o.x - x, o.y - y) < o.r + 4)) return false;
-      if (!offTrail(x, y, 8) || cityStreetSD(x, y) < 2 || !clearOfBridges(x, y, 2) || inCrownRoom(x, y) || Math.hypot(x - CROWN.fx, y - CROWN.y) < 30) return false;
+      if (!offTrail(x, y, 8) || !clearOfBridges(x, y, 2) || inCrownRoom(x, y) || Math.hypot(x - CROWN.fx, y - CROWN.y) < 30 || villageSD(x, y) < 3) return false;
       if (x > PORTAL_X - 3 && TRANSPORT.some(T => Math.abs(y - T.y) < 36)) return false;
       const g = new THREE.Group(); const r = KIT[kind](g); g.position.set(x, fl - 0.05, y); g.rotation.y = rnd()*Math.PI*2; src.add(g);
       placed.push([x, y, r]); if (kind !== 'lamp') CAVE_SOLIDS.push({ x, y, r: r*0.8 });
@@ -8018,62 +7981,67 @@ function buildCaveDressing(){
     };
     // each room: a handful at random spots on open floor
     for (const R of ROOMS){
-      if (R.spoke && R.spoke.theme === 'crown') continue;
-      const want = R.transport ? 16 : R.ring ? 46 : R.name === 'The Hub' ? 7 : 9;
+      if (R.crown || R.key === 'p1') continue;
+      const want = R.transport ? 22 : R.key === 'p3' ? 16 : R.key === 'p2' ? 6 : R.hill ? 5 : 6;
       let n = 0;
       for (let k = 0; k < 3000 && n < want; k++){
         const c = R.circles[(rnd()*R.circles.length) | 0], a = rnd()*Math.PI*2, rr = Math.sqrt(rnd())*c[2]*0.95, x = c[0] + Math.cos(a)*rr, y = c[1] + Math.sin(a)*rr;
-        if (R.transport && Math.hypot(x - R.transport.x, y - R.transport.y) > 30) continue;
+        if (R.transport && Math.hypot(x - R.transport.x, y - R.transport.y) > 44) continue;
         const kind = R.transport ? near[(rnd()*near.length) | 0] : kinds[(rnd()*kinds.length) | 0];
         if (tryPut(kind, x, y)) n++;
       }
     }
     scene.add(mergeModel(src));
   }
-  // ---- the cave city: terraced adobe dwellings up both walls of the story ring, windows and doorways facing the street
+  // ---- the plateaus: Plateau 2's village (adobe houses in the 1.0 cave city's style, on two levels), Plateau 3's ruins
+  // (foundations and rubble), Plateau 1's camp of tents and the aliens living there, and the basement's trucks
   {
     const box = new THREE.BoxGeometry(1, 1, 1), mats = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
     const winMat = new THREE.MeshBasicMaterial({ color: 0x241c1a });
-    const N = 900, bm = new THREE.InstancedMesh(box, mats, N), wm = new THREE.InstancedMesh(box, winMat, N*2);
-    const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), Sv = new THREE.Vector3(), Pv = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
-    const pal = [0xb79f80, 0xa88d6d, 0x9c8264, 0xc2ab8c, 0x8f7559];
+    const N = VILLAGE.length*6 + 40, bm = new THREE.InstancedMesh(box, mats, N), wm = new THREE.InstancedMesh(box, winMat, N);
+    const M = new THREE.Matrix4(), Q = new THREE.Quaternion(), Sv = new THREE.Vector3(), Pv = new THREE.Vector3(), Yv = new THREE.Vector3(0, 1, 0), col = new THREE.Color();
+    const pal = [0xb79f80, 0xa88d6d, 0x9c8264, 0xc2ab8c, 0x8f7559], rpal = [0x8a7a68, 0x7a6b5a, 0x958571];
     let nb = 0, nw = 0;
-    // nothing stands up into a terrace: anything whose footprint comes under one is cut down to sit beneath it
-    caveDress.bld = [];
-    const put = (a, lat, depth, len, base, top, side) => {
-      { const ux = Math.cos(rad(a)), uy = Math.sin(rad(a)), [cx, cy0] = polar(a, ringR(a) + lat);
-        for (const dk of CAVE_BRIDGES){
-          if (cx < dk.box[0] - 8 || cx > dk.box[2] + 8 || cy0 < dk.box[1] - 8 || cy0 > dk.box[3] + 8) continue;
-          for (const u of [-0.5, 0, 0.5]) for (const v of [-0.5, -0.25, 0, 0.25, 0.5]){
-            const q = cityProj(dk, cx + ux*u*depth - uy*v*len, cy0 + uy*u*depth + ux*v*len, null);
-            if (q.dist < dk.hw + 1.2) top = Math.min(top, q.h - 1.0);
-          }
+    const blk = (x, y, z, w, h, d, a, hex) => { if (nb >= N) return; Q.setFromAxisAngle(Yv, -a); Pv.set(x, y, z); Sv.set(d, h, w); M.compose(Pv, Q, Sv); bm.setMatrixAt(nb, M); col.setHex(hex); bm.setColorAt(nb, col); nb++; };
+    for (const b of VILLAGE){
+      const c = Math.cos(b.a), sn = Math.sin(b.a);
+      if (b.kind === 'house'){
+        blk(b.x, b.base - 1 + (b.h + 1)/2, b.y, b.w, b.h + 1, b.d, b.a, pal[(rnd()*pal.length) | 0]);
+        if (rnd() < 0.5) blk(b.x - c*b.d*0.15, b.base + b.h + 1.4, b.y - sn*b.d*0.15, b.w*0.55, 2.8, b.d*0.6, b.a, pal[(rnd()*pal.length) | 0]);   // a second storey
+        // a doorway and a window or two on its face (toward the plateau's middle)
+        const fx = b.x + c*(b.d/2 + 0.03), fy = b.y + sn*(b.d/2 + 0.03), tx = -sn, ty = c, nWin = 1 + (rnd()*2 | 0);
+        for (let k = 0; k <= nWin && nw < N; k++){
+          const o = (k - nWin/2)*b.w*0.3, door = k === 0, wh = door ? Math.min(2.4, b.h*0.6) : 1.1, wy = door ? b.base + wh/2 : b.base + b.h*0.62;
+          Q.setFromAxisAngle(Yv, -b.a); Pv.set(fx + tx*o, wy, fy + ty*o); Sv.set(0.08, wh, door ? 1.4 : 1.0); M.compose(Pv, Q, Sv); wm.setMatrixAt(nw++, M);
         }
-        if (nb < N && top - base >= 1.2) caveDress.bld.push([cx, cy0, ux, uy, depth, len, base, top]); }
-      if (nb >= N || top - base < 1.2) return;
-      const [x, y] = polar(a, ringR(a) + lat), h = top - base;
-      Q.setFromAxisAngle(Y, -rad(a)); Pv.set(x, base + h/2, y); Sv.set(depth, h, len); M.compose(Pv, Q, Sv); bm.setMatrixAt(nb, M);
-      col.setHex(pal[(rnd()*pal.length) | 0]); bm.setColorAt(nb, col); nb++;
-      // a doorway or a window or two on the face toward the street
-      const ux = Math.cos(rad(a)), uy = Math.sin(rad(a)), fx = x - side*ux*(depth/2 + 0.03), fy = y - side*uy*(depth/2 + 0.03), tx = -uy, ty = ux;
-      const nWin = 1 + (rnd()*2 | 0);
-      for (let k = 0; k < nWin && nw < N*2; k++){
-        const o = (k - (nWin - 1)/2)*len*0.35, door = k === 0 && rnd() < 0.5, wh = door ? Math.min(2.4, h*0.6) : 1.1, wy = door ? base + wh/2 : base + h*0.6;
-        Pv.set(fx + tx*o, wy, fy + ty*o); Sv.set(0.08, wh, door ? 1.4 : 1.0); M.compose(Pv, Q, Sv); wm.setMatrixAt(nw++, M);
+      } else {
+        // a ruin: the stubs of its walls, broken off unevenly, and rubble inside and round it
+        for (const [u, v, w, d] of [[b.d/2, 0, b.w, 0.6], [-b.d/2, 0, b.w, 0.6], [0, b.w/2, 0.6, b.d], [0, -b.w/2, 0.6, b.d]]){
+          if (rnd() < 0.25) continue;
+          const hh = 0.3 + rnd()*b.h, wx = b.x + c*u - sn*v, wy = b.y + sn*u + c*v;
+          blk(wx, b.base - 0.4 + (hh + 0.4)/2, wy, w*(0.5 + rnd()*0.5), hh + 0.4, d, b.a, rpal[(rnd()*rpal.length) | 0]);
+        }
+        for (let k = 0; k < 6; k++){ const r = 0.3 + rnd()*0.7, ox = (rnd() - 0.5)*b.d*1.4, oy = (rnd() - 0.5)*b.w*1.4;
+          const m = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), lam(rpal[k % 3])); m.material.flatShading = true; m.position.set(b.x + ox, b.base + r*0.4, b.y + oy); m.rotation.set(rnd()*3, rnd()*3, 0); scene.add(m); }
       }
-    };
-    for (const side of [1, -1]) for (let a = 34; a < 326; a += 2.4){
-      if (!cityBuilt(a, side)) continue;
-      const W = ringW(a), len = rad(2.4)*(ringR(a) + side*(W - 9))*0.86;
-      const lat1 = side*(W - 9.5), [x1, y1] = polar(a, ringR(a) + lat1); caveField(x1, y1, f);
-      // the first row: under a terrace it holds the terrace up; under a low ramp there's no room for one
-      const top1 = f.floor + 3.5 + rnd()*2.5;
-      put(a, lat1, 6, len, f.floor - 1, top1, side);
-      const lat2 = side*(W - 4), [x2, y2] = polar(a, ringR(a) + lat2); caveField(x2, y2, f);
-      const top2 = Math.max(top1, f.floor) + 4 + rnd()*5; put(a + (rnd() - 0.5)*0.6, lat2, 3, len*0.9, f.floor - 1, top2, side);
-      if (rnd() < 0.7){ const lat3 = side*(W - 1.5), [x3, y3] = polar(a, ringR(a) + lat3); caveField(x3, y3, f); put(a + (rnd() - 0.5)*0.8, lat3, 3, len*0.8, f.floor - 1, Math.max(top2, f.floor) + 3 + rnd()*5, side); }
     }
     bm.count = nb; wm.count = nw; bm.instanceColor.needsUpdate = true; scene.add(bm); scene.add(wm);
+    // Plateau 1: tents and lean-tos round its edge, a fire, and the people living here
+    let cs = 51; const crnd = () => (cs = (cs * 16807) % 2147483647) / 2147483647;
+    for (const [a, r] of [[60, 30], [130, 31], [175, 30], [215, 32], [345, 28]]){
+      const ar = a*Math.PI/180, x = CAVE_C.x + Math.cos(ar)*r, y = CAVE_C.y + Math.sin(ar)*r; caveField(x, y, f);
+      const g = BUILD.camp(crnd); g.position.set(x, f.floor - 0.05, y); g.rotation.y = -ar - Math.PI/2; scene.add(g); CAVE_SOLIDS.push({ x, y, r: 4.5 });
+    }
+    caveDress.aliens = [];
+    for (let k = 0; k < 7; k++){
+      const ar = (40 + k*45)*Math.PI/180, r = 14 + crnd()*10, x = CAVE_C.x + Math.cos(ar)*r, y = CAVE_C.y + Math.sin(ar)*r; caveField(x, y, f);
+      const rig = buildAlien(crnd); rig.root.position.set(x, f.floor, y); rig.root.rotation.y = -Math.atan2(CAVE_C.x - x, -(CAVE_C.y - y)); scene.add(rig.root);
+      caveDress.aliens.push({ rig, ph: crnd()*6 }); CAVE_SOLIDS.push({ x, y, r: 0.6 });
+    }
+    // the basement: big haul trucks parked along its walls
+    for (const [x, y, rot] of [[-468, 120, 0.3], [-478, 76, -0.2], [-452, 46, 1.4]]){
+      caveField(x, y, f); const g = BUILD.haul(); g.scale.setScalar(1.6); g.position.set(x, f.floor, y); g.rotation.y = rot; scene.add(g); CAVE_SOLIDS.push({ x, y, r: 6.5 });
+    }
   }
   // ---- the terraces, as light bridges like the ones up top: a deck of light that shows only while you're riding it
   // (pylons hold it up where no rooftop does), and a portal at each foot, two white posts that gain caps of light and
@@ -8112,8 +8080,6 @@ function buildCaveDressing(){
       for (let i = 0; i < d.n; i++){
         if (d.cum[i] < next || d.L - d.cum[i] < 12) continue;
         caveField(d.X[i], d.Y[i], f); const clear = d.H[i] - f.floor; if (clear < 4) continue;
-        const [a, lat, Wd] = ringLocal(d.X[i], d.Y[i]), overStreet = Math.abs(lat) < Wd - STREET_EDGE, inRing = Math.abs(lat) < Wd;
-        if (d.kind === 'carpet' ? inRing : overStreet ? Math.abs(lat) < 7 : cityBuilt(a, lat > 0 ? 1 : -1)) continue;
         next = d.cum[i] + 30;
         const hgt = clear + 1.5, col = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 1.1, hgt, 10), post); col.position.set(d.X[i], f.floor - 1.5 + hgt/2 - 0.6, d.Y[i]); scene.add(col);
         const head = new THREE.Mesh(new THREE.BoxGeometry(2*d.hw*0.8, 0.5, 1.6), post); head.position.set(d.X[i], d.H[i] - 0.95, d.Y[i]);
@@ -8325,7 +8291,7 @@ const portalMask = (() => {
     fragmentShader: 'void main(){ gl_FragColor = vec4(0.0); gl_FragDepthEXT = 1.0; }', depthFunc: THREE.AlwaysDepth, colorWrite: false, side: THREE.DoubleSide, extensions: { fragDepth: true } });
   const sc2 = new THREE.Scene(), doorMat = new THREE.MeshBasicMaterial({ colorWrite: false, side: THREE.DoubleSide });
   for (const T of TRANSPORT){
-    const g = new THREE.PlaneGeometry(2*PORTAL_HW, 7.5); g.rotateY(Math.PI/2); g.translate(PORTAL_X, RING_LEVEL + 3.75, T.y);
+    const g = new THREE.PlaneGeometry(2*PORTAL_HW, 12); g.rotateY(Math.PI/2); g.translate(PORTAL_X, RING_LEVEL + 6, T.y);
     const m = new THREE.Mesh(g, farMat); m.renderOrder = 1; m.frustumCulled = false; sc.add(m);
     const d = new THREE.Mesh(g, doorMat); d.frustumCulled = false; sc2.add(d);            // the doorway at its true depth
   }
@@ -8511,10 +8477,10 @@ loadProgress(); applyRegalia(); calfUI();
 // the cave sandbox: every visit starts on the Mine Road, a little way out from the mine, facing in
 function caveSpawn(where){
   ONSTATION = false; CAVE_DECK = null;
-  if (where === 'ring'){ const a = 58, [x, y] = polar(a, ringR(a)); spawnAt(x, y, Math.atan2(-Math.sin(rad(a)), -Math.cos(rad(a)))); UNDER = true; }
-  else if (where === 'hall'){ spawnAt(CAVE_C.x + 8, CAVE_C.y, -Math.PI/2); UNDER = true; }
+  if (where === 'ring'){ spawnAt(P2C.x - 6, P2C.y + 30, Math.PI); UNDER = true; }   // (Plateau 2, at the foot of Hill 1)
+  else if (where === 'hall'){ spawnAt(CAVE_C.x + 8, CAVE_C.y - 10, Math.PI); UNDER = true; }   // (Plateau 1, facing down Hill 1)
   else if (where === 'port'){ spawnAt(PORTAL_X - 16, TRANSPORT[0].y, Math.PI/2); UNDER = true; }
-  else if (where === 'crown'){ spawnAt(CROWN.fx - 24, CROWN.y + 10, Math.PI/2); UNDER = true; }
+  else if (where === 'crown'){ spawnAt(CROWN.fx - 70, CROWN.y, Math.PI/2); UNDER = true; }   // (Plateau 2, lined up with the light bridge to the crown door)
   else if (where === 'station'){ TRANSPORT[0].open = true; savePortals(); spawnAt(PORTAL_X + 14, TRANSPORT[0].y, Math.PI/2); UNDER = true; ONSTATION = true; }
   else { UNDER = false; const a = [22, 283], b = [4, 293]; spawnAt(a[0], a[1], Math.atan2(b[0] - a[0], -(b[1] - a[1]))); }
   clearTracks();
@@ -8685,7 +8651,7 @@ $('caveRegalia').addEventListener('click', () => { outfit = !outfit; saveEnd(); 
 $('ceremonyBtn').addEventListener('click', () => { ceremony = (ceremony + 1) % 3; if (ceremony === 2) crownSpent = 'altar'; else if (crownSpent === 'altar') crownSpent = ''; saveCrown(); saveEnd(); calfUI(); regaliaBtn(); });
 regaliaBtn();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { sfx, music, applyStage, get gate4Open2(){ return gate4Open; }, giantUp(){ return giant.up; }, get checkpoint(){ return checkpoint; }, get promptCtx(){ return promptCtx; }, updateCourt, OBS_ALTAR, eldersIn, courtOpen, SHIP_SPOT, setCrownAll(){ crownGot = [...Array(CROWN.n).keys()]; crownSpent = ''; saveCrown(); }, get crownSpent(){ return crownSpent; }, get ceremony(){ return ceremony; }, get outfit(){ return outfit; }, set outfit(v){ outfit = v; }, get cosK(){ return cosK; }, camera, get toastText(){ return document.getElementById("toast").textContent; }, CAVE_BRIDGES, CROWN, CROWN_SPIRAL, get crownGot(){ return crownGot; }, crownReset, inCrownRoom, caveField, caveFloor, caveSD, CAVE_TRAILS, SHAFT, HALLS, ROOMS, SPOKES, STATION, TRANSPORT, PORTAL_X, stationD, cavePowered, get stationK(){ return stationK; }, caveDress, MINE, CAVE_BOX, caveTiles, caveSpawn, mineCut, mineRidge, heightNat, get UNDER(){ return UNDER; }, set UNDER(v){ UNDER = v; }, CITY_DECKS, get CAVE_DECK(){ return CAVE_DECK; }, set CAVE_DECK(v){ CAVE_DECK = v; }, cityStreetSD, ringLocal, stationFloor, get ONSTATION(){ return ONSTATION; }, set ONSTATION(v){ ONSTATION = v; }, CROWN_GATE, STATION_TRAILS, portalView, get caveK(){ return caveK; }, CAVE_SOLIDS, caveMask, pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get bridge2Down(){ return bridge2Down; }, SPUR_PASS, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { sfx, music, applyStage, get gate4Open2(){ return gate4Open; }, giantUp(){ return giant.up; }, get checkpoint(){ return checkpoint; }, get promptCtx(){ return promptCtx; }, updateCourt, OBS_ALTAR, eldersIn, courtOpen, SHIP_SPOT, setCrownAll(){ crownGot = [...Array(CROWN.n).keys()]; crownSpent = ''; saveCrown(); }, get crownSpent(){ return crownSpent; }, get ceremony(){ return ceremony; }, get outfit(){ return outfit; }, set outfit(v){ outfit = v; }, get cosK(){ return cosK; }, camera, get toastText(){ return document.getElementById("toast").textContent; }, CAVE_BRIDGES, CROWN, CROWN_SPIRAL, get crownGot(){ return crownGot; }, crownReset, inCrownRoom, caveField, caveFloor, caveSD, CAVE_TRAILS, SHAFT, HALLS, ROOMS, SPOKES, STATION, TRANSPORT, PORTAL_X, stationD, cavePowered, get stationK(){ return stationK; }, caveDress, MINE, CAVE_BOX, caveTiles, caveSpawn, mineCut, mineRidge, heightNat, get UNDER(){ return UNDER; }, set UNDER(v){ UNDER = v; }, CITY_DECKS, get CAVE_DECK(){ return CAVE_DECK; }, set CAVE_DECK(v){ CAVE_DECK = v; }, cityStreetSD, HILLS, LV, VILLAGE, villageSD, P2C, stationFloor, get ONSTATION(){ return ONSTATION; }, set ONSTATION(v){ ONSTATION = v; }, CROWN_GATE, STATION_TRAILS, portalView, get caveK(){ return caveK; }, CAVE_SOLIDS, caveMask, pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get bridge2Down(){ return bridge2Down; }, SPUR_PASS, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

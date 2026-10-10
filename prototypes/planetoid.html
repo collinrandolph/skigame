@@ -68,7 +68,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <div class="row opt"><span>Weight</span><b id="hWeight">100%</b></div>
   <div class="row"><span>From start</span><b id="hFrom">0 m</b></div>
   <div class="row opt"><span>Skied</span><b id="hDist">0 m</b></div>
-  <div class="row opt"><span>Nearest beacon</span><b id="hBeacon">–</b></div>
+  <div class="row opt"><span>Nearest landmark</span><b id="hBeacon">–</b></div>
   <div class="legs"><div class="leg" id="legL">Left</div><div class="leg" id="legR">Right</div></div>
   <div class="help"><b>← →</b> kick (hold to ride the glide) · <b>Space</b> + kick: loaded stroke · <b>↑</b> tuck, <b>← →</b> lean · <b>↓</b> snow plow · <b>V</b> planet view · <b>P</b> 800 m / 300 m planet · <b>R</b> reset</div>
 </div>
@@ -88,7 +88,8 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <label for="tBld">Buildings<output id="oBld"></output><input id="tBld" type="range" min="0" max="3" step="0.25" value="1"></label>
   <label for="tOff">Ungroomed snow (× friction)<output id="oOff"></output><input id="tOff" type="range" min="1" max="12" step="0.5" value="1.5"></label>
   <label for="tPush">Push per kick<output id="oPush"></output><input id="tPush" type="range" min="0.2" max="2.5" step="0.05" value="2.5"></label>
-  <div class="btns"><button id="resetBtn" type="button">Reset skier</button><button id="defaultsBtn" type="button">Defaults</button></div>
+  <div class="btns"><button id="resetBtn" type="button">Reset skier</button><button id="defaultsBtn" type="button">Defaults</button><button id="procBtn" type="button" hidden>Back to procedural planet</button></div>
+  <p class="note" id="layoutNote">Drop a planet.json from the planet editor here to ski it.</p>
   <p class="note">Kick, turn and glide tuning are the main game's defaults.</p>
 </details>
 
@@ -99,6 +100,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="planet-terrain.js"></script>
 <script>
 'use strict';
 // ============================================================================================================
@@ -138,29 +140,11 @@ let saved = {}; try { saved = JSON.parse(localStorage.getItem(STORE) || '{}'); }
 const save = () => { try { const o = { lift: P.lift, daynight: P.daynight }; SETTINGS.forEach(([i]) => { o[i] = $(i).value; }); localStorage.setItem(STORE, JSON.stringify(o)); } catch (e) {} };
 
 // ---------- terrain: 3D gradient noise sampled on the sphere, in metres ----------
-const PERM = (() => {
-  const p = new Uint8Array(256); for (let i = 0; i < 256; i++) p[i] = i;
-  let s = 20261010; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
-  for (let i = 255; i > 0; i--){ const j = Math.floor(rnd()*(i + 1)); const t = p[i]; p[i] = p[j]; p[j] = t; }
-  const q = new Uint8Array(512); for (let i = 0; i < 512; i++) q[i] = p[i & 255]; return q;
-})();
-const fade = t => t*t*t*(t*(t*6 - 15) + 10), lerp = (t, a, b) => a + t*(b - a);
-function gr(h, x, y, z){ h &= 15; const u = h < 8 ? x : y, v = h < 4 ? y : (h === 12 || h === 14) ? x : z; return ((h & 1) ? -u : u) + ((h & 2) ? -v : v); }
-function noise3(x, y, z){
-  const X = Math.floor(x), Y = Math.floor(y), Z = Math.floor(z);
-  x -= X; y -= Y; z -= Z;
-  const xi = X & 255, yi = Y & 255, zi = Z & 255, u = fade(x), v = fade(y), w = fade(z);
-  const A = PERM[xi] + yi, AA = PERM[A] + zi, AB = PERM[A + 1] + zi, B = PERM[xi + 1] + yi, BA = PERM[B] + zi, BB = PERM[B + 1] + zi;
-  return lerp(w,
-    lerp(v, lerp(u, gr(PERM[AA], x, y, z), gr(PERM[BA], x - 1, y, z)), lerp(u, gr(PERM[AB], x, y - 1, z), gr(PERM[BB], x - 1, y - 1, z))),
-    lerp(v, lerp(u, gr(PERM[AA + 1], x, y, z - 1), gr(PERM[BA + 1], x - 1, y, z - 1)), lerp(u, gr(PERM[AB + 1], x, y - 1, z - 1), gr(PERM[BB + 1], x - 1, y - 1, z - 1))));
-}
-// height above the base radius at unit direction (x, y, z). the wavelengths are in metres, so bumps stay the same
-// size whatever the planet's radius: broad swells (~150 m), rolling hills (~60 m) and small humps (~24 m)
-function heightAt(x, y, z){
-  const R = P.R, a = R/150, b = R/60, c = R/24;
-  return 7*noise3(x*a, y*a, z*a) + 2.5*noise3(x*b + 31.7, y*b + 5.1, z*b - 12.3) + 0.7*noise3(x*c - 77.3, y*c + 41.9, z*c + 8.8);
-}
+// the ground comes from planet-terrain.js (shared with the planet editor): the procedural planet, or a layout's
+// noise, stamps and sculpting when one is loaded
+const PTR = window.PlanetTerrain, noise3 = PTR.noise3;
+let LAYOUT = null, TERRAIN = PTR.terrain(null, P.R);
+function heightAt(x, y, z){ return TERRAIN.height(x, y, z); }
 const groundR = d => P.R + heightAt(d.x, d.y, d.z);
 
 // ---------- renderer, scene, camera ----------
@@ -210,6 +194,7 @@ const planetMat = new THREE.MeshLambertMaterial({ vertexColors: true });
 const planet = new THREE.Group(); scene.add(planet);
 let chunks = [];
 function buildPlanet(){
+  TERRAIN = PTR.terrain(LAYOUT, P.R);
   for (const c of chunks){ c.mesh.geometry.dispose(); planet.remove(c.mesh); }
   chunks = [];
   const R = P.R;
@@ -311,8 +296,49 @@ function buildTrails(rnd){
   const poles = [new V().crossVectors(START_N, randUnit()).normalize()];
   for (let tries = 0; poles.length < nT && tries < 2000; tries++){ const p = randUnit(); if (poles.every(q => Math.abs(p.dot(q)) < Math.cos(25*D2R))) poles.push(p); }
   const blockers = solids.filter(o => !o.box).map(o => ({ d: o.d, a: (o.r + 7)/R }))
-    .concat(BEACON_DIRS.map(([x, y, z]) => ({ d: new V(x, y, z).normalize(), a: 9/R })));
+    .concat(beaconList.map(b => ({ d: b.d, a: (b.r + 6)/R })));
   const tmp = new V(), side = new V(), q = new V();
+  // a trail's grid entries and its groomed ribbon. closed trails wrap round; open ones stop at their ends
+  const addTrail = (name, out, closed) => {
+    const ti = trails.length, M = out.length, segN = closed ? M : M - 1;
+    let len = 0; for (let k = 0; k < segN; k++) len += out[k].angleTo(out[(k + 1) % M])*R;
+    trails.push({ name, pts: out, len, closed });
+    // the grid: each segment goes in every cell within about 8.5 m of its middle
+    for (let k = 0; k < segN; k++){
+      const a = out[k], b = out[(k + 1) % M]; q.copy(a).add(b).normalize();
+      side.copy(Math.abs(q.y) < 0.9 ? new V(0, 1, 0) : new V(1, 0, 0)).cross(q).normalize(); const s2 = new V().crossVectors(q, side);
+      const keys = new Set([cellOf(q.x, q.y, q.z)]);
+      for (let i = 0; i < 12; i++){ const an = i/12*Math.PI*2; for (const rr of [4.5, 9]){ tmp.copy(q).multiplyScalar(R).addScaledVector(side, Math.cos(an)*rr).addScaledVector(s2, Math.sin(an)*rr).normalize(); keys.add(cellOf(tmp.x, tmp.y, tmp.z)); } }
+      for (const key of keys){ let l = tgrid.get(key); if (!l) tgrid.set(key, l = []); l.push(ti, k); }
+    }
+    // the groomed ribbon, laid on the ground in 7 strips across (so it follows small bumps)
+    const OFF = [-2.8, -2.5, -1.25, 0, 1.25, 2.5, 2.8], C7 = OFF.length;
+    const pos = new Float32Array(M*C7*3), nor = new Float32Array(M*C7*3), uv = new Float32Array(M*C7*2);
+    for (let k = 0; k < M; k++){
+      const P0 = out[k], nx = closed ? out[(k + 1) % M] : out[Math.min(M - 1, k + 1)], pv = closed ? out[(k - 1 + M) % M] : out[Math.max(0, k - 1)];
+      tmp.copy(nx).sub(pv); side.crossVectors(tmp, P0).normalize();
+      for (let c = 0; c < C7; c++){
+        q.copy(P0).multiplyScalar(R).addScaledVector(side, OFF[c]).normalize();
+        const r = groundR(q) + (Math.abs(OFF[c]) > 2.6 ? 0.03 : 0.05), o = (k*C7 + c)*3;
+        pos[o] = q.x*r; pos[o + 1] = q.y*r; pos[o + 2] = q.z*r; nor[o] = q.x; nor[o + 1] = q.y; nor[o + 2] = q.z;
+        uv[(k*C7 + c)*2] = (OFF[c] + 2.8)/5.6;
+      }
+    }
+    const idx = new Uint32Array(segN*(C7 - 1)*6); let ii = 0;
+    for (let k = 0; k < segN; k++) for (let c = 0; c < C7 - 1; c++){
+      const a = k*C7 + c, b = ((k + 1) % M)*C7 + c;
+      idx[ii++] = a; idx[ii++] = a + 1; idx[ii++] = b; idx[ii++] = a + 1; idx[ii++] = b + 1; idx[ii++] = b;   // facing out
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeBoundingSphere();
+    const mesh = new THREE.Mesh(g, trailMat); scene.add(mesh); trailMeshes.push(mesh);
+  };
+  // a layout's own trails (a smooth curve through its points), and nothing else
+  if (LAYOUT){
+    for (const t of LAYOUT.trails) if (t.pts.length >= 2) addTrail(t.name, PTR.evenCurve(t.pts, t.closed, 1.5, R).map(a => new V(...a)), !!t.closed);
+    return;
+  }
   poles.forEach((C, ti) => {
     const A = ti === 0 ? START_N.clone().addScaledVector(C, -START_N.dot(C)).normalize() : new V().crossVectors(C, randUnit()).normalize();
     const B = new V().crossVectors(C, A);
@@ -331,37 +357,7 @@ function buildTrails(rnd){
     const cum = [0]; for (let i = 1; i <= N; i++) cum.push(cum[i - 1] + pts[i - 1].angleTo(pts[i % N])*R);
     const total = cum[N], M = Math.round(total/1.5), out = []; let j = 0;
     for (let k = 0; k < M; k++){ const sd = k*total/M; while (cum[j + 1] < sd) j++; const u = (sd - cum[j])/Math.max(1e-9, cum[j + 1] - cum[j]); out.push(pts[j].clone().lerp(pts[(j + 1) % N], u).normalize()); }
-    const tr = { name: TRAIL_NAMES[ti % TRAIL_NAMES.length], pts: out, len: total };
-    trails.push(tr);
-    // the grid: each segment goes in every cell within about 8.5 m of its middle
-    for (let k = 0; k < M; k++){
-      const a = out[k], b = out[(k + 1) % M]; q.copy(a).add(b).normalize();
-      side.copy(Math.abs(q.y) < 0.9 ? new V(0, 1, 0) : new V(1, 0, 0)).cross(q).normalize(); const s2 = new V().crossVectors(q, side);
-      const keys = new Set([cellOf(q.x, q.y, q.z)]);
-      for (let i = 0; i < 12; i++){ const an = i/12*Math.PI*2; for (const rr of [4.5, 9]){ tmp.copy(q).multiplyScalar(R).addScaledVector(side, Math.cos(an)*rr).addScaledVector(s2, Math.sin(an)*rr).normalize(); keys.add(cellOf(tmp.x, tmp.y, tmp.z)); } }
-      for (const key of keys){ let l = tgrid.get(key); if (!l) tgrid.set(key, l = []); l.push(ti, k); }
-    }
-    // the groomed ribbon, laid on the ground in 7 strips across (so it follows small bumps)
-    const OFF = [-2.8, -2.5, -1.25, 0, 1.25, 2.5, 2.8], C7 = OFF.length;
-    const pos = new Float32Array(M*C7*3), nor = new Float32Array(M*C7*3), uv = new Float32Array(M*C7*2);
-    for (let k = 0; k < M; k++){
-      const P0 = out[k]; tmp.copy(out[(k + 1) % M]).sub(out[(k - 1 + M) % M]); side.crossVectors(tmp, P0).normalize();
-      for (let c = 0; c < C7; c++){
-        q.copy(P0).multiplyScalar(R).addScaledVector(side, OFF[c]).normalize();
-        const r = groundR(q) + (Math.abs(OFF[c]) > 2.6 ? 0.03 : 0.05), o = (k*C7 + c)*3;
-        pos[o] = q.x*r; pos[o + 1] = q.y*r; pos[o + 2] = q.z*r; nor[o] = q.x; nor[o + 1] = q.y; nor[o + 2] = q.z;
-        uv[(k*C7 + c)*2] = (OFF[c] + 2.8)/5.6;
-      }
-    }
-    const idx = new Uint32Array(M*(C7 - 1)*6); let ii = 0;
-    for (let k = 0; k < M; k++) for (let c = 0; c < C7 - 1; c++){
-      const a = k*C7 + c, b = ((k + 1) % M)*C7 + c;
-      idx[ii++] = a; idx[ii++] = a + 1; idx[ii++] = b; idx[ii++] = a + 1; idx[ii++] = b + 1; idx[ii++] = b;   // facing out
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-    g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeBoundingSphere();
-    const mesh = new THREE.Mesh(g, trailMat); scene.add(mesh); trailMeshes.push(mesh);
+    addTrail(TRAIL_NAMES[ti % TRAIL_NAMES.length], out, true);
   });
 }
 // how close a direction comes to any trail (coarse: every 3rd point), for keeping buildings off them
@@ -370,10 +366,14 @@ function trailClear(dir, r){
   for (const tr of trails){ const p = tr.pts; for (let k = 0; k < p.length; k += 3) if (p[k].x*dir.x + p[k].y*dir.y + p[k].z*dir.z > lim) return false; }
   return true;
 }
-// face the skier along the first trail at the start
+// at the start, face along the trail you're standing on (if you are on one)
 function faceTrail(){
-  const tr = trails[0]; if (!tr) return;
-  const p = tr.pts, t = p[1].clone().sub(p[p.length - 1]).normalize();
+  let best = null, bd = 8/P.R;
+  for (const tr of trails){ const p = tr.pts; for (let k = 0; k < p.length; k++){ const a = p[k].angleTo(n); if (a < bd){ bd = a; best = [tr, k]; } } }
+  if (!best) return;
+  const [tr, k] = best, p = tr.pts, M = p.length;
+  const a = tr.closed ? p[(k + 1) % M] : p[Math.min(M - 1, k + 1)], b = tr.closed ? p[(k - 1 + M) % M] : p[Math.max(0, k - 1)];
+  const t = a.clone().sub(b).normalize();
   S.th = S.tgt = camTh = Math.atan2(t.dot(ex), -t.dot(ey)); S.thv = 0; camVel = 0;
 }
 
@@ -420,7 +420,7 @@ function buildStructures(rnd){
   const randDir = out => { const z = 2*rnd() - 1, a = rnd()*Math.PI*2, r = Math.sqrt(1 - z*z); return out.set(r*Math.cos(a), z, r*Math.sin(a)); };
   const tangents = dir => { t1.copy(Math.abs(dir.y) < 0.9 ? up : X).cross(dir).normalize(); t2.crossVectors(dir, t1); };
   const offset = (dir, ox, oy, out) => { tangents(dir); return out.copy(dir).multiplyScalar(R).addScaledVector(t1, ox).addScaledVector(t2, oy).normalize(); };
-  const beaconDirs = BEACON_DIRS.map(([x, y, z]) => new THREE.Vector3(x, y, z).normalize());
+  const beaconDirs = beaconList.map(b => b.d);
   const clear = (dir, r) => {
     if (dir.angleTo(START_N)*R < r + 30) return false;
     for (const b of beaconDirs) if (dir.angleTo(b)*R < r + 12) return false;
@@ -459,6 +459,8 @@ function buildStructures(rnd){
   const addBld = (dir, spin, tower) => {
     const w = 4 + 6*rnd(), dp = 4 + 6*rnd(), h = tower ? 12 + 16*rnd() : 3 + 6*rnd(), r = Math.hypot(w, dp)/2;
     if (!clear(dir, r) || !trailClear(dir, r)) return false;
+    // not on steep ground: the footprint's corners may differ by at most a quarter of its width
+    { tangents(dir); let lo = Infinity, hi = -Infinity; for (let i = 0; i < 4; i++){ const an = i*Math.PI/2; p.copy(dir).multiplyScalar(R).addScaledVector(t1, Math.cos(an)*r).addScaledVector(t2, Math.sin(an)*r).normalize(); const g = groundR(p); lo = Math.min(lo, g); hi = Math.max(hi, g); } if (hi - lo > r*0.5) return false; }
     const b = baseR(dir, r), sink = groundR(dir) - b;
     const qq = orient(dir, spin).clone(), a = X.clone().applyQuaternion(qq);
     blds.push({ d: dir.clone(), b, q: qq, w, dp, h: h + sink, col: PAL[Math.floor(rnd()*PAL.length)] });
@@ -507,7 +509,7 @@ function buildTrees(rnd){
   const R = P.R, V = THREE.Vector3, area = 4*Math.PI*R*R;
   clearBuckets('trees'); trees = []; treeGrid = new Map();
   const d = new V(), t1 = new V(), t2 = new V(), q = new V(), up = new V(0, 1, 0);
-  const beaconDirs = BEACON_DIRS.map(([x, y, z]) => new V(x, y, z).normalize());
+  const beaconDirs = beaconList.map(b => b.d);
   const tries = Math.min(500000, Math.round(area/45*P.trees)), maxT = 20000;
   for (let i = 0; i < tries && trees.length < maxT; i++){
     const z = 2*rnd() - 1, a = rnd()*Math.PI*2, rr = Math.sqrt(1 - z*z); d.set(rr*Math.cos(a), z, rr*Math.sin(a));
@@ -547,8 +549,37 @@ const ROCK_GEO = new THREE.DodecahedronGeometry(1, 0), ROCK_MAT = new THREE.Mesh
 const BEACON_DIRS = [[0,1,0,'red',0xd2462e], [0,-1,0,'violet',0x8a5cd6], [1,0,0,'yellow',0xf2c230], [-1,0,0,'green',0x2f9a5a], [0,0,1,'blue',0x2f6fd6], [0,0,-1,'orange',0xf08a2a]];
 const beacons = new THREE.Group(); scene.add(beacons);
 const beaconList = [];
+// the six beacons on the procedural planet, or a layout's landmarks: spires are cones, towers are boxes, the rest are
+// poles with a lamp on top. all solid
+function buildLandmarks(){
+  const up = new THREE.Vector3(0, 1, 0);
+  while (beacons.children.length){ const c = beacons.children[0]; beacons.remove(c); c.traverse(o => o.geometry && o.geometry.dispose()); }
+  beaconList.length = 0;
+  const list = LAYOUT ? LAYOUT.landmarks.map(m => ({ d: new THREE.Vector3(...m.d).normalize(), name: m.name, color: new THREE.Color(m.color).getHex(), h: m.height, type: m.type }))
+    : BEACON_DIRS.map(([x, y, z, name, color]) => ({ d: new THREE.Vector3(x, y, z).normalize(), name, color, h: 18, type: 'beacon' }));
+  const poleM = new THREE.MeshLambertMaterial({ color: 0x3a4652 });
+  for (const L0 of list){
+    const g = new THREE.Group(), h = L0.h, col = L0.color; let r = 2.6;
+    g.position.copy(L0.d).multiplyScalar(groundR(L0.d) - 0.3); g.quaternion.setFromUnitVectors(up, L0.d);
+    if (L0.type === 'spire'){
+      r = Math.max(2, h*0.12);
+      const c = new THREE.Mesh(new THREE.ConeGeometry(r, h, 6), new THREE.MeshLambertMaterial({ color: col })); c.position.y = h/2; g.add(c);
+    } else if (L0.type === 'tower'){
+      const w = Math.max(3, h*0.14); r = w*0.75;
+      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshLambertMaterial({ color: col })); b.position.y = h/2; g.add(b);
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(w*0.5, w*0.5, w*0.5), new THREE.MeshBasicMaterial({ color: 0xfff3c4 })); lamp.position.y = h + w*0.25; g.add(lamp);
+    } else {
+      const k = Math.max(1, h/18);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.22*k, 0.32*k, h, 8), poleM); pole.position.y = h/2; g.add(pole);
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.4*k, 1.4*k, 1.4*k), new THREE.MeshBasicMaterial({ color: col })); lamp.position.y = h + 0.6*k; g.add(lamp);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.6, 0.6, 12), new THREE.MeshLambertMaterial({ color: col })); base.position.y = 0.1; g.add(base);
+    }
+    beacons.add(g); beaconList.push({ d: L0.d, name: L0.name, r });
+  }
+}
 function buildScatter(){
   const R = P.R;
+  buildLandmarks();
   clearBuckets('rocks'); rocks = [];
   { let s2 = 777; buildStructures(() => (s2 = (s2 * 16807) % 2147483647) / 2147483647); }
   { let s4 = 2468; buildTrees(() => (s4 = (s4 * 16807) % 2147483647) / 2147483647); }
@@ -573,19 +604,7 @@ function buildScatter(){
     k++;
   }
   addBucketed('rocks', ROCK_GEO, ROCK_MAT, rockItems, (o, M) => M.copy(o.m), o => o.size);
-  // beacons: tall poles with a lamp, one over the middle of each cube face
-  while (beacons.children.length) beacons.remove(beacons.children[0]);
-  beaconList.length = 0;
-  const poleG = new THREE.CylinderGeometry(0.22, 0.32, 18, 8), lampG = new THREE.BoxGeometry(1.4, 1.4, 1.4), baseG = new THREE.CylinderGeometry(2.2, 2.6, 0.6, 12);
-  const poleM = new THREE.MeshLambertMaterial({ color: 0x3a4652 });
-  for (const [x, y, z, name, color] of BEACON_DIRS){
-    const dd = new THREE.Vector3(x, y, z).normalize(), g = new THREE.Group();
-    g.position.copy(dd).multiplyScalar(groundR(dd) - 0.2); g.quaternion.setFromUnitVectors(up, dd);
-    const pole = new THREE.Mesh(poleG, poleM); pole.position.y = 9; g.add(pole);
-    const lamp = new THREE.Mesh(lampG, new THREE.MeshBasicMaterial({ color })); lamp.position.y = 18.6; g.add(lamp);
-    const base = new THREE.Mesh(baseG, new THREE.MeshLambertMaterial({ color })); base.position.y = 0.1; g.add(base);
-    beacons.add(g); beaconList.push({ d: dd, name, r: 2.6 });
-  }
+
 }
 
 // the ring station, in orbit (the v2 station's ring, seen from the planet)
@@ -608,8 +627,10 @@ function updateStation(t){
 // ---------- the skier's place on the planet ----------
 const START_N = new THREE.Vector3(0.15, 1, 0.25).normalize();
 const n = new THREE.Vector3(), ex = new THREE.Vector3(), ey = new THREE.Vector3();
+let AT_ONCE = null;      // ?at=x,y,z (from the editor's Ski here): where to put the skier the first time
+{ const a = new URLSearchParams(location.search).get('at'); if (a){ const v = a.split(',').map(Number); if (v.length === 3 && v.every(isFinite)) AT_ONCE = new THREE.Vector3(...v).normalize(); } }
 function placeAtStart(){
-  n.copy(START_N);
+  n.copy(AT_ONCE || START_N); AT_ONCE = null;
   ex.set(1, 0, 0).addScaledVector(n, -n.x).normalize();
   ey.crossVectors(ex, n).normalize();        // as in the game's 3D: X east, Y up, Z south (east × up = south)
 }
@@ -1142,14 +1163,53 @@ $('defaultsBtn').addEventListener('click', () => {
   save(); rNote(); resize(); if (P.R !== oldR) rebuild(); else if (P.mtn + ',' + P.bld + ',' + P.trees !== oldS) buildScatter();
 });
 
+// ---------- layouts from the planet editor ----------
+// ?layout=editor reads the editor's autosave (or asks the editor window for it); ?layout=some/planet.json fetches one
+// (that needs the page served over http); a planet.json dropped on the page loads it too
+function applyLayout(Lz){
+  LAYOUT = Lz;
+  START_N.set(...Lz.start.d).normalize();
+  P.R = Lz.radius; $('tR').value = Lz.radius; $('oR').textContent = Lz.radius + ' m';
+  for (const [id, o, k, f] of SETTINGS){ const v = { mtn: Lz.scatter.mountains, bld: Lz.scatter.buildings, trees: Lz.scatter.trees }[k]; if (v === undefined) continue; P[k] = v; $(id).value = v; $(o).textContent = f(v); }
+  layoutUI();
+}
+function layoutUI(){
+  $('procBtn').hidden = !LAYOUT;
+  $('layoutNote').textContent = LAYOUT ? 'Skiing “' + LAYOUT.name + '” from the planet editor (' + LAYOUT.stamps.length + ' stamps, ' + LAYOUT.trails.length + ' trails, ' + LAYOUT.landmarks.length + ' landmarks).' : 'Drop a planet.json from the planet editor here to ski it.';
+  sizeLabel(); rNote();
+}
+function bootLayout(){
+  const want = new URLSearchParams(location.search).get('layout');
+  if (!want) return Promise.resolve();
+  if (want === 'editor'){
+    let Lz = null; try { const s = localStorage.getItem(PTR.STORE); if (s) Lz = PTR.parse(s); } catch (e) {}
+    if (Lz){ applyLayout(Lz); return Promise.resolve(); }
+    if (!window.opener) return Promise.resolve();
+    return new Promise(res => {
+      const on = e => { if (e.data && e.data.planetLayout){ try { applyLayout(PTR.parse(e.data.planetLayout)); } catch (err) {} removeEventListener('message', on); res(); } };
+      addEventListener('message', on); window.opener.postMessage('planetoid:need-layout', '*'); setTimeout(res, 1500);
+    });
+  }
+  return fetch(want).then(r => r.json()).then(o => applyLayout(PTR.parse(o))).catch(() => {});
+}
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault(); const f = e.dataTransfer.files[0]; if (!f) return;
+  f.text().then(t => { try { applyLayout(PTR.parse(t)); rebuild(true); } catch (err) { $('layoutNote').textContent = 'That file isn’t a planet layout.'; } });
+});
+$('procBtn').addEventListener('click', e => {
+  LAYOUT = null; START_N.set(0.15, 1, 0.25).normalize(); history.replaceState(null, '', location.pathname); layoutUI(); rebuild(true); e.currentTarget.blur();
+});
+
 // ---------- go ----------
-placeAtStart(); resize(); rNote(); sizeLabel();
-setTimeout(() => {
+resize(); rNote(); sizeLabel();
+bootLayout().then(() => {
+  placeAtStart();
   buildPlanet(); faceTrail();
   $('loading').style.display = 'none';
-  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length }, buildCounts), drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt };   // test hook
+  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length }, buildCounts), drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
-}, 0);
+});
 </script>
 </body>
 </html>

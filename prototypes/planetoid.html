@@ -60,6 +60,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 <div class="hud panel" aria-live="off">
   <h1>Planetoid</h1>
   <div class="row"><span>Speed</span><b id="hSpeed">0.0 km/h</b></div>
+  <div class="row"><span>Snow</span><b id="hSnow">–</b></div>
   <div class="row"><span>Grade</span><b id="hGrade">0%</b></div>
   <div class="row opt"><span>Weight</span><b id="hWeight">100%</b></div>
   <div class="row"><span>From start</span><b id="hFrom">0 m</b></div>
@@ -82,6 +83,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <label for="tMax">Top speed<output id="oMax"></output><input id="tMax" type="range" min="10" max="60" step="1" value="38"></label>
   <label for="tMtn">Mountains<output id="oMtn"></output><input id="tMtn" type="range" min="0" max="3" step="0.25" value="1"></label>
   <label for="tBld">Buildings<output id="oBld"></output><input id="tBld" type="range" min="0" max="3" step="0.25" value="1"></label>
+  <label for="tOff">Ungroomed snow (× friction)<output id="oOff"></output><input id="tOff" type="range" min="1" max="12" step="0.5" value="1.5"></label>
   <label for="tPush">Push per kick<output id="oPush"></output><input id="tPush" type="range" min="0.2" max="2.5" step="0.05" value="2.5"></label>
   <div class="btns"><button id="resetBtn" type="button">Reset skier</button><button id="defaultsBtn" type="button">Defaults</button></div>
   <p class="note">Kick, turn and glide tuning are the main game's defaults.</p>
@@ -118,12 +120,13 @@ const P = {
   push: 2.5, tap: 80, klen: 50, turn: 5, turn2: 5, turn3: 15, k180: 8, k180t: 6, kfloor: 15, kwin: 450,
   tfStop: 180, tfMove: 90, tfVlo: 1, tfVhi: 14, decay: 20, snap: 160, splay: 11, fric: 0.4, glide: 0.25, grip: 25,
   gwin: 600, gcut: 95, max: 38, lboost: 1.4, plow: 2.5, tuck: 50, lean: 50, camd: 15, sway: 0.8, cam: 0.6, pixel: 4,
-  R: 300, lift: false, daynight: false, mtn: 1, bld: 1,
+  R: 300, lift: false, daynight: false, mtn: 1, bld: 1, off: 1.5,
 };
 const SETTINGS = [
   ['tR', 'oR', 'R', v => v + ' m'], ['tCamd', 'oCamd', 'camd', v => v.toFixed(1) + ' m'],
   ['tPixel', 'oPixel', 'pixel', v => v > 1 ? v + ' px' : 'off'], ['tMax', 'oMax', 'max', v => v + ' km/h'],
   ['tPush', 'oPush', 'push', v => v.toFixed(2) + ' m/s'],
+  ['tOff', 'oOff', 'off', v => '×' + v.toFixed(1)],
   ['tMtn', 'oMtn', 'mtn', v => v ? '×' + v : 'none'], ['tBld', 'oBld', 'bld', v => v ? '×' + v : 'none'],
 ];
 const STORE = 'skate-planetoid';
@@ -210,7 +213,7 @@ function buildPlanet(){
   // about 2.5 m between vertices, capped for big planets (the terrain's smallest bumps are ~24 m, so it holds up)
   const N = Math.min(320, Math.ceil(Math.PI/2*R/2.5/CH)*CH), n = N/CH, M = N + 1;
   const pos = new Float32Array(M*M*3), dir = new Float32Array(M*M*3);
-  const col = new THREE.Color(), snow = new THREE.Color(0xf6f9fc), shade = new THREE.Color(0xb9cadb), hollow = new THREE.Color(0xdde8f3);
+  const col = new THREE.Color(), snow = new THREE.Color(0xe6edf3), shade = new THREE.Color(0xb3c4d6), hollow = new THREE.Color(0xd5e0eb);
   for (const [nn, uu, vv] of FACES){
     for (let j = 0; j < M; j++) for (let i = 0; i < M; i++){
       const s = -1 + 2*i/N, t = -1 + 2*j/N;
@@ -254,6 +257,121 @@ function buildPlanet(){
     }
   }
   buildScatter();
+}
+
+// ---------- trails: groomed loops, each one all the way round the planet ----------
+// each trail is a great circle tilted its own way, with two wobbles along it (a few long swings and some shorter ones),
+// then pushed out round the mountains and beacons and smoothed, so it bends round them. the first passes through the
+// start. groomed snow is the 5 m strip; everything else is ungroomed (the game's rules: friction and drag × Ungroomed
+// snow, half the push in loose snow, with the same half-metre soft edge)
+const TRAIL_W = 5;
+const TRAIL_NAMES = ['Long Way Round', 'Meridian', 'Twister', 'Polar Loop', 'Crossways', 'Far Side', 'Wanderer', 'Equinox', 'Lantern Line', 'Ridgeway', 'Halo', 'Switchback'];
+const offTrail = d => { const e = d - TRAIL_W/2; return e <= -0.5 ? 0 : e >= 0 ? 1 : (e + 0.5)/0.5; };
+let trails = [], trailMeshes = [], tgrid = new Map(), TG = 64;
+// a cell of a cube-sphere grid (about 8 m across), for finding the trail segments near a point quickly
+function cellOf(x, y, z){
+  const ax = Math.abs(x), ay = Math.abs(y), az = Math.abs(z); let f, u, v, m;
+  if (ax >= ay && ax >= az){ f = x > 0 ? 0 : 1; m = ax; u = y; v = z; }
+  else if (ay >= az){ f = y > 0 ? 2 : 3; m = ay; u = x; v = z; }
+  else { f = z > 0 ? 4 : 5; m = az; u = x; v = y; }
+  const i = Math.min(TG - 1, Math.floor((u/m + 1)/2*TG)), j = Math.min(TG - 1, Math.floor((v/m + 1)/2*TG));
+  return (f*TG + i)*TG + j;
+}
+// how far (m) a direction is from the nearest trail's centre line, and which trail (only looks within about 8 m)
+function nearestTrailAt(d){
+  const list = tgrid.get(cellOf(d.x, d.y, d.z)); if (!list) return { d: Infinity, t: null };
+  let best = Infinity, bt = null;
+  for (let i = 0; i < list.length; i += 2){
+    const tr = trails[list[i]], k = list[i + 1], a = tr.pts[k], b = tr.pts[(k + 1) % tr.pts.length];
+    const bx = b.x - a.x, by = b.y - a.y, bz = b.z - a.z, L2 = bx*bx + by*by + bz*bz || 1e-12;
+    const u = Math.max(0, Math.min(1, ((d.x - a.x)*bx + (d.y - a.y)*by + (d.z - a.z)*bz)/L2));
+    const dist = Math.hypot(d.x - a.x - u*bx, d.y - a.y - u*by, d.z - a.z - u*bz)*P.R;
+    if (dist < best){ best = dist; bt = tr; }
+  }
+  return { d: best, t: bt };
+}
+// corduroy: ribs along the trail, a slightly darker groomed edge each side
+const cordTex = (() => {
+  const c = document.createElement('canvas'); c.width = 112; c.height = 2; const g = c.getContext('2d');
+  for (let x = 0; x < 112; x++){ g.fillStyle = (x < 6 || x > 105) ? '#c9d6e2' : (Math.floor((x - 6)/5) % 2 ? '#eef3f8' : '#fbfdff'); g.fillRect(x, 0, 1, 2); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;
+})();
+const trailMat = new THREE.MeshLambertMaterial({ map: cordTex, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+function buildTrails(rnd){
+  const R = P.R, V = THREE.Vector3;
+  for (const m of trailMeshes){ scene.remove(m); m.geometry.dispose(); }
+  trailMeshes = []; trails = []; tgrid = new Map();
+  TG = Math.max(16, Math.min(160, Math.round(Math.PI/2*R/8)));
+  const nT = Math.max(4, Math.min(12, Math.round(2 + R/100)));
+  const randUnit = () => { const z = 2*rnd() - 1, a = rnd()*Math.PI*2, r = Math.sqrt(1 - z*z); return new V(r*Math.cos(a), z, r*Math.sin(a)); };
+  // each loop's axis, at least 25° from every other, so they run off in different directions and cross
+  const poles = [new V().crossVectors(START_N, randUnit()).normalize()];
+  for (let tries = 0; poles.length < nT && tries < 2000; tries++){ const p = randUnit(); if (poles.every(q => Math.abs(p.dot(q)) < Math.cos(25*D2R))) poles.push(p); }
+  const blockers = solids.filter(o => !o.box).map(o => ({ d: o.d, a: (o.r + 7)/R }))
+    .concat(BEACON_DIRS.map(([x, y, z]) => ({ d: new V(x, y, z).normalize(), a: 9/R })));
+  const tmp = new V(), side = new V(), q = new V();
+  poles.forEach((C, ti) => {
+    const A = ti === 0 ? START_N.clone().addScaledVector(C, -START_N.dot(C)).normalize() : new V().crossVectors(C, randUnit()).normalize();
+    const B = new V().crossVectors(C, A);
+    const k1 = Math.max(2, Math.round((2 + 3*rnd())*R/300)), k2 = Math.max(5, Math.round((5 + 5*rnd())*R/300));
+    const a1 = (20 + 55*rnd())/R, a2 = (5 + 15*rnd())/R, f1 = ti ? rnd()*Math.PI*2 : 0, f2 = ti ? rnd()*Math.PI*2 : 0;
+    const N = Math.ceil(2*Math.PI*R/1.5);
+    let pts = [];
+    for (let i = 0; i < N; i++){ const t = i/N*Math.PI*2, w = a1*Math.sin(k1*t + f1) + a2*Math.sin(k2*t + f2); pts.push(new V().addScaledVector(A, Math.cos(t)).addScaledVector(B, Math.sin(t)).addScaledVector(C, w).normalize()); }
+    // round the mountains and beacons near this loop's band: push out to their edge, smooth, repeat
+    const near = blockers.filter(b => Math.abs(b.d.dot(C)) < Math.sin(Math.min(Math.PI/2, a1 + a2 + b.a + 30/R)));
+    const push = () => { for (const p of pts) for (const b of near){ const c = p.dot(b.d); if (c > Math.cos(b.a)){ tmp.copy(p).addScaledVector(b.d, -c); const L = tmp.length(); if (L < 1e-9) continue; tmp.divideScalar(L); p.copy(b.d).multiplyScalar(Math.cos(b.a)).addScaledVector(tmp, Math.sin(b.a)); } } };
+    const smooth = () => { const o = pts.map(p => p.clone()); for (let i = 0; i < N; i++) pts[i].copy(o[(i - 1 + N) % N]).add(o[i]).add(o[i]).add(o[(i + 1) % N]).normalize(); };
+    if (near.length) for (let it = 0; it < 6; it++){ push(); smooth(); smooth(); smooth(); }
+    push();
+    // even 1.5 m spacing along the finished line
+    const cum = [0]; for (let i = 1; i <= N; i++) cum.push(cum[i - 1] + pts[i - 1].angleTo(pts[i % N])*R);
+    const total = cum[N], M = Math.round(total/1.5), out = []; let j = 0;
+    for (let k = 0; k < M; k++){ const sd = k*total/M; while (cum[j + 1] < sd) j++; const u = (sd - cum[j])/Math.max(1e-9, cum[j + 1] - cum[j]); out.push(pts[j].clone().lerp(pts[(j + 1) % N], u).normalize()); }
+    const tr = { name: TRAIL_NAMES[ti % TRAIL_NAMES.length], pts: out, len: total };
+    trails.push(tr);
+    // the grid: each segment goes in every cell within about 8.5 m of its middle
+    for (let k = 0; k < M; k++){
+      const a = out[k], b = out[(k + 1) % M]; q.copy(a).add(b).normalize();
+      side.copy(Math.abs(q.y) < 0.9 ? new V(0, 1, 0) : new V(1, 0, 0)).cross(q).normalize(); const s2 = new V().crossVectors(q, side);
+      const keys = new Set([cellOf(q.x, q.y, q.z)]);
+      for (let i = 0; i < 12; i++){ const an = i/12*Math.PI*2; for (const rr of [4.5, 9]){ tmp.copy(q).multiplyScalar(R).addScaledVector(side, Math.cos(an)*rr).addScaledVector(s2, Math.sin(an)*rr).normalize(); keys.add(cellOf(tmp.x, tmp.y, tmp.z)); } }
+      for (const key of keys){ let l = tgrid.get(key); if (!l) tgrid.set(key, l = []); l.push(ti, k); }
+    }
+    // the groomed ribbon, laid on the ground in 7 strips across (so it follows small bumps)
+    const OFF = [-2.8, -2.5, -1.25, 0, 1.25, 2.5, 2.8], C7 = OFF.length;
+    const pos = new Float32Array(M*C7*3), nor = new Float32Array(M*C7*3), uv = new Float32Array(M*C7*2);
+    for (let k = 0; k < M; k++){
+      const P0 = out[k]; tmp.copy(out[(k + 1) % M]).sub(out[(k - 1 + M) % M]); side.crossVectors(tmp, P0).normalize();
+      for (let c = 0; c < C7; c++){
+        q.copy(P0).multiplyScalar(R).addScaledVector(side, OFF[c]).normalize();
+        const r = groundR(q) + (Math.abs(OFF[c]) > 2.6 ? 0.03 : 0.05), o = (k*C7 + c)*3;
+        pos[o] = q.x*r; pos[o + 1] = q.y*r; pos[o + 2] = q.z*r; nor[o] = q.x; nor[o + 1] = q.y; nor[o + 2] = q.z;
+        uv[(k*C7 + c)*2] = (OFF[c] + 2.8)/5.6;
+      }
+    }
+    const idx = new Uint32Array(M*(C7 - 1)*6); let ii = 0;
+    for (let k = 0; k < M; k++) for (let c = 0; c < C7 - 1; c++){
+      const a = k*C7 + c, b = ((k + 1) % M)*C7 + c;
+      idx[ii++] = a; idx[ii++] = a + 1; idx[ii++] = b; idx[ii++] = a + 1; idx[ii++] = b + 1; idx[ii++] = b;   // facing out
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeBoundingSphere();
+    const mesh = new THREE.Mesh(g, trailMat); scene.add(mesh); trailMeshes.push(mesh);
+  });
+}
+// how close a direction comes to any trail (coarse: every 3rd point), for keeping buildings off them
+function trailClear(dir, r){
+  const lim = Math.cos((r + TRAIL_W/2 + 4)/P.R);
+  for (const tr of trails){ const p = tr.pts; for (let k = 0; k < p.length; k += 3) if (p[k].x*dir.x + p[k].y*dir.y + p[k].z*dir.z > lim) return false; }
+  return true;
+}
+// face the skier along the first trail at the start
+function faceTrail(){
+  const tr = trails[0]; if (!tr) return;
+  const p = tr.pts, t = p[1].clone().sub(p[p.length - 1]).normalize();
+  S.th = S.tgt = camTh = Math.atan2(t.dot(ex), -t.dot(ey)); S.thv = 0; camVel = 0;
 }
 
 // ---------- mountains (cones) and buildings (boxes): primitives scattered at random, all solid ----------
@@ -300,12 +418,15 @@ function buildStructures(rnd){
     for (const m of [rock, cap]){ m.frustumCulled = false; scene.add(m); structMeshes.push(m); }
   }
 
-  // buildings
+  // trails, round the mountains
+  { let s3 = 31337; buildTrails(() => (s3 = (s3 * 16807) % 2147483647) / 2147483647); }
+
+  // buildings (kept off the trails; most villages sit beside one)
   const PAL = [0xa8643c, 0x7d5338, 0xd6c8ab, 0x5b6b7a, 0x9c3d33, 0x6f7f5a, 0xc29a5b];
   const blds = [], maxB = 1500;
   const addBld = (dir, spin, tower) => {
     const w = 4 + 6*rnd(), dp = 4 + 6*rnd(), h = tower ? 12 + 16*rnd() : 3 + 6*rnd(), r = Math.hypot(w, dp)/2;
-    if (!clear(dir, r)) return false;
+    if (!clear(dir, r) || !trailClear(dir, r)) return false;
     const b = baseR(dir, r), sink = groundR(dir) - b;
     const qq = orient(dir, spin).clone(), a = X.clone().applyQuaternion(qq);
     blds.push({ d: dir.clone(), b, q: qq, w, dp, h: h + sink, col: PAL[Math.floor(rnd()*PAL.length)] });
@@ -314,7 +435,13 @@ function buildStructures(rnd){
   };
   const nV = Math.round(area/90000*P.bld);
   for (let v = 0, tries = 0; v < nV && tries < nV*20 && blds.length < maxB; tries++){
-    randDir(c); if (!clear(c, 30)) continue; v++;
+    if (trails.length && rnd() < 0.6){
+      // beside a trail: 25-50 m off to one side of a point on it
+      const tr = trails[Math.floor(rnd()*trails.length)], k = Math.floor(rnd()*tr.pts.length), P0 = tr.pts[k];
+      t1.copy(tr.pts[(k + 1) % tr.pts.length]).sub(tr.pts[(k - 1 + tr.pts.length) % tr.pts.length]); t2.crossVectors(t1, P0).normalize();
+      c.copy(P0).multiplyScalar(R).addScaledVector(t2, (rnd() < 0.5 ? -1 : 1)*(25 + 25*rnd())).normalize();
+    } else randDir(c);
+    if (!clear(c, 30)) continue; v++;
     const spin = rnd()*Math.PI*2, k = 3 + Math.floor(rnd()*7);
     for (let j = 0, tj = 0; j < k && tj < k*6; tj++){
       const a = rnd()*Math.PI*2, rr = 6 + 34*Math.sqrt(rnd());
@@ -362,6 +489,7 @@ function buildScatter(){
     if (d.angleTo(START_N)*R < 14) continue;                       // keep the start clear
     if (solids.some(o => d.angleTo(o.d)*R < o.r + 1)) continue;     // and out of the mountains and buildings
     const size = 0.35 + 1.3*Math.pow(rnd(), 2.2);
+    if (nearestTrailAt(d).d < TRAIL_W/2 + size + 0.5) continue;    // and off the trails
     p.copy(d).multiplyScalar(groundR(d) - 0.3*size);
     q.setFromUnitVectors(up, d); q2.setFromAxisAngle(up, rnd()*Math.PI*2); q.multiply(q2);
     sc.set(size, size*(0.55 + 0.3*rnd()), size*(0.8 + 0.4*rnd()));
@@ -431,7 +559,7 @@ function grad(){ const e = 0.5; return [(hLocal(e, 0) - hLocal(-e, 0))/(2*e), (h
 // ============================================================================================================
 // the skier: the main game's skating model (kicks, kick turns, glide, splay, ski marks, tuck, snow plow)
 // ============================================================================================================
-const S = { x: 0, y: 0, vx: 0, vy: 0, th: 0, thv: 0, tgt: 0, dist: 0, grade: 0, weight: 1 };
+const S = { x: 0, y: 0, vx: 0, vy: 0, th: 0, thv: 0, tgt: 0, dist: 0, grade: 0, weight: 1, off: 0, trail: null };
 const PUSH_LEN = 0.7, REACH = 0.6, STANCE = 0.12, PLOW_STANCE = 0.35, CAM_RELEASE_MS = 1500;
 let skis = [], lastSki = { L: null, R: null }, weightLeg = null, lastLeg = null, lastKickAt = 0, camPending = 0, mode = null;
 let kickDrive = null, streak = 0, kickPrevT = -1e9, streakKmh = 0, streakTrig = false, snapSkip = 0, sideRun = 0, runTurn = 0, turnRestart = false, lastTurnDeg = 0;
@@ -515,9 +643,9 @@ function kick(leg, opt = {}){
   camPending = S.tgt - camRef;
   // 3. impulse, limited by top speed. part lands now, the rest over the kick length while the key is held
   const ang = S.tgt + side*sp*D2R, v = speed(), vmax = P.max/3.6;
-  const eff = Math.max(0.08, 1 - v/vmax) * sameLegPower(), tap = P.tap/100, push = P.push*bst;
+  const eff = Math.max(0.08, 1 - v/vmax) * (1 - 0.5*S.off) * sameLegPower(), tap = P.tap/100, push = P.push*bst;   // half the push sinks into loose snow
   S.vx += Math.sin(ang)*push*eff*tap; S.vy += -Math.cos(ang)*push*eff*tap;
-  kickDrive = { leg, dx: Math.sin(ang), dy: -Math.cos(ang), base: push*sameLegPower()*(1 - tap), done: 0 };
+  kickDrive = { leg, dx: Math.sin(ang), dy: -Math.cos(ang), base: push*(1 - 0.5*S.off)*sameLegPower()*(1 - tap), done: 0 };
   // 4. the other ski takes the weight (re-set along the new heading in a kick turn)
   const other = leg === 'L' ? 'R' : 'L', o = lastSki[other];
   if (!o || !o.live || !o.glide || sameSide){
@@ -575,6 +703,9 @@ function step(dt){
   S.weight = Math.max(0, 1 - speed()*speed()/(G*r));
   const wK = P.lift ? S.weight : 1;
   const gm = glideMult();
+  // groomed or not: ungroomed snow multiplies friction and drag (a held glide works off the trail too, as in the game)
+  const tq = nearestTrailAt(n); S.off = offTrail(tq.d); S.trail = tq.t;
+  const surf = (1 + (P.off - 1)*S.off) * gm;
 
   const ws = weightLeg && lastSki[weightLeg], onSki = ws && ws.live && ws.glide;
   const fx = (onSki && !mode) ? ws.dx : Math.sin(S.th), fy = (onSki && !mode) ? ws.dy : -Math.cos(S.th);
@@ -583,8 +714,8 @@ function step(dt){
   if (plowHold){ fwd = 0; lat = 0; }
   else {
     fwd -= G*(hx*fx + hy*fy)*dt;
-    fwd *= Math.exp(-P.glide * gm * (mode === 'tuck' ? 1 - P.tuck/100 : 1) * dt);
-    const dec = (P.fric * gm * wK + (mode === 'plow' ? P.plow : 0)) * dt;
+    fwd *= Math.exp(-P.glide * surf * (mode === 'tuck' ? 1 - P.tuck/100 : 1) * dt);
+    const dec = (P.fric * surf * wK + (mode === 'plow' ? P.plow : 0)) * dt;
     fwd = Math.abs(fwd) <= dec ? 0 : fwd - Math.sign(fwd)*dec;
   }
   lat = mode === 'tuck' ? 0 : lat * Math.exp(-P.grip*dt);
@@ -655,7 +786,7 @@ function updateMarks(){
     const R = P.R, len = Math.max(0.05, s.len);
     _a.copy(s.p3); _b.copy(s.p3).multiplyScalar(R).addScaledVector(s.t3, len).normalize();
     _s.crossVectors(s.t3, s.p3).normalize().multiplyScalar(s.w/2/R);
-    const corner = (base, sign, o) => { _c.copy(base).addScaledVector(_s, sign).normalize(); const rr = groundR(_c) + 0.04; markPos[o] = _c.x*rr; markPos[o+1] = _c.y*rr; markPos[o+2] = _c.z*rr; };
+    const corner = (base, sign, o) => { _c.copy(base).addScaledVector(_s, sign).normalize(); const rr = groundR(_c) + 0.09; markPos[o] = _c.x*rr; markPos[o+1] = _c.y*rr; markPos[o+2] = _c.z*rr; };
     const o = s.slot*18;
     corner(_a, -1, o); corner(_b, -1, o + 3); corner(_a, 1, o + 6);
     corner(_b, -1, o + 9); corner(_b, 1, o + 12); corner(_a, 1, o + 15);
@@ -812,6 +943,7 @@ const circumference = () => 2*Math.PI*P.R;
 function fmtM(m){ return m >= 1000 ? (m/1000).toFixed(2) + ' km' : Math.round(m) + ' m'; }
 function hud(){
   $('hSpeed').textContent = (speed()*3.6).toFixed(1) + ' km/h';
+  $('hSnow').textContent = S.off < 0.5 && S.trail ? 'Groomed · ' + S.trail.name : 'Ungroomed';
   $('hGrade').textContent = (S.grade >= 0 ? '+' : '') + Math.round(S.grade*100) + '%';
   $('hWeight').textContent = Math.round(S.weight*100) + '%';
   const from = n.angleTo(START_N)*P.R;
@@ -885,7 +1017,7 @@ $('viewBtn').addEventListener('click', e => { toggleView(); e.currentTarget.blur
 function resetSkier(){
   placeAtStart(); Object.assign(S, { x: 0, y: 0, vx: 0, vy: 0, th: 0, thv: 0, tgt: 0, dist: 0 });
   camTh = camVel = camPending = focusLat = focusV = 0; camR = null; mode = null; weightLeg = null; lastLeg = null; kickDrive = null;
-  clearMarks();
+  clearMarks(); faceTrail();
 }
 $('resetBtn').addEventListener('click', e => { resetSkier(); e.currentTarget.blur(); });
 function rNote(){
@@ -922,9 +1054,9 @@ $('defaultsBtn').addEventListener('click', () => {
 // ---------- go ----------
 placeAtStart(); resize(); rNote();
 setTimeout(() => {
-  buildPlanet();
+  buildPlanet(); faceTrail();
   $('loading').style.display = 'none';
-  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => buildCounts, ex, ey };   // test hook
+  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => buildCounts, ex, ey, trails: () => trails, nearestTrailAt };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 }, 0);
 </script>

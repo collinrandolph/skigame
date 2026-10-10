@@ -91,6 +91,7 @@ The map is four times its old area and split into zones, each locked until you c
   - A controller-layout panel in the top right.
 - **Dev view:** the full HUD, Tuning and stick debug tools. Toggle it with the **Dev** button or the **`** key.
 
+- **Status messages:** each stays on screen for about 7 seconds before it fades.
 - **Goal label (top centre):** shown only while there's a goal. That means a count still to fill (terminals, orbs, crystals, crown crystals), or somewhere to go next ("Ski to the gates", "Open the Crystal Gate"). It shows no zone names and hides once a goal is done. Pickups don't also pop up a count message: the label is the one count (only the last orb, crystal or crown crystal gets a message, saying where to go next).
 - **Upright phone in the mine:** in the mine's close camera and on the crown room spiral, an upright phone's view widens to at least 44° across and turns with you twice as fast, so you stay in frame through tight turns; on the spiral the camera also tucks in close and low, under the turn above.
 - **Zone 5 court:** the elders wait in front of the observatory, either side of the Starway's (dark) gate. Before the ceremony, the attendants wait just outside the ring by the diamond the next calf will take, and after a reload or checkpoint they're already there.
@@ -174,7 +175,7 @@ The map is four times its old area and split into zones, each locked until you c
 - **The station:** about 70% of its first size, so the two teleporter rings are about 30% closer together. Walkway widths, people and the rings themselves are unchanged. Every straight walkway, the teleporter arms included, runs on to the main walkway's centre line, so there's no gap where an arm meets it at an angle. Each teleporter ring has a broad landing with its control post, railed all round, the rails joining the arm's.
 - **The teleporter cave (station ↔ surface):** a tunnel with the mine tunnel's cross-section, scaled up: a flat floor, walls curving up and a low-arched roof. It has rough icy walls like the mine's cut and steel arches with lamps. Its floor matches the ground up top: open snow from wall to wall, and down the middle a groomed trail as wide as the trails outside, with the same corduroy and soft edges. It's part of the world above ground, so it looks like it.
   - **Shape:** 14 m straight, a 90° bend, then 14 m to its mouth.
-  - **The ring:** at its inner end, a rock face with the same circular ring as the Basement teleporter in front of it: the same size, ring, band of light and membrane.
+  - **The ring:** over its last 13 m the tunnel opens into a cavern, about 1.9 times as wide and 1.8 times as tall, big enough to hold the whole ring. At its end, a rock face with the same circular ring as the Basement teleporter in front of it: the same size, ring, band of light and membrane.
   - **On the surface:** it's buried in a rough mound of the ridge beside the mine, cut into like the mine's own cut, with a timber portal at the mouth.
   - **The way in:** a groomed ramp running from the mouth and easing into the ground round about over about 18 m, with no step or ridge. It's on the map as a standard green trail, the **Teleporter Cave**, off the Mine Road. You can ski in from outside at any time.
   - **On the station:** the far arm ends in the same ring on its landing. The cave beyond shows only through the ring, like a doorway into another world.
@@ -182,7 +183,7 @@ The map is four times its old area and split into zones, each locked until you c
   - **Turning round:** if you turn round inside, you're carried straight back, so you always come out the way you went in.
   - **The camera:** it stays inside the cave and under its roof. Leaving through the ring or the mouth, it follows you out rather than being left in the tunnel or lifted over the mound.
   - **Unlocking:** the surface ring stays dark and solid until you've ridden out from the station once; after that it takes you to the station. The cave itself is open to ski into at any time. This is saved in your browser. A reset or any checkpoint puts the ring back to sleep, since you haven't come through from the station yet.
-  - **Status posts:** like the Basement's, one inside the surface cave beside its ring (red until it's awake) and one on the station's landing (green: it's the way out).
+  - **Status posts:** the same post stands in the same spot beside the ring in both copies, red until the teleporter's been woken from the station's side and green after. There's another on the station's landing, like the Basement's (green: it's the way out).
   - **Tested:**
     - skiing in from outside to the dark ring and back out, then once awake through to the station;
     - the station → surface → out of the mouth → back in → station round trip;

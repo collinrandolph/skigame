@@ -525,7 +525,16 @@ const MINE_GATE = { k: 0, hint: -1e9, mesh: null };
 // its cross-section is the mine tunnel's, scaled up: a flat floor, walls curving up over wallW to edgeH at R out from
 // the middle, and a low-arched roof H up. hw: how far out from the middle you can ski (where the walls start to rise)
 const VEST = { hw: 5.0, R: 6.0, wallW: 2.3, edgeH: 5.5, H: 8.2, lip: 0.4, pts: [] };
+// the cave opens out into a cavern over its last 13 m to the ring: wider (SW) and taller (SH), tall enough to take the
+// whole ring. k(sv): 1 at the ring end, 0 out along the tunnel. hwAt / roofAtS: the floor's half-width and the roof
+// height across, at sv
+VEST.SW = 1.9; VEST.SH = 1.8;
+VEST.ck = sv => 1 - smooth01(3, 13, sv);
+VEST.sw = sv => 1 + (VEST.SW - 1)*VEST.ck(sv); VEST.sh = sv => 1 + (VEST.SH - 1)*VEST.ck(sv);
+VEST.hwAt = sv => VEST.hw*VEST.sw(sv);
+VEST.roofAtS = (lat, sv) => VEST.roofAt(lat/VEST.sw(sv))*VEST.sh(sv);
 VEST.roofAt = lat => { const t2 = Math.max(0, Math.min(1, 1 + (Math.abs(lat) - VEST.R)/(2*VEST.wallW))); return VEST.H - (VEST.H - VEST.edgeH)*t2*t2; };
+let addVestPosts = null;     // (the teleporter cave's status posts, put in once its two copies are built)
 let VIN = false;              // in the surface's teleporter cave (entered through its mouth): its own floor and walls
 { const P = VEST.pts; for (let u = 0; u <= 14; u += 1) P.push([u, 0]);
   for (let k = 1; k <= 12; k++){ const t = k/12*Math.PI/2; P.push([14 + 12*Math.sin(t), 12 - 12*Math.cos(t)]); }
@@ -568,7 +577,8 @@ function vestMound(x, y){
   const F = VFR.surf; if (Math.abs(x - F.x) > 70 || Math.abs(y - F.y) > 70) return -Infinity;
   const [along, , u, v] = vestOut(x, y), dc = vProj(u, v)[0];
   const rough = 1.6*Math.sin(x/5.3 + Math.sin(y/7.1)*2) + 1.1*Math.sin(y/4.1 - x/6.3) + 0.7*Math.sin((x + y)/2.7);   // (rough, like the mine's ridge)
-  return F.h + VEST.H + 5 + rough - Math.max(0, dc - VEST.R - 5)*0.55 - Math.max(0, along)*0.9;
+  const sv = vProj(u, v)[1], ck = VEST.ck(sv), Rk = VEST.R*VEST.sw(sv);   // (over the cavern it's higher and broader)
+  return F.h + VEST.H*VEST.sh(sv) + 5 + rough - Math.max(0, dc - Rk - 5)*0.55 - Math.max(0, along)*0.9;
 }
 // the way in: a groomed ramp out from the mouth, level at first, easing into the ground round about over 18 m, and
 // cut through the mound with banks either side, like the mine's cut. returns [its floor, how much it takes over (0..1)]
@@ -802,9 +812,9 @@ const saveEnd = () => { try { localStorage.setItem(OUTFIT_KEY, outfit ? '1' : '0
 function vestSurfSD(x, y){
   const F = VFR.surf; if (Math.abs(x - F.x) > 50 || Math.abs(y - F.y) > 50) return 99;
   const [u, v] = vLocal(F, x, y), [dc, sv] = vProj(u, v);
-  if (VIN) return vestOut(x, y)[0] > -0.2 ? 99 : Math.min(VEST.hw - dc, sv - 0.8, VEST.post ? Math.hypot(x - VEST.post[0], y - VEST.post[1]) - 0.9 : 99);   // inside: the walls, and the ring's end of it (past the mouth, the cut's own walls)
-  if (sv > VEST.L - 0.6 || dc > VEST.R + 8) return 99;
-  return Math.max(dc - VEST.R - 1, sv - VEST.L + 1);                // outside: the mound over it is solid (in only through its mouth)
+  if (VIN) return vestOut(x, y)[0] > -0.2 ? 99 : Math.min(VEST.hwAt(sv) - dc, sv - 0.8, VEST.post ? Math.hypot(x - VEST.post[0], y - VEST.post[1]) - 0.9 : 99);   // inside: the walls, and the ring's end of it (past the mouth, the cut's own walls)
+  if (sv > VEST.L - 0.6 || dc > VEST.R*VEST.SW + 8) return 99;
+  return Math.max(dc - VEST.R*VEST.sw(sv) - 1, sv - VEST.L + 1);                // outside: the mound over it is solid (in only through its mouth)
 }
 function obstacleSD(x, y, terrainOnly = false){ return UNDER ? caveSD(x, y) : Math.min(obstacleSD0(x, y, terrainOnly), vestSurfSD(x, y)); }
 function obstacleSD0(x, y, terrainOnly = false){
@@ -1363,7 +1373,7 @@ function stationD(x, y){
   for (const w of STATION.walks) d = Math.min(d, segDist(x, y, w[0], w[1], w[2], w[3]) - w[4]);
   for (const L of STATION.loops){ const rx = x - L.x, ry = y - L.y; if (rx*L.ux + ry*L.uy >= 0) d = Math.min(d, Math.abs(Math.hypot(rx, ry) - L.r) - L.hw); }
   if (r > STATION.deckR - 4 && r < STATION.R + 2) d = Math.min(d, stationRamp(x, y)[0] - STATION.ramp.hw);
-  if (Math.abs(x - FAR_TP.x) < 50 && Math.abs(y - FAR_TP.y) < 50){ const [u, v] = vLocal(VFR.stn, x, y); if (u > -1){ const [dc, sv] = vProj(u, v); if (sv < VEST.L - 0.3) d = Math.min(d, dc - VEST.hw); } }
+  if (Math.abs(x - FAR_TP.x) < 50 && Math.abs(y - FAR_TP.y) < 50){ const [u, v] = vLocal(VFR.stn, x, y); if (u > -1){ const [dc, sv] = vProj(u, v); if (sv < VEST.L - 0.3) d = Math.min(d, dc - VEST.hwAt(sv)); } }
   return d;
 }
 function stationFloor(x, y){
@@ -1436,7 +1446,7 @@ function vestStep(){
   const [dc, sv] = vProj(u, v), prev = vest.prev; vest.prev = sv;
   if (sv < 3 || sv > 14) vest.lock = false;
   if (vest.lock && prev !== null && (sv - prev)*vest.lockDir < -0.005) vest.lock = false;   // (turned round: free to switch back at once)
-  if (vest.lock || prev === null || dc > VEST.hw || sv < 5 || sv > 12) return;
+  if (vest.lock || prev === null || dc > VEST.hwAt(sv) || sv < 5 || sv > 12) return;
   const cp = camera.position, [cu, cv] = vLocal(F, cp.x, cp.z), csv = vProj(cu, cv)[1];
   if (onStn && sv > prev && csv > 1){ vest.lock = true; vest.lockDir = 1; vest.lockAt = sv; vestSwap(VFR.stn, VFR.surf); }
   else if (!onStn && TPC_OPEN && sv < prev && csv > 1){ vest.lock = true; vest.lockDir = -1; vest.lockAt = sv; vestSwap(VFR.surf, VFR.stn); }
@@ -3319,14 +3329,14 @@ function groundMat(tex){
     // and the teleporter cave's bore, under its mound: its centre line in six pieces
     const F = VFR.surf, idx = [0, 14, 17, 20, 23, 26, VEST.pts.length - 1], W = idx.map(i => vWorld(F, ...VEST.pts[i]));
     { const e = VEST.pts[VEST.pts.length - 1], q = vWorld(F, e[0] + Math.cos(VEST.exitA)*VEST.lip, e[1] + Math.sin(VEST.exitA)*VEST.lip); W[W.length - 1] = q; }   // (on through the lip of rock past the mouth)
-    const xs = W.map(q => q[0]), ys = W.map(q => q[1]), M = VEST.R + 1;
+    const xs = W.map(q => q[0]), ys = W.map(q => q[1]), M = VEST.R*VEST.SW + 1;
     mineUniforms.uVestS = { value: W.slice(0, -1).map((q, k) => new THREE.Vector4(q[0], q[1], W[k+1][0], W[k+1][1])) };
     mineUniforms.uVestB = { value: new THREE.Vector4(Math.min(...xs) - M, Math.min(...ys) - M, Math.max(...xs) + M, Math.max(...ys) + M) };
-    mineUniforms.uVestP = { value: new THREE.Vector4(F.h, VEST.R + 0.15, VEST.edgeH, VEST.H) }; mineUniforms.uVestW = { value: VEST.wallW }; }
+    mineUniforms.uVestP = { value: new THREE.Vector4(F.h, VEST.R + 0.15, VEST.edgeH, VEST.H) }; mineUniforms.uVestW = { value: VEST.wallW }; mineUniforms.uVestC = { value: new THREE.Vector2(VEST.SW, VEST.SH) }; }
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, mineUniforms);
     sh.vertexShader = 'varying vec3 vMineW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vMineW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vMineW;\nuniform vec4 uMine; uniform vec4 uMineX; uniform vec4 uMineH; uniform vec4 uVestS[6]; uniform vec4 uVestB; uniform vec4 uVestP; uniform float uVestW;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+    sh.fragmentShader = 'varying vec3 vMineW;\nuniform vec4 uMine; uniform vec4 uMineX; uniform vec4 uMineH; uniform vec4 uVestS[6]; uniform vec4 uVestB; uniform vec4 uVestP; uniform float uVestW; uniform vec2 uVestC;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
   {
     float s = uMine.x - vMineW.x, lat = abs(vMineW.z - uMine.y);
     if (s > 0.0 && s < 16.0 && lat < uMineX.x + 0.05){
@@ -3337,11 +3347,13 @@ function groundMat(tex){
       if (vMineW.y < roof + 0.05) discard;
     }
   }
-  if (vMineW.x > uVestB.x && vMineW.x < uVestB.z && vMineW.z > uVestB.y && vMineW.z < uVestB.w && vMineW.y < uVestP.x + uVestP.w + 0.4){
-    float dm = 1e9; vec2 q = vMineW.xz;
-    for (int i = 0; i < 6; i++){ vec2 a = uVestS[i].xy, e = uVestS[i].zw - a; float t = dot(q - a, e)/dot(e, e); if (t >= 0.0 && t <= 1.0) dm = min(dm, length(q - a - e*t)); if (i > 0) dm = min(dm, length(q - a)); }
+  if (vMineW.x > uVestB.x && vMineW.x < uVestB.z && vMineW.z > uVestB.y && vMineW.z < uVestB.w && vMineW.y < uVestP.x + uVestP.w*uVestC.y + 0.4){
+    float dm = 1e9, shc = 1.0; vec2 q = vMineW.xz;   // (dm: distance out, scaled to the tunnel's own size where it opens into the cavern)
+    for (int i = 0; i < 6; i++){ vec2 a = uVestS[i].xy, e = uVestS[i].zw - a; float t = dot(q - a, e)/dot(e, e);
+      if (t >= 0.0 && t <= 1.0){ float k = i == 0 ? 1.0 - smoothstep(3.0, 13.0, t*length(e)) : 0.0, d = length(q - a - e*t)/(1.0 + (uVestC.x - 1.0)*k); if (d < dm){ dm = d; shc = 1.0 + (uVestC.y - 1.0)*k; } }
+      if (i > 0){ float d = length(q - a); if (d < dm){ dm = d; shc = 1.0; } } }
     float t2 = clamp(1.0 + (dm - uVestP.y + 0.15)/(2.0*uVestW), 0.0, 1.0);
-    if (dm < uVestP.y && vMineW.y < uVestP.x + uVestP.w - (uVestP.w - uVestP.z)*t2*t2 + 0.25) discard;
+    if (dm < uVestP.y && vMineW.y < uVestP.x + (uVestP.w - (uVestP.w - uVestP.z)*t2*t2)*shc + 0.25) discard;
   }`);
   };
   return m;
@@ -4114,7 +4126,7 @@ function animateGate(dt){
   animateBridge(dt);
 }
 let toastT = 0;
-function toast(msg){ const el = $('toast'); el.textContent = msg; el.classList.add('on'); toastT = performance.now() + 3600; }
+function toast(msg){ const el = $('toast'); el.textContent = msg; el.classList.add("on"); toastT = performance.now() + 7200; }   // (on screen for 7.2 s)
 function updateOrbs(dt){
   const now = performance.now();
   for (const o of orbs){
@@ -8049,7 +8061,7 @@ const bothWorlds = o => { o.traverse(q => { q.layers.enable(0); q.layers.enable(
     const status = new THREE.MeshBasicMaterial({ color: ANTENNA.red }); pt(g, new THREE.SphereGeometry(0.2, 10, 8), status, 0, 5.15, 0);
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: orbGlowTex, color: ANTENNA.red, transparent: true, depthWrite: false, fog: false, opacity: 0.8 }));
     halo.position.set(0, 5.15, 0); halo.scale.set(1.8, 1.8, 1); g.add(halo);
-    return { lights, status, halo };
+    return { lights, status, halo, g };
   };
   for (const T of TRANSPORT){
     const cap = T.name[0].toUpperCase() + T.name.slice(1);
@@ -8065,10 +8077,19 @@ const bothWorlds = o => { o.traverse(q => { q.layers.enable(0); q.layers.enable(
   // out), one inside the surface's cave beside its ring (red until you've come through from the station)
   { const F = VFR.stn, x = F.x - 7, y = F.y - 7.2, post = mk(x, y, Math.PI/2, STATION_GROUP, STATION.h);
     CONTROLS.push({ zone: 3, name: 'the far teleporter', ...post, x, y, r: 9, told: false, cave: true, isOpen: () => true, open: () => {}, tell: () => 'The teleporter to the surface: ski through the ring to come out in the cave beside the mine.' }); }
-  { const F = VFR.surf, [x, y] = vWorld(F, 1.4, -(VEST.hw - 1.1)), post = mk(x, y, Math.atan2(-Math.cos(F.a), -Math.sin(F.a)), scene, F.h);
-    VEST.post = [x, y];
-    CONTROLS.push({ zone: 3, name: 'the teleporter', ...post, x, y, r: 10, told: false, cave: false, isOpen: () => TPC_OPEN, open: () => {},
-      tell: () => TPC_OPEN ? 'The teleporter is awake: ski through the ring to the space station.' : 'This teleporter is dark. It can only be woken from the far side, out at the space station.' }); }
+  // and inside the cave, beside its ring, the same post in both copies, at the same spot (they must look the same):
+  // red until the teleporter's been woken from the station's side, green after. the station copy's is drawn only
+  // through the ring, like the rest of that copy
+  // (set up once the cave's two copies exist, further on)
+  addVestPosts = () => { for (const [copy, F, station] of [[vestMeshes.surf, VFR.surf, false], [vestMeshes.stn, VFR.stn, true]]){
+    const u = 1.4, v = -(VEST.hwAt(u) - 1.6), post = mk(u, v, -Math.PI/2, copy.g, 0), [x, y] = vWorld(F, u, v);
+    if (station){
+      const map = new Map(); post.g.traverse(o => { if (!o.material) return; if (!map.has(o.material)){ const c = o.material.clone(); map.set(o.material, c); copy.clip.push(c); } o.material = map.get(o.material); o.layers.set(1); });
+      post.lights = post.lights.map(m => map.get(m) || m); post.status = map.get(post.status) || post.status;
+    } else VEST.post = [x, y];
+    CONTROLS.push({ zone: 3, name: 'the teleporter', ...post, x, y, r: station ? 0 : 10, told: false, cave: station, isOpen: () => TPC_OPEN, open: () => {},
+      tell: () => TPC_OPEN ? 'The teleporter is awake: ski through the ring to the space station.' : 'This teleporter is dark. It can only be woken from the far side, out at the space station.' });
+  } };
 }
 // the vestibule's two copies: steel-lined, lit by its own strips (no fog, no outside light), so they look the same
 const vestMeshes = (() => {
@@ -8096,7 +8117,7 @@ const vestMeshes = (() => {
     // soft edges, a metre either side, like the trails' blurred rim
     for (let k = 0; k < 10; k++){ x.globalAlpha = (k + 1)/11; x.fillStyle = grm; x.fillRect(c0 - 10 + k, 0, 1, H); x.fillRect(c0 + tw + 9 - k, 0, 1, H); }
     x.globalAlpha = 1;
-    floorTex = new THREE.CanvasTexture(cv); floorTex.wrapT = THREE.RepeatWrapping; return floorTex; };
+    floorTex = new THREE.CanvasTexture(cv); floorTex.wrapT = THREE.RepeatWrapping; floorTex.wrapS = THREE.ClampToEdgeWrapping; return floorTex; };
   const mkMats = () => ({ rock: basic({ vertexColors: true }), floor: basic({ map: vestFloorTex() }), steel: basic({ color: 0x3b4654 }), lamp: basic({ color: 0xffd08a }),
     ring: basic({ color: 0x6a74c8 }), glow: basic({ color: 0xb79cff }) });
   const nrm = i => { const a = P[Math.max(0, i - 1)], b = P[Math.min(n - 1, i + 1)], tx = b[0] - a[0], ty = b[1] - a[1], l = Math.hypot(tx, ty); return [-ty/l, tx/l]; };
@@ -8106,7 +8127,7 @@ const vestMeshes = (() => {
   // out: pushed out (+) or in (-) from the walls. returns [x, y, z, how far up (0..1), a random 0..1]
   const bore = (i, k, out = 0, rough = 0.35) => {
     const [l0, h0] = prof[k], [nx, ny] = nrm(i), edge = Math.min(k, K - k) < 1 ? 0 : 1, j = edge*rough*(hash(i, k) - 0.5)*2 + out;
-    const up = h0/VEST.H, lat = l0 + Math.sign(l0)*j*(1 - up*0.6), h = h0 + j*up;
+    const up = h0/VEST.H, sv = Math.min(VEST.L + 2, VEST.cum[Math.min(i, VEST.cum.length - 1)]), lat = (l0 + Math.sign(l0)*j*(1 - up*0.6))*VEST.sw(sv), h = (h0 + j*up)*VEST.sh(sv);
     return [P[i][0] + nx*lat, h, P[i][1] + ny*lat, up, hash(i + 7, k + 3)];
   };
   // icy blue like the mine's cut, streaked down the walls, paler higher up
@@ -8127,9 +8148,12 @@ const vestMeshes = (() => {
     // width as the trails outside (TRAIL_W), its corduroy running along it, its edges soft
     const fl = [], uv = []; let run = 0;
     for (let i = 0; i < n - 1; i++){
-      const [ax, ay] = nrm(i), [bx, by] = nrm(i + 1), p = P[i], q = P[i+1], w = hw + 0.05, L = Math.hypot(q[0] - p[0], q[1] - p[1]), v0 = run/12.8, v1 = (run + L)/12.8; run += L;
-      fl.push(p[0] + ax*w, 0.02, p[1] + ay*w, q[0] + bx*w, 0.02, q[1] + by*w, p[0] - ax*w, 0.02, p[1] - ay*w, p[0] - ax*w, 0.02, p[1] - ay*w, q[0] + bx*w, 0.02, q[1] + by*w, q[0] - bx*w, 0.02, q[1] - by*w);
-      uv.push(0, v0, 0, v1, 1, v0, 1, v0, 0, v1, 1, v1);
+      const [ax, ay] = nrm(i), [bx, by] = nrm(i + 1), p = P[i], q = P[i+1], L = Math.hypot(q[0] - p[0], q[1] - p[1]), v0 = run/12.8, v1 = (run + L)/12.8; run += L;
+      const sa = VEST.sw(VEST.cum[Math.min(i, VEST.cum.length - 1)]), sb = VEST.sw(VEST.cum[Math.min(i + 1, VEST.cum.length - 1)]), wa = (hw + 0.05)*sa, wb = (hw + 0.05)*sb;
+      fl.push(p[0] + ax*wa, 0.02, p[1] + ay*wa, q[0] + bx*wb, 0.02, q[1] + by*wb, p[0] - ax*wa, 0.02, p[1] - ay*wa, p[0] - ax*wa, 0.02, p[1] - ay*wa, q[0] + bx*wb, 0.02, q[1] + by*wb, q[0] - bx*wb, 0.02, q[1] - by*wb);
+      // (the texture spans the tunnel's own width: past it, wider in the cavern, it carries on as open snow)
+      const ua = 0.5 - sa/2, ub = 0.5 - sb/2;
+      uv.push(ua, v0, ub, v1, 1 - ua, v0, 1 - ua, v0, ub, v1, 1 - ub, v1);
     }
     { const gm = new THREE.BufferGeometry(); gm.setAttribute('position', new THREE.Float32BufferAttribute(fl, 3)); gm.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.add(new THREE.Mesh(gm, mats.floor)); }
     // steel arches every 5 m, a lamp at the crown of every other one
@@ -8149,7 +8173,8 @@ const vestMeshes = (() => {
     // the tunnel's own outline, as a flat shape (for its end face and the far cap)
     const profPath = (path) => { prof.forEach(([l, h], k) => k ? path.lineTo(l, h) : path.moveTo(l, h)); path.lineTo(prof[0][0], prof[0][1]); return path; };
     // the rock face the tunnel ends in, just behind the ring
-    { const sh = new THREE.Shape(); sh.moveTo(-DR - 3, 0); sh.lineTo(DR + 3, 0); sh.lineTo(DR + 3, C + DR + 3); sh.lineTo(-DR - 3, C + DR + 3); sh.lineTo(-DR - 3, 0); sh.holes.push(profPath(new THREE.Path()));
+    { const sh = new THREE.Shape(), s0 = VEST.sw(0), h0s = VEST.sh(0); prof.forEach(([l, h], k) => k ? sh.lineTo(l*s0*1.04, h*h0s*1.02) : sh.moveTo(l*s0*1.04, h*h0s*1.02)); const lx = prof[prof.length - 1][0]*s0*1.04, fx = prof[0][0]*s0*1.04; sh.lineTo(lx, -1); sh.lineTo(fx, -1); sh.lineTo(fx, 0);
+      sh.holes.push(doorShape(new THREE.Path(), DR + 0.2));
       const face = new THREE.Mesh(new THREE.ShapeGeometry(sh, 24), basic({ color: 0x9db8cc })); face.rotation.y = Math.PI/2; face.position.set(0.35, 0, 0); g.add(face); }
     if (!station){ const back = new THREE.Mesh(disc(DR + 0.5), basic({ color: 0x232833 })); back.rotation.y = Math.PI/2; back.position.set(-0.6, 0, 0); g.add(back); }
     if (station){
@@ -8171,19 +8196,20 @@ const vestMeshes = (() => {
   const surf = build(VFR.surf, scene, 0, false), stn = build(VFR.stn, STATION_GROUP, 1, true);
   return { surf, stn };
 })();
+addVestPosts();
 // the station's copy of the teleporter cave shows only through its ring, like a doorway into another world: from the
 // station's side, it's clipped to the pyramid from the camera through the ring (and to the far side of the ring);
 // from inside it, it's all there; from anywhere else (past the ring but outside it), none of it
 const vestClip = (() => {
   const N = 24, planes = Array.from({ length: N + 1 }, () => new THREE.Plane()), none = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -1e7)];
   const ring = [], ctr = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), cam = new THREE.Vector3(), probe = new THREE.Vector3();
-  let mode = '';
-  const set = (list, m) => { if (mode === m && m !== 'pyr') return; mode = m; for (const mt of vestMeshes.stn.clip) mt.clippingPlanes = list; };
+  let mode = '', seen = 0;
+  const set = (list, m) => { if (mode === m && m !== 'pyr' && seen === vestMeshes.stn.clip.length) return; mode = m; seen = vestMeshes.stn.clip.length; for (const mt of vestMeshes.stn.clip) mt.clippingPlanes = list; };
   return () => {
     const F = VFR.stn, R = DOOR_R + 0.3, c = Math.cos(F.a), sn = Math.sin(F.a);
     if (!ring.length) for (let k = 0; k < N; k++){ const t = k/N*Math.PI*2, v = Math.cos(t)*R; ring.push(new THREE.Vector3(F.x - v*sn, F.h + DOOR_C + Math.sin(t)*R, F.y + v*c)); }
     cam.copy(camera.position); const [u, v] = vLocal(F, cam.x, cam.z), [dc, sv] = vProj(u, v);
-    if (u > -0.05 && dc < VEST.R + 0.5 && sv < VEST.L + 1){ set(null, 'all'); return; }
+    if (u > -0.05 && dc < VEST.R*VEST.sw(sv) + 0.5 && sv < VEST.L + 1){ set(null, 'all'); return; }
     if (u >= -0.05){ set(none, 'none'); return; }
     ctr.set(F.x, F.h + DOOR_C, F.y);
     for (let k = 0; k < N; k++){ a.copy(ring[k]); b.copy(ring[(k + 1) % N]); planes[k].setFromCoplanarPoints(cam, a, b); if (planes[k].distanceToPoint(ctr) < 0) planes[k].negate(); }
@@ -8905,11 +8931,11 @@ function vestCamPull(x, y){
   const F = VFR.surf; if (Math.abs(S.x - F.x) > 70 || Math.abs(S.y - F.y) > 70) return null;
   const [al, lat] = vestOut(S.x, S.y);
   if (!VIN && !(al > -0.5 && al < 22 && lat < VEST.hw + 3 + Math.max(0, al)*0.5)) return null;
-  const free = (px, pz) => { const [a2, l2, u2, v2] = vestOut(px, pz); if (a2 < VEST.lip){ const [d2, s2] = vProj(u2, v2); if (d2 < VEST.hw - 0.8 && s2 > 1.2) return true; if (a2 < 0) return false; }
+  const free = (px, pz) => { const [a2, l2, u2, v2] = vestOut(px, pz); if (a2 < VEST.lip){ const [d2, s2] = vProj(u2, v2); if (d2 < VEST.hwAt(s2) - 0.8 && s2 > 1.2) return true; if (a2 < 0) return false; }
     return l2 < VEST.hw + 1 + Math.max(0, a2)*0.5 - 0.8 || heightNat(px, pz) < F.h + 4; };
   if (!free(x, y)){ let lo = 0, hi = 1; for (let it = 0; it < 14; it++){ const m = (lo + hi)/2; if (free(S.x + (x - S.x)*m, S.y + (y - S.y)*m)) lo = m; else hi = m; } x = S.x + (x - S.x)*lo; y = S.y + (y - S.y)*lo; }
   // and inside the cave's outline, under its roof
-  const [a3, , u3, v3] = vestOut(x, y), [d3] = vProj(u3, v3), cap = a3 < 0.5 && d3 < VEST.R ? F.h + VEST.roofAt(d3) - 0.8 : Infinity;
+  const [a3, , u3, v3] = vestOut(x, y), [d3, s3] = vProj(u3, v3), cap = a3 < 0.5 && d3 < VEST.R*VEST.sw(s3) ? F.h + VEST.roofAtS(d3, s3) - 0.8 : Infinity;
   return [x, y, Math.min(ground(x, y), F.h + Math.max(0, a3 - 2)*0.1), cap];
 }
 // in a teleporter vestibule the camera stays inside it: in front of the ring, between the walls, under the roof
@@ -8920,13 +8946,13 @@ function vestCamClamp(){
     if (su < 0 && su > -25 && pu > -0.3){ const k = Math.max(0, (-0.3 - su)/(pu - su)); p.set(S.x + (p.x - S.x)*k, Math.min(camH + 1.2 + (p.y - camH - 1.2)*k, F.h + DOOR_C + DOOR_R - 1), S.y + (p.z - S.y)*k); return; }
   }
   const F = ONSTATION ? VFR.stn : VFR.surf, [su, sv0] = vLocal(F, S.x, S.y), [sd, ss] = vProj(su, sv0);
-  if (sd > VEST.hw || ss > VEST.L || ss < -1) return;
-  const p = camera.position, inside = (x, z) => { const [u, v] = vLocal(F, x, z), [d, sv] = vProj(u, v); return d < VEST.hw - 0.8 && sv > 1.2; };
+  if (sd > VEST.hwAt(ss) || ss > VEST.L || ss < -1) return;
+  const p = camera.position, inside = (x, z) => { const [u, v] = vLocal(F, x, z), [d, sv] = vProj(u, v); return d < VEST.hwAt(sv) - 0.8 && sv > 1.2; };
   if (!inside(p.x, p.z)){
     let lo = 0, hi = 1; for (let it = 0; it < 14; it++){ const m = (lo + hi)/2; if (inside(S.x + (p.x - S.x)*m, S.y + (p.z - S.y)*m)) lo = m; else hi = m; }
     p.x = S.x + (p.x - S.x)*lo; p.z = S.y + (p.z - S.y)*lo;
   }
-  { const [cu, cv] = vLocal(F, p.x, p.z), d = vProj(cu, cv)[0]; p.y = Math.min(p.y, F.h + VEST.roofAt(d) - 0.8); }
+  { const [cu, cv] = vLocal(F, p.x, p.z), [d, cs] = vProj(cu, cv); p.y = Math.min(p.y, F.h + VEST.roofAtS(d, cs) - 0.8); }
 }
 function caveCamClamp(){
   // (on the surface, only while you're in the mine's cut yourself, not on a bridge passing over or anywhere nearby)

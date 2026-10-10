@@ -82,6 +82,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <label for="tPixel">Pixel size<output id="oPixel"></output><input id="tPixel" type="range" min="1" max="6" step="1" value="4"></label>
   <label for="tMax">Top speed<output id="oMax"></output><input id="tMax" type="range" min="10" max="60" step="1" value="38"></label>
   <label for="tMtn">Mountains<output id="oMtn"></output><input id="tMtn" type="range" min="0" max="3" step="0.25" value="1"></label>
+  <label for="tTrees">Trees<output id="oTrees"></output><input id="tTrees" type="range" min="0" max="3" step="0.25" value="1"></label>
   <label for="tBld">Buildings<output id="oBld"></output><input id="tBld" type="range" min="0" max="3" step="0.25" value="1"></label>
   <label for="tOff">Ungroomed snow (× friction)<output id="oOff"></output><input id="tOff" type="range" min="1" max="12" step="0.5" value="1.5"></label>
   <label for="tPush">Push per kick<output id="oPush"></output><input id="tPush" type="range" min="0.2" max="2.5" step="0.05" value="2.5"></label>
@@ -120,14 +121,14 @@ const P = {
   push: 2.5, tap: 80, klen: 50, turn: 5, turn2: 5, turn3: 15, k180: 8, k180t: 6, kfloor: 15, kwin: 450,
   tfStop: 180, tfMove: 90, tfVlo: 1, tfVhi: 14, decay: 20, snap: 160, splay: 11, fric: 0.4, glide: 0.25, grip: 25,
   gwin: 600, gcut: 95, max: 38, lboost: 1.4, plow: 2.5, tuck: 50, lean: 50, camd: 15, sway: 0.8, cam: 0.6, pixel: 4,
-  R: 300, lift: false, daynight: false, mtn: 1, bld: 1, off: 1.5,
+  R: 300, lift: false, daynight: false, mtn: 1, bld: 1, off: 1.5, trees: 1,
 };
 const SETTINGS = [
   ['tR', 'oR', 'R', v => v + ' m'], ['tCamd', 'oCamd', 'camd', v => v.toFixed(1) + ' m'],
   ['tPixel', 'oPixel', 'pixel', v => v > 1 ? v + ' px' : 'off'], ['tMax', 'oMax', 'max', v => v + ' km/h'],
   ['tPush', 'oPush', 'push', v => v.toFixed(2) + ' m/s'],
   ['tOff', 'oOff', 'off', v => '×' + v.toFixed(1)],
-  ['tMtn', 'oMtn', 'mtn', v => v ? '×' + v : 'none'], ['tBld', 'oBld', 'bld', v => v ? '×' + v : 'none'],
+  ['tMtn', 'oMtn', 'mtn', v => v ? '×' + v : 'none'], ['tBld', 'oBld', 'bld', v => v ? '×' + v : 'none'], ['tTrees', 'oTrees', 'trees', v => v ? '×' + v : 'none'],
 ];
 const STORE = 'skate-planetoid';
 const DEFAULTS = {}; SETTINGS.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -468,6 +469,59 @@ function buildStructures(rnd){
 }
 let buildCounts = {};
 
+// ---------- trees: the game's spruces (a trunk and two cone tiers), in woods and clearings on the ungroomed snow ----------
+// a patchy noise decides where the woods are; trees keep a clear corridor of 3-6 m either side of every trail (as in the
+// game), stay off steep ground, out of the mountains, buildings and beacons, and at least 2.2 m apart. trunks are solid
+let trees = [], treeMeshes = [], treeGrid = new Map();
+const treeMats = [new THREE.MeshLambertMaterial({ color: 0x4d3f35 }), new THREE.MeshLambertMaterial({ color: 0x2f4a43 }), new THREE.MeshLambertMaterial({ color: 0x3e5c53 })];
+const TREE_PARTS = [
+  { geo: new THREE.CylinderGeometry(0.12, 0.18, 1.6, 6), y: 0.8 },
+  { geo: new THREE.ConeGeometry(1.5, 3.4, 8), y: 2.7 },
+  { geo: new THREE.ConeGeometry(1.05, 2.6, 8), y: 4.4 },
+];
+function buildTrees(rnd){
+  const R = P.R, V = THREE.Vector3, area = 4*Math.PI*R*R;
+  for (const m of treeMeshes) scene.remove(m);
+  treeMeshes = []; trees = []; treeGrid = new Map();
+  const d = new V(), t1 = new V(), t2 = new V(), q = new V(), up = new V(0, 1, 0);
+  const beaconDirs = BEACON_DIRS.map(([x, y, z]) => new V(x, y, z).normalize());
+  const tries = Math.min(500000, Math.round(area/45*P.trees)), maxT = 20000;
+  for (let i = 0; i < tries && trees.length < maxT; i++){
+    const z = 2*rnd() - 1, a = rnd()*Math.PI*2, rr = Math.sqrt(1 - z*z); d.set(rr*Math.cos(a), z, rr*Math.sin(a));
+    // woods and clearings
+    const f = 0.65*noise3(d.x*R/75 + 11.1, d.y*R/75 - 4.2, d.z*R/75 + 7.7) + 0.35*noise3(d.x*R/30 - 3.3, d.y*R/30 + 9.9, d.z*R/30 + 1.4);
+    if (rnd() > 0.04 + 0.92*smooth01(-0.05, 0.3, f)) continue;
+    if (d.angleTo(START_N)*R < 14) continue;
+    if (nearestTrailAt(d).d < TRAIL_W/2 + 3 + rnd()*3) continue;
+    if (beaconDirs.some(b => d.angleTo(b)*R < 5)) continue;
+    if (solids.some(o => d.dot(o.d) > Math.cos((o.r + 1.5)/R))) continue;
+    // not on steep ground
+    t1.copy(Math.abs(d.y) < 0.9 ? up : new V(1, 0, 0)).cross(d).normalize(); t2.crossVectors(d, t1);
+    const hAt = (u, v) => { q.copy(d).multiplyScalar(R).addScaledVector(t1, u).addScaledVector(t2, v).normalize(); return groundR(q); };
+    if (Math.hypot(hAt(1, 0) - hAt(-1, 0), hAt(0, 1) - hAt(0, -1))/2 > 0.3 + rnd()*0.1) continue;
+    // no two trunks on top of each other
+    const key = cellOf(d.x, d.y, d.z), cell = treeGrid.get(key);
+    if (cell && cell.some(t => t.d.angleTo(d)*R < 2.2)) continue;
+    const t = { d: d.clone(), s: 0.7 + rnd()*0.7, spin: rnd()*Math.PI*2 };
+    trees.push(t);
+    // into the grid: its own cell and any cell within 1.5 m, so the collision lookup finds it from either side of a border
+    const keys = new Set([key]);
+    for (let k = 0; k < 6; k++){ const an = k/6*Math.PI*2; q.copy(d).multiplyScalar(R).addScaledVector(t1, Math.cos(an)*1.5).addScaledVector(t2, Math.sin(an)*1.5).normalize(); keys.add(cellOf(q.x, q.y, q.z)); }
+    for (const kk of keys){ let l = treeGrid.get(kk); if (!l) treeGrid.set(kk, l = []); l.push(t); }
+  }
+  if (!trees.length) return;
+  const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), q2 = new THREE.Quaternion(), sc = new V(), pos = new V();
+  TREE_PARTS.forEach((part, pi) => {
+    const mesh = new THREE.InstancedMesh(part.geo, treeMats[pi], trees.length);
+    trees.forEach((t, i) => {
+      qq.setFromUnitVectors(up, t.d); q2.setFromAxisAngle(up, t.spin); qq.multiply(q2);
+      pos.copy(t.d).multiplyScalar(groundR(t.d) - 0.1 + part.y*t.s);
+      mesh.setMatrixAt(i, m4.compose(pos, qq, sc.set(t.s, t.s, t.s)));
+    });
+    mesh.instanceMatrix.needsUpdate = true; mesh.frustumCulled = false; scene.add(mesh); treeMeshes.push(mesh);
+  });
+}
+
 // ---------- scattered rocks (solid) and six beacons, so you can see the curve and judge speed ----------
 let rocks = [], rockMesh = null;
 const BEACON_DIRS = [[0,1,0,'red',0xd2462e], [0,-1,0,'violet',0x8a5cd6], [1,0,0,'yellow',0xf2c230], [-1,0,0,'green',0x2f9a5a], [0,0,1,'blue',0x2f6fd6], [0,0,-1,'orange',0xf08a2a]];
@@ -478,6 +532,7 @@ function buildScatter(){
   if (rockMesh){ scene.remove(rockMesh); rockMesh.geometry.dispose(); }
   rocks = [];
   { let s2 = 777; buildStructures(() => (s2 = (s2 * 16807) % 2147483647) / 2147483647); }
+  { let s4 = 2468; buildTrees(() => (s4 = (s4 * 16807) % 2147483647) / 2147483647); }
   let s = 4242; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
   const count = Math.max(150, Math.min(3000, Math.round(4*Math.PI*R*R/700)));
   rockMesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0x7d8a96 }), count);
@@ -490,6 +545,7 @@ function buildScatter(){
     if (solids.some(o => d.angleTo(o.d)*R < o.r + 1)) continue;     // and out of the mountains and buildings
     const size = 0.35 + 1.3*Math.pow(rnd(), 2.2);
     if (nearestTrailAt(d).d < TRAIL_W/2 + size + 0.5) continue;    // and off the trails
+    { const tl = treeGrid.get(cellOf(d.x, d.y, d.z)); if (tl && tl.some(t => t.d.angleTo(d)*R < size + 1)) continue; }   // and clear of the trees
     p.copy(d).multiplyScalar(groundR(d) - 0.3*size);
     q.setFromUnitVectors(up, d); q2.setFromAxisAngle(up, rnd()*Math.PI*2); q.multiply(q2);
     sc.set(size, size*(0.55 + 0.3*rnd()), size*(0.8 + 0.4*rnd()));
@@ -757,6 +813,7 @@ function collide(){
   };
   for (const k of rocks) if (k.x*n.x + k.y*n.y + k.z*n.z > lim) hit(k.x, k.y, k.z, k.r);
   for (const b of beaconList) if (b.d.dot(n) > lim) hit(b.d.x, b.d.y, b.d.z, b.r);
+  { const tl = treeGrid.get(cellOf(n.x, n.y, n.z)); if (tl) for (const t of tl) hit(t.d.x, t.d.y, t.d.z, 0.18*t.s + 0.05); }   // tree trunks
   for (const o of solids){
     if (o.d.dot(n) < o.lim) continue;
     if (!o.box){ hit(o.d.x, o.d.y, o.d.z, o.r); continue; }
@@ -1038,17 +1095,17 @@ for (const [i, o, k, f] of SETTINGS){
   const upd = () => { P[k] = +el.value; $(o).textContent = f(+el.value); };
   upd();
   el.addEventListener('input', () => { upd(); if (k === 'R') rNote(); if (k === 'pixel') resize(); });
-  el.addEventListener('change', () => { save(); if (k === 'R') rebuild(); if (k === 'mtn' || k === 'bld') buildScatter(); });
+  el.addEventListener('change', () => { save(); if (k === 'R') rebuild(); if (k === 'mtn' || k === 'bld' || k === 'trees') buildScatter(); });
 }
 for (const [id, key] of [['tLift', 'lift'], ['tDay', 'daynight']]){
   const el = $(id); if (saved[key] !== undefined) el.checked = !!saved[key];
   P[key] = el.checked; el.addEventListener('change', () => { P[key] = el.checked; save(); });
 }
 $('defaultsBtn').addEventListener('click', () => {
-  const oldR = P.R, oldS = P.mtn + ',' + P.bld;
+  const oldR = P.R, oldS = P.mtn + ',' + P.bld + ',' + P.trees;
   for (const [i, o, k, f] of SETTINGS){ $(i).value = DEFAULTS[i]; P[k] = +DEFAULTS[i]; $(o).textContent = f(P[k]); }
   $('tLift').checked = P.lift = false; $('tDay').checked = P.daynight = false;
-  save(); rNote(); resize(); if (P.R !== oldR) rebuild(); else if (P.mtn + ',' + P.bld !== oldS) buildScatter();
+  save(); rNote(); resize(); if (P.R !== oldR) rebuild(); else if (P.mtn + ',' + P.bld + ',' + P.trees !== oldS) buildScatter();
 });
 
 // ---------- go ----------
@@ -1056,7 +1113,7 @@ placeAtStart(); resize(); rNote();
 setTimeout(() => {
   buildPlanet(); faceTrail();
   $('loading').style.display = 'none';
-  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => buildCounts, ex, ey, trails: () => trails, nearestTrailAt };   // test hook
+  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length }, buildCounts), ex, ey, trails: () => trails, nearestTrailAt };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 }, 0);
 </script>

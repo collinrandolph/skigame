@@ -149,31 +149,46 @@ The map is four times its old area and split into zones, each locked until you c
 
 2.0 replaces 1.0's whole underground except the crown room. Its 3D models and lighting are still placeholders to be refined.
 
-- **The mine's gate:** the timber portal on the mine's ridge now has a barred steel gate. It stays shut (you're told so if you come close) until all of zone 3's terminals are powered, then its two halves slide back into the ridge. The label over the portal reads "THE MINE · 2 / 3 TERMINALS" (however many are powered), then "OPEN".
-- **The mine shaft:** from the portal it winds down under the ridge at a steady grade to Plateau 1.
-- **Layout:** three hills step down between four plateaus, each hill dropping 70 m (about 21%, like 1.0's skills parks), so runs come out at 20–27 km/h:
-  - **Plateau 1:** where the shaft comes in, with the miners' camps and a few aliens.
-  - **Hill 1:** down from Plateau 1 to Plateau 2. Its west half is a slalom with gates, its east half a plain descent.
-  - **Plateau 2:** has two levels. The lower one is the foot of Hill 1 and the top of Hill 2. The upper level, behind a sheer step, holds the crown room. Only the **Crown Ramp** (a light bridge, always on) climbs the step, straight to the crown door.
-  - **Hill 2:** big rollers down the middle, with a berm path weaving down beside them.
-  - **Plateau 3:** at its foot, with the village's houses and ruins.
-  - **Hill 3:** a half-pipe.
-  - **The Basement:** at the bottom, with the haul trucks and the teleporter.
-- **The crown room:** unchanged from 1.0 (the spiral, the 30 crown crystals and the giant crystal), moved to Plateau 2's upper level. The door still opens only for the reward outfit.
-- **The teleporter (Basement → station):** a steel wall with a massive ring and its generators. Its control post opens it once zone 3's terminals are powered, and you ski straight through onto the station.
-- **The far teleporter (station → surface):** a new arm off the far side of the station ends in a ring inside a short steel passage, 14 m straight, a 90° bend, then 14 m to its mouth. An identical passage is dug into the hillside beside the mine's entrance, angled away from it so it doesn't compete with the mine, and close enough for repeat runs. Partway along the straight, out of sight of either mouth, you're carried from one copy to the other with the same position, heading and speed.
-  - **Unlocking:** the surface ring is dark at first ("TELEPORTER · DARK"), and it tells you it can only be woken from the far side. Ride the far teleporter out from the station once and it wakes for good ("TELEPORTER · TO THE STATION"). Then skiing into it from the surface takes you back onto the station. This is saved in your browser.
-  - Trees, boulders and outcrops are kept out of the passage's cut.
-- **Map:** the big map shows the cave's floor plan and courses (or, while you're on the station, the station's instead, since the two overlap), and the passage beside the mine (purple once it's awake). Underground, the corner map zooms to the cave.
-- **Checkpoints:** **Zone 3** starts you at the mine's (now open) gate, **Crown room** on Plateau 2 lined up with the Crown Ramp, and **Space port** by the Basement teleporter.
+- **The mine's gate:** the timber portal on the mine's ridge has a barred steel gate. It stays shut until all of zone 3's terminals are powered (you're told so if you come close), then sinks into the floor. The label over the portal reads "THE MINE · 2 / 3 TERMINALS" (however many are powered), then "OPEN".
+- **The mine shaft:** from the portal it winds down under the ridge at a steady grade. Its last 26 m open out like a cave mouth into Plateau 1, with the floor, walls and roof widening and rising together. The steel arches stop where the flare begins.
+- **An underground ski area:** three hills step down between the plateaus, each about 330 m long and dropping 90 m (27% on average).
+  - **Pitch:** each hill varies between steeper and gentler pitches, with side-hill sections and long swells.
+  - **Hill ends:** every hill eases level into the plateau at both ends, meeting it flush. There's no lip to throw you or lift your ski tracks.
+  - **Edges:** orange marker poles run down both sides every 8 m so your speed shows, with a light mast every 48 m.
+  - **Grooming:** every plateau and hill is groomed wall to wall, except a rim of open snow along the foot of the walls. Camps, gear and houses stand on that rim, never on the snow you ski.
+  - **Speed:** a deep tuck reaches about 185 km/h at the foot of a hill. The 90 m drop is set in `LV` and can be adjusted.
+- **Plateau 1:** where the shaft comes in, with the miners' camps and aliens round its rim.
+- **Hill 1:** 80 m wide, open on its east half. Its west half is a slalom set for a deep tuck: at the speed a deep tuck carries you, each turn is no tighter than about 55% of what a full lean can carve. So the gates start close together and spread out as you speed up (6 gates). A test skier in deep tuck followed the line to within 1.8 m. The hill runs straight at the crown door, which glows through the cave's haze all the way down.
+- **Plateau 2:** much bigger, on two levels.
+  - **The lower level:** takes in Hill 1 and leads on to Hill 2, with dwellings along its east side and round its west.
+  - **The upper terrace:** a broad raised plaza (about 120 m across and 96 m deep, 14 m up a sheer step). The **Crown Ramp**, a light bridge that is always on, climbs it straight in line with Hill 1. A double row of crystal-capped columns lines the way to the crown door at the terrace's far end, with grander houses down both sides.
+- **The crown room:** unchanged inside (the spiral, the 30 crown crystals and the giant crystal), now behind the terrace's north wall. The door still opens only for the reward outfit.
+- **Hill 2:** 92 m wide. A winding banked berm path runs down its east half; rollers run down its west half all the way out to the wall, as an alternative line.
+- **Plateau 3 and Hill 3:** ruins on Plateau 3; Hill 3 is a half-pipe down to the Basement.
+- **The Basement teleporter:** one circular doorway, a single heavy steel ring with a band of light inside it, filled with the membrane. The station shows through the doorway once it's open. The steel wall now runs wide and up into the roof, so space no longer shows through any gap round it.
+- **The teleporter cave (station ↔ surface):** a round bore through rock, styled like the mine's tunnel, with rough icy rock walls, a snow floor, steel arches with lamps, and a ring with its membrane at the inner end.
+  - **Shape:** it runs 14 m straight, through a 90° bend, then 14 m to its mouth.
+  - **On the surface:** the cave is buried in a mound of the ridge beside the mine, so you see only its mouth: a timber portal like the mine's at the head of a cut. You can only get in through the mouth.
+  - **On the station:** the far arm's ring is set in a rock face, with the bore hanging off it like an asteroid.
+  - **Crossing over:** the two copies are identical inside. Partway along the straight, out of sight of either end, you're carried from one to the other with the same position, heading and speed.
+  - **Unlocking:** the surface ring is dark until you've ridden out from the station once; after that it takes you back. This is saved in your browser.
+  - **Tested:** the round trip, station → surface → out of the mouth → back in → station.
+- **The giant's loop ramp:** the wrong-way loop under the moose giant now runs straight out between his legs until it's well clear of them (about 22 m out). Then it makes an easy turn and swings round him on a gently tightening curve, merging onto the far side of the Hidden Way. It keeps at least 5.5 m from the centre of every leg, and a test ride stays on it through the turn.
+- **Map:** the big map shows the cave's floor plan and courses (or, while you're on the station, the station's instead, since the two overlap), and the teleporter cave beside the mine (purple once it's awake). Underground, the corner map zooms to the cave.
+- **Checkpoints:**
+  - **Zone 3** starts you at the mine's (now open) gate.
+  - **Crown room** puts you on Plateau 2's lower level, lined up with the Crown Ramp.
+  - **Space port** puts you by the Basement teleporter.
 - **Unchanged from 1.0:** the station (a world of its own, seen only through the teleporter's doorway), the portal rendering, the camera rules underground and the ship's cargo bin.
-- **Testing:** **Cave: the mine**, **Cave: Plateau 1**, **Cave: the station** and **Cave: the crown door** in dev view's Testing group. **Checkpoint: Plateau 2** and **Checkpoint: station** set your checkpoint there.
-- **Coming next (story):** the crystal altar triggered from the cave, and the giant's loop ramp kept straight under the giant until it clears his legs.
+- **Testing:**
+  - **Cave: the mine**, **Cave: Plateau 1**, **Cave: the station** and **Cave: the crown door** are in dev view's Testing group.
+  - **Checkpoint: Plateau 2** and **Checkpoint: station** set your checkpoint there.
+- **Coming next (story):** the crystal altar triggered from the cave.
 
 ### End game
 
 - **The ceremony:** bring 3 calves to the observatory. Once the elders have taken their places in the ring and you're near it, the two attendants in white walk over, stand either side of you with their arms raised, and dress you in the court's purple (the reward outfit). An altar like zone 3's, but larger, then rises from the snow in the middle of the ring and asks for 30 purple crystals to complete the ceremony. The Starway stays dark until then.
-- **The crown room:** the purple outfit opens the crown door on Plateau 2's upper level, and the 30 crown crystals are up the spiral inside. You carry them until you spend them.
+- **The crown room:** the purple outfit opens the crown door at the far end of Plateau 2's upper terrace, and the 30 crown crystals are up the spiral inside. You carry them until you spend them.
 - **Spending the 30, one of two ways:**
   - **At the altar:** offer them to complete the ceremony. The altar sinks away, the cosmic moose appear out in space (you no longer need every calf for them) and the Starway lights.
   - **On the ship:** the ship waits at the station's big east dock (Dock 1), its engines glowing red, with a crowd of crew along the dock. Its cargo bin stands on a bracket off the main walkway's outer edge at Dock 1, right behind the ship's engines: open, glowing purple inside, the court's gold diamond on its sides, with a column of light above it. Ski the main walkway past the bin and the crew ask for the crystals: the old mine is stripped bare and the new one is still being dug, so they're stranded. Give them the crystals and leave the planet, and everything begins again in your own orange. Or stay on the station. Once you've given the crystals to the court, the crew are still stranded.

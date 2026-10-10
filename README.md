@@ -181,7 +181,7 @@ The map is four times its old area and split into zones, each locked until you c
   - **Crossing over:** the two copies are identical inside. Partway along the straight, out of sight of either end, you're carried from one to the other with the same position, heading and speed.
   - **Turning round:** if you turn round inside, you're carried straight back, so you always come out the way you went in.
   - **The camera:** it stays inside the cave and under its roof. Leaving through the ring or the mouth, it follows you out rather than being left in the tunnel or lifted over the mound.
-  - **Unlocking:** the surface ring stays dark and solid until you've ridden out from the station once; after that it takes you to the station. This is saved in your browser.
+  - **Unlocking:** the surface ring stays dark and solid until you've ridden out from the station once; after that it takes you to the station. The cave itself is open to ski into at any time. This is saved in your browser. A reset or any checkpoint puts the ring back to sleep, since you haven't come through from the station yet.
   - **Status posts:** like the Basement's, one inside the surface cave beside its ring (red until it's awake) and one on the station's landing (green: it's the way out).
   - **Tested:**
     - skiing in from outside to the dark ring and back out, then once awake through to the station;

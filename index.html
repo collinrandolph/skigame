@@ -4209,7 +4209,7 @@ function resetOrbs(){
   for (const K of KIOSKS){ K.state = 'dormant'; K.dismissed = false; for (const o of K.orbs){ o.got = false; o.fade = 0; o.g.visible = false; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; } updateKioskLook(K); }
   if (trial.K){ const K = trial.K; trial.K = null; updateKioskLook(K); }
   releasePet(); returnZ5Calves(); sleepGiant(); checkpoint = null; ceremony = 0; saveEnd(); crownReset(); CROWN_GATE.open = false; pet.lastDismissed = -1; SKY_ON = null; bhShown = false; bhLatch = false;
-  setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; altar.state = 0; altar.dismissed = false; setCaveAltar(false, true); setCrystalsCollected(0); setCrystalsActive(false); updateAltarLook(); gate4Open = false; gate4.open = 0; bridgeWanted = bridge2Wanted = false; bridgeDown = bridge2Down = 0; animateGate(0);
+  setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; altar.state = 0; altar.dismissed = false; setCaveAltar(false, true); TPC_OPEN = false; saveTpc();   /* (the teleporter cave's ring sleeps again until you come through from the station) */ setCrystalsCollected(0); setCrystalsActive(false); updateAltarLook(); gate4Open = false; gate4.open = 0; bridgeWanted = bridge2Wanted = false; bridgeDown = bridge2Down = 0; animateGate(0);
   saveProgress();
 }
 

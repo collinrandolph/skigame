@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Skate Ski Planetoid</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* v3.0 prototype: a bare lumpy planetoid you skate around. full-bleed WebGL canvas, HUD top left, view button top right,
+   settings bottom right, kick pads on touch screens */
+:root{
+  --bg:#dfe7ee; --panel:rgba(255,255,255,.88); --line:#c4d1dd; --ink:#1d2a36; --muted:#5d7083; --skier:#d2462e;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b1218; --panel:rgba(14,22,30,.88); --line:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4; --skier:#ff6a4d;
+}}
+:root[data-theme="dark"]{ --bg:#0b1218; --panel:rgba(14,22,30,.88); --line:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4; --skier:#ff6a4d; }
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--mono);overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:none;-webkit-touch-callout:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px}
+.hud{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);left:16px;padding:12px 14px;display:grid;gap:6px;min-width:210px;max-width:calc(100vw - 32px)}
+.hud h1{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.04em;text-transform:uppercase;margin:0 0 2px;line-height:1}
+.row{display:flex;justify-content:space-between;gap:16px;font-size:12px;font-variant-numeric:tabular-nums}
+.row span:first-child{color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:10.5px;align-self:center}
+.legs{display:flex;gap:6px;margin-top:2px}
+.leg{flex:1;text-align:center;font-size:11px;padding:3px 0;border:1px solid var(--line);border-radius:4px;color:var(--muted);transition:background .12s,color .12s}
+.leg.on{background:var(--skier);color:#fff;border-color:var(--skier)}
+.help{font-size:11px;color:var(--muted);line-height:1.55;max-width:230px;margin-top:2px}
+.help b{color:var(--ink);font-weight:500}
+.top-right{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);right:16px;display:flex;gap:8px}
+button{font:500 12px var(--mono);color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--skier);outline-offset:2px}
+details{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);padding:10px 14px;width:min(270px,calc(100vw - 32px));max-height:calc(100vh - 120px);overflow:auto}
+summary{cursor:pointer;font-family:var(--display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:14px}
+details label{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:11px;color:var(--muted);margin-top:10px}
+details label input[type=range]{grid-column:1 / -1;width:100%;accent-color:var(--skier)}
+details label output{color:var(--ink);font-variant-numeric:tabular-nums}
+details .check{display:flex;align-items:center;gap:8px;grid-template-columns:none}
+details .check input{accent-color:var(--skier)}
+details .note{font-size:10.5px;color:var(--muted);line-height:1.5;margin:4px 0 0}
+details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.pads{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);display:none;justify-content:space-between;padding:0 16px;pointer-events:none}
+.pad{pointer-events:auto;width:min(34vw,170px);height:110px;border-radius:10px;background:var(--panel);border:1px solid var(--line);font:700 15px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--ink);display:flex;align-items:center;justify-content:center}
+.pad.mid{width:min(20vw,96px)}
+.pad.on{background:var(--skier);color:#fff;border-color:var(--skier)}
+@media (max-width:560px){ .hud{min-width:0;max-width:calc(100vw - 172px);padding:10px 12px} .hud .opt,.hud .help{display:none} .hud h1{font-size:18px} }
+@media (pointer:coarse){ .pads{display:flex} details{bottom:calc(env(safe-area-inset-bottom,0px) + 140px)} .help{display:none} }
+#loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="loading">Building the planet…</div>
+
+<div class="hud panel" aria-live="off">
+  <h1>Planetoid</h1>
+  <div class="row"><span>Speed</span><b id="hSpeed">0.0 km/h</b></div>
+  <div class="row"><span>Grade</span><b id="hGrade">0%</b></div>
+  <div class="row opt"><span>Weight</span><b id="hWeight">100%</b></div>
+  <div class="row"><span>From start</span><b id="hFrom">0 m</b></div>
+  <div class="row opt"><span>Skied</span><b id="hDist">0 m</b></div>
+  <div class="row opt"><span>Nearest beacon</span><b id="hBeacon">–</b></div>
+  <div class="legs"><div class="leg" id="legL">Left</div><div class="leg" id="legR">Right</div></div>
+  <div class="help"><b>← →</b> kick (hold to ride the glide) · <b>Space</b> + kick: loaded stroke · <b>↑</b> tuck, <b>← →</b> lean · <b>↓</b> snow plow · <b>V</b> planet view · <b>R</b> reset</div>
+</div>
+
+<div class="top-right"><button id="viewBtn" type="button">Planet view</button></div>
+
+<details class="panel" id="settings">
+  <summary>Settings</summary>
+  <label for="tR">Planet radius<output id="oR"></output><input id="tR" type="range" min="150" max="1200" step="50" value="300"></label>
+  <p class="note" id="rNote"></p>
+  <label class="check"><input id="tLift" type="checkbox"> Curvature lightens you (less friction at speed)</label>
+  <label class="check"><input id="tDay" type="checkbox"> Fixed sun (day side and night side)</label>
+  <label for="tCamd">Camera distance<output id="oCamd"></output><input id="tCamd" type="range" min="4" max="40" step="0.5" value="15"></label>
+  <label for="tPixel">Pixel size<output id="oPixel"></output><input id="tPixel" type="range" min="1" max="6" step="1" value="4"></label>
+  <label for="tMax">Top speed<output id="oMax"></output><input id="tMax" type="range" min="10" max="60" step="1" value="38"></label>
+  <label for="tPush">Push per kick<output id="oPush"></output><input id="tPush" type="range" min="0.2" max="2.5" step="0.05" value="2.5"></label>
+  <div class="btns"><button id="resetBtn" type="button">Reset skier</button><button id="defaultsBtn" type="button">Defaults</button></div>
+  <p class="note">Kick, turn and glide tuning are the main game's defaults.</p>
+</details>
+
+<div class="pads" aria-hidden="true">
+  <div class="pad" id="padL">Left kick</div>
+  <div class="pad mid" id="padT">Tuck</div>
+  <div class="pad" id="padR">Right kick</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+// ============================================================================================================
+// Planetoid prototype for v3.0.
+//
+// The planet is a real sphere: gravity points at the centre, "up" is away from it, and there are no edges.
+// The skier's physics is the main game's 2D model, unchanged in spirit. It runs in a small flat frame that
+// travels with the skier:
+//   n        the skier's direction from the planet's centre (local up)
+//   ex, ey   two tangent vectors at the skier: ex is the 2D model's +x, ey its +y (heading 0 = -y, as in the game)
+// Every step, the 2D displacement is turned into a move along the surface (a rotation about the planet's centre),
+// and ex/ey are rotated with it (parallel transport). Holding a heading in that frame is following a great circle.
+// S.x/S.y are the 2D model's own coordinates, "unrolled" along the path: only differences between nearby points
+// are ever used (the ski marks), so the game's ski logic works on them as it is.
+// ============================================================================================================
+const $ = id => document.getElementById(id);
+const D2R = Math.PI / 180, G = 9.81;
+const smooth01 = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a)/(b - a))); return t*t*(3 - 2*t); };
+
+// ---------- tuning: the main game's defaults (index.html sliders) ----------
+const P = {
+  push: 2.5, tap: 80, klen: 50, turn: 5, turn2: 5, turn3: 15, k180: 8, k180t: 6, kfloor: 15, kwin: 450,
+  tfStop: 180, tfMove: 90, tfVlo: 1, tfVhi: 14, decay: 20, snap: 160, splay: 11, fric: 0.4, glide: 0.25, grip: 25,
+  gwin: 600, gcut: 95, max: 38, lboost: 1.4, plow: 2.5, tuck: 50, lean: 50, camd: 15, sway: 0.8, cam: 0.6, pixel: 4,
+  R: 300, lift: false, daynight: false,
+};
+const SETTINGS = [
+  ['tR', 'oR', 'R', v => v + ' m'], ['tCamd', 'oCamd', 'camd', v => v.toFixed(1) + ' m'],
+  ['tPixel', 'oPixel', 'pixel', v => v > 1 ? v + ' px' : 'off'], ['tMax', 'oMax', 'max', v => v + ' km/h'],
+  ['tPush', 'oPush', 'push', v => v.toFixed(2) + ' m/s'],
+];
+const STORE = 'skate-planetoid';
+const DEFAULTS = {}; SETTINGS.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
+let saved = {}; try { saved = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch (e) {}
+const save = () => { try { const o = { lift: P.lift, daynight: P.daynight }; SETTINGS.forEach(([i]) => { o[i] = $(i).value; }); localStorage.setItem(STORE, JSON.stringify(o)); } catch (e) {} };
+
+// ---------- terrain: 3D gradient noise sampled on the sphere, in metres ----------
+const PERM = (() => {
+  const p = new Uint8Array(256); for (let i = 0; i < 256; i++) p[i] = i;
+  let s = 20261010; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 255; i > 0; i--){ const j = Math.floor(rnd()*(i + 1)); const t = p[i]; p[i] = p[j]; p[j] = t; }
+  const q = new Uint8Array(512); for (let i = 0; i < 512; i++) q[i] = p[i & 255]; return q;
+})();
+const fade = t => t*t*t*(t*(t*6 - 15) + 10), lerp = (t, a, b) => a + t*(b - a);
+function gr(h, x, y, z){ h &= 15; const u = h < 8 ? x : y, v = h < 4 ? y : (h === 12 || h === 14) ? x : z; return ((h & 1) ? -u : u) + ((h & 2) ? -v : v); }
+function noise3(x, y, z){
+  const X = Math.floor(x), Y = Math.floor(y), Z = Math.floor(z);
+  x -= X; y -= Y; z -= Z;
+  const xi = X & 255, yi = Y & 255, zi = Z & 255, u = fade(x), v = fade(y), w = fade(z);
+  const A = PERM[xi] + yi, AA = PERM[A] + zi, AB = PERM[A + 1] + zi, B = PERM[xi + 1] + yi, BA = PERM[B] + zi, BB = PERM[B + 1] + zi;
+  return lerp(w,
+    lerp(v, lerp(u, gr(PERM[AA], x, y, z), gr(PERM[BA], x - 1, y, z)), lerp(u, gr(PERM[AB], x, y - 1, z), gr(PERM[BB], x - 1, y - 1, z))),
+    lerp(v, lerp(u, gr(PERM[AA + 1], x, y, z - 1), gr(PERM[BA + 1], x - 1, y, z - 1)), lerp(u, gr(PERM[AB + 1], x, y - 1, z - 1), gr(PERM[BB + 1], x - 1, y - 1, z - 1))));
+}
+// height above the base radius at unit direction (x, y, z). the wavelengths are in metres, so bumps stay the same
+// size whatever the planet's radius: broad swells (~150 m), rolling hills (~60 m) and small humps (~24 m)
+function heightAt(x, y, z){
+  const R = P.R, a = R/150, b = R/60, c = R/24;
+  return 7*noise3(x*a, y*a, z*a) + 2.5*noise3(x*b + 31.7, y*b + 5.1, z*b - 12.3) + 0.7*noise3(x*c - 77.3, y*c + 41.9, z*c + 8.8);
+}
+const groundR = d => P.R + heightAt(d.x, d.y, d.z);
+
+// ---------- renderer, scene, camera ----------
+const cv = $('c');
+const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: false });
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, 1, 0.3, 4000);
+const HOR_DAY = new THREE.Color(0xeaf2f8), ZEN_DAY = new THREE.Color(0x7fb0de), HOR_NIGHT = new THREE.Color(0x1a2233), ZEN_NIGHT = new THREE.Color(0x05080f);
+scene.fog = new THREE.Fog(HOR_DAY.clone(), 80, 400);
+const hemi = new THREE.HemisphereLight(0xffffff, 0xa8c4d8, 0.75); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 0.65); scene.add(sun);
+const SUN_FIXED = new THREE.Vector3(0.35, 0.9, 0.25).normalize();
+let W = 0, H = 0;
+function resize(){
+  W = innerWidth; H = innerHeight;
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  const px = P.pixel > 1 ? Math.max(2, Math.round(P.pixel*Math.min(W, H)/1000)) : 0;   // as the main game
+  renderer.setPixelRatio(px > 1 ? 1/px : dpr); renderer.setSize(W, H, false);
+  camera.aspect = W/H; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize);
+
+// the sky: a gradient around the skier's own up, so the horizon is wherever the planet's edge is
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, depthTest: false,
+  uniforms: { up: { value: new THREE.Vector3(0, 1, 0) }, zen: { value: ZEN_DAY.clone() }, hor: { value: HOR_DAY.clone() }, space: { value: new THREE.Color(0x060a14) }, spaceK: { value: 0 } },
+  vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix*vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }',
+  fragmentShader: 'uniform vec3 up, zen, hor, space; uniform float spaceK; varying vec3 vW; void main(){ vec3 d = normalize(vW - cameraPosition); float t = dot(d, up); vec3 c = mix(hor, zen, smoothstep(0.0, 0.7, t)); c = mix(c, hor*0.92, smoothstep(0.0, -0.4, t)); gl_FragColor = vec4(mix(c, space, spaceK), 1.0); }',
+});
+const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), skyMat);
+sky.frustumCulled = false; sky.renderOrder = -10; scene.add(sky);
+const stars = (() => {
+  const N = 1600, pos = new Float32Array(N*3); let s = 99; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < N; i++){ const z = 2*rnd() - 1, a = rnd()*Math.PI*2, r = Math.sqrt(1 - z*z); pos[i*3] = r*Math.cos(a); pos[i*3+1] = z; pos[i*3+2] = r*Math.sin(a); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const m = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }));
+  m.frustumCulled = false; m.renderOrder = -9; scene.add(m); return m;
+})();
+
+// ---------- the planet: a cube-sphere, each face split into chunks so what's past the horizon isn't drawn ----------
+const FACES = [
+  [[1,0,0],[0,0,-1],[0,1,0]], [[-1,0,0],[0,0,1],[0,1,0]], [[0,1,0],[1,0,0],[0,0,-1]],
+  [[0,-1,0],[1,0,0],[0,0,1]], [[0,0,1],[1,0,0],[0,1,0]], [[0,0,-1],[-1,0,0],[0,1,0]],
+];
+const CH = 8;    // chunks per face edge
+const planetMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+const planet = new THREE.Group(); scene.add(planet);
+let chunks = [];
+function buildPlanet(){
+  for (const c of chunks){ c.mesh.geometry.dispose(); planet.remove(c.mesh); }
+  chunks = [];
+  const R = P.R;
+  // about 2.5 m between vertices, capped for big planets (the terrain's smallest bumps are ~24 m, so it holds up)
+  const N = Math.min(320, Math.ceil(Math.PI/2*R/2.5/CH)*CH), n = N/CH, M = N + 1;
+  const pos = new Float32Array(M*M*3), dir = new Float32Array(M*M*3);
+  const col = new THREE.Color(), snow = new THREE.Color(0xf6f9fc), shade = new THREE.Color(0xb9cadb), hollow = new THREE.Color(0xdde8f3);
+  for (const [nn, uu, vv] of FACES){
+    for (let j = 0; j < M; j++) for (let i = 0; i < M; i++){
+      const s = -1 + 2*i/N, t = -1 + 2*j/N;
+      const x = nn[0] + uu[0]*s + vv[0]*t, y = nn[1] + uu[1]*s + vv[1]*t, z = nn[2] + uu[2]*s + vv[2]*t;
+      // spherified cube: evenly spread points
+      const x2 = x*x, y2 = y*y, z2 = z*z;
+      const dx = x*Math.sqrt(1 - y2/2 - z2/2 + y2*z2/3), dy = y*Math.sqrt(1 - z2/2 - x2/2 + z2*x2/3), dz = z*Math.sqrt(1 - x2/2 - y2/2 + x2*y2/3);
+      const r = R + heightAt(dx, dy, dz), k = (j*M + i)*3;
+      dir[k] = dx; dir[k+1] = dy; dir[k+2] = dz; pos[k] = dx*r; pos[k+1] = dy*r; pos[k+2] = dz*r;
+    }
+    const P3 = (i, j) => { i = Math.max(0, Math.min(N, i)); j = Math.max(0, Math.min(N, j)); const k = (j*M + i)*3; return [pos[k], pos[k+1], pos[k+2]]; };
+    for (let cj = 0; cj < CH; cj++) for (let ci = 0; ci < CH; ci++){
+      const m = n + 1, vp = new Float32Array(m*m*3), vn = new Float32Array(m*m*3), vc = new Float32Array(m*m*3);
+      for (let j = 0; j < m; j++) for (let i = 0; i < m; i++){
+        const gi = ci*n + i, gj = cj*n + j, k = (gj*M + gi)*3, o = (j*m + i)*3;
+        vp[o] = pos[k]; vp[o+1] = pos[k+1]; vp[o+2] = pos[k+2];
+        const a = P3(gi + 1, gj), b = P3(gi - 1, gj), c = P3(gi, gj + 1), d = P3(gi, gj - 1);
+        const ux = a[0]-b[0], uy = a[1]-b[1], uz = a[2]-b[2], wx = c[0]-d[0], wy = c[1]-d[1], wz = c[2]-d[2];
+        let nx = uy*wz - uz*wy, ny = uz*wx - ux*wz, nz = ux*wy - uy*wx; const L = Math.hypot(nx, ny, nz) || 1; nx /= L; ny /= L; nz /= L;
+        vn[o] = nx; vn[o+1] = ny; vn[o+2] = nz;
+        // snow, a touch bluer on steep faces and down in the hollows
+        const slope = 1 - (nx*dir[k] + ny*dir[k+1] + nz*dir[k+2]);
+        const h = Math.hypot(pos[k], pos[k+1], pos[k+2]) - R;
+        col.copy(snow).lerp(hollow, smooth01(2, -6, h)).lerp(shade, Math.min(1, Math.sqrt(slope)*2.4));
+        vc[o] = col.r; vc[o+1] = col.g; vc[o+2] = col.b;
+      }
+      const idx = new Uint16Array(n*n*6); let q = 0;
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++){
+        const a = j*m + i, b = a + 1, c = a + m, d = c + 1;
+        idx[q++] = a; idx[q++] = b; idx[q++] = c; idx[q++] = b; idx[q++] = d; idx[q++] = c;
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(vp, 3)); g.setAttribute('normal', new THREE.BufferAttribute(vn, 3)); g.setAttribute('color', new THREE.BufferAttribute(vc, 3));
+      g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeBoundingSphere();
+      const mesh = new THREE.Mesh(g, planetMat); planet.add(mesh);
+      const mid = (ci*n + n/2), mjd = (cj*n + n/2), km = (Math.round(mjd)*M + Math.round(mid))*3;
+      const c = new THREE.Vector3(dir[km], dir[km+1], dir[km+2]).normalize();
+      let ang = 0;
+      for (const [ii, jj] of [[ci*n, cj*n], [ci*n + n, cj*n], [ci*n, cj*n + n], [ci*n + n, cj*n + n]]){ const kk = (jj*M + ii)*3; ang = Math.max(ang, c.angleTo(new THREE.Vector3(dir[kk], dir[kk+1], dir[kk+2]))); }
+      chunks.push({ mesh, c, ang });
+    }
+  }
+  buildScatter();
+}
+
+// ---------- scattered rocks (solid) and six beacons, so you can see the curve and judge speed ----------
+let rocks = [], rockMesh = null;
+const BEACON_DIRS = [[0,1,0,'red',0xd2462e], [0,-1,0,'violet',0x8a5cd6], [1,0,0,'yellow',0xf2c230], [-1,0,0,'green',0x2f9a5a], [0,0,1,'blue',0x2f6fd6], [0,0,-1,'orange',0xf08a2a]];
+const beacons = new THREE.Group(); scene.add(beacons);
+const beaconList = [];
+function buildScatter(){
+  const R = P.R;
+  if (rockMesh){ scene.remove(rockMesh); rockMesh.geometry.dispose(); }
+  rocks = [];
+  let s = 4242; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const count = Math.max(150, Math.min(3000, Math.round(4*Math.PI*R*R/700)));
+  rockMesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0x7d8a96 }), count);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), q2 = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), d = new THREE.Vector3(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+  let k = 0;
+  while (k < count){
+    const z = 2*rnd() - 1, a = rnd()*Math.PI*2, rr = Math.sqrt(1 - z*z);
+    d.set(rr*Math.cos(a), z, rr*Math.sin(a));
+    if (d.angleTo(START_N)*R < 14) continue;                       // keep the start clear
+    const size = 0.35 + 1.3*Math.pow(rnd(), 2.2);
+    p.copy(d).multiplyScalar(groundR(d) - 0.3*size);
+    q.setFromUnitVectors(up, d); q2.setFromAxisAngle(up, rnd()*Math.PI*2); q.multiply(q2);
+    sc.set(size, size*(0.55 + 0.3*rnd()), size*(0.8 + 0.4*rnd()));
+    m.compose(p, q, sc); rockMesh.setMatrixAt(k, m);
+    rocks.push({ x: d.x, y: d.y, z: d.z, r: size*0.85 });
+    k++;
+  }
+  rockMesh.instanceMatrix.needsUpdate = true; scene.add(rockMesh);
+  // beacons: tall poles with a lamp, one over the middle of each cube face
+  while (beacons.children.length) beacons.remove(beacons.children[0]);
+  beaconList.length = 0;
+  const poleG = new THREE.CylinderGeometry(0.22, 0.32, 18, 8), lampG = new THREE.BoxGeometry(1.4, 1.4, 1.4), baseG = new THREE.CylinderGeometry(2.2, 2.6, 0.6, 12);
+  const poleM = new THREE.MeshLambertMaterial({ color: 0x3a4652 });
+  for (const [x, y, z, name, color] of BEACON_DIRS){
+    const dd = new THREE.Vector3(x, y, z).normalize(), g = new THREE.Group();
+    g.position.copy(dd).multiplyScalar(groundR(dd) - 0.2); g.quaternion.setFromUnitVectors(up, dd);
+    const pole = new THREE.Mesh(poleG, poleM); pole.position.y = 9; g.add(pole);
+    const lamp = new THREE.Mesh(lampG, new THREE.MeshBasicMaterial({ color })); lamp.position.y = 18.6; g.add(lamp);
+    const base = new THREE.Mesh(baseG, new THREE.MeshLambertMaterial({ color })); base.position.y = 0.1; g.add(base);
+    beacons.add(g); beaconList.push({ d: dd, name, r: 2.6 });
+  }
+}
+
+// the ring station, in orbit (the v2 station's ring, seen from the planet)
+const station = (() => {
+  const g = new THREE.Group(), mat = new THREE.MeshLambertMaterial({ color: 0xc9d3dc }), glow = new THREE.MeshBasicMaterial({ color: 0xa69be6 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1, 0.08, 8, 64), mat); g.add(ring);
+  const band = new THREE.Mesh(new THREE.TorusGeometry(1, 0.085, 4, 64, Math.PI*2), glow); band.scale.set(1, 1, 0.3); g.add(band);
+  const hub = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 10), mat); g.add(hub);
+  for (let i = 0; i < 4; i++){ const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.5, 6), mat); sp.rotation.z = i*Math.PI/4*2; g.add(sp); }
+  scene.add(g); return g;
+})();
+const ORBIT_TILT = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0.3).normalize(), 35*D2R);
+function updateStation(t){
+  const R = P.R, a = t/140*Math.PI*2, o = new THREE.Vector3(Math.cos(a), 0, Math.sin(a)).applyQuaternion(ORBIT_TILT);
+  station.position.copy(o).multiplyScalar(R*1.7);
+  station.scale.setScalar(R*0.09);
+  station.lookAt(0, 0, 0); station.rotateZ(t*0.1);
+}
+
+// ---------- the skier's place on the planet ----------
+const START_N = new THREE.Vector3(0.15, 1, 0.25).normalize();
+const n = new THREE.Vector3(), ex = new THREE.Vector3(), ey = new THREE.Vector3();
+function placeAtStart(){
+  n.copy(START_N);
+  ex.set(1, 0, 0).addScaledVector(n, -n.x).normalize();
+  ey.crossVectors(ex, n).normalize();        // as in the game's 3D: X east, Y up, Z south (east × up = south)
+}
+const _d = new THREE.Vector3(), _ax = new THREE.Vector3(), _q = new THREE.Quaternion(), _t = new THREE.Vector3();
+// move the skier (and their frame) along the surface by (mx, my) metres of the 2D model
+function moveLocal(mx, my){
+  _d.set(0, 0, 0).addScaledVector(ex, mx).addScaledVector(ey, my);
+  const L = _d.length(); if (L < 1e-9) return;
+  _ax.crossVectors(n, _d).normalize();
+  _q.setFromAxisAngle(_ax, L / groundR(n));
+  n.applyQuaternion(_q).normalize(); ex.applyQuaternion(_q);
+  ex.addScaledVector(n, -ex.dot(n)).normalize(); ey.crossVectors(ex, n).normalize();
+}
+// the direction from the centre of a point (ox, oy) metres away in the skier's frame
+function dirLocal(ox, oy, out = new THREE.Vector3()){
+  return out.copy(n).multiplyScalar(P.R).addScaledVector(ex, ox).addScaledVector(ey, oy).normalize();
+}
+function hLocal(ox, oy){ dirLocal(ox, oy, _t); return heightAt(_t.x, _t.y, _t.z); }
+// the ground's slope in the 2D model's axes (positive = rising that way)
+function grad(){ const e = 0.5; return [(hLocal(e, 0) - hLocal(-e, 0))/(2*e), (hLocal(0, e) - hLocal(0, -e))/(2*e)]; }
+
+// ============================================================================================================
+// the skier: the main game's skating model (kicks, kick turns, glide, splay, ski marks, tuck, snow plow)
+// ============================================================================================================
+const S = { x: 0, y: 0, vx: 0, vy: 0, th: 0, thv: 0, tgt: 0, dist: 0, grade: 0, weight: 1 };
+const PUSH_LEN = 0.7, REACH = 0.6, STANCE = 0.12, PLOW_STANCE = 0.35, CAM_RELEASE_MS = 1500;
+let skis = [], lastSki = { L: null, R: null }, weightLeg = null, lastLeg = null, lastKickAt = 0, camPending = 0, mode = null;
+let kickDrive = null, streak = 0, kickPrevT = -1e9, streakKmh = 0, streakTrig = false, snapSkip = 0, sideRun = 0, runTurn = 0, turnRestart = false, lastTurnDeg = 0;
+const held = { L: false, R: false }, legFlash = { L: 0, R: 0 };
+let glideLeg = null, glideStart = 0;
+const speed = () => Math.hypot(S.vx, S.vy);
+
+function splayNow(){ const v = speed(); return Math.min(60, P.splay * Math.min(1.6, Math.max(0.55, Math.sqrt(4 / Math.max(v, 1.2))))); }
+function fullTurnDeg(kmh = speed()*3.6){ return P.tfStop + (P.tfMove - P.tfStop) * smooth01(P.tfVlo, P.tfVhi, kmh); }
+function sameSideTurn(k){
+  if (k <= 1) return P.turn;
+  if (k === 2) return P.turn2;
+  if (streakTrig){
+    const nn = Math.max(3, Math.round(P.k180t)), m = nn - 2, need = fullTurnDeg(streakKmh) - P.turn - P.turn2;
+    const step = Math.max(0, (need - P.turn2*m) / (m*(m + 1)/2));
+    return Math.min(90, P.turn2 + step*(k - 2));
+  }
+  const nn = Math.max(3, Math.round(P.k180)), rest = nn - 2, need = fullTurnDeg(streakKmh) - P.turn - P.turn2;
+  const step = rest > 1 ? Math.max(0, (need - P.turn3*rest) / (rest*(rest - 1)/2)) : 0;
+  return Math.min(90, P.turn3 + step*(k - 3));
+}
+const sameLegPower = () => Math.max(0.15, 1 - (P.decay/100) * (streak - 1));
+function moveDir(){ const v = speed(); return v > 0.05 ? [S.vx/v, S.vy/v] : [Math.sin(S.th), -Math.cos(S.th)]; }
+const headingOf = (dx, dy) => Math.atan2(dx, -dy);
+function footAt(side, th){ return [S.x + Math.cos(th)*side*STANCE, S.y + Math.sin(th)*side*STANCE]; }
+
+// a ski mark: straight, set down at an anchor and growing along its line. besides the 2D model's numbers it keeps its
+// place on the planet (p3: direction from the centre, t3: its direction along the surface) for drawing
+const MARKS = 1200;
+let markSlot = 0;
+function newSki(side, ang, ax = S.x, ay = S.y){
+  const s = { ax, ay, dx: Math.sin(ang), dy: -Math.cos(ang), len: 0, live: true, side, dirty: true, slot: markSlot++ % MARKS, w: 0.09 };
+  s.p3 = dirLocal(ax - S.x, ay - S.y);
+  s.t3 = new THREE.Vector3().addScaledVector(ex, s.dx).addScaledVector(ey, s.dy).normalize();
+  skis.push(s); if (skis.length > MARKS) skis.shift();
+  return s;
+}
+function setParallel(side, alongHeading = false){
+  let [mx, my] = (mode === 'tuck' || alongHeading) ? [Math.sin(S.th), -Math.cos(S.th)] : moveDir();
+  if (mx*Math.sin(S.th) - my*Math.cos(S.th) < 0){ mx = -mx; my = -my; }
+  const st = mode === 'plow' ? PLOW_STANCE : STANCE;
+  const s = newSki(side, headingOf(mx, my), S.x + (-my)*side*st, S.y + mx*side*st);
+  if (mode === 'plow') s.w = 0.16;
+  return s;
+}
+function enterMode(m){
+  const fresh = mode !== m;
+  if (!mode) S.tgt -= camPending;     // a mode runs straight along the stride's centre line
+  mode = m; weightLeg = null; camPending = 0;
+  if (fresh) for (const k of ['L', 'R']){ if (lastSki[k]) lastSki[k].live = false; lastSki[k] = setParallel(k === 'L' ? -1 : 1); }
+  legFlash.L = legFlash.R = 0.6;
+}
+
+function kick(leg, opt = {}){
+  // leg 'L' pushes off the left ski: heading steps right (+). leg 'R' pushes off the right ski: steps left (-)
+  const side = leg === 'L' ? 1 : -1, out = -side, sameSide = leg === lastLeg;
+  const tNow = performance.now(), quick = tNow - kickPrevT <= P.kwin;
+  streak = sameSide && quick ? streak + 1 : 1;
+  sideRun = sameSide ? sideRun + 1 : 1;
+  kickPrevT = tNow;
+  if (streak === 1){ streakKmh = speed()*3.6; streakTrig = opt.src === 'trigger'; snapSkip = 0; }
+  const thPre = S.tgt;
+  // 1. the push prints first: the kicking ski's line carries straight on
+  const sp0 = splayNow(), bst = opt.boost || 1;
+  const sp = bst > 1 ? Math.asin(Math.sin(sp0*D2R) / bst) / D2R : sp0;
+  const mine = lastSki[leg];
+  if (mine && mine.live){ mine.len += PUSH_LEN; mine.dirty = true; mine.live = false; }
+  else { const s = newSki(out, thPre + out*sp*D2R, ...footAt(out, thPre)); s.len = PUSH_LEN; s.live = false; }
+  // 2. rotate: same-leg kicks build into a kick turn from your heading; an opposite kick is measured from the camera heading
+  lastTurnDeg = sameSideTurn(streak - snapSkip);
+  if (sameSide && sideRun >= 3) lastTurnDeg = Math.max(lastTurnDeg, P.kfloor);
+  if (!sameSide || sideRun === 1){ runTurn = 0; turnRestart = false; }
+  if (sameSide && turnRestart){ lastTurnDeg = P.kfloor; turnRestart = false; }
+  const a = side * lastTurnDeg * D2R;
+  let camRef = S.tgt - camPending; const prev = S.tgt;
+  if (sameSide){
+    runTurn += lastTurnDeg;
+    if (runTurn >= fullTurnDeg(streakKmh) - 0.5){ runTurn = 0; turnRestart = true; snapSkip = streak - 2; }
+    S.tgt = prev + a; camRef = prev;
+  } else { S.tgt = camRef + a; runTurn = lastTurnDeg; }
+  camPending = S.tgt - camRef;
+  // 3. impulse, limited by top speed. part lands now, the rest over the kick length while the key is held
+  const ang = S.tgt + side*sp*D2R, v = speed(), vmax = P.max/3.6;
+  const eff = Math.max(0.08, 1 - v/vmax) * sameLegPower(), tap = P.tap/100, push = P.push*bst;
+  S.vx += Math.sin(ang)*push*eff*tap; S.vy += -Math.cos(ang)*push*eff*tap;
+  kickDrive = { leg, dx: Math.sin(ang), dy: -Math.cos(ang), base: push*sameLegPower()*(1 - tap), done: 0 };
+  // 4. the other ski takes the weight (re-set along the new heading in a kick turn)
+  const other = leg === 'L' ? 'R' : 'L', o = lastSki[other];
+  if (!o || !o.live || !o.glide || sameSide){
+    if (o) o.live = false;
+    lastSki[other] = newSki(side, S.tgt + side*sp*D2R, ...footAt(side, S.tgt));
+    lastSki[other].glide = true;
+  }
+  weightLeg = other; lastSki[leg] = null;
+  lastLeg = leg; lastKickAt = performance.now(); legFlash[leg] = 1;
+}
+function press(leg, boost = 1, src = null){ mode = null; held[leg] = true; kick(leg, { boost, src }); glideLeg = leg; glideStart = performance.now(); }
+function release(leg){ held[leg] = false; }
+function glideMult(){
+  if (!glideLeg || !held[glideLeg]) return 1;
+  const t = (performance.now() - glideStart) / Math.max(1, P.gwin);
+  if (t >= 1) return 1;
+  const f = t < 0.6 ? 0 : (t - 0.6)/0.4, e = f*f*(3 - 2*f);
+  return 1 - (P.gcut/100) * (1 - e);
+}
+
+// tuck and snow plow are held; letting go of the plow returns you to a tuck if that's still held
+const hold = { tuck: new Set(), plow: new Set() };
+function setTuck(on, src){ on ? hold.tuck.add(src) : hold.tuck.delete(src); syncMode(); }
+function setPlow(on, src){ on ? hold.plow.add(src) : hold.plow.delete(src); syncMode(); }
+function syncMode(){
+  const want = hold.plow.size ? 'plow' : hold.tuck.size ? 'tuck' : null;
+  if (want && want !== mode) enterMode(want);
+  else if (!want && mode) mode = null;           // both skis stay down until your next stroke
+}
+let keyLean = 0, touchLean = 0, padLean = 0;
+
+function step(dt){
+  // the rest of the kick, pushed out while the key is held
+  if (kickDrive){
+    if (!held[kickDrive.leg] || mode) kickDrive = null;
+    else {
+      const frac = Math.min(1 - kickDrive.done, dt / Math.max(0.02, P.klen/1000));
+      const amt = kickDrive.base * frac * Math.max(0.08, 1 - speed()/(P.max/3.6));
+      S.vx += kickDrive.dx*amt; S.vy += kickDrive.dy*amt; kickDrive.done += frac;
+      if (kickDrive.done >= 1 - 1e-6) kickDrive = null;
+    }
+  }
+  // leaning in a tuck carves you round (fading out below about 10 km/h)
+  const steer = keyLean || touchLean || padLean;
+  if (mode === 'tuck' && steer) S.tgt += steer * P.lean * D2R * dt * Math.min(1, speed()/3);
+  // the heading eases toward the kick's heading on a critically damped spring
+  if (P.snap <= 0){ S.th = S.tgt; S.thv = 0; }
+  else { const w = 5000/P.snap, h = dt/4; for (let i = 0; i < 4; i++){ S.thv += (w*w*(S.tgt - S.th) - 2*w*S.thv)*h; S.th += S.thv*h; } }
+
+  // the hill: gravity pulls along the skis, by the slope under you (measured in your own frame)
+  const [hx, hy] = grad(), [mx, my] = moveDir();
+  S.grade = hx*mx + hy*my;
+  // how heavy you are: going round a planet this small, part of gravity just keeps you on the curve
+  const r = groundR(n);
+  S.weight = Math.max(0, 1 - speed()*speed()/(G*r));
+  const wK = P.lift ? S.weight : 1;
+  const gm = glideMult();
+
+  const ws = weightLeg && lastSki[weightLeg], onSki = ws && ws.live && ws.glide;
+  const fx = (onSki && !mode) ? ws.dx : Math.sin(S.th), fy = (onSki && !mode) ? ws.dy : -Math.cos(S.th);
+  let fwd = S.vx*fx + S.vy*fy, lat = S.vx*(-fy) + S.vy*fx;
+  const plowHold = mode === 'plow' && Math.abs(fwd) < 0.15 && Math.abs(lat) < 0.15;
+  if (plowHold){ fwd = 0; lat = 0; }
+  else {
+    fwd -= G*(hx*fx + hy*fy)*dt;
+    fwd *= Math.exp(-P.glide * gm * (mode === 'tuck' ? 1 - P.tuck/100 : 1) * dt);
+    const dec = (P.fric * gm * wK + (mode === 'plow' ? P.plow : 0)) * dt;
+    fwd = Math.abs(fwd) <= dec ? 0 : fwd - Math.sign(fwd)*dec;
+  }
+  lat = mode === 'tuck' ? 0 : lat * Math.exp(-P.grip*dt);
+  S.vx = fx*fwd + (-fy)*lat; S.vy = fy*fwd + fx*lat;
+
+  // move: in the 2D model, and round the planet
+  const mvx = S.vx*dt, mvy = S.vy*dt;
+  S.x += mvx; S.y += mvy; moveLocal(mvx, mvy);
+  frameMove[0] += mvx; frameMove[1] += mvy;
+  collide();
+  S.dist += Math.hypot(mvx, mvy);
+
+  // planted skis: the mark grows along the ski as the body travels; lifted and re-set when the body drifts off it
+  for (const k of ['L', 'R']){
+    const sk = lastSki[k]; if (!sk || !sk.live) continue;
+    const rx = S.x - sk.ax, ry = S.y - sk.ay, along = rx*sk.dx + ry*sk.dy, off = Math.abs(rx*sk.dy - ry*sk.dx);
+    if (along > sk.len){ sk.len = along; sk.dirty = true; }
+    const bend = mode ? Math.abs(Math.atan2(sk.dx*Math.cos(S.th) + sk.dy*Math.sin(S.th), sk.dx*Math.sin(S.th) - sk.dy*Math.cos(S.th))) : 0;
+    const reach = mode ? (mode === 'plow' ? PLOW_STANCE : STANCE) + 0.1 : REACH;
+    if (off > reach || along < sk.len - 0.5 || (bend > 2*D2R && sk.len > 0.05)){ sk.live = false; lastSki[k] = setParallel(sk.side); continue; }
+    // (planet only) a long run on one ski carries on as a fresh mark every 4 m along the same line, so the marks follow
+    // the curve of the ground instead of cutting straight across it. the ski, its glide and its line don't change
+    if (sk.len > 4){ const c = newSki(sk.side, headingOf(sk.dx, sk.dy), sk.ax + sk.dx*sk.len, sk.ay + sk.dy*sk.len); c.glide = sk.glide; c.w = sk.w; sk.live = false; lastSki[k] = c; }
+  }
+  if (mode || speed() < 0.05) for (const k of ['L', 'R']){ if (lastSki[k] && lastSki[k].live) continue; lastSki[k] = setParallel(k === 'L' ? -1 : 1); }
+  legFlash.L = Math.max(0, legFlash.L - dt*5); legFlash.R = Math.max(0, legFlash.R - dt*5);
+}
+// rocks and beacon bases are solid: you're pushed out and lose the speed you had into them
+function collide(){
+  if (TEST.ghost) return;
+  const R = P.R, lim = Math.cos(8/R);
+  const hit = (x, y, z, rr) => {
+    const ox = ((x - n.x)*ex.x + (y - n.y)*ex.y + (z - n.z)*ex.z)*R, oy = ((x - n.x)*ey.x + (y - n.y)*ey.y + (z - n.z)*ey.z)*R;
+    const d = Math.hypot(ox, oy), min = rr + 0.3;
+    if (d >= min || d < 1e-6) return;
+    const ux = ox/d, uy = oy/d, push = min - d;
+    S.x -= ux*push; S.y -= uy*push; moveLocal(-ux*push, -uy*push);
+    const vn = S.vx*ux + S.vy*uy; if (vn > 0){ S.vx -= ux*vn; S.vy -= uy*vn; }
+  };
+  for (const k of rocks) if (k.x*n.x + k.y*n.y + k.z*n.z > lim) hit(k.x, k.y, k.z, k.r);
+  for (const b of beaconList) if (b.d.dot(n) > lim) hit(b.d.x, b.d.y, b.d.z, b.r);
+}
+
+// ---------- ski marks: one buffer of quads laid on the surface ----------
+const markPos = new Float32Array(MARKS*6*3);
+const markGeo = new THREE.BufferGeometry(); markGeo.setAttribute('position', new THREE.BufferAttribute(markPos, 3));
+const markMesh = new THREE.Mesh(markGeo, new THREE.MeshBasicMaterial({ color: 0x7d93a8, transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide }));
+markMesh.frustumCulled = false; scene.add(markMesh);
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Vector3();
+function updateMarks(){
+  let any = false;
+  for (const s of skis){
+    if (!s.dirty) continue; s.dirty = false; any = true;
+    const R = P.R, len = Math.max(0.05, s.len);
+    _a.copy(s.p3); _b.copy(s.p3).multiplyScalar(R).addScaledVector(s.t3, len).normalize();
+    _s.crossVectors(s.t3, s.p3).normalize().multiplyScalar(s.w/2/R);
+    const corner = (base, sign, o) => { _c.copy(base).addScaledVector(_s, sign).normalize(); const rr = groundR(_c) + 0.04; markPos[o] = _c.x*rr; markPos[o+1] = _c.y*rr; markPos[o+2] = _c.z*rr; };
+    const o = s.slot*18;
+    corner(_a, -1, o); corner(_b, -1, o + 3); corner(_a, 1, o + 6);
+    corner(_b, -1, o + 9); corner(_b, 1, o + 12); corner(_a, 1, o + 15);
+  }
+  if (any) markGeo.attributes.position.needsUpdate = true;
+}
+function clearMarks(){ markPos.fill(0); markGeo.attributes.position.needsUpdate = true; skis = []; lastSki = { L: null, R: null }; }
+
+const TEST = { ghost: false };   // test hook: ghost turns collisions off
+
+// ---------- the skier's figure ----------
+const fig = new THREE.Group(); scene.add(fig);
+const M = c => new THREE.MeshLambertMaterial({ color: c });
+const jacket = M(0xd2462e), pants = M(0x2b3a4a), dark = M(0x1d2a36), skin = M(0xe2b49a);
+const body = new THREE.Group(); fig.add(body);
+const hips = new THREE.Group(); body.add(hips);
+const torso = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, 0.26), jacket); torso.position.y = 0.31; hips.add(torso);
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), skin); head.position.y = 0.78; hips.add(head);
+const hat = new THREE.Mesh(new THREE.SphereGeometry(0.135, 12, 6, 0, Math.PI*2, 0, Math.PI/2), jacket); hat.position.y = 0.8; hips.add(hat);
+const arms = []; for (const sd of [-1, 1]){ const a = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.55, 0.1), jacket); a.position.set(sd*0.27, 0.32, 0); a.geometry.translate(0, -0.25, 0); a.position.y = 0.58; hips.add(a); arms.push(a); }
+const legGeo = new THREE.CylinderGeometry(0.075, 0.065, 1, 8); legGeo.translate(0, 0.5, 0);
+const legs = { L: new THREE.Mesh(legGeo, pants), R: new THREE.Mesh(legGeo, pants) }; fig.add(legs.L, legs.R);
+const skiGeo = new THREE.BoxGeometry(0.08, 0.03, 1.75);
+const skiMesh = { L: new THREE.Mesh(skiGeo, dark), R: new THREE.Mesh(skiGeo, dark) }; fig.add(skiMesh.L, skiMesh.R);
+const youMark = new THREE.Mesh(new THREE.ConeGeometry(1, 2.4, 12), new THREE.MeshBasicMaterial({ color: 0xd2462e })); youMark.geometry.rotateX(Math.PI); youMark.geometry.translate(0, 1.2, 0); scene.add(youMark);
+const _right = new THREE.Vector3(), _back = new THREE.Vector3(), _f = new THREE.Vector3(), _m4 = new THREE.Matrix4(), _hip = new THREE.Vector3(), _foot = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+let rock = 0, rockV = 0;
+function poseFigure(dt){
+  const th = S.th;
+  _f.set(0, 0, 0).addScaledVector(ex, Math.sin(th)).addScaledVector(ey, -Math.cos(th));
+  _right.crossVectors(_f, n).normalize(); _back.copy(_f).negate();
+  _m4.makeBasis(_right, n, _back);
+  fig.quaternion.setFromRotationMatrix(_m4);
+  fig.position.copy(n).multiplyScalar(groundR(n));
+  // feet: on each planted ski where it passes under the body; a lifted ski trails out to its side
+  const r2 = [Math.cos(th), Math.sin(th)], b2 = [-Math.sin(th), Math.cos(th)];
+  const feet = {};
+  for (const k of ['L', 'R']){
+    const sd = k === 'L' ? -1 : 1, s = lastSki[k], m = skiMesh[k];
+    if (s && s.live){
+      const rx = S.x - s.ax, ry = S.y - s.ay, along = Math.max(0, rx*s.dx + ry*s.dy);
+      const ox = s.ax + s.dx*along - S.x, oy = s.ay + s.dy*along - S.y;
+      let fxl = ox*r2[0] + oy*r2[1], fzl = ox*b2[0] + oy*b2[1];
+      const L = Math.hypot(fxl, fzl); if (L > 0.6){ fxl *= 0.6/L; fzl *= 0.6/L; }
+      feet[k] = [fxl, 0.04, fzl];
+      m.rotation.set(0, -(headingOf(s.dx, s.dy) - th), 0);
+    } else {
+      const sp = splayNow()*D2R*1.6;
+      feet[k] = [sd*0.3, 0.16, 0.3];
+      m.rotation.set(0.12, -sd*sp, 0);
+    }
+    m.position.set(feet[k][0], feet[k][1], feet[k][2]);
+  }
+  // the body rocks over the ski it's standing on
+  const target = mode ? 0 : weightLeg === 'L' ? -0.1 : weightLeg === 'R' ? 0.1 : 0;
+  const w = 9, h = dt/4; for (let i = 0; i < 4; i++){ rockV += (w*w*(target - rock) - 2*w*rockV)*h; rock += rockV*h; }
+  const tuckK = mode === 'tuck' ? 1 : 0;
+  body.position.set(rock, 0, 0);
+  hips.position.set(0, 0.92 - 0.3*tuckK - (mode === 'plow' ? 0.08 : 0), 0);
+  hips.rotation.set(-(0.18 + 0.75*tuckK), 0, -rock*0.8);
+  for (const [i, a] of arms.entries()) a.rotation.set(tuckK ? 1.3 : 0.25 + 0.5*Math.max(legFlash.L, legFlash.R), 0, (i ? -1 : 1)*0.12);
+  // legs: from the hips to each foot
+  for (const k of ['L', 'R']){
+    const sd = k === 'L' ? -1 : 1;
+    _hip.set(rock + sd*0.11, hips.position.y, 0);
+    _foot.set(feet[k][0], feet[k][1] + 0.05, feet[k][2]);
+    const leg = legs[k], d = _foot.sub(_hip), L = d.length();
+    leg.position.copy(_hip); leg.scale.set(1, L, 1); leg.quaternion.setFromUnitVectors(_up, d.multiplyScalar(-1/L).negate());
+  }
+}
+
+// ---------- the chase camera (as the main game), and the planet view ----------
+let camTh = 0, camVel = 0, focusLat = 0, focusV = 0, camR = null, viewOn = false, viewK = 0;
+const frameMove = [0, 0];
+const _cp = new THREE.Vector3(), _cl = new THREE.Vector3(), _cd = new THREE.Vector3(), _oq = new THREE.Quaternion(), _cq = new THREE.Quaternion();
+const chaseCam = new THREE.PerspectiveCamera(), orbitCam = new THREE.PerspectiveCamera();
+function camTarget(){
+  const midStride = glideLeg && held[glideLeg];
+  if (camPending && !midStride && performance.now() - lastKickAt > CAM_RELEASE_MS) camPending = 0;
+  return S.tgt - camPending;
+}
+function placeCamera(dt){
+  const R = P.R;
+  // heading: a critically damped spring that filters out the kick-to-kick sway
+  const w = 3 / Math.max(0.05, P.cam), h = dt/4;
+  for (let i = 0; i < 4; i++){ camVel += (w*w*(camTarget() - camTh) - 2*w*camVel)*h; camTh += camVel*h; }
+  const dx = Math.sin(camTh), dy = -Math.cos(camTh), back = P.camd, up = P.camd*0.62, ahead = P.camd*0.55;
+  // side-to-side the camera follows slowly, so you see the body weave from ski to ski
+  focusLat -= frameMove[0]*(-dy) + frameMove[1]*dx; frameMove[0] = frameMove[1] = 0;
+  const ws = 3 / Math.max(0.1, P.sway), hs = dt/4;
+  for (let i = 0; i < 4; i++){ focusV += (ws*ws*(0 - focusLat) - 2*ws*focusV)*hs; focusLat += focusV*hs; }
+  focusLat = Math.max(-3, Math.min(3, focusLat));
+  const fox = -dy*focusLat, foy = dx*focusLat;
+  const gr0 = groundR(n); camR = camR === null ? gr0 : camR + (gr0 - camR)*Math.min(1, dt*4);
+  dirLocal(fox - dx*back, foy - dy*back, _cd);
+  _cp.copy(_cd).multiplyScalar(Math.max(camR + up, groundR(_cd) + 1.5));
+  dirLocal(fox + dx*ahead, foy + dy*ahead, _cl).multiplyScalar(camR + 0.4);
+  chaseCam.position.copy(_cp); chaseCam.up.copy(n); chaseCam.lookAt(_cl);
+  // planet view: well out above you, looking at the centre with your heading up the screen
+  _f.set(0, 0, 0).addScaledVector(ex, dx).addScaledVector(ey, dy);
+  orbitCam.position.copy(n).multiplyScalar(0.9).addScaledVector(_f, -0.45).normalize().multiplyScalar(R*3.1);
+  orbitCam.up.copy(_f); orbitCam.lookAt(0, 0, 0);
+  viewK += ((viewOn ? 1 : 0) - viewK) * Math.min(1, dt*2.5);
+  const k = viewK*viewK*(3 - 2*viewK);
+  camera.position.lerpVectors(chaseCam.position, orbitCam.position, k);
+  _cq.copy(chaseCam.quaternion); _oq.copy(orbitCam.quaternion); camera.quaternion.copy(_cq).slerp(_oq, k);
+  camera.far = R*12; camera.updateProjectionMatrix();
+  return k;
+}
+
+// ---------- the frame ----------
+let last = performance.now(), hudT = 0, t0 = performance.now();
+function frame(now){
+  const dt = Math.min(0.1, (now - last)/1000); last = now;
+  pollPad();
+  const nsub = Math.max(1, Math.ceil(dt*60 - 1e-6));
+  for (let i = 0; i < nsub; i++) step(dt/nsub);
+  poseFigure(dt);
+  const k = placeCamera(dt);
+  updateMarks();
+  const t = (now - t0)/1000;
+  updateStation(t);
+
+  // light and sky: the sun sits over your shoulder, or (fixed sun) stays put so the planet has a night side
+  const R = P.R;
+  if (P.daynight) sun.position.copy(SUN_FIXED);
+  else sun.position.copy(n).multiplyScalar(0.5).addScaledVector(ex, -0.65).addScaledVector(ey, -0.35);
+  const dayK = P.daynight ? smooth01(-0.25, 0.2, n.dot(SUN_FIXED)) : 1;
+  hemi.position.copy(n); hemi.intensity = 0.15 + 0.4*dayK; sun.intensity = 0.62;
+  skyMat.uniforms.up.value.copy(n);
+  skyMat.uniforms.hor.value.copy(HOR_NIGHT).lerp(HOR_DAY, dayK); skyMat.uniforms.zen.value.copy(ZEN_NIGHT).lerp(ZEN_DAY, dayK);
+  skyMat.uniforms.spaceK.value = k;
+  sky.position.copy(camera.position); sky.scale.setScalar(R*8);
+  stars.position.copy(camera.position); stars.scale.setScalar(R*7);
+  stars.material.opacity = Math.max(k, 1 - dayK) * 0.9;
+  scene.fog.color.copy(skyMat.uniforms.hor.value);
+  scene.fog.near = 70 + k*R*20; scene.fog.far = 200 + 0.5*R + k*R*40;
+
+  // only the chunks this side of the horizon (or all of them, in the planet view)
+  const camDir = _t.copy(camera.position).normalize(), hc = camera.position.length() - R + 25;
+  const horizon = Math.acos(Math.min(1, R/(R + Math.max(1, hc))));
+  for (const c of chunks) c.mesh.visible = k > 0.02 || c.c.dot(camDir) > Math.cos(Math.min(Math.PI, horizon + c.ang + 0.15));
+  rockMesh.visible = k < 0.98;
+  youMark.visible = k > 0.02; youMark.position.copy(n).multiplyScalar(groundR(n) + 2); youMark.quaternion.setFromUnitVectors(_up, n); youMark.scale.setScalar(R*0.012*k + 0.01);
+
+  renderer.render(scene, camera);
+  if (now - hudT > 100){ hudT = now; hud(); }
+  requestAnimationFrame(frame);
+}
+
+// ---------- HUD ----------
+const circumference = () => 2*Math.PI*P.R;
+function fmtM(m){ return m >= 1000 ? (m/1000).toFixed(2) + ' km' : Math.round(m) + ' m'; }
+function hud(){
+  $('hSpeed').textContent = (speed()*3.6).toFixed(1) + ' km/h';
+  $('hGrade').textContent = (S.grade >= 0 ? '+' : '') + Math.round(S.grade*100) + '%';
+  $('hWeight').textContent = Math.round(S.weight*100) + '%';
+  const from = n.angleTo(START_N)*P.R;
+  $('hFrom').textContent = fmtM(from) + (innerWidth > 560 ? ' · ' + Math.round(from/(circumference()/2)*100) + '% to far side' : '');
+  $('hDist').textContent = fmtM(S.dist);
+  let best = null, bd = Infinity; for (const b of beaconList){ const d = n.angleTo(b.d)*P.R; if (d < bd){ bd = d; best = b; } }
+  $('hBeacon').textContent = best ? best.name + ', ' + fmtM(bd) : '–';
+  $('legL').classList.toggle('on', legFlash.L > 0.1 || weightLeg === 'L');
+  $('legR').classList.toggle('on', legFlash.R > 0.1 || weightLeg === 'R');
+}
+
+// ---------- input: keyboard (as the game), controller triggers, touch pads ----------
+const kb = { left: false, right: false, space: false };
+const keyLeg = k => (k === 'a' || k === 'arrowleft') ? 'L' : (k === 'd' || k === 'arrowright') ? 'R' : null;
+function updKeyLean(){ keyLean = (kb.right ? 1 : 0) - (kb.left ? 1 : 0); }
+addEventListener('keydown', e => {
+  if (e.target instanceof HTMLInputElement) return;
+  const k = e.key.toLowerCase(), leg = keyLeg(k);
+  if (leg){
+    e.preventDefault(); if (e.repeat) return;
+    if (leg === 'L') kb.left = true; else kb.right = true;
+    if (mode === 'tuck') updKeyLean(); else if (mode !== 'plow') press(leg, kb.space ? P.lboost : 1, 'key');
+    return;
+  }
+  if (k === ' '){ e.preventDefault(); kb.space = true; return; }
+  if (k === 'arrowup' || k === 'w'){ e.preventDefault(); if (!e.repeat){ setTuck(true, 'key'); updKeyLean(); } return; }
+  if (k === 'arrowdown' || k === 's'){ e.preventDefault(); if (!e.repeat) setPlow(true, 'key'); return; }
+  if (k === 'v' && !e.repeat) toggleView();
+  if (k === 'r' && !e.repeat) resetSkier();
+});
+addEventListener('keyup', e => {
+  const k = e.key.toLowerCase(), leg = keyLeg(k);
+  if (leg){ if (leg === 'L') kb.left = false; else kb.right = false; release(leg); updKeyLean(); return; }
+  if (k === ' ') kb.space = false;
+  if (k === 'arrowup' || k === 'w'){ setTuck(false, 'key'); keyLean = 0; }
+  if (k === 'arrowdown' || k === 's') setPlow(false, 'key');
+});
+addEventListener('blur', () => { held.L = held.R = false; kb.left = kb.right = kb.space = false; keyLean = 0; hold.tuck.clear(); hold.plow.clear(); syncMode(); });
+
+const padSt = { L: false, R: false, tuck: false, plow: false };
+function pollPad(){
+  const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+  let g = null; for (const p of gps) if (p){ g = p; break; }
+  if (!g) return;
+  const tuckOn = !!((g.buttons[4] && g.buttons[4].pressed) || (g.buttons[5] && g.buttons[5].pressed));
+  if (tuckOn !== padSt.tuck){ padSt.tuck = tuckOn; setTuck(tuckOn, 'pad'); }
+  const plowOn = !!(g.buttons[1] && g.buttons[1].pressed);
+  if (plowOn !== padSt.plow){ padSt.plow = plowOn; setPlow(plowOn, 'pad'); }
+  for (const [leg, b] of [['L', g.buttons[6]], ['R', g.buttons[7]]]){
+    const v = b ? b.value : 0;
+    if (!padSt[leg] && v > 0.5){ padSt[leg] = true; if (!mode) press(leg, 1, 'trigger'); }
+    else if (padSt[leg] && v < 0.3){ padSt[leg] = false; release(leg); }
+  }
+  const ax = g.axes[0] || 0; padLean = mode === 'tuck' && Math.abs(ax) > 0.15 ? ax : 0;
+  if (g.buttons[3] && g.buttons[3].pressed && !padSt.view){ padSt.view = true; toggleView(); } else if (!(g.buttons[3] && g.buttons[3].pressed)) padSt.view = false;
+}
+function bindPad(el, down, up){
+  el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture(e.pointerId); el.classList.add('on'); down(); });
+  const end = () => { el.classList.remove('on'); up(); };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+}
+bindPad($('padL'), () => { if (mode === 'tuck') touchLean = -1; else press('L', 1, 'touch'); }, () => { release('L'); if (touchLean < 0) touchLean = 0; });
+bindPad($('padR'), () => { if (mode === 'tuck') touchLean = 1; else press('R', 1, 'touch'); }, () => { release('R'); if (touchLean > 0) touchLean = 0; });
+bindPad($('padT'), () => setTuck(true, 'touch'), () => { setTuck(false, 'touch'); touchLean = 0; });
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('dblclick', e => e.preventDefault());
+
+// ---------- settings, view, reset ----------
+function toggleView(){ viewOn = !viewOn; $('viewBtn').textContent = viewOn ? 'Back to skiing' : 'Planet view'; }
+$('viewBtn').addEventListener('click', e => { toggleView(); e.currentTarget.blur(); });
+function resetSkier(){
+  placeAtStart(); Object.assign(S, { x: 0, y: 0, vx: 0, vy: 0, th: 0, thv: 0, tgt: 0, dist: 0 });
+  camTh = camVel = camPending = focusLat = focusV = 0; camR = null; mode = null; weightLeg = null; lastLeg = null; kickDrive = null;
+  clearMarks();
+}
+$('resetBtn').addEventListener('click', e => { resetSkier(); e.currentTarget.blur(); });
+function rNote(){
+  const R = P.R, horizon = Math.sqrt(2*R*P.camd*0.62);
+  $('rNote').textContent = 'Circumference ' + fmtM(2*Math.PI*R) + ', surface ' + (4*Math.PI*R*R/1e6).toFixed(2) + ' km², horizon about ' + Math.round(horizon) + ' m from the camera. The 1.0 map is about 0.8 km².';
+}
+function rebuild(){
+  $('loading').style.display = 'flex';
+  requestAnimationFrame(() => setTimeout(() => {
+    buildPlanet(); clearMarks(); camR = null;
+    // stay where you were on the planet; just settle onto the new ground
+    $('loading').style.display = 'none';
+  }, 0));
+}
+for (const [i, o, k, f] of SETTINGS){
+  const el = $(i);
+  if (saved[i] !== undefined) el.value = saved[i];
+  const upd = () => { P[k] = +el.value; $(o).textContent = f(+el.value); };
+  upd();
+  el.addEventListener('input', () => { upd(); if (k === 'R') rNote(); if (k === 'pixel') resize(); });
+  el.addEventListener('change', () => { save(); if (k === 'R') rebuild(); });
+}
+for (const [id, key] of [['tLift', 'lift'], ['tDay', 'daynight']]){
+  const el = $(id); if (saved[key] !== undefined) el.checked = !!saved[key];
+  P[key] = el.checked; el.addEventListener('change', () => { P[key] = el.checked; save(); });
+}
+$('defaultsBtn').addEventListener('click', () => {
+  const oldR = P.R;
+  for (const [i, o, k, f] of SETTINGS){ $(i).value = DEFAULTS[i]; P[k] = +DEFAULTS[i]; $(o).textContent = f(P[k]); }
+  $('tLift').checked = P.lift = false; $('tDay').checked = P.daynight = false;
+  save(); rNote(); resize(); if (P.R !== oldR) rebuild();
+});
+
+// ---------- go ----------
+placeAtStart(); resize(); rNote();
+setTimeout(() => {
+  buildPlanet();
+  $('loading').style.display = 'none';
+  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST };   // test hook
+  requestAnimationFrame(t => { last = t; frame(t); });
+}, 0);
+</script>
+</body>
+</html>

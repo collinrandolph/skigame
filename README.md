@@ -144,6 +144,7 @@ The map is four times its old area and split into zones, each locked until you c
 - `index.html` is the current game.
 - `cave/index.html` now just forwards to the game (the underground was built there as a sandbox, and has been merged in).
 - `prototypes/top-down-2d.html` is the earlier top-down canvas version.
+- `prototypes/planetoid.html` is a 3.0 sandbox: the same skating physics on a lumpy round planetoid (a real sphere, gravity toward the centre, no edges), with the chase camera, a planet view (V), solid rocks, six beacons and a ring station in orbit. Settings change the planet's radius (150 to 1200 m), add a fixed sun with a night side, and let speed lighten you on the curve.
 
 ## The underground and the space station (2.0)
 

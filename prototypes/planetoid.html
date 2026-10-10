@@ -80,6 +80,8 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <label for="tCamd">Camera distance<output id="oCamd"></output><input id="tCamd" type="range" min="4" max="40" step="0.5" value="15"></label>
   <label for="tPixel">Pixel size<output id="oPixel"></output><input id="tPixel" type="range" min="1" max="6" step="1" value="4"></label>
   <label for="tMax">Top speed<output id="oMax"></output><input id="tMax" type="range" min="10" max="60" step="1" value="38"></label>
+  <label for="tMtn">Mountains<output id="oMtn"></output><input id="tMtn" type="range" min="0" max="3" step="0.25" value="1"></label>
+  <label for="tBld">Buildings<output id="oBld"></output><input id="tBld" type="range" min="0" max="3" step="0.25" value="1"></label>
   <label for="tPush">Push per kick<output id="oPush"></output><input id="tPush" type="range" min="0.2" max="2.5" step="0.05" value="2.5"></label>
   <div class="btns"><button id="resetBtn" type="button">Reset skier</button><button id="defaultsBtn" type="button">Defaults</button></div>
   <p class="note">Kick, turn and glide tuning are the main game's defaults.</p>
@@ -116,12 +118,13 @@ const P = {
   push: 2.5, tap: 80, klen: 50, turn: 5, turn2: 5, turn3: 15, k180: 8, k180t: 6, kfloor: 15, kwin: 450,
   tfStop: 180, tfMove: 90, tfVlo: 1, tfVhi: 14, decay: 20, snap: 160, splay: 11, fric: 0.4, glide: 0.25, grip: 25,
   gwin: 600, gcut: 95, max: 38, lboost: 1.4, plow: 2.5, tuck: 50, lean: 50, camd: 15, sway: 0.8, cam: 0.6, pixel: 4,
-  R: 300, lift: false, daynight: false,
+  R: 300, lift: false, daynight: false, mtn: 1, bld: 1,
 };
 const SETTINGS = [
   ['tR', 'oR', 'R', v => v + ' m'], ['tCamd', 'oCamd', 'camd', v => v.toFixed(1) + ' m'],
   ['tPixel', 'oPixel', 'pixel', v => v > 1 ? v + ' px' : 'off'], ['tMax', 'oMax', 'max', v => v + ' km/h'],
   ['tPush', 'oPush', 'push', v => v.toFixed(2) + ' m/s'],
+  ['tMtn', 'oMtn', 'mtn', v => v ? '×' + v : 'none'], ['tBld', 'oBld', 'bld', v => v ? '×' + v : 'none'],
 ];
 const STORE = 'skate-planetoid';
 const DEFAULTS = {}; SETTINGS.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
@@ -253,6 +256,91 @@ function buildPlanet(){
   buildScatter();
 }
 
+// ---------- mountains (cones) and buildings (boxes): primitives scattered at random, all solid ----------
+// mountains are faceted cones 25-95 m tall with a snow cap. buildings come in villages of 3-9 round a centre, plus a
+// few loners; about one in seven is a tower. each one sits on the lowest ground under its footprint, so nothing floats
+let solids = [], structMeshes = [];
+const flatGeo = g => { const f = g.toNonIndexed(); f.computeVertexNormals(); g.dispose(); return f; };   // faceted look
+function buildStructures(rnd){
+  const R = P.R, area = 4*Math.PI*R*R;
+  for (const m of structMeshes){ scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
+  structMeshes = []; solids = [];
+  const up = new THREE.Vector3(0, 1, 0), X = new THREE.Vector3(1, 0, 0), d = new THREE.Vector3(), c = new THREE.Vector3(), p = new THREE.Vector3(), t1 = new THREE.Vector3(), t2 = new THREE.Vector3();
+  const q = new THREE.Quaternion(), q2 = new THREE.Quaternion(), sc = new THREE.Vector3(), m4 = new THREE.Matrix4();
+  const randDir = out => { const z = 2*rnd() - 1, a = rnd()*Math.PI*2, r = Math.sqrt(1 - z*z); return out.set(r*Math.cos(a), z, r*Math.sin(a)); };
+  const tangents = dir => { t1.copy(Math.abs(dir.y) < 0.9 ? up : X).cross(dir).normalize(); t2.crossVectors(dir, t1); };
+  const offset = (dir, ox, oy, out) => { tangents(dir); return out.copy(dir).multiplyScalar(R).addScaledVector(t1, ox).addScaledVector(t2, oy).normalize(); };
+  const beaconDirs = BEACON_DIRS.map(([x, y, z]) => new THREE.Vector3(x, y, z).normalize());
+  const clear = (dir, r) => {
+    if (dir.angleTo(START_N)*R < r + 30) return false;
+    for (const b of beaconDirs) if (dir.angleTo(b)*R < r + 12) return false;
+    for (const o of solids) if (dir.angleTo(o.d)*R < r + o.r + 3) return false;
+    return true;
+  };
+  const baseR = (dir, r) => { let lo = groundR(dir); tangents(dir); for (let i = 0; i < 8; i++){ const a = i/8*Math.PI*2; p.copy(dir).multiplyScalar(R).addScaledVector(t1, Math.cos(a)*r).addScaledVector(t2, Math.sin(a)*r).normalize(); lo = Math.min(lo, groundR(p)); } return lo - 0.4; };
+  const orient = (dir, spin) => { q.setFromUnitVectors(up, dir); q2.setFromAxisAngle(up, spin); return q.multiply(q2); };
+
+  // mountains
+  const nM = Math.min(400, Math.round(area/40000*P.mtn));
+  const mtns = [];
+  for (let tries = 0; mtns.length < nM && tries < nM*30; tries++){
+    randDir(d);
+    const H = 25 + 70*Math.pow(rnd(), 1.5), r = H*(0.6 + 0.6*rnd());
+    if (!clear(d, r)) continue;
+    const b = baseR(d, r), sink = groundR(d) - b;
+    mtns.push({ d: d.clone(), b, H: H + sink, r, spin: rnd()*Math.PI*2 });
+    solids.push({ d: d.clone(), r, lim: Math.cos((r + 10)/R) });
+  }
+  if (mtns.length){
+    const rockG = flatGeo(new THREE.ConeGeometry(1, 1, 7, 1)); rockG.translate(0, 0.5, 0);
+    const capG = flatGeo(new THREE.ConeGeometry(0.36, 0.36, 7, 1)); capG.translate(0, 1 - 0.18 + 0.004, 0); capG.scale(1.015, 1, 1.015);
+    const rock = new THREE.InstancedMesh(rockG, new THREE.MeshLambertMaterial({ color: 0x7f8d9b }), mtns.length);
+    const cap = new THREE.InstancedMesh(capG, new THREE.MeshLambertMaterial({ color: 0xf4f8fb }), mtns.length);
+    mtns.forEach((o, i) => { m4.compose(p.copy(o.d).multiplyScalar(o.b), orient(o.d, o.spin), sc.set(o.r, o.H, o.r)); rock.setMatrixAt(i, m4); cap.setMatrixAt(i, m4); });
+    for (const m of [rock, cap]){ m.frustumCulled = false; scene.add(m); structMeshes.push(m); }
+  }
+
+  // buildings
+  const PAL = [0xa8643c, 0x7d5338, 0xd6c8ab, 0x5b6b7a, 0x9c3d33, 0x6f7f5a, 0xc29a5b];
+  const blds = [], maxB = 1500;
+  const addBld = (dir, spin, tower) => {
+    const w = 4 + 6*rnd(), dp = 4 + 6*rnd(), h = tower ? 12 + 16*rnd() : 3 + 6*rnd(), r = Math.hypot(w, dp)/2;
+    if (!clear(dir, r)) return false;
+    const b = baseR(dir, r), sink = groundR(dir) - b;
+    const qq = orient(dir, spin).clone(), a = X.clone().applyQuaternion(qq);
+    blds.push({ d: dir.clone(), b, q: qq, w, dp, h: h + sink, col: PAL[Math.floor(rnd()*PAL.length)] });
+    solids.push({ d: dir.clone(), r, lim: Math.cos((r + 10)/R), box: true, a, hw: w/2, hd: dp/2 });
+    return true;
+  };
+  const nV = Math.round(area/90000*P.bld);
+  for (let v = 0, tries = 0; v < nV && tries < nV*20 && blds.length < maxB; tries++){
+    randDir(c); if (!clear(c, 30)) continue; v++;
+    const spin = rnd()*Math.PI*2, k = 3 + Math.floor(rnd()*7);
+    for (let j = 0, tj = 0; j < k && tj < k*6; tj++){
+      const a = rnd()*Math.PI*2, rr = 6 + 34*Math.sqrt(rnd());
+      if (addBld(offset(c, Math.cos(a)*rr, Math.sin(a)*rr, d), spin + (rnd() < 0.7 ? 0 : Math.PI/2) + (rnd() - 0.5)*0.3, rnd() < 0.14)) j++;
+    }
+  }
+  for (let j = 0, tries = 0; j < nV && tries < nV*20 && blds.length < maxB; tries++) if (addBld(randDir(d), rnd()*Math.PI*2, rnd() < 0.3)) j++;
+  if (blds.length){
+    const boxG = new THREE.BoxGeometry(1, 1, 1); boxG.translate(0, 0.5, 0);
+    const roofG = new THREE.BoxGeometry(1, 1, 1); roofG.translate(0, 0.5, 0);
+    const box = new THREE.InstancedMesh(boxG, new THREE.MeshLambertMaterial({ color: 0xffffff }), blds.length);
+    const roof = new THREE.InstancedMesh(roofG, new THREE.MeshLambertMaterial({ color: 0xf4f8fb }), blds.length);
+    const col = new THREE.Color(), lift = new THREE.Vector3();
+    blds.forEach((o, i) => {
+      p.copy(o.d).multiplyScalar(o.b);
+      m4.compose(p, o.q, sc.set(o.w, o.h, o.dp)); box.setMatrixAt(i, m4); box.setColorAt(i, col.setHex(o.col));
+      lift.copy(o.d).multiplyScalar(o.h);                          // snow on the roof: a slab a little wider than the walls
+      m4.compose(p.add(lift), o.q, sc.set(o.w + 0.5, 0.35, o.dp + 0.5)); roof.setMatrixAt(i, m4);
+    });
+    box.instanceColor.needsUpdate = true;
+    for (const m of [box, roof]){ m.frustumCulled = false; scene.add(m); structMeshes.push(m); }
+  }
+  buildCounts = { mountains: mtns.length, buildings: blds.length };
+}
+let buildCounts = {};
+
 // ---------- scattered rocks (solid) and six beacons, so you can see the curve and judge speed ----------
 let rocks = [], rockMesh = null;
 const BEACON_DIRS = [[0,1,0,'red',0xd2462e], [0,-1,0,'violet',0x8a5cd6], [1,0,0,'yellow',0xf2c230], [-1,0,0,'green',0x2f9a5a], [0,0,1,'blue',0x2f6fd6], [0,0,-1,'orange',0xf08a2a]];
@@ -262,6 +350,7 @@ function buildScatter(){
   const R = P.R;
   if (rockMesh){ scene.remove(rockMesh); rockMesh.geometry.dispose(); }
   rocks = [];
+  { let s2 = 777; buildStructures(() => (s2 = (s2 * 16807) % 2147483647) / 2147483647); }
   let s = 4242; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
   const count = Math.max(150, Math.min(3000, Math.round(4*Math.PI*R*R/700)));
   rockMesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0x7d8a96 }), count);
@@ -271,6 +360,7 @@ function buildScatter(){
     const z = 2*rnd() - 1, a = rnd()*Math.PI*2, rr = Math.sqrt(1 - z*z);
     d.set(rr*Math.cos(a), z, rr*Math.sin(a));
     if (d.angleTo(START_N)*R < 14) continue;                       // keep the start clear
+    if (solids.some(o => d.angleTo(o.d)*R < o.r + 1)) continue;     // and out of the mountains and buildings
     const size = 0.35 + 1.3*Math.pow(rnd(), 2.2);
     p.copy(d).multiplyScalar(groundR(d) - 0.3*size);
     q.setFromUnitVectors(up, d); q2.setFromAxisAngle(up, rnd()*Math.PI*2); q.multiply(q2);
@@ -279,7 +369,7 @@ function buildScatter(){
     rocks.push({ x: d.x, y: d.y, z: d.z, r: size*0.85 });
     k++;
   }
-  rockMesh.instanceMatrix.needsUpdate = true; scene.add(rockMesh);
+  rockMesh.instanceMatrix.needsUpdate = true; rockMesh.frustumCulled = false; scene.add(rockMesh);
   // beacons: tall poles with a lamp, one over the middle of each cube face
   while (beacons.children.length) beacons.remove(beacons.children[0]);
   beaconList.length = 0;
@@ -522,7 +612,7 @@ function step(dt){
   if (mode || speed() < 0.05) for (const k of ['L', 'R']){ if (lastSki[k] && lastSki[k].live) continue; lastSki[k] = setParallel(k === 'L' ? -1 : 1); }
   legFlash.L = Math.max(0, legFlash.L - dt*5); legFlash.R = Math.max(0, legFlash.R - dt*5);
 }
-// rocks and beacon bases are solid: you're pushed out and lose the speed you had into them
+// rocks, beacon bases, mountains and buildings are solid: you're pushed out and lose the speed you had into them
 function collide(){
   if (TEST.ghost) return;
   const R = P.R, lim = Math.cos(8/R);
@@ -536,6 +626,20 @@ function collide(){
   };
   for (const k of rocks) if (k.x*n.x + k.y*n.y + k.z*n.z > lim) hit(k.x, k.y, k.z, k.r);
   for (const b of beaconList) if (b.d.dot(n) > lim) hit(b.d.x, b.d.y, b.d.z, b.r);
+  for (const o of solids){
+    if (o.d.dot(n) < o.lim) continue;
+    if (!o.box){ hit(o.d.x, o.d.y, o.d.z, o.r); continue; }
+    // a building: a box turned to its own axis. find where you are in its frame and push out through the nearest wall
+    const ox = (o.d.x - n.x)*R, oy = (o.d.y - n.y)*R, oz = (o.d.z - n.z)*R;
+    const px = -(ox*ex.x + oy*ex.y + oz*ex.z), py = -(ox*ey.x + oy*ey.y + oz*ey.z);   // you, from the box's centre
+    let ax = o.a.dot(ex), ay = o.a.dot(ey); const L = Math.hypot(ax, ay) || 1; ax /= L; ay /= L;
+    const bx = -ay, by = ax, u = px*ax + py*ay, v = px*bx + py*by, hw = o.hw + 0.3, hd = o.hd + 0.3;
+    if (Math.abs(u) >= hw || Math.abs(v) >= hd) continue;
+    const pu = hw - Math.abs(u), pv = hd - Math.abs(v);
+    const [nx, ny, push] = pu < pv ? [ax*(u < 0 ? -1 : 1), ay*(u < 0 ? -1 : 1), pu] : [bx*(v < 0 ? -1 : 1), by*(v < 0 ? -1 : 1), pv];
+    S.x += nx*push; S.y += ny*push; moveLocal(nx*push, ny*push);
+    const vn = S.vx*nx + S.vy*ny; if (vn < 0){ S.vx -= nx*vn; S.vy -= ny*vn; }
+  }
 }
 
 // ---------- ski marks: one buffer of quads laid on the surface ----------
@@ -560,7 +664,8 @@ function updateMarks(){
 }
 function clearMarks(){ markPos.fill(0); markGeo.attributes.position.needsUpdate = true; skis = []; lastSki = { L: null, R: null }; }
 
-const TEST = { ghost: false };   // test hook: ghost turns collisions off
+const TEST = { ghost: false,     // test hook: ghost turns collisions off; place(dir) puts the skier there
+  place(d){ n.copy(d).normalize(); ex.set(1, 0, 0).addScaledVector(n, -n.x).normalize(); ey.crossVectors(ex, n).normalize(); camR = null; } };
 
 // ---------- the skier's figure ----------
 const fig = new THREE.Group(); scene.add(fig);
@@ -688,7 +793,7 @@ function frame(now){
   stars.position.copy(camera.position); stars.scale.setScalar(R*7);
   stars.material.opacity = Math.max(k, 1 - dayK) * 0.9;
   scene.fog.color.copy(skyMat.uniforms.hor.value);
-  scene.fog.near = 70 + k*R*20; scene.fog.far = 200 + 0.5*R + k*R*40;
+  scene.fog.near = 120 + k*R*20; scene.fog.far = 420 + 0.8*R + k*R*40;
 
   // only the chunks this side of the horizon (or all of them, in the planet view)
   const camDir = _t.copy(camera.position).normalize(), hc = camera.position.length() - R + 25;
@@ -801,17 +906,17 @@ for (const [i, o, k, f] of SETTINGS){
   const upd = () => { P[k] = +el.value; $(o).textContent = f(+el.value); };
   upd();
   el.addEventListener('input', () => { upd(); if (k === 'R') rNote(); if (k === 'pixel') resize(); });
-  el.addEventListener('change', () => { save(); if (k === 'R') rebuild(); });
+  el.addEventListener('change', () => { save(); if (k === 'R') rebuild(); if (k === 'mtn' || k === 'bld') buildScatter(); });
 }
 for (const [id, key] of [['tLift', 'lift'], ['tDay', 'daynight']]){
   const el = $(id); if (saved[key] !== undefined) el.checked = !!saved[key];
   P[key] = el.checked; el.addEventListener('change', () => { P[key] = el.checked; save(); });
 }
 $('defaultsBtn').addEventListener('click', () => {
-  const oldR = P.R;
+  const oldR = P.R, oldS = P.mtn + ',' + P.bld;
   for (const [i, o, k, f] of SETTINGS){ $(i).value = DEFAULTS[i]; P[k] = +DEFAULTS[i]; $(o).textContent = f(P[k]); }
   $('tLift').checked = P.lift = false; $('tDay').checked = P.daynight = false;
-  save(); rNote(); resize(); if (P.R !== oldR) rebuild();
+  save(); rNote(); resize(); if (P.R !== oldR) rebuild(); else if (P.mtn + ',' + P.bld !== oldS) buildScatter();
 });
 
 // ---------- go ----------
@@ -819,7 +924,7 @@ placeAtStart(); resize(); rNote();
 setTimeout(() => {
   buildPlanet();
   $('loading').style.display = 'none';
-  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST };   // test hook
+  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => buildCounts, ex, ey };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 }, 0);
 </script>

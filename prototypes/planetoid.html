@@ -31,6 +31,9 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;image-renderi
 .leg.on{background:var(--skier);color:#fff;border-color:var(--skier)}
 .help{font-size:11px;color:var(--muted);line-height:1.55;max-width:230px;margin-top:2px}
 .help b{color:var(--ink);font-weight:500}
+.rad{display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.rad input{width:140px;accent-color:var(--skier)}
+.rad output{min-width:52px;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums;text-transform:none;letter-spacing:0;font-size:12px}
 .top-right{position:fixed;top:calc(env(safe-area-inset-top,0px) + 16px);right:16px;display:flex;gap:8px}
 button{font:500 12px var(--mono);color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;cursor:pointer}
 button:hover{border-color:var(--muted)}
@@ -48,7 +51,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 .pad{pointer-events:auto;width:min(34vw,170px);height:110px;border-radius:10px;background:var(--panel);border:1px solid var(--line);font:700 15px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--ink);display:flex;align-items:center;justify-content:center}
 .pad.mid{width:min(20vw,96px)}
 .pad.on{background:var(--skier);color:#fff;border-color:var(--skier)}
-@media (max-width:560px){ .top-right{flex-direction:column;align-items:flex-end} .hud{min-width:0;max-width:calc(100vw - 172px);padding:10px 12px} .hud .opt,.hud .help{display:none} .hud h1{font-size:18px} }
+@media (max-width:560px){ .top-right{flex-direction:column;align-items:flex-end} .rad{gap:6px;padding:5px 8px} .rad span{display:none} .rad input{width:60px} .rad output{min-width:40px} .hud{min-width:0;max-width:calc(100vw - 172px);padding:10px 12px} .hud .opt,.hud .help{display:none} .hud h1{font-size:18px} }
 @media (pointer:coarse){ .pads{display:flex} details{bottom:calc(env(safe-area-inset-bottom,0px) + 140px)} .help{display:none} }
 #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);pointer-events:none}
 </style>
@@ -70,11 +73,10 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <div class="help"><b>← →</b> kick (hold to ride the glide) · <b>Space</b> + kick: loaded stroke · <b>↑</b> tuck, <b>← →</b> lean · <b>↓</b> snow plow · <b>V</b> planet view · <b>P</b> 800 m / 300 m planet · <b>R</b> reset</div>
 </div>
 
-<div class="top-right"><button id="sizeBtn" type="button" title="Switch between an 800 m and a 300 m planet (P)">800 m</button><button id="viewBtn" type="button">Planet view</button></div>
+<div class="top-right"><label class="rad panel" for="tR"><span>Radius</span><input id="tR" type="range" min="150" max="1200" step="50" value="800"><output id="oR"></output></label><button id="sizeBtn" type="button" title="Switch between an 800 m and a 300 m planet (P)">Try 300 m</button><button id="viewBtn" type="button">Planet view</button></div>
 
 <details class="panel" id="settings">
   <summary>Settings</summary>
-  <label for="tR">Planet radius<output id="oR"></output><input id="tR" type="range" min="150" max="1200" step="50" value="800"></label>
   <p class="note" id="rNote"></p>
   <label class="check"><input id="tLift" type="checkbox"> Curvature lightens you (less friction at speed)</label>
   <label class="check"><input id="tDay" type="checkbox"> Fixed sun (day side and night side)</label>
@@ -1115,7 +1117,7 @@ function rebuild(reset = false){
   }, 0));
 }
 // the size toggle: 800 m <-> 300 m (any other radius from the slider counts as "not 800", so the toggle goes to 800)
-function sizeLabel(){ $('sizeBtn').textContent = P.R + ' m'; }
+function sizeLabel(){ $('sizeBtn').textContent = P.R === 800 ? 'Try 300 m' : 'Try 800 m'; }   // where the toggle takes you
 function toggleSize(){
   const R = P.R === 800 ? 300 : 800;
   $('tR').value = R; P.R = R; $('oR').textContent = R + ' m'; rNote(); save(); rebuild(true);
@@ -1127,7 +1129,7 @@ for (const [i, o, k, f] of SETTINGS){
   const upd = () => { P[k] = +el.value; $(o).textContent = f(+el.value); };
   upd();
   el.addEventListener('input', () => { upd(); if (k === 'R') rNote(); if (k === 'pixel') resize(); });
-  el.addEventListener('change', () => { save(); if (k === 'R') rebuild(); if (k === 'mtn' || k === 'bld' || k === 'trees') buildScatter(); });
+  el.addEventListener('change', () => { save(); if (k === 'R'){ el.blur(); rebuild(); } if (k === 'mtn' || k === 'bld' || k === 'trees') buildScatter(); });
 }
 for (const [id, key] of [['tLift', 'lift'], ['tDay', 'daynight']]){
   const el = $(id); if (saved[key] !== undefined) el.checked = !!saved[key];

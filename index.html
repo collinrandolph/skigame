@@ -7812,7 +7812,7 @@ function hud(){
     const z = hudZone(S.x, S.y), K = activeKiosk() || trial.K, cry = !K && altar.state === 1;
     let n = 0, tot = 0, label = '';
     if (K){ n = kioskGot(K); tot = orbsFor(K); label = trial.K === K ? fmtTime(trial.t) : n === tot ? 'Back to the terminal' : 'Orbs'; }
-    else if (cry){ n = crystalsGot(); tot = CRYSTAL_TOTAL; label = n === tot ? 'Back to the altar' : 'Crystals'; }
+    else if (cry){ n = crystalsGot(); tot = CRYSTAL_TOTAL; label = n === tot ? 'Open the Crystal Gate' : 'Crystals'; }
     else if (z !== 4 && z !== 5){ n = kiosksPowered(z); tot = KIOSK_COUNT[z]; label = n === tot ? (z === 1 ? (gateOpen && gate2Open ? 'Gates open' : 'Ski to the gates') : z === 2 ? (bridgeWanted && bridge2Wanted ? 'Bridges down' : 'Ski to the bridges') : altar.state === 2 ? 'Crystal gate open' : !CAVE_ALTAR.done ? 'Into the mine' : 'All powered') : 'Terminals'; }
     const crownHud = UNDER && !ONSTATION && inCrownRoom(S.x, S.y);
     if (crownHud){ n = crownGot.length; tot = CROWN.n; }

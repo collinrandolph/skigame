@@ -91,7 +91,7 @@ The map is four times its old area and split into zones, each locked until you c
   - A controller-layout panel in the top right.
 - **Dev view:** the full HUD, Tuning and stick debug tools. Toggle it with the **Dev** button or the **`** key.
 
-- **Goal label (top centre):** shown only while there's a goal. That means a count still to fill (terminals, orbs, crystals, crown crystals), or somewhere to go next ("Ski to the gates", "Back to the altar"). It shows no zone names and hides once a goal is done. Pickups don't also pop up a count message: the label is the one count (only the last orb, crystal or crown crystal gets a message, saying where to go next).
+- **Goal label (top centre):** shown only while there's a goal. That means a count still to fill (terminals, orbs, crystals, crown crystals), or somewhere to go next ("Ski to the gates", "Open the Crystal Gate"). It shows no zone names and hides once a goal is done. Pickups don't also pop up a count message: the label is the one count (only the last orb, crystal or crown crystal gets a message, saying where to go next).
 - **Upright phone in the mine:** in the mine's close camera and on the crown room spiral, an upright phone's view widens to at least 44° across and turns with you twice as fast, so you stay in frame through tight turns; on the spiral the camera also tucks in close and low, under the turn above.
 - **Zone 5 court:** the elders wait in front of the observatory, either side of the Starway's (dark) gate. Before the ceremony, the attendants wait just outside the ring by the diamond the next calf will take, and after a reload or checkpoint they're already there.
 - **Ribs:** the purple crystals and glow under the ribs are gone; crystals are meant to be scarce.

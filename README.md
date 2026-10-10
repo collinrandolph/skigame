@@ -150,7 +150,7 @@ The map is four times its old area and split into zones, each locked until you c
 2.0 replaces 1.0's whole underground except the crown room. Its 3D models and lighting are still placeholders to be refined.
 
 - **The mine's gate:** the timber portal on the mine's ridge has a barred steel gate. It stays shut until all of zone 3's terminals are powered (you're told so if you come close), then sinks into the floor. The label over the portal reads "THE MINE · 2 / 3 TERMINALS" (however many are powered), then "OPEN".
-- **The mine shaft:** from the portal it winds down under the ridge at a steady grade. Its last 26 m open out like a cave mouth into Plateau 1, with the floor, walls and roof widening and rising together. The steel arches stop where the flare begins.
+- **The mine shaft:** from the portal it drops at about 20% for the first 50 m, deep enough to keep its full 5.6 m of headroom under the low ground west of the ridge. Before, the roof was squashed to 1.1–4 m there, because it keeps 1.2 m under the snow. Then it eases to a gentle grade the rest of the way. Its last 26 m open out like a cave mouth into Plateau 1, with the floor, walls and roof widening and rising together. The steel arches stop where the flare begins. Tested: full headroom along its whole length.
 - **An underground ski area:** three hills step down between the plateaus, each about 330 m long and dropping 90 m (27% on average).
   - **Pitch:** each hill varies between steeper and gentler pitches, with side-hill sections and long swells.
   - **Hill ends:** every hill eases level into the plateau at both ends, meeting it flush. There's no lip to throw you or lift your ski tracks.
@@ -160,19 +160,27 @@ The map is four times its old area and split into zones, each locked until you c
 - **Plateau 1:** where the shaft comes in, with the miners' camps and aliens round its rim.
 - **Hill 1:** 80 m wide, open on its east half. Its west half is a slalom set for a deep tuck: at the speed a deep tuck carries you, each turn is no tighter than about 55% of what a full lean can carve. So the gates start close together and spread out as you speed up (6 gates). A test skier in deep tuck followed the line to within 1.8 m. The hill runs straight at the crown door, which glows through the cave's haze all the way down.
 - **Plateau 2:** much bigger, on two levels.
-  - **The lower level:** takes in Hill 1 and leads on to Hill 2, with dwellings along its east side and round its west.
+  - **The lower level:** takes in Hill 1 and leads on to Hill 2. Dwellings line every stretch of its walls, except the ways into the hills, the courses and the ramp's foot. Against the terrace's 14 m step, a row of dwellings stands two and three high like cliff dwellings. Any under the Crown Ramp is kept 1.5 m below its deck.
   - **The upper terrace:** a broad raised plaza (about 120 m across and 96 m deep, 14 m up a sheer step). The **Crown Ramp**, a light bridge that is always on, climbs it straight in line with Hill 1. A double row of crystal-capped columns lines the way to the crown door at the terrace's far end, with grander houses down both sides.
 - **The crown room:** unchanged inside (the spiral, the 30 crown crystals and the giant crystal), now behind the terrace's north wall. The door still opens only for the reward outfit.
 - **Hill 2:** 92 m wide. A winding banked berm path runs down its east half; rollers run down its west half all the way out to the wall, as an alternative line.
 - **Plateau 3 and Hill 3:** ruins on Plateau 3; Hill 3 is a half-pipe down to the Basement.
-- **The Basement teleporter:** one circular doorway, a single heavy steel ring with a band of light inside it, filled with the membrane. The station shows through the doorway once it's open. The steel wall now runs wide and up into the roof, so space no longer shows through any gap round it.
-- **The teleporter cave (station ↔ surface):** a round bore through rock, styled like the mine's tunnel, with rough icy rock walls, a snow floor, steel arches with lamps, and a ring with its membrane at the inner end.
-  - **Shape:** it runs 14 m straight, through a 90° bend, then 14 m to its mouth.
-  - **On the surface:** the cave is buried in a mound of the ridge beside the mine, so you see only its mouth: a timber portal like the mine's at the head of a cut. You can only get in through the mouth.
-  - **On the station:** the far arm's ring is set in a rock face, with the bore hanging off it like an asteroid.
+- **The Basement teleporter:** one circular doorway, a single heavy steel ring with a band of light inside it, filled with the membrane. The station shows through it once it's open.
+  - **The wall:** it runs wide and up into the roof, so space never shows through a gap round it.
+  - **The floor:** level for about 20 m either side of the doorway, at exactly the station deck's height. The cave floor used to rise 0.7 m into the wall right at the doorway, which caused a drop and drawing glitches as you crossed.
+  - **The camera:** it comes in close as you near the doorway and eases back out gently once you're through.
+  - **Tested:** ground height stays level across the crossing.
+- **The station's walkways:** every straight walkway, the teleporter arms included, now runs on to the main walkway's centre line, slightly under it. Where an arm meets the round walkway at an angle there's no gap at either corner. Each teleporter ring has a broad landing, its control post standing on it.
+- **The teleporter cave (station ↔ surface):** a round bore through rock, styled like the mine's tunnel, with rough icy rock walls, a snow floor, and steel arches with lamps.
+  - **Shape:** 14 m straight, a 90° bend, then 14 m to its mouth.
+  - **The ring:** at its inner end, exactly like the Basement teleporter's: the same size, the same heavy ring and band of light, and a membrane that's dark while asleep and a faint glow once awake.
+  - **On the surface:** it's buried in a mound of the ridge beside the mine. Its mouth ends in a short lip of rock with a timber portal like the mine's, at the head of a cut. The floor runs level from the cut into the cave, and the ground inside the opening isn't drawn, so nothing blocks it. You can ski in from outside at any time.
+  - **The camera there:** in the cave or its cut, a camera that would end up inside the mound is pulled in toward you rather than lifted over it.
+  - **On the station:** the far arm ends in the same ring on its landing. The cave beyond shows only through the ring, like a doorway into another world.
   - **Crossing over:** the two copies are identical inside. Partway along the straight, out of sight of either end, you're carried from one to the other with the same position, heading and speed.
-  - **Unlocking:** the surface ring is dark until you've ridden out from the station once; after that it takes you back. This is saved in your browser.
-  - **Tested:** the round trip, station → surface → out of the mouth → back in → station.
+  - **Unlocking:** the surface ring stays dark and solid until you've ridden out from the station once; after that it takes you to the station. This is saved in your browser.
+  - **Status posts:** like the Basement's, one inside the surface cave beside its ring (red until it's awake) and one on the station's landing (green: it's the way out). Each tells you what it does as you come up to it.
+  - **Tested:** skiing in from outside to the dark ring and back out; then, once awake, in and through to the station; and the station → surface → out of the mouth → back in → station round trip.
 - **The giant's loop ramp:** the wrong-way loop under the moose giant now runs straight out between his legs until it's well clear of them (about 22 m out). Then it makes an easy turn and swings round him on a gently tightening curve, merging onto the far side of the Hidden Way. It keeps at least 5.5 m from the centre of every leg, and a test ride stays on it through the turn.
 - **Map:** the big map shows the cave's floor plan and courses (or, while you're on the station, the station's instead, since the two overlap), and the teleporter cave beside the mine (purple once it's awake). Underground, the corner map zooms to the cave.
 - **Checkpoints:**

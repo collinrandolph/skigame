@@ -48,7 +48,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 .pad{pointer-events:auto;width:min(34vw,170px);height:110px;border-radius:10px;background:var(--panel);border:1px solid var(--line);font:700 15px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--ink);display:flex;align-items:center;justify-content:center}
 .pad.mid{width:min(20vw,96px)}
 .pad.on{background:var(--skier);color:#fff;border-color:var(--skier)}
-@media (max-width:560px){ .hud{min-width:0;max-width:calc(100vw - 172px);padding:10px 12px} .hud .opt,.hud .help{display:none} .hud h1{font-size:18px} }
+@media (max-width:560px){ .top-right{flex-direction:column;align-items:flex-end} .hud{min-width:0;max-width:calc(100vw - 172px);padding:10px 12px} .hud .opt,.hud .help{display:none} .hud h1{font-size:18px} }
 @media (pointer:coarse){ .pads{display:flex} details{bottom:calc(env(safe-area-inset-bottom,0px) + 140px)} .help{display:none} }
 #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);pointer-events:none}
 </style>
@@ -67,14 +67,14 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <div class="row opt"><span>Skied</span><b id="hDist">0 m</b></div>
   <div class="row opt"><span>Nearest beacon</span><b id="hBeacon">–</b></div>
   <div class="legs"><div class="leg" id="legL">Left</div><div class="leg" id="legR">Right</div></div>
-  <div class="help"><b>← →</b> kick (hold to ride the glide) · <b>Space</b> + kick: loaded stroke · <b>↑</b> tuck, <b>← →</b> lean · <b>↓</b> snow plow · <b>V</b> planet view · <b>R</b> reset</div>
+  <div class="help"><b>← →</b> kick (hold to ride the glide) · <b>Space</b> + kick: loaded stroke · <b>↑</b> tuck, <b>← →</b> lean · <b>↓</b> snow plow · <b>V</b> planet view · <b>P</b> 800 m / 300 m planet · <b>R</b> reset</div>
 </div>
 
-<div class="top-right"><button id="viewBtn" type="button">Planet view</button></div>
+<div class="top-right"><button id="sizeBtn" type="button" title="Switch between an 800 m and a 300 m planet (P)">800 m</button><button id="viewBtn" type="button">Planet view</button></div>
 
 <details class="panel" id="settings">
   <summary>Settings</summary>
-  <label for="tR">Planet radius<output id="oR"></output><input id="tR" type="range" min="150" max="1200" step="50" value="300"></label>
+  <label for="tR">Planet radius<output id="oR"></output><input id="tR" type="range" min="150" max="1200" step="50" value="800"></label>
   <p class="note" id="rNote"></p>
   <label class="check"><input id="tLift" type="checkbox"> Curvature lightens you (less friction at speed)</label>
   <label class="check"><input id="tDay" type="checkbox"> Fixed sun (day side and night side)</label>
@@ -121,7 +121,7 @@ const P = {
   push: 2.5, tap: 80, klen: 50, turn: 5, turn2: 5, turn3: 15, k180: 8, k180t: 6, kfloor: 15, kwin: 450,
   tfStop: 180, tfMove: 90, tfVlo: 1, tfVhi: 14, decay: 20, snap: 160, splay: 11, fric: 0.4, glide: 0.25, grip: 25,
   gwin: 600, gcut: 95, max: 38, lboost: 1.4, plow: 2.5, tuck: 50, lean: 50, camd: 15, sway: 0.8, cam: 0.6, pixel: 4,
-  R: 300, lift: false, daynight: false, mtn: 1, bld: 1, off: 1.5, trees: 1,
+  R: 800, lift: false, daynight: false, mtn: 1, bld: 1, off: 1.5, trees: 1,
 };
 const SETTINGS = [
   ['tR', 'oR', 'R', v => v + ' m'], ['tCamd', 'oCamd', 'camd', v => v.toFixed(1) + ' m'],
@@ -375,15 +375,44 @@ function faceTrail(){
   S.th = S.tgt = camTh = Math.atan2(t.dot(ex), -t.dot(ey)); S.thv = 0; camVel = 0;
 }
 
+// ---------- instanced scenery, in buckets by patch of the planet (8 x 8 per cube face, like the ground's chunks) ----------
+// each bucket is drawn only while its patch could be above the horizon (taller things are seen from further off), or,
+// in the planet view, while it's on the near side. this is what keeps 20,000 trees cheap
+const BK = 8;
+let buckets = [];
+function bucketKey(d){
+  const ax = Math.abs(d.x), ay = Math.abs(d.y), az = Math.abs(d.z); let f, u, v, m;
+  if (ax >= ay && ax >= az){ f = d.x > 0 ? 0 : 1; m = ax; u = d.y; v = d.z; }
+  else if (ay >= az){ f = d.y > 0 ? 2 : 3; m = ay; u = d.x; v = d.z; }
+  else { f = d.z > 0 ? 4 : 5; m = az; u = d.x; v = d.y; }
+  return (f*BK + Math.min(BK - 1, Math.floor((u/m + 1)/2*BK)))*BK + Math.min(BK - 1, Math.floor((v/m + 1)/2*BK));
+}
+// items need .d (direction); place(item, m4) sets its matrix; color(item) its colour (optional); height(item) how tall
+function addBucketed(group, geo, mat, items, place, height, color){
+  const map = new Map();
+  for (const it of items){ const k = bucketKey(it.d); let l = map.get(k); if (!l) map.set(k, l = []); l.push(it); }
+  const m4 = new THREE.Matrix4(), col = new THREE.Color();
+  for (const list of map.values()){
+    const mesh = new THREE.InstancedMesh(geo, mat, list.length), c = new THREE.Vector3(); let h = 0;
+    list.forEach((it, i) => { place(it, m4); mesh.setMatrixAt(i, m4); if (color) mesh.setColorAt(i, col.setHex(color(it))); c.add(it.d); h = Math.max(h, height(it)); });
+    c.normalize(); let ang = 0; for (const it of list) ang = Math.max(ang, c.angleTo(it.d));
+    mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    mesh.frustumCulled = false; scene.add(mesh);
+    buckets.push({ mesh, c, ang, h, group });
+  }
+}
+function clearBuckets(group){ buckets = buckets.filter(b => { if (b.group !== group) return true; scene.remove(b.mesh); return false; }); }
+
 // ---------- mountains (cones) and buildings (boxes): primitives scattered at random, all solid ----------
 // mountains are faceted cones 25-95 m tall with a snow cap. buildings come in villages of 3-9 round a centre, plus a
 // few loners; about one in seven is a tower. each one sits on the lowest ground under its footprint, so nothing floats
-let solids = [], structMeshes = [];
+let solids = [], structGeos = [];
+const MTN_MATS = [new THREE.MeshLambertMaterial({ color: 0x7f8d9b }), new THREE.MeshLambertMaterial({ color: 0xf4f8fb })];
+const BLD_MATS = [new THREE.MeshLambertMaterial({ color: 0xffffff }), new THREE.MeshLambertMaterial({ color: 0xf4f8fb })];
 const flatGeo = g => { const f = g.toNonIndexed(); f.computeVertexNormals(); g.dispose(); return f; };   // faceted look
 function buildStructures(rnd){
   const R = P.R, area = 4*Math.PI*R*R;
-  for (const m of structMeshes){ scene.remove(m); m.geometry.dispose(); m.material.dispose(); }
-  structMeshes = []; solids = [];
+  clearBuckets('structs'); for (const g of structGeos) g.dispose(); structGeos = []; solids = [];
   const up = new THREE.Vector3(0, 1, 0), X = new THREE.Vector3(1, 0, 0), d = new THREE.Vector3(), c = new THREE.Vector3(), p = new THREE.Vector3(), t1 = new THREE.Vector3(), t2 = new THREE.Vector3();
   const q = new THREE.Quaternion(), q2 = new THREE.Quaternion(), sc = new THREE.Vector3(), m4 = new THREE.Matrix4();
   const randDir = out => { const z = 2*rnd() - 1, a = rnd()*Math.PI*2, r = Math.sqrt(1 - z*z); return out.set(r*Math.cos(a), z, r*Math.sin(a)); };
@@ -413,10 +442,10 @@ function buildStructures(rnd){
   if (mtns.length){
     const rockG = flatGeo(new THREE.ConeGeometry(1, 1, 7, 1)); rockG.translate(0, 0.5, 0);
     const capG = flatGeo(new THREE.ConeGeometry(0.36, 0.36, 7, 1)); capG.translate(0, 1 - 0.18 + 0.004, 0); capG.scale(1.015, 1, 1.015);
-    const rock = new THREE.InstancedMesh(rockG, new THREE.MeshLambertMaterial({ color: 0x7f8d9b }), mtns.length);
-    const cap = new THREE.InstancedMesh(capG, new THREE.MeshLambertMaterial({ color: 0xf4f8fb }), mtns.length);
-    mtns.forEach((o, i) => { m4.compose(p.copy(o.d).multiplyScalar(o.b), orient(o.d, o.spin), sc.set(o.r, o.H, o.r)); rock.setMatrixAt(i, m4); cap.setMatrixAt(i, m4); });
-    for (const m of [rock, cap]){ m.frustumCulled = false; scene.add(m); structMeshes.push(m); }
+    structGeos.push(rockG, capG);
+    const place = (o, M) => M.compose(p.copy(o.d).multiplyScalar(o.b), orient(o.d, o.spin), sc.set(o.r, o.H, o.r));
+    addBucketed('structs', rockG, MTN_MATS[0], mtns, place, o => o.H);
+    addBucketed('structs', capG, MTN_MATS[1], mtns, place, o => o.H);
   }
 
   // trails, round the mountains
@@ -453,17 +482,10 @@ function buildStructures(rnd){
   if (blds.length){
     const boxG = new THREE.BoxGeometry(1, 1, 1); boxG.translate(0, 0.5, 0);
     const roofG = new THREE.BoxGeometry(1, 1, 1); roofG.translate(0, 0.5, 0);
-    const box = new THREE.InstancedMesh(boxG, new THREE.MeshLambertMaterial({ color: 0xffffff }), blds.length);
-    const roof = new THREE.InstancedMesh(roofG, new THREE.MeshLambertMaterial({ color: 0xf4f8fb }), blds.length);
-    const col = new THREE.Color(), lift = new THREE.Vector3();
-    blds.forEach((o, i) => {
-      p.copy(o.d).multiplyScalar(o.b);
-      m4.compose(p, o.q, sc.set(o.w, o.h, o.dp)); box.setMatrixAt(i, m4); box.setColorAt(i, col.setHex(o.col));
-      lift.copy(o.d).multiplyScalar(o.h);                          // snow on the roof: a slab a little wider than the walls
-      m4.compose(p.add(lift), o.q, sc.set(o.w + 0.5, 0.35, o.dp + 0.5)); roof.setMatrixAt(i, m4);
-    });
-    box.instanceColor.needsUpdate = true;
-    for (const m of [box, roof]){ m.frustumCulled = false; scene.add(m); structMeshes.push(m); }
+    structGeos.push(boxG, roofG);
+    addBucketed('structs', boxG, BLD_MATS[0], blds, (o, M) => M.compose(p.copy(o.d).multiplyScalar(o.b), o.q, sc.set(o.w, o.h, o.dp)), o => o.h, o => o.col);
+    // snow on the roof: a slab a little wider than the walls
+    addBucketed('structs', roofG, BLD_MATS[1], blds, (o, M) => M.compose(p.copy(o.d).multiplyScalar(o.b + o.h), o.q, sc.set(o.w + 0.5, 0.35, o.dp + 0.5)), o => o.h);
   }
   buildCounts = { mountains: mtns.length, buildings: blds.length };
 }
@@ -472,7 +494,7 @@ let buildCounts = {};
 // ---------- trees: the game's spruces (a trunk and two cone tiers), in woods and clearings on the ungroomed snow ----------
 // a patchy noise decides where the woods are; trees keep a clear corridor of 3-6 m either side of every trail (as in the
 // game), stay off steep ground, out of the mountains, buildings and beacons, and at least 2.2 m apart. trunks are solid
-let trees = [], treeMeshes = [], treeGrid = new Map();
+let trees = [], treeGrid = new Map();
 const treeMats = [new THREE.MeshLambertMaterial({ color: 0x4d3f35 }), new THREE.MeshLambertMaterial({ color: 0x2f4a43 }), new THREE.MeshLambertMaterial({ color: 0x3e5c53 })];
 const TREE_PARTS = [
   { geo: new THREE.CylinderGeometry(0.12, 0.18, 1.6, 6), y: 0.8 },
@@ -481,8 +503,7 @@ const TREE_PARTS = [
 ];
 function buildTrees(rnd){
   const R = P.R, V = THREE.Vector3, area = 4*Math.PI*R*R;
-  for (const m of treeMeshes) scene.remove(m);
-  treeMeshes = []; trees = []; treeGrid = new Map();
+  clearBuckets('trees'); trees = []; treeGrid = new Map();
   const d = new V(), t1 = new V(), t2 = new V(), q = new V(), up = new V(0, 1, 0);
   const beaconDirs = BEACON_DIRS.map(([x, y, z]) => new V(x, y, z).normalize());
   const tries = Math.min(500000, Math.round(area/45*P.trees)), maxT = 20000;
@@ -511,31 +532,27 @@ function buildTrees(rnd){
   }
   if (!trees.length) return;
   const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), q2 = new THREE.Quaternion(), sc = new V(), pos = new V();
-  TREE_PARTS.forEach((part, pi) => {
-    const mesh = new THREE.InstancedMesh(part.geo, treeMats[pi], trees.length);
-    trees.forEach((t, i) => {
-      qq.setFromUnitVectors(up, t.d); q2.setFromAxisAngle(up, t.spin); qq.multiply(q2);
-      pos.copy(t.d).multiplyScalar(groundR(t.d) - 0.1 + part.y*t.s);
-      mesh.setMatrixAt(i, m4.compose(pos, qq, sc.set(t.s, t.s, t.s)));
-    });
-    mesh.instanceMatrix.needsUpdate = true; mesh.frustumCulled = false; scene.add(mesh); treeMeshes.push(mesh);
-  });
+  for (const t of trees) t.g = groundR(t.d);
+  TREE_PARTS.forEach((part, pi) => addBucketed('trees', part.geo, treeMats[pi], trees, (t, M) => {
+    qq.setFromUnitVectors(up, t.d); q2.setFromAxisAngle(up, t.spin); qq.multiply(q2);
+    M.compose(pos.copy(t.d).multiplyScalar(t.g - 0.1 + part.y*t.s), qq, sc.set(t.s, t.s, t.s));
+  }, t => 6*t.s));
 }
 
 // ---------- scattered rocks (solid) and six beacons, so you can see the curve and judge speed ----------
-let rocks = [], rockMesh = null;
+let rocks = [];
+const ROCK_GEO = new THREE.DodecahedronGeometry(1, 0), ROCK_MAT = new THREE.MeshLambertMaterial({ color: 0x7d8a96 });
 const BEACON_DIRS = [[0,1,0,'red',0xd2462e], [0,-1,0,'violet',0x8a5cd6], [1,0,0,'yellow',0xf2c230], [-1,0,0,'green',0x2f9a5a], [0,0,1,'blue',0x2f6fd6], [0,0,-1,'orange',0xf08a2a]];
 const beacons = new THREE.Group(); scene.add(beacons);
 const beaconList = [];
 function buildScatter(){
   const R = P.R;
-  if (rockMesh){ scene.remove(rockMesh); rockMesh.geometry.dispose(); }
-  rocks = [];
+  clearBuckets('rocks'); rocks = [];
   { let s2 = 777; buildStructures(() => (s2 = (s2 * 16807) % 2147483647) / 2147483647); }
   { let s4 = 2468; buildTrees(() => (s4 = (s4 * 16807) % 2147483647) / 2147483647); }
   let s = 4242; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
   const count = Math.max(150, Math.min(3000, Math.round(4*Math.PI*R*R/700)));
-  rockMesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1, 0), new THREE.MeshLambertMaterial({ color: 0x7d8a96 }), count);
+  const rockItems = [];
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), q2 = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), d = new THREE.Vector3(), p = new THREE.Vector3(), sc = new THREE.Vector3();
   let k = 0;
   while (k < count){
@@ -549,11 +566,11 @@ function buildScatter(){
     p.copy(d).multiplyScalar(groundR(d) - 0.3*size);
     q.setFromUnitVectors(up, d); q2.setFromAxisAngle(up, rnd()*Math.PI*2); q.multiply(q2);
     sc.set(size, size*(0.55 + 0.3*rnd()), size*(0.8 + 0.4*rnd()));
-    m.compose(p, q, sc); rockMesh.setMatrixAt(k, m);
+    rockItems.push({ d: d.clone(), m: m.compose(p, q, sc).clone(), size });
     rocks.push({ x: d.x, y: d.y, z: d.z, r: size*0.85 });
     k++;
   }
-  rockMesh.instanceMatrix.needsUpdate = true; rockMesh.frustumCulled = false; scene.add(rockMesh);
+  addBucketed('rocks', ROCK_GEO, ROCK_MAT, rockItems, (o, M) => M.copy(o.m), o => o.size);
   // beacons: tall poles with a lamp, one over the middle of each cube face
   while (beacons.children.length) beacons.remove(beacons.children[0]);
   beaconList.length = 0;
@@ -986,8 +1003,14 @@ function frame(now){
   // only the chunks this side of the horizon (or all of them, in the planet view)
   const camDir = _t.copy(camera.position).normalize(), hc = camera.position.length() - R + 25;
   const horizon = Math.acos(Math.min(1, R/(R + Math.max(1, hc))));
-  for (const c of chunks) c.mesh.visible = k > 0.02 || c.c.dot(camDir) > Math.cos(Math.min(Math.PI, horizon + c.ang + 0.15));
-  rockMesh.visible = k < 0.98;
+  // (in the planet view, only the near side)
+  for (const c of chunks) c.mesh.visible = k > 0.02 ? c.c.dot(camDir) > -Math.sin(c.ang + 0.1) : c.c.dot(camDir) > Math.cos(Math.min(Math.PI, horizon + c.ang + 0.15));
+  for (const b of buckets){
+    // (rocks never, and trees only on small planets: from out here they'd be specks)
+    if (k > 0.02){ b.mesh.visible = b.group !== 'rocks' && !(b.group === 'trees' && R > 500) && b.c.dot(camDir) > -Math.sin(b.ang + 0.1); continue; }
+    const far = horizon + Math.acos(R/(R + b.h + 12)) + b.ang + 0.03;   // its top can show over the horizon from this far
+    b.mesh.visible = b.c.dot(camDir) > Math.cos(Math.min(Math.PI, far));
+  }
   youMark.visible = k > 0.02; youMark.position.copy(n).multiplyScalar(groundR(n) + 2); youMark.quaternion.setFromUnitVectors(_up, n); youMark.scale.setScalar(R*0.012*k + 0.01);
 
   renderer.render(scene, camera);
@@ -1030,6 +1053,7 @@ addEventListener('keydown', e => {
   if (k === 'arrowdown' || k === 's'){ e.preventDefault(); if (!e.repeat) setPlow(true, 'key'); return; }
   if (k === 'v' && !e.repeat) toggleView();
   if (k === 'r' && !e.repeat) resetSkier();
+  if (k === 'p' && !e.repeat) toggleSize();
 });
 addEventListener('keyup', e => {
   const k = e.key.toLowerCase(), leg = keyLeg(k);
@@ -1081,14 +1105,22 @@ function rNote(){
   const R = P.R, horizon = Math.sqrt(2*R*P.camd*0.62);
   $('rNote').textContent = 'Circumference ' + fmtM(2*Math.PI*R) + ', surface ' + (4*Math.PI*R*R/1e6).toFixed(2) + ' km², horizon about ' + Math.round(horizon) + ' m from the camera. The 1.0 map is about 0.8 km².';
 }
-function rebuild(){
-  $('loading').style.display = 'flex';
+function rebuild(reset = false){
+  $('loading').style.display = 'flex'; sizeLabel();
   requestAnimationFrame(() => setTimeout(() => {
     buildPlanet(); clearMarks(); camR = null;
+    if (reset) resetSkier();
     // stay where you were on the planet; just settle onto the new ground
     $('loading').style.display = 'none';
   }, 0));
 }
+// the size toggle: 800 m <-> 300 m (any other radius from the slider counts as "not 800", so the toggle goes to 800)
+function sizeLabel(){ $('sizeBtn').textContent = P.R + ' m'; }
+function toggleSize(){
+  const R = P.R === 800 ? 300 : 800;
+  $('tR').value = R; P.R = R; $('oR').textContent = R + ' m'; rNote(); save(); rebuild(true);
+}
+$('sizeBtn').addEventListener('click', e => { toggleSize(); e.currentTarget.blur(); });
 for (const [i, o, k, f] of SETTINGS){
   const el = $(i);
   if (saved[i] !== undefined) el.value = saved[i];
@@ -1109,11 +1141,11 @@ $('defaultsBtn').addEventListener('click', () => {
 });
 
 // ---------- go ----------
-placeAtStart(); resize(); rNote();
+placeAtStart(); resize(); rNote(); sizeLabel();
 setTimeout(() => {
   buildPlanet(); faceTrail();
   $('loading').style.display = 'none';
-  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length }, buildCounts), ex, ey, trails: () => trails, nearestTrailAt };   // test hook
+  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length }, buildCounts), drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 }, 0);
 </script>

@@ -522,7 +522,10 @@ const MINE_GATE = { k: 0, hint: -1e9, mesh: null };
 // the teleporter cave's centre line in its own frame: u out from the ring, v across. 14 m straight, a 90° bend (so the
 // mouth can't be seen from the straight, where the switch happens), 14 m to its mouth. it's a round bore through rock,
 // R across with its centre C up (so its floor is hw either side of the middle), H high at the top
-const VEST = { hw: 6.1, R: 7.5, C: 4.2, H: 11.7, lip: 1.6, pts: [] };   // (the same round doorway as the basement teleporter's)
+// its cross-section is the mine tunnel's, scaled up: a flat floor, walls curving up over wallW to edgeH at R out from
+// the middle, and a low-arched roof H up. hw: how far out from the middle you can ski (where the walls start to rise)
+const VEST = { hw: 5.0, R: 6.0, wallW: 2.3, edgeH: 5.5, H: 8.2, lip: 0.4, pts: [] };
+VEST.roofAt = lat => { const t2 = Math.max(0, Math.min(1, 1 + (Math.abs(lat) - VEST.R)/(2*VEST.wallW))); return VEST.H - (VEST.H - VEST.edgeH)*t2*t2; };
 let VIN = false;              // in the surface's teleporter cave (entered through its mouth): its own floor and walls
 { const P = VEST.pts; for (let u = 0; u <= 14; u += 1) P.push([u, 0]);
   for (let k = 1; k <= 12; k++){ const t = k/12*Math.PI/2; P.push([14 + 12*Math.sin(t), 12 - 12*Math.cos(t)]); }
@@ -564,17 +567,22 @@ function vestOut(x, y){
 function vestMound(x, y){
   const F = VFR.surf; if (Math.abs(x - F.x) > 70 || Math.abs(y - F.y) > 70) return -Infinity;
   const [along, , u, v] = vestOut(x, y), dc = vProj(u, v)[0];
-  return F.h + VEST.H + 4 - Math.max(0, dc - VEST.R - 4)*0.6 - Math.max(0, along)*2.5;
+  const rough = 1.6*Math.sin(x/5.3 + Math.sin(y/7.1)*2) + 1.1*Math.sin(y/4.1 - x/6.3) + 0.7*Math.sin((x + y)/2.7);   // (rough, like the mine's ridge)
+  return F.h + VEST.H + 5 + rough - Math.max(0, dc - VEST.R - 5)*0.55 - Math.max(0, along)*0.9;
 }
-function vestMouthCut(x, y){
-  const F = VFR.surf; if (Math.abs(x - F.x) > 70 || Math.abs(y - F.y) > 70) return Infinity;
-  const [along, lat] = vestOut(x, y); if (along < 0 || along > 18) return Infinity;
-  const w = VEST.hw + 1 + along*0.5; return F.h + Math.max(0, along - 2)*0.1 + Math.max(0, lat - w)*0.8;
+// the way in: a groomed ramp out from the mouth, level at first, easing into the ground round about over 18 m, and
+// cut through the mound with banks either side, like the mine's cut. returns [its floor, how much it takes over (0..1)]
+function vestApproach(x, y, nat){
+  const F = VFR.surf; if (Math.abs(x - F.x) > 70 || Math.abs(y - F.y) > 70) return null;
+  const [along, lat] = vestOut(x, y); if (along < -1 || along > 30) return null;
+  const w = VEST.R + 0.5 + Math.max(0, along)*0.35, k = smooth01(w + 7, w, lat)*smooth01(30, 22, along);
+  if (k <= 0) return null;
+  return [F.h + (nat - F.h)*smooth01(2, 20, along), k];
 }
 // right at the cave's mouth (the last couple of metres in, and its lip): level floor, whichever side you're coming from
 function vestMouthFloor(x, y){ const F = VFR.surf; if (Math.abs(x - F.x) > 60 || Math.abs(y - F.y) > 60) return false; const [along, lat] = vestOut(x, y); return along > -2.5 && along < VEST.lip + 0.4 && lat < VEST.hw; }
 // is (x, y) within r of the teleporter cave or its cut? keeps the scatter off it
-function vestNear(x, y, r){ const F = VFR.surf; if (Math.abs(x - F.x) > 80 || Math.abs(y - F.y) > 80) return false; const [along, lat, u, v] = vestOut(x, y); return vProj(u, v)[0] < VEST.R + 6 + r || (along > -r && along < 18 + r && lat < VEST.hw + 10 + r); }
+function vestNear(x, y, r){ const F = VFR.surf; if (Math.abs(x - F.x) > 80 || Math.abs(y - F.y) > 80) return false; const [along, lat, u, v] = vestOut(x, y); return vProj(u, v)[0] < VEST.R + 6 + r || (along > -r && along < 30 + r && lat < VEST.R + 18 + r); }
 function mineCut(x, y){
   const sm = mineS(x), lat = Math.abs(y - MINE.y);
   if (sm > 3 || sm < -34 || lat > 30) return Infinity;
@@ -721,8 +729,8 @@ function heightNat(x, y){
   if (q < 1.35) h += (LAKE.h - h) * (1 - smooth01(0.98, 1.35, q));
   // the mine ridge, and the cut into it
   h += mineRidge(x, y);
-  h = Math.max(h, vestMound(x, y));
-  h = Math.min(h, mineCut(x, y), vestMouthCut(x, y));
+  { const nat = h; h = Math.max(h, vestMound(x, y)); const ap = vestApproach(x, y, nat); if (ap) h += (ap[0] - h)*ap[1]; }
+  h = Math.min(h, mineCut(x, y));
   // the portal pads: level at the height the ground had right under the portal
   if (!padBusy) for (const P of PORTAL_PADS){
     const d = Math.hypot(x - P.x, y - P.y); if (d > 28) continue;
@@ -900,6 +908,9 @@ const TRAILS = [
   // zone 2's way west: through the pass in the spur to the foot of the switchbacks, without crossing the river
   // zone 3: west from the Watcher Climb to the mine in the ridge
   { name:'Mine Road',        diff:'green',  zone:0, pts:[[40,272],[22,283],[4,293],[-10,296],[MINE.x,MINE.y]] },
+  // off the Mine Road to the teleporter cave beside the mine: in along the line of its mouth and through to its ring
+  { name:'Teleporter Cave',  diff:'green',  zone:0, pts:(() => { const F = VFR.surf, P = VEST.pts, e = P[P.length - 1], ex = Math.cos(VEST.exitA), ey = Math.sin(VEST.exitA), W = (u, v) => vWorld(F, u, v);
+      const out = [[22,283], [14,262], W(e[0] + ex*24, e[1] + ey*24), W(e[0] + ex*10, e[1] + ey*10)]; for (let i = P.length - 1; i >= 2; i -= 4) out.push(W(...P[i])); out.push(W(2, 0)); return out; })() },
   { name:'Spur Pass',        diff:'green',  zone:0, pts:[[246,95],[215,108],[180,116],[140,120],[105,122],[75,122],[58,125],[50,131],[40,135.5],[30,137],[23,138.5],[BRIDGE2.x,BRIDGE2.yN - 1]] },
   // zone 3: around and across the frozen lake, among the ruins
   { name:'Bridge Road',      diff:'green',  zone:3, pts:[[BRIDGE2.x,BRIDGE2.yS + 1],[45,195],[100,212],[150,218],[200,214],[250,205],[285,190],[BRIDGE.x,BRIDGE.yS + 1]] },
@@ -917,7 +928,7 @@ const TRAILS = [
 ];
 for (const t of TRAILS) if (t.zone === undefined) t.zone = 1;   // trails carry their zone's orbs; zone 0 = connectors
 const JUNCTIONS = [
-  { name:'Stadium', x:0, y:0 }, { name:'North Jct', x:0, y:-40 }, { name:'Summit Jct', x:5, y:-135 }, { name:'Valley Jct', x:-78, y:-30 }, { name:'East Jct', x:50, y:-62 },
+  { name:'Mine Jct', x:22, y:283 }, { name:'Stadium', x:0, y:0 }, { name:'North Jct', x:0, y:-40 }, { name:'Summit Jct', x:5, y:-135 }, { name:'Valley Jct', x:-78, y:-30 }, { name:'East Jct', x:50, y:-62 },
   { name:'Pass Jct', x:248, y:-75 }, { name:'Crown Jct', x:380, y:-150 }, { name:'Rim Jct', x:400, y:-10 }, { name:'Bridge', x:BRIDGE.x, y:BRIDGE.yN - 1 },
   { name:'Saddle', x:SADDLE.x, y:SADDLE.y }, { name:'Lower Bridge', x:BRIDGE2.x, y:BRIDGE2.yS + 1 }, { name:'Watcher Jct', x:100, y:212 }, { name:'Ribs Jct', x:250, y:205 },
   { name:'North Shore', x:175, y:236 }, { name:'South Shore', x:175, y:364 }, { name:'West Shore', x:81, y:300 }, { name:'East Shore', x:264.5, y:325.2 }, { name:'Far Jct', x:305, y:350 }, { name:'Crystal Gate', x:G4.x, y:G4.y }, { name:'Frost Jct', x:G4.x, y:G4.y + 30 }, { name:'Herd Jct', x:226, y:700 },
@@ -1071,7 +1082,8 @@ function doorShape(path = new THREE.Shape(), r = DOOR_R){ const a0 = -Math.asin(
 // the space station (from the concept): a domed hub, a walkway ring round it, a raised deck round the hub's outside
 // reached by a spiral ramp, eight dock arms (a walkway each side of a docked ship) and two portal arms out to the
 // portals. all metal decks, all railed. pieces at deck level are straight walkways: [ax, ay, bx, by, half-width]
-const STATION = { x: PORTAL_X + 190, y: TRANSPORT[0].y + 55, h: RING_LEVEL, R: 95, hw: 4.5, hubR: 40, deckR: 46, deckHW: 3.5, deckUp: 8, armIn: 96, armOut: 185, walkHW: 2.5 };
+// (2.0: about 70% of its first size, the teleporters that much closer together; walkway widths are unchanged)
+const STATION = { x: PORTAL_X + 133, y: TRANSPORT[0].y + 38, h: RING_LEVEL, R: 66, hw: 4.5, hubR: 28, deckR: 32, deckHW: 3.5, deckUp: 8, armIn: 67, armOut: 130, walkHW: 2.5 };
 STATION.walks = []; STATION.docks = []; STATION.arms = []; STATION.loops = [];
 for (let k = 0; k < 8; k++){
   const a = k*Math.PI/4, ux = Math.cos(a), uy = Math.sin(a), big = k === 0, off = big ? 13 : 10, out = big ? STATION.armOut + 15 : STATION.armOut;
@@ -1088,14 +1100,14 @@ for (const T of TRANSPORT){
   const arm = [PORTAL_X, T.y, x1, T.y, PORTAL_HW, 'Teleporter Arm']; STATION.arms.push(arm); STATION.walks.push(arm);
   STATION.walks.push([PORTAL_X, T.y, PORTAL_X + 14, T.y, 10, 'Teleporter Landing']);   // (a broad landing at the ring, its control post on it)
 }
-// ---- the far teleporter: on the opposite side of the station from the basement's (point for point: 55 m the other side
+// ---- the far teleporter: on the opposite side of the station from the basement's (point for point: 38 m the other side
 // of the centre line, out east), its arm running out to a ring like the basement's. through it is a short vestibule, a
 // steel-lined tunnel that bends once, and that same vestibule stands in the hillside beside the mine on the surface.
 // the two are identical inside (self-lit, so they look the same in either world), and the switch from one to the
 // other happens partway along it, past the bend's blind side, with you and the camera both inside: you ski out of the
 // station's copy into the surface's. the surface's ring is dark until you've come through it once from the station;
 // after that it carries you back the other way too
-const FAR_TP = { x: STATION.x + 190, y: STATION.y + 55 };
+const FAR_TP = { x: STATION.x + 133, y: STATION.y + 38 };
 { const x1 = STATION.x + Math.sqrt((STATION.R - STATION.hw + 0.5)**2 - (FAR_TP.y - STATION.y)**2);
   const arm = [x1, FAR_TP.y, FAR_TP.x, FAR_TP.y, PORTAL_HW, 'Far Teleporter Arm']; STATION.arms.push(arm); STATION.walks.push(arm);
   STATION.walks.push([FAR_TP.x - 14, FAR_TP.y, FAR_TP.x, FAR_TP.y, 10, 'Far Teleporter Landing']); }
@@ -1423,10 +1435,11 @@ function vestStep(){
   if (u < -3 || u > 45 || Math.abs(v) > 40){ vest.prev = null; vest.lock = false; return; }
   const [dc, sv] = vProj(u, v), prev = vest.prev; vest.prev = sv;
   if (sv < 3 || sv > 14) vest.lock = false;
+  if (vest.lock && prev !== null && (sv - prev)*vest.lockDir < -0.005) vest.lock = false;   // (turned round: free to switch back at once)
   if (vest.lock || prev === null || dc > VEST.hw || sv < 5 || sv > 12) return;
   const cp = camera.position, [cu, cv] = vLocal(F, cp.x, cp.z), csv = vProj(cu, cv)[1];
-  if (onStn && sv > prev && csv > 1){ vest.lock = true; vestSwap(VFR.stn, VFR.surf); }
-  else if (!onStn && TPC_OPEN && sv < prev && csv > 1){ vest.lock = true; vestSwap(VFR.surf, VFR.stn); }
+  if (onStn && sv > prev && csv > 1){ vest.lock = true; vest.lockDir = 1; vest.lockAt = sv; vestSwap(VFR.stn, VFR.surf); }
+  else if (!onStn && TPC_OPEN && sv < prev && csv > 1){ vest.lock = true; vest.lockDir = -1; vest.lockAt = sv; vestSwap(VFR.surf, VFR.stn); }
 }
 function caveStep(px, py, dt){
   if (!ONSTATION){
@@ -1621,23 +1634,26 @@ function cityRampSD(x, y, floor){
 }
 // ---- the courses
 const STATION_TRAILS = [], CAVE_TRAILS = [];
+const CAVE_J = { J2: [-282, 122], J3: [-380, 516], JB: [-470, 92] };   // (the network's junctions)
 CAVE_TRAILS.push({ name: 'Mine Shaft', diff: 'blue', pts: SHAFT_PTS });
 {
   const H1 = HILLS[0], H2 = HILLS[1], H3 = HILLS[2], along = (hl, a, lat) => [hl.x + lat, hl.y0 + hl.dir*a];
-  // Hill 1: open down its east half, the slalom down its west; both run out across the lower level to the Crown Ramp
-  const ramp = CAVE_BRIDGES[0], rx = ramp.X[0], ry = ramp.Y[0];
-  const desc = [[-246, 505], along(H1, -20, 14)]; for (let a = 0; a <= H1.L; a += 30) desc.push(along(H1, a, 16)); desc.push(along(H1, H1.L + 20, 8), [rx, ry + 12], [rx, ry]);
+  // one connected network: every course starts and ends at a shared junction. J1 Plateau 1 (where the shaft comes
+  // in), J2 Plateau 2's lower level, F the Crown Ramp's foot, J3 Plateau 3, JB the basement
+  const ramp = CAVE_BRIDGES[0], F = [ramp.X[0], ramp.Y[0]], J1 = SHAFT_PTS[SHAFT_PTS.length - 1], J2 = CAVE_J.J2, J3 = CAVE_J.J3, JB = CAVE_J.JB;
+  const desc = [J1, along(H1, -20, 14)]; for (let a = 0; a <= H1.L; a += 30) desc.push(along(H1, a, 16)); desc.push(along(H1, H1.L + 18, 8), [F[0], F[1] + 14], F);
   CAVE_TRAILS.push({ name: 'Hill 1 Descent', diff: 'blue', pts: desc });
-  const sl = [[-262, 502], along(H1, -18, SLALOM_C)]; for (let a = 0; a <= H1.L; a += 4) sl.push(along(H1, a, SLALOM(a)));
-  sl.push(along(H1, H1.L + 18, SLALOM_C));
+  const sl = [J1, along(H1, -18, SLALOM_C)]; for (let a = 0; a <= H1.L; a += 4) sl.push(along(H1, a, SLALOM(a)));
+  sl.push(along(H1, H1.L + 14, SLALOM_C), J2);
   CAVE_TRAILS.push({ name: 'Hill 1 Slalom', diff: 'black', pts: sl });
-  // across the lower level to the top of Hill 2: the berm path down its east half, the rollers down its west
-  const bp = [along(H1, H1.L + 18, SLALOM_C), [-300, 120], along(H2, -18, BERM_C)]; for (let a = 0; a <= H2.L; a += 5) bp.push(along(H2, a, bermPath(H2, a))); bp.push(along(H2, H2.L + 22, BERM_C), [-370, 514]);
+  CAVE_TRAILS.push({ name: 'Plateau 2 Way', diff: 'green', pts: [J2, [(J2[0] + F[0])/2, F[1] + 18], F] });
+  // from the lower level down Hill 2: the berm path on its east half, the rollers on its west, both to Plateau 3
+  const bp = [J2, along(H2, -16, BERM_C)]; for (let a = 0; a <= H2.L; a += 5) bp.push(along(H2, a, bermPath(H2, a))); bp.push(along(H2, H2.L + 18, BERM_C), J3);
   CAVE_TRAILS.push({ name: 'Hill 2 Berm Path', diff: 'blue', pts: bp });
-  const rl = [[-320, 116], along(H2, -16, -22)]; for (let a = 0; a <= H2.L; a += 20) rl.push(along(H2, a, -24)); rl.push(along(H2, H2.L + 20, -16), [-370, 514]);
+  const rl = [J2, along(H2, -16, -20)]; for (let a = 0; a <= H2.L; a += 20) rl.push(along(H2, a, -24)); rl.push(along(H2, H2.L + 18, -16), J3);
   CAVE_TRAILS.push({ name: 'Hill 2 Rollers', diff: 'black', pts: rl });
   // across Plateau 3 and down the half-pipe to the basement and its teleporter
-  const hp = [[-370, 514], [-420, 516], along(H3, -20, 0)]; for (let a = 0; a <= H3.L; a += 30) hp.push(along(H3, a, 0)); hp.push(along(H3, H3.L + 24, 0), [-470, 92], [PORTAL_X - 4, TRANSPORT[0].y]);
+  const hp = [J3, [-420, 518], along(H3, -20, 0)]; for (let a = 0; a <= H3.L; a += 30) hp.push(along(H3, a, 0)); hp.push(along(H3, H3.L + 24, 0), JB, [PORTAL_X - 4, TRANSPORT[0].y]);
   CAVE_TRAILS.push({ name: 'Hill 3 Half-pipe', diff: 'black', pts: hp });
   // up on the terrace: from the ramp's top along the broad way to the crown door, and on in to the spiral's foot
   const rt = ramp.n - 1;
@@ -1693,7 +1709,7 @@ const layerTrails = () => UNDER ? (ONSTATION ? STATION_TRAILS : CAVE_DECK ? [CAV
     VILLAGE.push({ x, y, a: ar + Math.PI, w, d, h: 4 + rnd()*5, base: LV.P2, kind: 'house' });
   }
 }
-const CAVE_JUNCTION_PTS = [[CAVE_C.x, CAVE_C.y], [-300, 120], [-370, 514], ...TRANSPORT.map(T => [PORTAL_X, T.y])];
+const CAVE_JUNCTION_PTS = [SHAFT_PTS[SHAFT_PTS.length - 1], CAVE_J.J2, [CAVE_BRIDGES[0].X[0], CAVE_BRIDGES[0].Y[0]], CAVE_J.J3, CAVE_J.JB, ...TRANSPORT.map(T => [PORTAL_X, T.y])];
 const STATION_JUNCTION_PTS = [...STATION.walks.map(w => [w[0], w[1]]), ...STATION.arms.map(w => [w[2], w[3]]), [STATION.ramp.X[0], STATION.ramp.Y[0]], [STATION.ramp.X[STATION.ramp.n-1], STATION.ramp.Y[STATION.ramp.n-1]]];
 // ================= end of the cavern's ground =================
 // distance from a point to the nearest groomed centre line
@@ -2285,7 +2301,7 @@ function checkInteract(){
   if (promptCtx || SKY_ON) return;
   for (const K of KIOSKS) if (K.state === 'active' && kioskGot(K) === orbsFor(K) && Math.hypot(S.x - K.x, S.y - K.y) < 7){ powerKiosk(K); K.dismissed = true; }
   if (trial.K && kioskGot(trial.K) === ORBS_PER_KIOSK && Math.hypot(S.x - trial.K.x, S.y - trial.K.y) < 7){ trial.K.dismissed = true; endTrial(true); }
-  const spots = [...KIOSKS.map(K => [K, 7, () => kioskPrompt(K)]), [altar, 8, altarPrompt], ...(ceremony === 1 && OBS_ALTAR.rise > 0.9 ? [[OBS_ALTAR, 8, obsAltarPrompt]] : []), ...(ONSTATION && stationFloor(S.x, S.y) < STATION.h + 2 ? [[SHIP_SPOT, 6, shipPrompt]] : [])];
+  const spots = [...KIOSKS.map(K => [K, 7, () => kioskPrompt(K)]), ...(altar.rise > 0.9 ? [[altar, 8, altarPrompt]] : []), ...(ceremony === 1 && OBS_ALTAR.rise > 0.9 ? [[OBS_ALTAR, 8, obsAltarPrompt]] : []), ...(ONSTATION && stationFloor(S.x, S.y) < STATION.h + 2 ? [[SHIP_SPOT, 6, shipPrompt]] : [])];
   for (const [it, r, fn] of spots){
     const d = Math.hypot(S.x - it.x, S.y - it.y);
     if (d > r + 6) it.dismissed = false;
@@ -3306,11 +3322,11 @@ function groundMat(tex){
     const xs = W.map(q => q[0]), ys = W.map(q => q[1]), M = VEST.R + 1;
     mineUniforms.uVestS = { value: W.slice(0, -1).map((q, k) => new THREE.Vector4(q[0], q[1], W[k+1][0], W[k+1][1])) };
     mineUniforms.uVestB = { value: new THREE.Vector4(Math.min(...xs) - M, Math.min(...ys) - M, Math.max(...xs) + M, Math.max(...ys) + M) };
-    mineUniforms.uVestP = { value: new THREE.Vector4(F.h, VEST.R + 0.15, VEST.C, VEST.R + 0.15) }; }
+    mineUniforms.uVestP = { value: new THREE.Vector4(F.h, VEST.R + 0.15, VEST.edgeH, VEST.H) }; mineUniforms.uVestW = { value: VEST.wallW }; }
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, mineUniforms);
     sh.vertexShader = 'varying vec3 vMineW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vMineW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = 'varying vec3 vMineW;\nuniform vec4 uMine; uniform vec4 uMineX; uniform vec4 uMineH; uniform vec4 uVestS[6]; uniform vec4 uVestB; uniform vec4 uVestP;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+    sh.fragmentShader = 'varying vec3 vMineW;\nuniform vec4 uMine; uniform vec4 uMineX; uniform vec4 uMineH; uniform vec4 uVestS[6]; uniform vec4 uVestB; uniform vec4 uVestP; uniform float uVestW;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
   {
     float s = uMine.x - vMineW.x, lat = abs(vMineW.z - uMine.y);
     if (s > 0.0 && s < 16.0 && lat < uMineX.x + 0.05){
@@ -3321,10 +3337,11 @@ function groundMat(tex){
       if (vMineW.y < roof + 0.05) discard;
     }
   }
-  if (vMineW.x > uVestB.x && vMineW.x < uVestB.z && vMineW.z > uVestB.y && vMineW.z < uVestB.w && vMineW.y < uVestP.x + uVestP.z + uVestP.w + 0.4){
+  if (vMineW.x > uVestB.x && vMineW.x < uVestB.z && vMineW.z > uVestB.y && vMineW.z < uVestB.w && vMineW.y < uVestP.x + uVestP.w + 0.4){
     float dm = 1e9; vec2 q = vMineW.xz;
     for (int i = 0; i < 6; i++){ vec2 a = uVestS[i].xy, e = uVestS[i].zw - a; float t = dot(q - a, e)/dot(e, e); if (t >= 0.0 && t <= 1.0) dm = min(dm, length(q - a - e*t)); if (i > 0) dm = min(dm, length(q - a)); }
-    if (dm < uVestP.y && vMineW.y < uVestP.x + uVestP.z + sqrt(max(0.0, uVestP.w*uVestP.w - dm*dm)) + 0.25) discard;
+    float t2 = clamp(1.0 + (dm - uVestP.y + 0.15)/(2.0*uVestW), 0.0, 1.0);
+    if (dm < uVestP.y && vMineW.y < uVestP.x + uVestP.w - (uVestP.w - uVestP.z)*t2*t2 + 0.25) discard;
   }`);
   };
   return m;
@@ -4192,7 +4209,7 @@ function resetOrbs(){
   for (const K of KIOSKS){ K.state = 'dormant'; K.dismissed = false; for (const o of K.orbs){ o.got = false; o.fade = 0; o.g.visible = false; o.g.scale.set(1, 1, 1); o.halo.material.opacity = 1; o.core.visible = true; } updateKioskLook(K); }
   if (trial.K){ const K = trial.K; trial.K = null; updateKioskLook(K); }
   releasePet(); returnZ5Calves(); sleepGiant(); checkpoint = null; ceremony = 0; saveEnd(); crownReset(); CROWN_GATE.open = false; pet.lastDismissed = -1; SKY_ON = null; bhShown = false; bhLatch = false;
-  setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; altar.state = 0; altar.dismissed = false; setCrystalsCollected(0); setCrystalsActive(false); updateAltarLook(); gate4Open = false; gate4.open = 0; bridgeWanted = bridge2Wanted = false; bridgeDown = bridge2Down = 0; animateGate(0);
+  setGateOpen(false); gate.open = 0; gate2Open = false; gate2.open = 0; altar.state = 0; altar.dismissed = false; setCaveAltar(false, true); setCrystalsCollected(0); setCrystalsActive(false); updateAltarLook(); gate4Open = false; gate4.open = 0; bridgeWanted = bridge2Wanted = false; bridgeDown = bridge2Down = 0; animateGate(0);
   saveProgress();
 }
 
@@ -5142,21 +5159,47 @@ const altar = (() => {
   const heart = new THREE.MeshLambertMaterial({ color: 0x6c5a8e, emissive: 0x000000, flatShading: true });
   const gem = pt(g, new THREE.OctahedronGeometry(0.55, 0), heart, 0, 3.5, 0); gem.scale.set(1, 1.8, 1);
   const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, 14, 14, 1, true), CRYSTAL_MAT.beam); beam.position.y = 10; beam.visible = false; g.add(beam);
-  SOLIDS.push({ x, y, r: 1.9 });
-  return { x, y, g, gem, heart, beam, state: 0, dismissed: false };
+  const solid = { x, y, r: 1.9 }; SOLIDS.push(solid);
+  return { x, y, h, g, gem, heart, beam, solid, state: 0, dismissed: false, rise: -1 };
 })();
+// ---- the cave's altar: a circle like the Broken Circle on the west half of Plateau 2's lower level, at its heart an
+// altar the twin of the surface's. ski up to it and it sinks into the floor, and in the Broken Circle the surface's
+// altar rises out of the snow, the 20 crystals with it: the crystal hunt starts down here. once the crystal gate is
+// open, the surface's altar sinks away again
+const CAVE_ALTAR = { x: -358, y: 90, done: false, k: 1, g: null, solid: null };
+try { CAVE_ALTAR.done = localStorage.getItem('skate-cave-altar') === '1'; } catch (e) {}
+const saveCaveAltar = () => { try { localStorage.setItem('skate-cave-altar', CAVE_ALTAR.done ? '1' : '0'); } catch (e) {} };
+function setCaveAltar(done, instant){
+  CAVE_ALTAR.done = done; saveCaveAltar();
+  if (instant){ CAVE_ALTAR.k = done ? 0 : 1; altar.rise = -1; }
+}
+function triggerCaveAltar(){
+  setCaveAltar(true); altar.state = 1; updateAltarLook(); setCrystalsActive(true); music.chime(0.5, true); saveProgress();
+  toast('The altar sinks into the floor. Far above, in the Broken Circle, an altar rises out of the snow, and 20 purple crystals appear beside landmarks in zones 1 to 3.');
+}
 function updateAltarLook(){
   altar.heart.emissive.setHex(altar.state === 0 ? 0x000000 : altar.state === 1 ? 0x4a3a7a : 0x6a55a8);
   altar.heart.color.setHex(altar.state === 0 ? 0x6c5a8e : 0xa993d6);
   altar.beam.visible = altar.state === 2;
 }
+let altarT = 0;
 function updateAltar(){
-  const now = performance.now()/1000;
+  const now = performance.now()/1000, dt = Math.min(0.1, altarT ? now - altarT : 0); altarT = now;
+  // (saves from before the cave altar: an altar already woken means you've been down there)
+  if (altar.state > 0 && !CAVE_ALTAR.done) setCaveAltar(true);
+  // the surface's altar: up while the crystal hunt is on, under the snow before and after
+  const want = CAVE_ALTAR.done && altar.state < 2 ? 1 : 0;
+  altar.rise = altar.rise < 0 ? want : altar.rise + Math.sign(want - altar.rise)*Math.min(Math.abs(want - altar.rise), dt*0.25);
+  altar.g.position.y = altar.h - 0.3 - (1 - altar.rise)*5.4; altar.g.visible = altar.rise > 0.01; altar.solid.r = altar.rise > 0.5 ? 1.9 : 0;
+  // the cave's: up until you come to it, then sinking away
+  { const C = CAVE_ALTAR, w2 = C.done ? 0 : 1; C.k += Math.sign(w2 - C.k)*Math.min(Math.abs(w2 - C.k), dt*0.3);
+    if (C.g){ C.g.position.y = LV.P2 - 0.3 - (1 - C.k)*5.4; C.g.visible = C.k > 0.01; } if (C.solid) C.solid.r = C.k > 0.5 ? 1.9 : 0;
+    if (!C.done && UNDER && !ONSTATION && Math.hypot(S.x - C.x, S.y - C.y) < 9) triggerCaveAltar(); }
   altar.gem.rotation.y = now*(altar.state ? 0.8 : 0.1);
   altar.gem.position.y = 3.5 + (altar.state ? 0.15*Math.sin(now*1.6) : 0);
 }
 function wakeAltar(){ checkpoint = { a: 1 }; altar.state = 1; updateAltarLook(); setCrystalsActive(true); music.chime(0.5, true); saveProgress(); toast('The altar wakes. 20 purple crystals have appeared beside landmarks in zones 1 to 3.'); }
-function finishAltar(){ checkpoint = { a: 1 }; altar.state = 2; updateAltarLook(); gate4Open = true; for (const K of KIOSKS) updateKioskLook(K); music.chime(1, true); saveProgress(); toast('The crystal gate in the southern divide is opening.'); }
+function finishAltar(){ checkpoint = { a: 1 }; altar.state = 2; updateAltarLook(); gate4Open = true; for (const K of KIOSKS) updateKioskLook(K); music.chime(1, true); saveProgress(); toast('The crystal gate in the southern divide is opening, and the altar sinks back into the snow.'); }
 const crystals = (() => {
   let seed = 8080; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const out = [];
@@ -7226,9 +7269,10 @@ function draw(){
   // and the black hole at the bottom
   funnelCam += ((insidePlanet ? 1 : 0) - funnelCam) * Math.min(1, fdt*1.2);
   const fk = funnelCam*funnelCam*(3 - 2*funnelCam);
-  let cxw = focus.x - dx*back*(1 - 0.35*fk), cyw = focus.y - dy*back*(1 - 0.35*fk), gcam = null;
-  { const q = vestCamPull(cxw, cyw); if (q){ [cxw, cyw, gcam] = q; } }   // (in or by the teleporter cave: pulled in, not lifted over its mound)
+  let cxw = focus.x - dx*back*(1 - 0.35*fk), cyw = focus.y - dy*back*(1 - 0.35*fk), gcam = null, vcap = Infinity;
+  { const q = vestCamPull(cxw, cyw); if (q){ [cxw, cyw, gcam, vcap] = q; } }   // (in or by the teleporter cave: pulled in, not lifted over its mound)
   camera.position.set(cxw, Math.max(camH + up - pk*up*0.62*(1 - fk) + fk*10, (UNDER ? camH : gcam !== null ? gcam : ground(cxw, cyw)) + 1.5), cyw);
+  if (vcap < camera.position.y) camera.position.y = vcap;
   caveCamClamp(); portalCamClamp();
   vestCamClamp();
   if (onSpiral) camera.position.y = Math.min(camera.position.y, camH + 2.2);
@@ -7629,7 +7673,8 @@ function renderMapLayers(g, MAP, mx, my, mw, mh, sc){
     for (const n of SKY.nodes) if (n.ground && !n.hidden){ g.beginPath(); g.arc(mX(n.x), mY(n.y), 4, 0, Math.PI*2); g.stroke(); }
     g.restore();
   }
-  if (zoneDone(3) && altar.state < 2){ const X = mX(altar.x), Y = mY(altar.y); g.fillStyle = '#8e7cb0'; g.beginPath(); g.moveTo(X, Y - 6); g.lineTo(X + 5, Y); g.lineTo(X, Y + 6); g.lineTo(X - 5, Y); g.fill(); }
+  if (zoneDone(3) && altar.state < 2){ const A = CAVE_ALTAR.done ? altar : CAVE_ALTAR, X = mX(A.x), Y = mY(A.y);   // (the cave's altar first, then the surface's)
+    g.fillStyle = '#8e7cb0'; g.beginPath(); g.moveTo(X, Y - 6); g.lineTo(X + 5, Y); g.lineTo(X, Y + 6); g.lineTo(X - 5, Y); g.fill(); }
   g.lineWidth = 3; g.lineCap = 'butt';
   g.strokeStyle = gateOpen ? C.orb : C.ink;
   g.beginPath(); g.moveTo(mX(GATE.x), mY(GATE.y - PASS_HW)); g.lineTo(mX(GATE.x), mY(GATE.y + PASS_HW)); g.stroke();
@@ -7764,7 +7809,7 @@ function hud(){
     let n = 0, tot = 0, label = '';
     if (K){ n = kioskGot(K); tot = orbsFor(K); label = trial.K === K ? fmtTime(trial.t) : n === tot ? 'Back to the terminal' : 'Orbs'; }
     else if (cry){ n = crystalsGot(); tot = CRYSTAL_TOTAL; label = n === tot ? 'Back to the altar' : 'Crystals'; }
-    else if (z !== 4 && z !== 5){ n = kiosksPowered(z); tot = KIOSK_COUNT[z]; label = n === tot ? (z === 1 ? (gateOpen && gate2Open ? 'Gates open' : 'Ski to the gates') : z === 2 ? (bridgeWanted && bridge2Wanted ? 'Bridges down' : 'Ski to the bridges') : altar.state === 2 ? 'Crystal gate open' : 'All powered') : 'Terminals'; }
+    else if (z !== 4 && z !== 5){ n = kiosksPowered(z); tot = KIOSK_COUNT[z]; label = n === tot ? (z === 1 ? (gateOpen && gate2Open ? 'Gates open' : 'Ski to the gates') : z === 2 ? (bridgeWanted && bridge2Wanted ? 'Bridges down' : 'Ski to the bridges') : altar.state === 2 ? 'Crystal gate open' : !CAVE_ALTAR.done ? 'Into the mine' : 'All powered') : 'Terminals'; }
     const crownHud = UNDER && !ONSTATION && inCrownRoom(S.x, S.y);
     if (crownHud){ n = crownGot.length; tot = CROWN.n; }
     const txt = tot && (!UNDER || crownHud) ? n + ' / ' + tot : UNDER ? (ONSTATION ? 'Station' : 'Cave') : 'Zone ' + z;
@@ -8023,33 +8068,39 @@ const bothWorlds = o => { o.traverse(q => { q.layers.enable(0); q.layers.enable(
 }
 // the vestibule's two copies: steel-lined, lit by its own strips (no fog, no outside light), so they look the same
 const vestMeshes = (() => {
-  // a round bore through rock like the mine's tunnel (rough icy rock, a snow floor, steel arches with lamps), the same
-  // in both copies down to its last bump, and self-lit so it looks the same in either world. at its inner end, a single
-  // ring round the bore with the glowing membrane in it
-  const R = VEST.R, C = VEST.C, P = VEST.pts.concat([[VEST.pts[VEST.pts.length - 1][0] + Math.cos(VEST.exitA)*VEST.lip, VEST.pts[VEST.pts.length - 1][1] + Math.sin(VEST.exitA)*VEST.lip]]), n = P.length, hw = Math.sqrt(R*R - C*C), ph0 = -Math.asin(C/R), K = 22;   // (with a lip of rock past the mouth)
+  // a tunnel like the mine's (its cross-section, rough icy walls like the mine's cut, a groomed snow floor, steel arches
+  // with lamps), the same in both copies down to its last bump, and self-lit so it looks the same in either world. at
+  // its inner end a rock face, and in front of it the same ring as the basement teleporter's
+  const R = VEST.R, C = DOOR_C, P = VEST.pts.concat([[VEST.pts[VEST.pts.length - 1][0] + Math.cos(VEST.exitA)*VEST.lip, VEST.pts[VEST.pts.length - 1][1] + Math.sin(VEST.exitA)*VEST.lip]]), n = P.length;
+  // the profile across, from one foot of the walls up over the roof to the other: [out from the middle, height]
+  const prof = (() => { const half = []; for (let k = 0; k <= 5; k++){ const t = k/5; half.push([R - VEST.wallW*(1 - t), VEST.edgeH*Math.pow(t, 2.2)]); }
+    for (let k = 1; k <= 8; k++){ const lat = R*(1 - k/8); half.push([lat, VEST.roofAt(lat)]); }
+    return [...half, ...half.slice(0, -1).reverse().map(([l, h]) => [-l, h])]; })();
+  const K = prof.length - 1, hw = R - VEST.wallW;
   const basic = o => new THREE.MeshBasicMaterial(Object.assign({ fog: false, side: THREE.DoubleSide }, o));
-  const mkMats = () => ({ rock: basic({ vertexColors: true }), floor: basic({ color: 0xdfe5ef }), cord: basic({ color: 0xcfd7e4 }), steel: basic({ color: 0x3b4654 }), lamp: basic({ color: 0xffd08a }),
+  const mkMats = () => ({ rock: basic({ vertexColors: true }), floor: basic({ color: 0xf4f7fb }), cord: basic({ color: 0xe6edf4 }), steel: basic({ color: 0x3b4654 }), lamp: basic({ color: 0xffd08a }),
     ring: basic({ color: 0x6a74c8 }), glow: basic({ color: 0xb79cff }) });
   const nrm = i => { const a = P[Math.max(0, i - 1)], b = P[Math.min(n - 1, i + 1)], tx = b[0] - a[0], ty = b[1] - a[1], l = Math.hypot(tx, ty); return [-ty/l, tx/l]; };
   const hash = (a, b) => { const x = Math.sin(a*127.1 + b*311.7)*43758.5453; return x - Math.floor(x); };
   const mesh = (pos, mat, col, idx) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); if (col) g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); if (idx) g.setIndex(idx); if (mat.flatShading) g.computeVertexNormals(); return new THREE.Mesh(g, mat); };
-  // a point on the bore at sample i, angle step k (rough by up to 0.4 m, smooth where it meets the floor)
-  const bore = (i, k, out = 0, rough = 0.4) => {
-    const ph = ph0 + (Math.PI - 2*ph0)*k/K, [nx, ny] = nrm(i), edge = Math.min(k, K - k) < 1 ? 0 : 1;
-    const r = R + out + edge*rough*(hash(i, k) - 0.5)*2;
-    const v = r*Math.cos(ph), h = C + r*Math.sin(ph);
-    return [P[i][0] + nx*v, h, P[i][1] + ny*v, ph, hash(i + 7, k + 3)];
+  // a point on the walls at sample i, profile step k (rough by up to 0.35 m, smooth where they meet the floor);
+  // out: pushed out (+) or in (-) from the walls. returns [x, y, z, how far up (0..1), a random 0..1]
+  const bore = (i, k, out = 0, rough = 0.35) => {
+    const [l0, h0] = prof[k], [nx, ny] = nrm(i), edge = Math.min(k, K - k) < 1 ? 0 : 1, j = edge*rough*(hash(i, k) - 0.5)*2 + out;
+    const up = h0/VEST.H, lat = l0 + Math.sign(l0)*j*(1 - up*0.6), h = h0 + j*up;
+    return [P[i][0] + nx*lat, h, P[i][1] + ny*lat, up, hash(i + 7, k + 3)];
   };
-  const ice = new THREE.Color(0x9fb8cc), rock = new THREE.Color(0x56667a), tmp = new THREE.Color();
+  // icy blue like the mine's cut, streaked down the walls, paler higher up
+  const ice = new THREE.Color(0xd6e6f1), deep = new THREE.Color(0x7fa3bf), tmp = new THREE.Color();
   function build(F, parent, layer, station){
     const mats = mkMats();
     const g = new THREE.Group(); g.position.set(F.x, F.h, F.y); g.rotation.y = -F.a; parent.add(g);
     // the bore's rock
     const pos = [], col = [], idx = [];
     for (let i = 0; i < n; i++) for (let k = 0; k <= K; k++){
-      const [x, y, z, ph, hn] = bore(i, k); pos.push(x, y, z);
-      const up = Math.max(0, Math.sin(ph)), shade = 0.62 + 0.3*up + 0.12*(hn - 0.5);
-      tmp.copy(rock).lerp(ice, 0.35 + 0.5*up*hn).multiplyScalar(shade); col.push(tmp.r, tmp.g, tmp.b);
+      const [x, y, z, up] = bore(i, k); pos.push(x, y, z);
+      const streak = 0.5 + 0.5*Math.sin(k*2.3 + Math.sin(i*0.7)*1.5), shade = 0.86 + 0.14*up;
+      tmp.copy(deep).lerp(ice, 0.25 + 0.45*streak + 0.3*up).multiplyScalar(shade); col.push(tmp.r, tmp.g, tmp.b);
     }
     for (let i = 0; i < n - 1; i++) for (let k = 0; k < K; k++){ const a = i*(K + 1) + k, b = a + K + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
     g.add(mesh(pos, mats.rock, col, idx));
@@ -8058,31 +8109,41 @@ const vestMeshes = (() => {
     for (let i = 0; i < n - 1; i++){
       const [ax, ay] = nrm(i), [bx, by] = nrm(i + 1), p = P[i], q = P[i+1];
       const quad = (arr, w, y) => arr.push(p[0] + ax*w, y, p[1] + ay*w, q[0] + bx*w, y, q[1] + by*w, p[0] - ax*w, y, p[1] - ay*w, p[0] - ax*w, y, p[1] - ay*w, q[0] + bx*w, y, q[1] + by*w, q[0] - bx*w, y, q[1] - by*w);
-      quad(fl, hw + 0.05, 0.02); quad(st, 2.5, 0.04);
+      quad(fl, hw + 0.05, 0.02);
     }
+    // the groomed corduroy: narrow stripes down the floor, like the trails up top
+    for (let i = 0; i < n - 1; i++){ const [ax, ay] = nrm(i), [bx, by] = nrm(i + 1), p = P[i], q = P[i+1];
+      for (let c2 = -hw + 0.6; c2 < hw - 0.3; c2 += 1.2) st.push(p[0] + ax*c2, 0.04, p[1] + ay*c2, q[0] + bx*c2, 0.04, q[1] + by*c2, p[0] + ax*(c2 + 0.5), 0.04, p[1] + ay*(c2 + 0.5),
+        p[0] + ax*(c2 + 0.5), 0.04, p[1] + ay*(c2 + 0.5), q[0] + bx*c2, 0.04, q[1] + by*c2, q[0] + bx*(c2 + 0.5), 0.04, q[1] + by*(c2 + 0.5)); }
     g.add(mesh(fl, mats.floor), mesh(st, mats.cord));
     // steel arches every 5 m, a lamp at the crown of every other one
     for (let i = 3, k2 = 0; i < n - 1; i += 5, k2++){
       const pts = []; for (let k = 0; k <= K; k++){ const [x, y, z] = bore(i, k, -0.25, 0); pts.push(new THREE.Vector3(x, y, z)); }
       g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.12, 6, false), mats.steel));
-      if (!(k2 % 2)){ const [x, y, z] = bore(i, K/2, -0.55, 0); const l = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), mats.lamp); l.position.set(x, y, z); g.add(l); }
+      if (!(k2 % 2)){ const [x, y, z] = bore(i, (K/2) | 0, -0.55, 0); const l = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), mats.lamp); l.position.set(x, y, z); g.add(l); }
     }
     // the ring at the inner end, just like the basement teleporter's: one heavy ring, a band of light inside it, and
     // the membrane (dark while it's asleep, nearly clear once it's awake)
     const disc = r => { const sh = new THREE.Shape(); const a0 = -Math.asin(Math.min(1, C/r)); sh.absarc(0, C, r, a0, Math.PI - a0, false); sh.lineTo(r*Math.cos(a0), 0); return new THREE.ShapeGeometry(sh, 48); };
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(R + 0.5, 0.9, 14, 72), mats.ring); ring.rotation.y = Math.PI/2; ring.position.set(0, C, 0); g.add(ring);
-    const glow = new THREE.Mesh(new THREE.TorusGeometry(R - 0.25, 0.16, 8, 72), mats.glow); glow.rotation.y = Math.PI/2; glow.position.set(0.4, C, 0); g.add(glow);
-    const mem = new THREE.Mesh(disc(R - 0.1), basic({ color: 0x2c2238, transparent: true, opacity: 0.95, depthWrite: false })); mem.rotation.y = Math.PI/2; mem.position.set(0.03, 0, 0); g.add(mem);
+    const DR = DOOR_R;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(DR + 0.5, 0.9, 14, 72), mats.ring); ring.rotation.y = Math.PI/2; ring.position.set(0, C, 0); g.add(ring);
+    const glow = new THREE.Mesh(new THREE.TorusGeometry(DR - 0.25, 0.16, 8, 72), mats.glow); glow.rotation.y = Math.PI/2; glow.position.set(0.4, C, 0); g.add(glow);
+    const mem = new THREE.Mesh(disc(DR - 0.1), basic({ color: 0x2c2238, transparent: true, opacity: 0.95, depthWrite: false })); mem.rotation.y = Math.PI/2; mem.position.set(0.03, 0, 0); g.add(mem);
     for (const o of [ring, glow, mem]) o.userData.noClip = true;
-    if (!station){ const back = new THREE.Mesh(disc(R + 0.5), basic({ color: 0x232833 })); back.rotation.y = Math.PI/2; back.position.set(-0.6, 0, 0); g.add(back); }
+    // the tunnel's own outline, as a flat shape (for its end face and the far cap)
+    const profPath = (path) => { prof.forEach(([l, h], k) => k ? path.lineTo(l, h) : path.moveTo(l, h)); path.lineTo(prof[0][0], prof[0][1]); return path; };
+    // the rock face the tunnel ends in, just behind the ring
+    { const sh = new THREE.Shape(); sh.moveTo(-DR - 3, 0); sh.lineTo(DR + 3, 0); sh.lineTo(DR + 3, C + DR + 3); sh.lineTo(-DR - 3, C + DR + 3); sh.lineTo(-DR - 3, 0); sh.holes.push(profPath(new THREE.Path()));
+      const face = new THREE.Mesh(new THREE.ShapeGeometry(sh, 24), basic({ color: 0x9db8cc })); face.rotation.y = Math.PI/2; face.position.set(0.35, 0, 0); g.add(face); }
+    if (!station){ const back = new THREE.Mesh(disc(DR + 0.5), basic({ color: 0x232833 })); back.rotation.y = Math.PI/2; back.position.set(-0.6, 0, 0); g.add(back); }
     if (station){
       // its far end, closed (you never get that far on this side: the switch comes first)
-      const cap = new THREE.Mesh(disc(R + 0.5), basic({ color: 0x4d5868 }));
+      const cap = new THREE.Mesh(new THREE.ShapeGeometry(profPath(new THREE.Shape()), 24), basic({ color: 0x9db8cc }));
       const [ex, ey] = P[n-1], [tx, ty] = [P[n-1][0] - P[n-2][0], P[n-1][1] - P[n-2][1]]; cap.position.set(ex, 0, ey); cap.rotation.y = -Math.atan2(ty, tx) + Math.PI/2; g.add(cap);
     } else {
       // its mouth on the surface: a timber portal like the mine's
       const wood = new THREE.MeshLambertMaterial({ color: 0x6b4b33 }), [ex, ey] = P[n-1], [tx, ty] = [P[n-1][0] - P[n-2][0], P[n-1][1] - P[n-2][1]], tl = Math.hypot(tx, ty), nx = -ty/tl, ny = tx/tl;
-      const PH = C + R + 0.6;
+      const PH = VEST.H + 0.6;
       for (const sd of [-1, 1]){ const m = new THREE.Mesh(new THREE.BoxGeometry(0.8, PH + 0.6, 0.8), wood); m.position.set(ex + nx*sd*(R + 0.6), (PH + 0.6)/2 - 0.3, ey + ny*sd*(R + 0.6)); g.add(m);
         const lp = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.45, 0.3), mats.lamp); lp.position.set(ex + nx*sd*(R + 0.1) + tx/tl*0.4, 4.2, ey + ny*sd*(R + 0.1) + ty/tl*0.4); g.add(lp); }
       const lin = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.9, 2*R + 3), wood); lin.position.set(ex, PH, ey); lin.rotation.y = -Math.atan2(ty, tx); g.add(lin);
@@ -8103,12 +8164,12 @@ const vestClip = (() => {
   let mode = '';
   const set = (list, m) => { if (mode === m && m !== 'pyr') return; mode = m; for (const mt of vestMeshes.stn.clip) mt.clippingPlanes = list; };
   return () => {
-    const F = VFR.stn, R = VEST.R + 0.3, c = Math.cos(F.a), sn = Math.sin(F.a);
-    if (!ring.length) for (let k = 0; k < N; k++){ const t = k/N*Math.PI*2, v = Math.cos(t)*R; ring.push(new THREE.Vector3(F.x - v*sn, F.h + VEST.C + Math.sin(t)*R, F.y + v*c)); }
+    const F = VFR.stn, R = DOOR_R + 0.3, c = Math.cos(F.a), sn = Math.sin(F.a);
+    if (!ring.length) for (let k = 0; k < N; k++){ const t = k/N*Math.PI*2, v = Math.cos(t)*R; ring.push(new THREE.Vector3(F.x - v*sn, F.h + DOOR_C + Math.sin(t)*R, F.y + v*c)); }
     cam.copy(camera.position); const [u, v] = vLocal(F, cam.x, cam.z), [dc, sv] = vProj(u, v);
     if (u > -0.05 && dc < VEST.R + 0.5 && sv < VEST.L + 1){ set(null, 'all'); return; }
     if (u >= -0.05){ set(none, 'none'); return; }
-    ctr.set(F.x, F.h + VEST.C, F.y); probe.set(F.x + c*5, F.h + VEST.C, F.y + sn*5);
+    ctr.set(F.x, F.h + DOOR_C, F.y);
     for (let k = 0; k < N; k++){ a.copy(ring[k]); b.copy(ring[(k + 1) % N]); planes[k].setFromCoplanarPoints(cam, a, b); if (planes[k].distanceToPoint(ctr) < 0) planes[k].negate(); }
     planes[N].setFromNormalAndCoplanarPoint(a.set(c, 0, sn), ctr);
     set(planes, 'pyr');
@@ -8409,6 +8470,15 @@ function buildCaveDressing(){
       const rig = buildAlien(crnd); rig.root.position.set(x, f.floor, y); rig.root.rotation.y = -Math.atan2(CAVE_C.x - x, -(CAVE_C.y - y)); scene.add(rig.root);
       caveDress.aliens.push({ rig, ph: crnd()*6 }); CAVE_SOLIDS.push({ x, y, r: 0.6 });
     }
+    // the cave's circle, like the Broken Circle on the surface, and at its heart the twin of the surface's altar
+    { const C = CAVE_ALTAR, ring = BUILD.circle(crnd); ring.position.set(C.x, LV.P2, C.y); scene.add(ring);
+      for (let k = 0; k < 14; k++){ if (k === 3 || k === 9 || k === 10) continue; const a = k/14*Math.PI*2; CAVE_SOLIDS.push({ x: C.x + Math.cos(a)*19, y: C.y + Math.sin(a)*19, r: 1.3 }); }
+      const g = new THREE.Group(); g.position.set(C.x, LV.P2 - 0.3, C.y); scene.add(g); C.g = g;
+      pt(g, cy(1.5, 1.9, 0.9, 8), SM.bone2, 0, 0.45, 0); pt(g, cy(0.75, 1.05, 1.5, 8), SM.bone, 0, 1.6, 0); pt(g, cy(1.35, 1.0, 0.35, 8), SM.bone2, 0, 2.5, 0);
+      for (let k = 0; k < 4; k++){ const a = k/4*Math.PI*2 + 0.4; pt(g, new THREE.ConeGeometry(0.25, 1.6, 5), SM.bone, Math.cos(a)*1.25, 3.1, Math.sin(a)*1.25, Math.sin(a)*0.35, 0, -Math.cos(a)*0.35); }
+      const gem = pt(g, new THREE.OctahedronGeometry(0.55, 0), new THREE.MeshLambertMaterial({ color: 0xa993d6, emissive: 0x4a3a7a, flatShading: true }), 0, 3.5, 0); gem.scale.set(1, 1.8, 1);
+      const L = new THREE.PointLight(0xb79cff, 0, 40, 1.4); L.position.set(C.x, LV.P2 + 6, C.y); scene.add(L); caveLights.push({ L, k: 1.0 });
+      C.solid = { x: C.x, y: C.y, r: 1.9 }; CAVE_SOLIDS.push(C.solid); }
     // the basement: big haul trucks parked along its walls
     for (const [x, y, rot] of [[-503, 120, 0.3], [-513, 78, -0.2], [-487, 46, 1.4]]){
       caveField(x, y, f); const g = BUILD.haul(); g.scale.setScalar(1.6); g.position.set(x, f.floor, y); g.rotation.y = rot; scene.add(g); CAVE_SOLIDS.push({ x, y, r: 6.5 });
@@ -8541,6 +8611,13 @@ function buildCaveDressing(){
       const e1 = trim(w[0] + nx, w[1] + ny, w[2] + nx, w[3] + ny), e2 = trim(w[0] - nx, w[1] - ny, w[2] - nx, w[3] - ny);
       slab([[[e1[0], e1[1]], [e1[2], e1[3]], [e2[2], e2[3]], [e2[0], e2[1]]]], h - 0.012);   // (a hair under the round deck where they overlap)
       for (const e of [e1, e2]){ const pts = []; for (let t = 0; t <= 1.0001; t += 1/Math.max(2, Math.ceil(L/2))) pts.push([e[0] + (e[2] - e[0])*t, e[1] + (e[3] - e[1])*t, h]); railing('w' + k, pts); }
+    });
+    // the teleporter landings' ends: across from the arm (broken where the arm joins) and either side of the ring
+    STATION.walks.forEach((w, k) => {
+      if (!/Landing/.test(w[5])) return;
+      const ring = /Far/.test(w[5]) ? w[2] : w[0], arm = /Far/.test(w[5]) ? w[0] : w[2], y = w[1], hwL = w[4], line = (x, a, b) => { const pts = []; for (let t = a; t <= b + 1e-6; t += 0.5) pts.push([x, y + t, h]); return pts; };
+      railing('w' + k, line(arm, -hwL, hwL));
+      railing('w' + k, line(ring, -hwL, -(DOOR_R - 1.2))); railing('w' + k, line(ring, DOOR_R - 1.2, hwL));
     });
     // the loops round the ships' noses
     STATION.loops.forEach((Lp, k) => {
@@ -8797,8 +8874,11 @@ function portalCamClamp(){
   if ((p.x - PORTAL_X)*(sx - PORTAL_X) >= 0) return;               // both on the same side
   const t = (PORTAL_X - sx)/(p.x - sx), z = sz + (p.z - sz)*t, y = sy + (p.y - sy)*t;
   const T = TRANSPORT.reduce((a, b) => Math.abs(b.y - sz) < Math.abs(a.y - sz) ? b : a);
-  if (Math.abs(z - T.y) < PORTAL_HW - 0.8 && y < RING_LEVEL + 6.6 && y > RING_LEVEL + 0.5) return;   // through the doorway: fine
-  const k = Math.max(0, t - 0.04); p.set(sx + (p.x - sx)*k, Math.min(sy + (p.y - sy)*k, RING_LEVEL + 6.2), sz + (p.z - sz)*k);
+  // (you in the cave, the camera out on the station: pulled back onto your side, so you never look into the cave from
+  // just past the doorway, which the drawing of the two worlds can't do cleanly)
+  if (sx < PORTAL_X && p.x > PORTAL_X){ const k = Math.max(0, (PORTAL_X - 0.4 - sx)/(p.x - sx)); p.set(sx + (p.x - sx)*k, Math.min(sy + (p.y - sy)*k, RING_LEVEL + DOOR_C + 5), sz + (p.z - sz)*k); return; }
+  if (Math.abs(z - T.y) < PORTAL_HW - 0.8 && y < RING_LEVEL + DOOR_C + 5 && y > RING_LEVEL + 0.5) return;   // through the doorway: fine
+  const k = Math.max(0, t - 0.04); p.set(sx + (p.x - sx)*k, Math.min(sy + (p.y - sy)*k, RING_LEVEL + DOOR_C + 4.6), sz + (p.z - sz)*k);
 }
 // underground, keep the camera inside the cave: pulled in toward you from any wall, and between the floor and the roof
 // in or by the surface's teleporter cave (inside it, or in the cut out front), a camera that would end up inside the
@@ -8812,11 +8892,17 @@ function vestCamPull(x, y){
   const free = (px, pz) => { const [a2, l2, u2, v2] = vestOut(px, pz); if (a2 < VEST.lip){ const [d2, s2] = vProj(u2, v2); if (d2 < VEST.hw - 0.8 && s2 > 1.2) return true; if (a2 < 0) return false; }
     return l2 < VEST.hw + 1 + Math.max(0, a2)*0.5 - 0.8 || heightNat(px, pz) < F.h + 4; };
   if (!free(x, y)){ let lo = 0, hi = 1; for (let it = 0; it < 14; it++){ const m = (lo + hi)/2; if (free(S.x + (x - S.x)*m, S.y + (y - S.y)*m)) lo = m; else hi = m; } x = S.x + (x - S.x)*lo; y = S.y + (y - S.y)*lo; }
-  return [x, y, Math.min(ground(x, y), F.h + Math.max(0, vestOut(x, y)[0] - 2)*0.1)];
+  // and inside the cave's outline, under its roof
+  const [a3, , u3, v3] = vestOut(x, y), [d3] = vProj(u3, v3), cap = a3 < 0.5 && d3 < VEST.R ? F.h + VEST.roofAt(d3) - 0.8 : Infinity;
+  return [x, y, Math.min(ground(x, y), F.h + Math.max(0, a3 - 2)*0.1), cap];
 }
 // in a teleporter vestibule the camera stays inside it: in front of the ring, between the walls, under the roof
 function vestCamClamp(){
   if (UNDER && !ONSTATION) return;
+  if (ONSTATION){   // out on the landing with the camera still back in the cave: brought through the ring after you
+    const F = VFR.stn, [su] = vLocal(F, S.x, S.y), p = camera.position, [pu] = vLocal(F, p.x, p.z);
+    if (su < 0 && su > -25 && pu > -0.3){ const k = Math.max(0, (-0.3 - su)/(pu - su)); p.set(S.x + (p.x - S.x)*k, Math.min(camH + 1.2 + (p.y - camH - 1.2)*k, F.h + DOOR_C + DOOR_R - 1), S.y + (p.z - S.y)*k); return; }
+  }
   const F = ONSTATION ? VFR.stn : VFR.surf, [su, sv0] = vLocal(F, S.x, S.y), [sd, ss] = vProj(su, sv0);
   if (sd > VEST.hw || ss > VEST.L || ss < -1) return;
   const p = camera.position, inside = (x, z) => { const [u, v] = vLocal(F, x, z), [d, sv] = vProj(u, v); return d < VEST.hw - 0.8 && sv > 1.2; };
@@ -8824,7 +8910,7 @@ function vestCamClamp(){
     let lo = 0, hi = 1; for (let it = 0; it < 14; it++){ const m = (lo + hi)/2; if (inside(S.x + (p.x - S.x)*m, S.y + (p.z - S.y)*m)) lo = m; else hi = m; }
     p.x = S.x + (p.x - S.x)*lo; p.z = S.y + (p.z - S.y)*lo;
   }
-  { const [cu, cv] = vLocal(F, p.x, p.z), d = Math.min(VEST.R - 0.3, vProj(cu, cv)[0]); p.y = Math.min(p.y, F.h + VEST.C + Math.sqrt(VEST.R*VEST.R - d*d) - 0.8); }
+  { const [cu, cv] = vLocal(F, p.x, p.z), d = vProj(cu, cv)[0]; p.y = Math.min(p.y, F.h + VEST.roofAt(d) - 0.8); }
 }
 function caveCamClamp(){
   // (on the surface, only while you're in the mine's cut yourself, not on a bridge passing over or anywhere nearby)
@@ -8887,6 +8973,7 @@ function caveSpawn(where){
   ONSTATION = false; CAVE_DECK = null;
   if (where === 'ring'){ spawnAt(-290, 128, Math.PI); UNDER = true; }   // (Plateau 2, at the foot of Hill 1)
   else if (where === 'hall'){ spawnAt(CAVE_C.x + 8, CAVE_C.y - 10, Math.PI); UNDER = true; }   // (Plateau 1, facing down Hill 1)
+  else if (where === 'altar'){ spawnAt(CAVE_ALTAR.x + 26, CAVE_ALTAR.y + 6, -Math.PI/2); UNDER = true; }   // (Plateau 2's west half, looking at the cave's circle)
   else if (where === 'port'){ spawnAt(PORTAL_X - 16, TRANSPORT[0].y, Math.PI/2); UNDER = true; }
   else if (where === 'crown'){ const [x, y] = CW(CL(CROWN.dx, LEDGE_Y)[0] - 56, 0); spawnAt(x, y, CROWN.face); UNDER = true; }   // (Plateau 2, lined up with the light bridge to the crown door)
   else if (where === 'station'){ TRANSPORT[0].open = true; savePortals(); spawnAt(PORTAL_X + 14, TRANSPORT[0].y, Math.PI/2); UNDER = true; ONSTATION = true; }
@@ -8900,7 +8987,7 @@ $('caveStation').addEventListener('click', () => caveSpawn('station'));
 $('caveCrown').addEventListener('click', () => caveSpawn('crown'));
 // ---- the checkpoint menu: behind a password; each stage is cumulative (everything the stages before it unlock), from
 // a full reset
-const CP_STAGES = ['Start', 'Zone 1', 'Zone 2', 'Zone 3', 'Crystals collected', 'Ceremony 1', 'Crown room', 'Space port', 'Ceremony 2', 'Ceremony 3'];
+const CP_STAGES = ['Start', 'Zone 1', 'Zone 2', 'Zone 3', 'Cave altar', 'Crystals collected', 'Ceremony 1', 'Crown room', 'Space port', 'Ceremony 2', 'Ceremony 3'];
 function applyStage(n){ sfxQuiet(1500); attendPlaced = false;
   if (promptCtx && !promptCtx.cp) closePrompt(false);
   SKY_ON = null; UNDER = false; ONSTATION = false; CAVE_DECK = null;
@@ -8909,12 +8996,13 @@ function applyStage(n){ sfxQuiet(1500); attendPlaced = false;
   if (n >= 1){ setKiosksPowered(1, KIOSK_COUNT[1]); gate.open = 1; gate2.open = 1; }
   if (n >= 2) setKiosksPowered(2, KIOSK_COUNT[2]);
   if (n >= 3){ setKiosksPowered(3, KIOSK_COUNT[3]); for (const T of TRANSPORT) T.open = true; }
-  if (n >= 4){ setCrystalsActive(true); setCrystalsCollected(CRYSTAL_TOTAL); altar.state = 1; gate4Open = false; updateAltarLook(); for (const K of KIOSKS) updateKioskLook(K); }
-  if (n >= 5){ altar.state = 2; gate4Open = true; updateAltarLook(); for (const K of KIOSKS) updateKioskLook(K); wakeGiant(true); setCalvesCrowned(3); }
-  if (n >= 6){ outfit = true; ceremony = 1; }
-  if (n >= 7){ crownGot = [...Array(CROWN.n).keys()]; crownSpent = ''; saveCrown(); }
-  if (n >= 9) setCalvesCrowned(15);
-  checkpoint = [null, { pos: [GATE.x - 14, GATE.y, Math.PI/2] }, { pos: [BRIDGE.x, BRIDGE.yN - 12, Math.PI] }, { cave: 'mouth' }, { a: 1 }, { z5: 1 }, { cave: 'crown' }, { cave: 'port' }, { z5: 1 }, { z5: 1 }][n];
+  if (n >= 4){ setCaveAltar(true, true); altar.state = 1; setCrystalsActive(true); updateAltarLook(); }
+  if (n >= 5){ setCrystalsActive(true); setCrystalsCollected(CRYSTAL_TOTAL); altar.state = 1; gate4Open = false; updateAltarLook(); for (const K of KIOSKS) updateKioskLook(K); }
+  if (n >= 6){ altar.state = 2; gate4Open = true; updateAltarLook(); for (const K of KIOSKS) updateKioskLook(K); wakeGiant(true); setCalvesCrowned(3); }
+  if (n >= 7){ outfit = true; ceremony = 1; }
+  if (n >= 8){ crownGot = [...Array(CROWN.n).keys()]; crownSpent = ''; saveCrown(); }
+  if (n >= 10) setCalvesCrowned(15);
+  checkpoint = [null, { pos: [GATE.x - 14, GATE.y, Math.PI/2] }, { pos: [BRIDGE.x, BRIDGE.yN - 12, Math.PI] }, { cave: 'mouth' }, { cave: 'altar' }, { a: 1 }, { z5: 1 }, { cave: 'crown' }, { cave: 'port' }, { z5: 1 }, { z5: 1 }][n];
   savePortals(); saveEnd(); applyRegalia(); regaliaBtn(); calfUI(); saveProgress();
   if (checkpoint) spawnAtCheckpoint();
   closeCpMenu(); toast('Checkpoint: ' + CP_STAGES[n] + '.');
@@ -9059,7 +9147,7 @@ $('caveRegalia').addEventListener('click', () => { outfit = !outfit; saveEnd(); 
 $('ceremonyBtn').addEventListener('click', () => { ceremony = (ceremony + 1) % 3; if (ceremony === 2) crownSpent = 'altar'; else if (crownSpent === 'altar') crownSpent = ''; saveCrown(); saveEnd(); calfUI(); regaliaBtn(); });
 regaliaBtn();
 applyTheme(); updateTiles(true); resize();
-if (/[?&]debug\b/.test(location.search)) window.__g = { sfx, music, applyStage, get gate4Open2(){ return gate4Open; }, giantUp(){ return giant.up; }, get checkpoint(){ return checkpoint; }, get promptCtx(){ return promptCtx; }, updateCourt, OBS_ALTAR, eldersIn, courtOpen, SHIP_SPOT, setCrownAll(){ crownGot = [...Array(CROWN.n).keys()]; crownSpent = ''; saveCrown(); }, get crownSpent(){ return crownSpent; }, get ceremony(){ return ceremony; }, get outfit(){ return outfit; }, set outfit(v){ outfit = v; }, get cosK(){ return cosK; }, camera, get toastText(){ return document.getElementById("toast").textContent; }, CAVE_BRIDGES, CROWN, CROWN_SPIRAL, get crownGot(){ return crownGot; }, crownReset, inCrownRoom, caveField, caveFloor, caveSD, CAVE_TRAILS, SHAFT, HALLS, ROOMS, SPOKES, STATION, TRANSPORT, PORTAL_X, stationD, cavePowered, get stationK(){ return stationK; }, caveDress, MINE, CAVE_BOX, caveTiles, caveSpawn, mineCut, mineRidge, heightNat, get UNDER(){ return UNDER; }, set UNDER(v){ UNDER = v; }, CITY_DECKS, get CAVE_DECK(){ return CAVE_DECK; }, set CAVE_DECK(v){ CAVE_DECK = v; }, cityStreetSD, HILLS, LV, VILLAGE, villageSD, P2C, FAR_TP, VFR, VEST, vestMeshes, MINE_GATE, get VIN(){ return VIN; }, tuck(dp){ enterMode("tuck"); tuckDeep = dp; }, setLean(v){ lean = v; }, SLALOM, caveGroomSD, SLALOM_GATES, CL, CW, get TPC_OPEN(){ return TPC_OPEN; }, set TPC_OPEN(v){ TPC_OPEN = v; }, stationFloor, get ONSTATION(){ return ONSTATION; }, set ONSTATION(v){ ONSTATION = v; }, CROWN_GATE, STATION_TRAILS, portalView, get caveK(){ return caveK; }, get caveCamK(){ return caveCamK; }, get camHv(){ return camH; }, CAVE_SOLIDS, caveMask, pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get bridge2Down(){ return bridge2Down; }, SPUR_PASS, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
+if (/[?&]debug\b/.test(location.search)) window.__g = { sfx, music, applyStage, get gate4Open2(){ return gate4Open; }, giantUp(){ return giant.up; }, get checkpoint(){ return checkpoint; }, get promptCtx(){ return promptCtx; }, updateCourt, OBS_ALTAR, eldersIn, courtOpen, SHIP_SPOT, setCrownAll(){ crownGot = [...Array(CROWN.n).keys()]; crownSpent = ''; saveCrown(); }, get crownSpent(){ return crownSpent; }, get ceremony(){ return ceremony; }, get outfit(){ return outfit; }, set outfit(v){ outfit = v; }, get cosK(){ return cosK; }, camera, get toastText(){ return document.getElementById("toast").textContent; }, CAVE_BRIDGES, CROWN, CROWN_SPIRAL, get crownGot(){ return crownGot; }, crownReset, inCrownRoom, caveField, caveFloor, caveSD, CAVE_TRAILS, SHAFT, HALLS, ROOMS, SPOKES, STATION, TRANSPORT, PORTAL_X, stationD, cavePowered, get stationK(){ return stationK; }, caveDress, MINE, CAVE_BOX, caveTiles, caveSpawn, mineCut, mineRidge, heightNat, get UNDER(){ return UNDER; }, set UNDER(v){ UNDER = v; }, CITY_DECKS, get CAVE_DECK(){ return CAVE_DECK; }, set CAVE_DECK(v){ CAVE_DECK = v; }, cityStreetSD, HILLS, LV, VILLAGE, villageSD, P2C, FAR_TP, VFR, VEST, vestMeshes, MINE_GATE, CAVE_ALTAR, altarObj: altar, get VIN(){ return VIN; }, tuck(dp){ enterMode("tuck"); tuckDeep = dp; }, setLean(v){ lean = v; }, SLALOM, caveGroomSD, SLALOM_GATES, CL, CW, get TPC_OPEN(){ return TPC_OPEN; }, set TPC_OPEN(v){ TPC_OPEN = v; }, stationFloor, get ONSTATION(){ return ONSTATION; }, set ONSTATION(v){ ONSTATION = v; }, CROWN_GATE, STATION_TRAILS, portalView, get caveK(){ return caveK; }, get caveCamK(){ return caveCamK; }, get camHv(){ return camH; }, CAVE_SOLIDS, caveMask, pollPad, PARTY, MUSICIANS, nearestTrail, BOULDERS, trees, nearHerd: typeof nearHerd === "function" ? nearHerd : null, pylons: SKY_PYLON, clearSky(){ SKY_ON = null; }, clearExit(){ skyExitNode = null; }, get camPending(){ return camPending; }, fw: fireworks, setCalvesCrowned, court, get completions(){ return completions; }, resetAll, applyRegalia, z5Calves, calfToTrio, diamondsLit, ATTEND, blackHolePrompt, get bhShown(){ return bhShown; }, space, wakeGiant, Z5, setSkyOn(d, i){ SKY_ON = { d, i }; skyEnterAt = -1e9; }, SKY, get SKY_ON(){ return SKY_ON; }, deckProj, skyStep, RING, ringIn, ringOut, ringCrest, WORLD, riverY, divideY, G4, SPUR, LAKE, trial, startTrial, get trialTimes(){ return trialTimes; }, pet, get HERDNOW(){ return HERD; }, adoptPet, hoofPrints, CONTROLS, KIOSKS, altar, startKiosk, powerKiosk, openPrompt, closePrompt, get promptCtx(){ return promptCtx; }, checkInteract, trackCol, get trackN(){ return trackN; }, syncTracks, GIANT, HERD_SITES, giant, get mode(){ return mode; }, get strideStyle(){ return strideStyle; }, get assistDbg(){ return [assistW, assistTrail && assistTrail.name, assistSince, assistSwitch, assistQuietUntil]; }, HERD, OUTCROPS, updateHerd, saveProgress, loadProgress, LAWN_PARTS, lawnSD, apronOff, updateCrystals, animateGate4, crystals, setCrystalsActive, setCrystalsCollected, G4, get gate4Open(){ return gate4Open; }, NPCS, updateNPCs, MOOSE, updateMoose, BRIDGE2, SADDLE, LAKE, onLake, get bridge2Down(){ return bridge2Down; }, SPUR_PASS, get gate2Open(){ return gate2Open; }, ground, deckLevel, STRUCTS, zoneAt, animateGate, TRAILS, GATE, BRIDGE, SPUR, get bridgeDown(){ return bridgeDown; }, step, updateOrbs, updateTiles, bakeTile, buildTile, place(x, y, th){ Object.assign(S, { x, y, vx:0, vy:0, th, tgt:th, thv:0, vis:th, visv:0, travel:th }); camTh = th; camVel = 0; camH = null; focus = null; camPending = 0; skis = []; lastSki = { L:null, R:null }; }, S, orbs, tiles, obstacleSD, height, gate, setGateOpen, collide, get gateOpen(){ return gateOpen; } };   // test hook
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 requestAnimationFrame(loop);

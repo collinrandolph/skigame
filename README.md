@@ -43,7 +43,7 @@ The map is four times its old area and split into zones, each locked until you c
 
 - **Terminals:** each of the first three zones has outpost terminals beside its trails: 2 in zone 1, 3 in zone 2 and 3 in zone 3. Ski up to one and start it, and its orbs light up on a loop of trail that leaves the terminal and comes back to it (10 per terminal, 15 in zone 3; each terminal has its own loop, a few hundred metres long). Collect them all and ski back: the terminal powers on by itself as you reach it, with no stop or prompt. Power every terminal in a zone, then ski up to a control to open what it guards (see below). Zone 1's terminals run both the east gate and the south gate, and zone 2's run both drawbridges; zone 3's power the mine's generators and lights and let the transport rooms' portals open. Only one terminal runs at a time. Each terminal has an antenna light: red while dormant, yellow (pulsing) while running and green once powered. While one terminal is running, the others that are still dormant go dark (they can't be started yet); powered ones stay green. Its screen and a row of lights (one per orb), which fill as you collect its orbs, match.
 - **Gate and bridge controls:** the east gate, the south gate and the two drawbridges each have their own control, and each opens on its own when you reach it: and every one can be opened from either side: each gate's lintel has lights on both faces, and each drawbridge has a post on each bank. It has one indicator light per terminal in its zone, red until that terminal is powered and then green, and an antenna light that stays red until you ski up to the control with every terminal powered. That opens the way, and the antenna turns green. Ski up to it before then and it tells you how many terminals are still to power.
-- **The altar:** on the dais at the centre of the Broken Circle. Stop at it any time to wake it (you don't have to power the zone 3 terminals first): the 20 purple crystals appear. Bring them all in, then come back to the altar to open the Crystal Gate.
+- **The altar:** on the dais at the centre of the Broken Circle. It's under the snow until you wake its twin in the mine: ski up to the cave altar on Plateau 2 and the Broken Circle's altar rises, with the 20 purple crystals out beside landmarks in zones 1 to 3. Bring them all back to it to open the crystal gate, and it sinks away again.
 - **Prompts:** skiing into range of a terminal or the altar when there's something to do there (start it, wake it, open the gate) interrupts the game with a full-screen prompt: you don't need to slow down, the skier holds still (keeping their speed) and it takes all input until you answer it. Keyboard: Space (or Enter) to go ahead, X (or Esc) to cancel. Controller: A to go ahead, X (or B) to cancel; the triggers don't cancel, since it's easy to squeeze one skiing up. Touch: tap the buttons. Anything that's only news (another terminal is running, orbs still out) is a short message instead of a prompt. Either way it won't come again until you've moved away and come back.
 - **Orb magnet:** an orb within 7 m (a slider in the Controller group) is drawn in to you, faster as it closes, so you only need to pass near it.
 - **Counter and map:** the counter at the top shows the running terminal's orbs, or the crystals once the altar is awake, or otherwise how many of the zone's terminals are powered. The map shows the terminals (red dormant, yellow running, green powered), the running terminal's orbs, the crystals and the altar.
@@ -168,30 +168,43 @@ The map is four times its old area and split into zones, each locked until you c
 - **The Basement teleporter:** one circular doorway, a single heavy steel ring with a band of light inside it, filled with the membrane. The station shows through it once it's open.
   - **The wall:** it runs wide and up into the roof, so space never shows through a gap round it.
   - **The floor:** level for about 20 m either side of the doorway, at exactly the station deck's height. The cave floor used to rise 0.7 m into the wall right at the doorway, which caused a drop and drawing glitches as you crossed.
-  - **The camera:** it comes in close as you near the doorway and eases back out gently once you're through.
+  - **The camera:** it comes in close as you near the doorway and eases back out gently once you're through. It never gets ahead of you through the doorway: while you're still in the cave it stays on your side, so the two worlds are never drawn from just past the doorway, which used to glitch.
   - **Tested:** ground height stays level across the crossing.
-- **The station's walkways:** every straight walkway, the teleporter arms included, now runs on to the main walkway's centre line, slightly under it. Where an arm meets the round walkway at an angle there's no gap at either corner. Each teleporter ring has a broad landing, its control post standing on it.
-- **The teleporter cave (station ↔ surface):** a round bore through rock, styled like the mine's tunnel, with rough icy rock walls, a snow floor, and steel arches with lamps.
+- **The station:** about 70% of its first size, so the two teleporter rings are about 30% closer together. Walkway widths, people and the rings themselves are unchanged. Every straight walkway, the teleporter arms included, runs on to the main walkway's centre line, so there's no gap where an arm meets it at an angle. Each teleporter ring has a broad landing with its control post, railed all round, the rails joining the arm's.
+- **The teleporter cave (station ↔ surface):** a tunnel with the mine tunnel's cross-section, scaled up: a flat floor, walls curving up and a low-arched roof. It has rough icy walls like the mine's cut, a groomed corduroy snow floor and steel arches with lamps. It's part of the world above ground, so it looks like it.
   - **Shape:** 14 m straight, a 90° bend, then 14 m to its mouth.
-  - **The ring:** at its inner end, exactly like the Basement teleporter's: the same size, the same heavy ring and band of light, and a membrane that's dark while asleep and a faint glow once awake.
-  - **On the surface:** it's buried in a mound of the ridge beside the mine. Its mouth ends in a short lip of rock with a timber portal like the mine's, at the head of a cut. The floor runs level from the cut into the cave, and the ground inside the opening isn't drawn, so nothing blocks it. You can ski in from outside at any time.
-  - **The camera there:** in the cave or its cut, a camera that would end up inside the mound is pulled in toward you rather than lifted over it.
+  - **The ring:** at its inner end, a rock face with the same circular ring as the Basement teleporter in front of it: the same size, ring, band of light and membrane.
+  - **On the surface:** it's buried in a rough mound of the ridge beside the mine, cut into like the mine's own cut, with a timber portal at the mouth.
+  - **The way in:** a groomed ramp running from the mouth and easing into the ground round about over about 18 m, with no step or ridge. It's on the map as a standard green trail, the **Teleporter Cave**, off the Mine Road. You can ski in from outside at any time.
   - **On the station:** the far arm ends in the same ring on its landing. The cave beyond shows only through the ring, like a doorway into another world.
   - **Crossing over:** the two copies are identical inside. Partway along the straight, out of sight of either end, you're carried from one to the other with the same position, heading and speed.
+  - **Turning round:** if you turn round inside, you're carried straight back, so you always come out the way you went in.
+  - **The camera:** it stays inside the cave and under its roof. Leaving through the ring or the mouth, it follows you out rather than being left in the tunnel or lifted over the mound.
   - **Unlocking:** the surface ring stays dark and solid until you've ridden out from the station once; after that it takes you to the station. This is saved in your browser.
-  - **Status posts:** like the Basement's, one inside the surface cave beside its ring (red until it's awake) and one on the station's landing (green: it's the way out). Each tells you what it does as you come up to it.
-  - **Tested:** skiing in from outside to the dark ring and back out; then, once awake, in and through to the station; and the station → surface → out of the mouth → back in → station round trip.
+  - **Status posts:** like the Basement's, one inside the surface cave beside its ring (red until it's awake) and one on the station's landing (green: it's the way out).
+  - **Tested:**
+    - skiing in from outside to the dark ring and back out, then once awake through to the station;
+    - the station → surface → out of the mouth → back in → station round trip;
+    - turning round inside, both ways.
 - **The giant's loop ramp:** the wrong-way loop under the moose giant now runs straight out between his legs until it's well clear of them (about 22 m out). Then it makes an easy turn and swings round him on a gently tightening curve, merging onto the far side of the Hidden Way. It keeps at least 5.5 m from the centre of every leg, and a test ride stays on it through the turn.
+- **Trails:** the cave's courses form one connected network. Every course starts and ends at a shared junction: Plateau 1 where the shaft comes in, Plateau 2's lower level, the Crown Ramp's foot, Plateau 3 and the Basement.
+- **The cave altar and the crystal hunt (story):** the crystal hunt now starts in the mine.
+  - **The circle:** in the middle of the west half of Plateau 2's lower level stands a circle of standing stones like the Broken Circle, with a twin of the surface's altar at its heart.
+  - **Waking it:** ski up to it and it sinks into the floor. In the Broken Circle on the surface, the altar rises out of the snow, and the 20 crystals appear.
+  - **Before that:** the Broken Circle stands empty. After zone 3, the counter reads "Into the mine" and the map points to the cave altar, then to the surface altar once it has risen.
+  - **After the gate:** once you've offered the crystals and the crystal gate opens, the surface altar sinks back into the snow.
+  - **Saving and old saves:** the cave altar is saved, and saves from before it count it as done if the surface altar was already woken.
+  - **Checkpoint:** a new **Cave altar** checkpoint follows **Zone 3**.
 - **Map:** the big map shows the cave's floor plan and courses (or, while you're on the station, the station's instead, since the two overlap), and the teleporter cave beside the mine (purple once it's awake). Underground, the corner map zooms to the cave.
 - **Checkpoints:**
   - **Zone 3** starts you at the mine's (now open) gate.
+  - **Cave altar** wakes it and starts you beside its circle.
   - **Crown room** puts you on Plateau 2's lower level, lined up with the Crown Ramp.
   - **Space port** puts you by the Basement teleporter.
 - **Unchanged from 1.0:** the station (a world of its own, seen only through the teleporter's doorway), the portal rendering, the camera rules underground and the ship's cargo bin.
 - **Testing:**
   - **Cave: the mine**, **Cave: Plateau 1**, **Cave: the station** and **Cave: the crown door** are in dev view's Testing group.
   - **Checkpoint: Plateau 2** and **Checkpoint: station** set your checkpoint there.
-- **Coming next (story):** the crystal altar triggered from the cave.
 
 ### End game
 

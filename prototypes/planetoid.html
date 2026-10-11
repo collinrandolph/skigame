@@ -334,7 +334,7 @@ function weatherStep(dt, t){
 const snowMat = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false,
   uniforms: { uCam: { value: new THREE.Vector3() }, uDisp: { value: new THREE.Vector3() }, uT: { value: 0 }, uBox: { value: 70 }, uAmt: { value: 0 }, uScale: { value: 400 }, uCol: { value: new THREE.Color(1, 1, 1) }, uStreak: { value: 0 } },
-  vertexShader: `attribute vec3 aP; attribute float aR; uniform vec3 uCam, uDisp; uniform float uT, uBox, uAmt, uScale; varying float vA;
+  vertexShader: `attribute vec3 aP; attribute float aR; uniform vec3 uCam, uDisp; uniform float uT, uBox, uAmt, uScale; varying float vA, vS;
     void main(){
       if (aR > uAmt){ gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; vA = 0.0; return; }
       float r2 = fract(aR*17.3), r3 = fract(aR*41.7);
@@ -346,10 +346,14 @@ const snowMat = new THREE.ShaderMaterial({
       // pixel effect then scales up). smaller than a pixel, it's one pixel as faint as the share of it the flake covers,
       // so the pixel size changes how the snow is pixelated, not how big the flakes are
       float px = (0.08 + 0.08*r3)*uScale/max(0.5, -mv.z);
-      gl_PointSize = clamp(px, 1.0, 64.0);
-      vA = (1.0 - smoothstep(0.3*uBox, 0.5*uBox, length(p)))*(0.55 + 0.45*r3)*min(1.0, px*px);
+      gl_PointSize = clamp(px, 1.0, 64.0); vS = gl_PointSize;
+      vA = (1.0 - smoothstep(0.3*uBox, 0.5*uBox, length(p)))*(0.55 + 0.45*r3)*min(1.0, px*px*0.785);   // (a disc covers π/4 of its square)
     }`,
-  fragmentShader: 'uniform vec3 uCol; varying float vA; void main(){ if (vA <= 0.0) discard; gl_FragColor = vec4(uCol, vA); }',
+  // round: a disc with a one-pixel soft edge (a flake under two pixels across is just its faded pixel)
+  fragmentShader: `uniform vec3 uCol; varying float vA, vS;
+    void main(){ if (vA <= 0.0) discard;
+      float r = length(gl_PointCoord - 0.5)*vS, a = vS < 2.0 ? 1.0 : 1.0 - smoothstep(vS*0.5 - 1.0, vS*0.5, r);
+      if (a <= 0.0) discard; gl_FragColor = vec4(uCol, vA*a); }`,
 });
 const snowPts = (() => {
   const N = 16000, P3 = new Float32Array(N*3), R1 = new Float32Array(N);

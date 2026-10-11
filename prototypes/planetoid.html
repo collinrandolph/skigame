@@ -66,6 +66,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <div class="row"><span>Speed</span><b id="hSpeed">0.0 km/h</b></div>
   <div class="row"><span>Snow</span><b id="hSnow">–</b></div>
   <div class="row"><span>Grade</span><b id="hGrade">0%</b></div>
+  <div class="row"><span>Local time</span><b id="hTime">–</b></div>
   <div class="row opt"><span>Weight</span><b id="hWeight">100%</b></div>
   <div class="row"><span>From start</span><b id="hFrom">0 m</b></div>
   <div class="row opt"><span>Skied</span><b id="hDist">0 m</b></div>
@@ -81,7 +82,10 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <summary>Settings</summary>
   <p class="note" id="rNote"></p>
   <label class="check"><input id="tLift" type="checkbox"> Curvature lightens you (less friction at speed)</label>
-  <label class="check"><input id="tDay" type="checkbox"> Fixed sun (day side and night side)</label>
+  <label class="check"><input id="tDay" type="checkbox" checked> Day and night (off: the sun stays over your shoulder)</label>
+  <label for="tDayLen">Day length<output id="oDayLen"></output><input id="tDayLen" type="range" min="0" max="60" step="1" value="20"></label>
+  <label for="tTilt">Axis tilt<output id="oTilt"></output><input id="tTilt" type="range" min="0" max="60" step="1" value="25"></label>
+  <label for="tClock">Time here<output id="oClock"></output><input id="tClock" type="range" min="0" max="24" step="0.05" value="9"></label>
   <label class="check"><input id="tFog" type="checkbox"> Fog (off shows the real draw distance)</label>
   <label for="tFlat">Flatten view<output id="oFlat"></output><input id="tFlat" type="range" min="0" max="0.75" step="0.05" value="0.4"></label>
   <p class="note" id="flatNote"></p>
@@ -138,13 +142,14 @@ const SETTINGS = [
   ['tFlat', 'oFlat', 'flat', v => v ? v.toFixed(2) : 'off'],
   ['tPixel', 'oPixel', 'pixel', v => v > 1 ? v + ' px' : 'off'], ['tMax', 'oMax', 'max', v => v + ' km/h'],
   ['tPush', 'oPush', 'push', v => v.toFixed(2) + ' m/s'],
+  ['tDayLen', 'oDayLen', 'dayLen', v => v ? v + ' min' : 'stopped'], ['tTilt', 'oTilt', 'tilt', v => v + '°'],
   ['tOff', 'oOff', 'off', v => '×' + v.toFixed(1)],
   ['tMtn', 'oMtn', 'mtn', v => v ? '×' + v : 'none'], ['tBld', 'oBld', 'bld', v => v ? '×' + v : 'none'], ['tTrees', 'oTrees', 'trees', v => v ? '×' + v : 'none'],
 ];
 const STORE = 'skate-planetoid';
 const DEFAULTS = {}; SETTINGS.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
 let saved = {}; try { saved = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch (e) {}
-const save = () => { try { const o = { lift: P.lift, daynight: P.daynight }; SETTINGS.forEach(([i]) => { o[i] = $(i).value; }); localStorage.setItem(STORE, JSON.stringify(o)); } catch (e) {} };
+const save = () => { try { const o = { lift: P.lift, cycle: P.daynight }; SETTINGS.forEach(([i]) => { o[i] = $(i).value; }); localStorage.setItem(STORE, JSON.stringify(o)); } catch (e) {} };
 
 // ---------- terrain: 3D gradient noise sampled on the sphere, in metres ----------
 // the ground comes from planet-terrain.js (shared with the planet editor): the procedural planet, or a layout's
@@ -163,7 +168,54 @@ const HOR_DAY = new THREE.Color(0xeaf2f8), ZEN_DAY = new THREE.Color(0x7fb0de), 
 scene.fog = new THREE.Fog(HOR_DAY.clone(), 80, 400);
 const hemi = new THREE.HemisphereLight(0xffffff, 0xa8c4d8, 0.75); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 0.65); scene.add(sun);
-const SUN_FIXED = new THREE.Vector3(0.35, 0.9, 0.25).normalize();
+// ---------- the sun: the planet turns once a day about an axis tilted toward the sun, so near one pole the sun never
+// sets and near the other it never rises. dayPhase is how far it has turned (whole turns). sunD is the sun's direction
+const _tw = new THREE.Vector3(), _twc = new THREE.Color(), _twc2 = new THREE.Color();
+const SUN0 = new THREE.Vector3(1, 0, 0), AXIS = new THREE.Vector3(0, 1, 0), sunD = new THREE.Vector3(1, 0, 0);
+const DAWN_HOR = new THREE.Color(0xff8a3a), DAWN_ZEN = new THREE.Color(0x8aa4d6), DUSK_HOR = new THREE.Color(0xb556d8), DUSK_ZEN = new THREE.Color(0x3a2a78);
+let dayPhase = 0;
+// the axis is placed so the start is at 35° north (an ordinary day and night there), then tilted toward the sun
+const _sx = new THREE.Vector3(), _ab = new THREE.Vector3();
+function sunAt(phase, out){
+  const a = (P.tilt || 0)*Math.PI/180, L35 = 35*Math.PI/180;
+  _sx.crossVectors(START_N, Math.abs(START_N.y) < 0.9 ? _tw.set(0, 1, 0) : _tw.set(1, 0, 0)).normalize();       // across, at the start
+  _ab.copy(START_N).multiplyScalar(Math.sin(L35)).addScaledVector(_sx, Math.cos(L35));                         // the untilted pole
+  SUN0.crossVectors(_sx, _ab).normalize();                                                                     // the sun, on the equator
+  AXIS.copy(_ab).multiplyScalar(Math.cos(a)).addScaledVector(SUN0, Math.sin(a));
+  return out.copy(SUN0).applyAxisAngle(AXIS, -phase*2*Math.PI);
+}
+// the local solar time (hours) at a direction, or null right at a pole
+function localTime(d, sd){
+  const ad = AXIS.dot(d), as = AXIS.dot(sd), nx = d.x - AXIS.x*ad, ny = d.y - AXIS.y*ad, nz = d.z - AXIS.z*ad, sx = sd.x - AXIS.x*as, sy = sd.y - AXIS.y*as, sz = sd.z - AXIS.z*as;
+  if (Math.hypot(nx, ny, nz) < 1e-4) return null;
+  const cx = sy*nz - sz*ny, cy = sz*nx - sx*nz, cz = sx*ny - sy*nx, ha = Math.atan2(AXIS.x*cx + AXIS.y*cy + AXIS.z*cz, sx*nx + sy*ny + sz*nz);
+  return ((12 + ha/(2*Math.PI)*24) % 24 + 24) % 24;
+}
+// turn the planet so it's this time of day where you are
+function setLocalTime(hours, d){
+  for (let it = 0; it < 3; it++){ sunAt(dayPhase, sunD); const now = localTime(d, sunD); if (now === null) return; let diff = hours - now; diff -= 24*Math.round(diff/24); dayPhase += diff/24; }
+  dayPhase -= Math.floor(dayPhase);
+}
+const fmtTime = h => { const m = Math.floor(h*60 + 0.5) % 1440; return String(Math.floor(m/60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+// sunrise and sunset colour on the ground too (seen best from the planet view: a band of orange on the morning edge of the
+// day side, purple on the evening edge)
+const TWIU = { uSunD: { value: sunD }, uAxis: { value: AXIS }, uTwiOn: { value: 1 }, uDawn: { value: new THREE.Color(0xff8a3a) }, uDusk: { value: new THREE.Color(0xa35ad8) } };
+function twilightPatch(mat){
+  const prev = mat.onBeforeCompile;
+  mat.onBeforeCompile = sh => {
+    if (prev) prev(sh);
+    Object.assign(sh.uniforms, TWIU);
+    sh.vertexShader = 'varying vec3 vTwW;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n  vTwW = (modelMatrix*vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'uniform vec3 uSunD, uAxis, uDawn, uDusk; uniform float uTwiOn; varying vec3 vTwW;\n' + sh.fragmentShader.replace('#include <dithering_fragment>', `
+      { vec3 up = normalize(vTwW); float s = dot(up, uSunD);
+        float band = smoothstep(-0.25, -0.03, s)*(1.0 - smoothstep(0.05, 0.32, s))*uTwiOn;
+        float dawn = smoothstep(-0.02, 0.02, dot(up, cross(uSunD, uAxis)));
+        vec3 tc = mix(uDusk, uDawn, dawn);
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb*tc*1.5 + tc*0.1, band*0.45); }
+      #include <dithering_fragment>`);
+  };
+  return mat;
+}
 let W = 0, H = 0;
 function resize(){
   W = innerWidth; H = innerHeight;
@@ -177,9 +229,21 @@ addEventListener('resize', resize);
 // the sky: a gradient around the skier's own up, so the horizon is wherever the planet's edge is
 const skyMat = new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite: false, depthTest: false,
-  uniforms: { up: { value: new THREE.Vector3(0, 1, 0) }, zen: { value: ZEN_DAY.clone() }, hor: { value: HOR_DAY.clone() }, space: { value: new THREE.Color(0x060a14) }, spaceK: { value: 0 } },
+  uniforms: { up: { value: new THREE.Vector3(0, 1, 0) }, zen: { value: ZEN_DAY.clone() }, hor: { value: HOR_DAY.clone() }, space: { value: new THREE.Color(0x060a14) }, spaceK: { value: 0 },
+    sunD: { value: new THREE.Vector3(0, 1, 0) }, twi: { value: new THREE.Color(0xff8f3d) }, twK: { value: 0 }, sunK: { value: 0 } },
   vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix*vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }',
-  fragmentShader: 'uniform vec3 up, zen, hor, space; uniform float spaceK; varying vec3 vW; void main(){ vec3 d = normalize(vW - cameraPosition); float t = dot(d, up); vec3 c = mix(hor, zen, smoothstep(0.0, 0.7, t)); c = mix(c, hor*0.92, smoothstep(0.0, -0.4, t)); gl_FragColor = vec4(mix(c, space, spaceK), 1.0); }',
+  // (at sunrise and sunset the horizon glows toward the sun, orange or purple, and fades away from it; the sun is a
+  // small disc with a glow round it)
+  fragmentShader: `uniform vec3 up, zen, hor, space, sunD, twi; uniform float spaceK, twK, sunK; varying vec3 vW;
+    void main(){ vec3 d = normalize(vW - cameraPosition); float t = dot(d, up);
+      vec3 c = mix(hor, zen, smoothstep(0.0, 0.7, t)); c = mix(c, hor*0.92, smoothstep(0.0, -0.4, t));
+      vec3 dh = d - up*t, sh = sunD - up*dot(sunD, up); float az = dot(normalize(dh + 1e-5), normalize(sh + 1e-5));
+      float band = 1.0 - smoothstep(0.0, 0.5, abs(t - 0.04));
+      c = mix(c, twi, twK*band*(0.25 + 0.75*(0.5 + 0.5*az)));
+      float sd = max(0.0, dot(d, sunD));
+      c += twi*twK*0.5*pow(sd, 10.0) + vec3(1.0, 0.92, 0.8)*0.25*sunK*pow(sd, 60.0);
+      c = mix(c, mix(vec3(1.0, 0.97, 0.88), twi*1.3 + 0.3, twK), smoothstep(0.9990, 0.9994, sd)*sunK);
+      gl_FragColor = vec4(mix(c, space, spaceK), 1.0); }`,
 });
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), skyMat);
 sky.frustumCulled = false; sky.renderOrder = -10; scene.add(sky);
@@ -223,7 +287,7 @@ function flatPatch(mat){
   };
   return mat;
 }
-const planetMat = flatPatch(new THREE.MeshLambertMaterial({ vertexColors: true }));
+const planetMat = twilightPatch(flatPatch(new THREE.MeshLambertMaterial({ vertexColors: true })));
 const planet = new THREE.Group(); scene.add(planet);
 let chunks = [];
 // the ground is built a chunk at a time. near the skier a chunk is rebuilt finer (lod 2 or 4: up to four times the points
@@ -362,7 +426,7 @@ const cordTex = (() => {
   for (let x = 0; x < 112; x++){ g.fillStyle = (x < 6 || x > 105) ? '#c9d6e2' : (Math.floor((x - 6)/5) % 2 ? '#eef3f8' : '#fbfdff'); g.fillRect(x, 0, 1, 2); }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;
 })();
-const trailMat = flatPatch(new THREE.MeshLambertMaterial({ map: cordTex, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
+const trailMat = twilightPatch(flatPatch(new THREE.MeshLambertMaterial({ map: cordTex, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })));
 function buildTrails(rnd){
   const R = P.R, V = THREE.Vector3;
   for (const m of trailMeshes){ scene.remove(m); m.geometry.dispose(); }
@@ -1216,17 +1280,33 @@ function frame(now){
   const t = (now - t0)/1000;
   updateStation(t);
 
-  // light and sky: the sun sits over your shoulder, or (fixed sun) stays put so the planet has a night side
+  // light and sky. day and night: the planet turns under the sun (a full turn every Day length minutes), and here the
+  // sky goes from day blue through orange (sunrise) or purple (sunset) to night. off: the sun sits over your shoulder
   const R = P.R;
-  if (P.daynight) sun.position.copy(SUN_FIXED);
-  else sun.position.copy(n).multiplyScalar(0.5).addScaledVector(ex, -0.65).addScaledVector(ey, -0.35);
-  const dayK = P.daynight ? smooth01(-0.25, 0.2, n.dot(SUN_FIXED)) : 1;
+  if (!frame.timeSet){ setLocalTime(9, n); frame.timeSet = true; }          // you start mid-morning
+  if (P.daynight && P.dayLen > 0) dayPhase = (dayPhase + dt/(P.dayLen*60)) % 1;
+  sunAt(dayPhase, sunD);
+  let dayK = 1, twK = 0, dawnK = 1;
+  if (P.daynight){
+    sun.position.copy(sunD);
+    const se = n.dot(sunD);                                                  // the sun's height here (sine of its elevation)
+    dayK = smooth01(-0.15, 0.12, se);
+    twK = smooth01(-0.28, -0.04, se)*(1 - smooth01(0.06, 0.34, se));
+    dawnK = smooth01(-0.02, 0.02, n.dot(_tw.crossVectors(sunD, AXIS)));      // rising here (morning side) or setting
+  } else sun.position.copy(n).multiplyScalar(0.5).addScaledVector(ex, -0.65).addScaledVector(ey, -0.35);
+  TWIU.uTwiOn.value = P.daynight ? 1 : 0;
+  const twH = _twc.copy(DUSK_HOR).lerp(DAWN_HOR, dawnK), twZ = _twc2.copy(DUSK_ZEN).lerp(DAWN_ZEN, dawnK);
   hemi.position.copy(n); hemi.intensity = 0.15 + 0.4*dayK; sun.intensity = 0.62;
+  sun.color.setRGB(1, 1, 1).lerp(twH, twK*0.6*(1 - k)); hemi.color.setRGB(1, 1, 1).lerp(twH, twK*0.35*(1 - k));
   skyMat.uniforms.up.value.copy(n);
-  skyMat.uniforms.hor.value.copy(HOR_NIGHT).lerp(HOR_DAY, dayK); skyMat.uniforms.zen.value.copy(ZEN_NIGHT).lerp(ZEN_DAY, dayK);
+  skyMat.uniforms.hor.value.copy(HOR_NIGHT).lerp(HOR_DAY, dayK).lerp(twH, twK*0.55); skyMat.uniforms.zen.value.copy(ZEN_NIGHT).lerp(ZEN_DAY, dayK).lerp(twZ, twK*0.6);
+  skyMat.uniforms.sunD.value.copy(P.daynight ? sunD : sun.position).normalize(); skyMat.uniforms.twi.value.copy(twH); skyMat.uniforms.twK.value = twK;
+  skyMat.uniforms.sunK.value = P.daynight ? smooth01(-0.05, 0.02, n.dot(sunD)) : 0;
   skyMat.uniforms.spaceK.value = k;
   sky.position.copy(camera.position); sky.scale.setScalar(R*8);
   stars.position.copy(camera.position); stars.scale.setScalar(R*7);
+  // the stars are fixed in space, so from the turning planet they wheel round the axis with the sun (the pole star stays put)
+  if (P.daynight) stars.quaternion.setFromAxisAngle(AXIS, -dayPhase*2*Math.PI); else stars.quaternion.identity();
   stars.material.opacity = Math.max(k, 1 - dayK) * 0.9;
   scene.fog.color.copy(skyMat.uniforms.hor.value);
   // flatten view: drawn as a planet of radius Re (fading out in the planet view)
@@ -1261,6 +1341,17 @@ const circumference = () => 2*Math.PI*P.R;
 function fmtM(m){ return m >= 1000 ? (m/1000).toFixed(2) + ' km' : Math.round(m) + ' m'; }
 function hud(){
   $('hSpeed').textContent = (speed()*3.6).toFixed(1) + ' km/h';
+  // the local time (and whether the sun stays up or down all day here, near a pole)
+  { const lt = localTime(n, sunD); let txt = lt === null ? '–' : fmtTime(lt);
+    if (P.daynight){ const dec = Math.asin(Math.max(-1, Math.min(1, AXIS.dot(sunD)))), lat = Math.asin(Math.max(-1, Math.min(1, AXIS.dot(n)))), D = 0.03;
+      // the sun circles at a fixed height (its declination) round the axis: past 90° minus that from the equator it never
+      // sets (on the tilted-toward side) or never rises
+      if (Math.abs(lat) > Math.PI/2 - Math.abs(dec) + D) txt += lat*dec > 0 ? ' · midnight sun' : ' · polar night';
+      else { const se = n.dot(sunD); if (se > -0.28 && se < 0.34) txt += n.dot(_tw.crossVectors(sunD, AXIS)) > 0 ? ' · sunrise' : ' · sunset'; else if (se < 0) txt += ' · night'; }
+      if (!P.dayLen) txt += ' (stopped)'; }
+    else txt = 'sun over your shoulder';
+    $('hTime').textContent = txt;
+    if (lt !== null && document.activeElement !== $('tClock')){ $('tClock').value = lt.toFixed(2); $('oClock').textContent = fmtTime(lt); } }
   $('hSnow').textContent = ONB ? 'Light bridge · ' + ONB.b.name : S.off < 0.5 && S.trail ? 'Groomed · ' + (S.trailNames && S.trailNames.length > 1 ? S.trailNames.join(' / ') : S.trail.name) : 'Ungroomed';
   $('hGrade').textContent = (S.grade >= 0 ? '+' : '') + Math.round(S.grade*100) + '%';
   $('hWeight').textContent = Math.round(S.weight*100) + '%';
@@ -1368,14 +1459,17 @@ for (const [i, o, k, f] of SETTINGS){
   el.addEventListener('input', () => { upd(); if (k === 'R' || k === 'flat') rNote(); if (k === 'pixel') resize(); });
   el.addEventListener('change', () => { save(); if (k === 'R'){ el.blur(); rebuild(); } if (k === 'mtn' || k === 'bld' || k === 'trees') buildScatter(); });
 }
-for (const [id, key] of [['tLift', 'lift'], ['tDay', 'daynight']]){
-  const el = $(id); if (saved[key] !== undefined) el.checked = !!saved[key];
+for (const [id, key, sk] of [['tLift', 'lift', 'lift'], ['tDay', 'daynight', 'cycle']]){
+  const el = $(id); if (saved[sk] !== undefined) el.checked = !!saved[sk];
   P[key] = el.checked; el.addEventListener('change', () => { P[key] = el.checked; save(); });
 }
+// drag Time here to turn the planet to that time of day where you are
+$('tClock').addEventListener('input', () => { const h = +$('tClock').value; setLocalTime(h, n); $('oClock').textContent = fmtTime(h); });
+$('tClock').addEventListener('change', () => $('tClock').blur());
 $('defaultsBtn').addEventListener('click', () => {
   const oldR = P.R, oldS = P.mtn + ',' + P.bld + ',' + P.trees;
   for (const [i, o, k, f] of SETTINGS){ $(i).value = DEFAULTS[i]; P[k] = +DEFAULTS[i]; $(o).textContent = f(P[k]); }
-  $('tLift').checked = P.lift = false; $('tDay').checked = P.daynight = false;
+  $('tLift').checked = P.lift = false; $('tDay').checked = P.daynight = true;
   save(); rNote(); resize(); if (P.R !== oldR) rebuild(); else if (P.mtn + ',' + P.bld + ',' + P.trees !== oldS) buildScatter();
 });
 
@@ -1429,7 +1523,8 @@ bootLayout().then(() => {
   placeAtStart();
   buildPlanet(); faceTrail();
   $('loading').style.display = 'none';
-  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList };   // test hook
+  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList,
+    sun: { setTime: h => setLocalTime(h, n), get time(){ return localTime(n, sunD); }, get dir(){ return sunD; }, get axis(){ return AXIS; }, get phase(){ return dayPhase; }, set phase(v){ dayPhase = v; } } };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 });
 </script>

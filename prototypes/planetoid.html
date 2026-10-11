@@ -54,13 +54,13 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 .pad{pointer-events:auto;width:min(34vw,170px);height:110px;border-radius:10px;background:var(--panel);border:1px solid var(--line);font:700 15px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--ink);display:flex;align-items:center;justify-content:center}
 .pad.mid{width:min(20vw,96px)}
 .pad.on{background:var(--skier);color:#fff;border-color:var(--skier)}
-@media (max-width:560px){ .top-right{flex-direction:column;align-items:flex-end} .rad{gap:6px;padding:5px 8px} .rad span{display:none} .rad input{width:60px} .rad output{min-width:40px} .hud{min-width:0;max-width:calc(100vw - 172px);padding:10px 12px} .hud .opt,.hud .help{display:none} .hud h1{font-size:18px} }
+@media (max-width:560px){ .top-right{flex-direction:column;align-items:flex-end} .rad{gap:6px;padding:5px 8px} .rad span{display:none} .rad input{width:60px} .rad output{min-width:40px} .hud{min-width:0;max-width:calc(100vw - 84px);padding:10px 12px} .hud .opt,.hud .help{display:none} .hud h1{font-size:18px} }
 @media (pointer:coarse){ .pads{display:flex} details{--sb:calc(env(safe-area-inset-bottom,0px) + 140px)} .help{display:none} }
 button.icon{width:40px;height:40px;padding:0;display:grid;place-items:center}
 button.icon.on{background:var(--skier);border-color:var(--skier);color:#fff}
-/* dev mode off: only the planet and dev buttons show (the touch pads still work, unseen) */
-body.clean .hud, body.clean .rad, body.clean #sizeBtn, body.clean #settings, body.clean #steepBan{display:none !important}
-body.clean .pad{opacity:0}
+/* dev mode: just the planet and dev buttons (and the touch controls, unless Settings says to hide them too) */
+body.clean .hud, body.clean #settings, body.clean #steepBan{display:none !important}
+body.clean.nopads .pads{display:none !important}
 #steepBan{position:fixed;left:50%;top:22%;transform:translateX(-50%);padding:8px 16px;border-radius:6px;background:var(--skier);color:#fff;font:700 18px var(--display);letter-spacing:.06em;text-transform:uppercase;display:none;pointer-events:none}
 #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);pointer-events:none}
 </style>
@@ -85,12 +85,15 @@ body.clean .pad{opacity:0}
 </div>
 
 <div id="steepBan" role="status">Too steep to ski</div>
-<div class="top-right"><label class="rad panel" for="tR"><span>Radius</span><input id="tR" type="range" min="150" max="1200" step="50" value="800"><output id="oR"></output></label><button id="sizeBtn" type="button" title="Switch between an 800 m and a 300 m planet (P)">Try 300 m</button><button id="devBtn" class="icon on" type="button" aria-pressed="true" aria-label="Dev mode: hide the UI" title="Dev mode: show or hide the UI (H)"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7 3 12l5 5M16 7l5 5-5 5M13.5 4.5l-3 15"/></svg></button><button id="viewBtn" class="icon" type="button" aria-pressed="false" aria-label="Planet view" title="Planet view (V)"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="6.5"/><path d="M4.2 15.6c-2 1.5-2.7 2.9-2 3.6 1.4 1.4 7.6-1.7 13.8-7.9S24.3 1.6 22.9.2c-.6-.6-2 0-3.6 2"/></svg></button></div>
+<div class="top-right"><button id="devBtn" class="icon" type="button" aria-pressed="false" aria-label="Dev mode" title="Dev mode: hide the UI (H)"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7 3 12l5 5M16 7l5 5-5 5M13.5 4.5l-3 15"/></svg></button><button id="viewBtn" class="icon" type="button" aria-pressed="false" aria-label="Planet view" title="Planet view (V)"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="6.5"/><path d="M4.2 15.6c-2 1.5-2.7 2.9-2 3.6 1.4 1.4 7.6-1.7 13.8-7.9S24.3 1.6 22.9.2c-.6-.6-2 0-3.6 2"/></svg></button></div>
 
 <details class="panel" id="settings">
   <summary>Settings</summary>
   <p class="note" id="rNote"></p>
   <label class="check"><input id="tLift" type="checkbox"> Curvature lightens you (less friction at speed)</label>
+  <label for="tR">Planet radius<output id="oR"></output><input id="tR" type="range" min="150" max="1200" step="50" value="800"></label>
+  <div class="btns" style="margin-top:6px"><button id="sizeBtn" type="button" title="Switch between an 800 m and a 300 m planet (P)">Try 300 m</button></div>
+  <label class="check"><input id="tDevPads" type="checkbox" checked> Dev mode hides the touch controls too</label>
   <label class="check"><input id="tDay" type="checkbox" checked> Day and night (off: the sun stays over your shoulder)</label>
   <label class="check"><input id="tAurora" type="checkbox" checked> Auroras at night</label>
   <label for="tWeather">Weather<select id="tWeather"><option value="random" selected>Random (changes every few minutes)</option><option value="clear">Clear</option><option value="flurries">Flurries</option><option value="snow">Snow</option><option value="heavy">Heavy snow</option><option value="blizzard">Blizzard</option></select></label>
@@ -161,7 +164,7 @@ const SETTINGS = [
 const STORE = 'skate-planetoid';
 const DEFAULTS = {}; SETTINGS.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
 let saved = {}; try { saved = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch (e) {}
-const save = () => { try { const o = { lift: P.lift, cycle: P.daynight, aurora: P.aurora, wind: P.windPush, weather: $('tWeather').value }; SETTINGS.forEach(([i]) => { o[i] = $(i).value; }); localStorage.setItem(STORE, JSON.stringify(o)); } catch (e) {} };
+const save = () => { try { const o = { lift: P.lift, cycle: P.daynight, aurora: P.aurora, wind: P.windPush, weather: $('tWeather').value, devPads: $('tDevPads').checked }; SETTINGS.forEach(([i]) => { o[i] = $(i).value; }); localStorage.setItem(STORE, JSON.stringify(o)); } catch (e) {} };
 
 // ---------- terrain: 3D gradient noise sampled on the sphere, in metres ----------
 // the ground comes from planet-terrain.js (shared with the planet editor): the procedural planet, or a layout's
@@ -1572,8 +1575,10 @@ document.addEventListener('dblclick', e => e.preventDefault());
 
 // ---------- settings, view, reset ----------
 function toggleView(){ viewOn = !viewOn; const b = $('viewBtn'); b.classList.toggle('on', viewOn); b.setAttribute('aria-pressed', viewOn); b.title = viewOn ? 'Back to skiing (V)' : 'Planet view (V)'; b.setAttribute('aria-label', viewOn ? 'Back to skiing' : 'Planet view'); }
-// dev mode: all the UI (HUD, settings, radius, touch-pad faces) or just the planet and dev buttons
-function toggleDev(){ const on = document.body.classList.toggle('clean') === false, b = $('devBtn'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? 'Dev mode: hide the UI' : 'Dev mode: show the UI'); }
+// dev mode: hides the UI (the info box, settings) leaving the planet and dev buttons, and the touch controls if Settings says
+function toggleDev(){ const on = document.body.classList.toggle('clean'), b = $('devBtn'); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.title = on ? 'Dev mode on: show the UI (H)' : 'Dev mode: hide the UI (H)'; }
+const devPads = () => document.body.classList.toggle('nopads', $('tDevPads').checked);
+$('tDevPads').addEventListener('change', () => { devPads(); save(); }); 
 $('devBtn').addEventListener('click', e => { toggleDev(); e.currentTarget.blur(); });
 $('viewBtn').addEventListener('click', e => { toggleView(); e.currentTarget.blur(); });
 function resetSkier(){
@@ -1616,6 +1621,8 @@ for (const [id, key, sk] of [['tLift', 'lift', 'lift'], ['tDay', 'daynight', 'cy
   P[key] = el.checked; el.addEventListener('change', () => { P[key] = el.checked; save(); });
 }
 if (saved.weather && WEATHER[saved.weather] || saved.weather === 'random') $('tWeather').value = saved.weather;
+if (saved.devPads !== undefined) $('tDevPads').checked = !!saved.devPads;
+devPads();
 $('tWeather').addEventListener('change', () => { save(); $('tWeather').blur(); });
 // drag Time here to turn the planet to that time of day where you are
 $('tClock').addEventListener('input', () => { const h = +$('tClock').value; setLocalTime(h, n); $('oClock').textContent = fmtTime(h); });

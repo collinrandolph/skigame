@@ -625,7 +625,7 @@ function finishDrawing(){
 let ptr = null;     // the active drag: { mode: 'orbit'|'tilt'|'move'|'sculpt', x, y, ... }
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('pointerdown', e => {
-  cv.setPointerCapture(e.pointerId);
+  try { cv.setPointerCapture(e.pointerId); } catch (err) {}
   const px = e.clientX, py = e.clientY;
   if (e.button === 2 || e.button === 1 || tool === 'orbit'){ ptr = { mode: e.shiftKey && e.button === 2 ? 'tilt' : 'orbit', x: px, y: py }; if (tool === 'orbit') cv.style.cursor = 'grabbing'; return; }
   if (e.button !== 0) return;
@@ -633,9 +633,11 @@ cv.addEventListener('pointerdown', e => {
     const h = handlePick(px, py);
     sel = h ? { kind: h.kind, ref: h.ref, i: h.i } : null; rebuildOverlays(); showSel();
     if (h) ptr = { mode: 'move', h, moved: false, cap0: h.kind === 'stamp' ? stampCap(h.ref) : h.kind === 'trail' && h.ref.carve ? trailCap(h.ref) : null };
+    else if (!groundPick(px, py)) ptr = { mode: 'orbit', x: px, y: py };      // off the planet: turn it
     return;
   }
-  const d = groundPick(px, py); if (!d) return;
+  // starting off the planet (in space) turns it, whatever the tool
+  const d = groundPick(px, py); if (!d){ ptr = { mode: 'orbit', x: px, y: py }; return; }
   const arr = d.toArray();
   if (tool === 'sculpt'){ ptr = { mode: 'sculpt', x: px, y: py, target: groundAt(d), last: performance.now() }; return; }
   if (tool === 'cliffs'){ ptr = { mode: 'cliff', x: px, y: py, goals: new Map() }; return; }

@@ -174,8 +174,21 @@ const sun = new THREE.DirectionalLight(0xffffff, 0.65); scene.add(sun);
 const _tw = new THREE.Vector3(), _twc = new THREE.Color(), _twc2 = new THREE.Color();
 const SUN0 = new THREE.Vector3(1, 0, 0), AXIS = new THREE.Vector3(0, 1, 0), sunD = new THREE.Vector3(1, 0, 0);
 const AUR_GLOW = new THREE.Color(0.45, 1.0, 0.7);
+// aurora colours: each night's display takes one of these at random (the foot, the top, and an accent some curtains
+// lean toward), all colours real auroras show: oxygen green and red, nitrogen blue and purple, and the aqua between
+const AURORAS = [
+  [[0.15, 1.0, 0.55], [0.7, 0.3, 1.0], [0.2, 0.9, 0.9]],     // green into purple
+  [[0.2, 1.0, 0.45], [1.0, 0.25, 0.3], [0.7, 0.3, 1.0]],     // green with red tops
+  [[0.2, 0.95, 0.9], [0.3, 0.45, 1.0], [0.15, 1.0, 0.55]],   // aqua into blue
+  [[1.0, 0.3, 0.35], [0.85, 0.2, 0.55], [0.7, 0.3, 1.0]],    // deep red
+  [[0.35, 0.5, 1.0], [0.75, 0.35, 1.0], [0.2, 0.95, 0.9]],   // blue into violet
+  [[0.2, 1.0, 0.5], [0.3, 0.9, 1.0], [0.35, 0.5, 1.0]],      // green into aqua
+];
+let auOn = false;
+function pickAurora(){ const a = AURORAS[Math.floor(Math.random()*AURORAS.length)], u = skyMat.uniforms;
+  u.auLo.value.setRGB(...a[0]); u.auHi.value.setRGB(...a[1]); u.auAlt.value.setRGB(...a[2]); AUR_GLOW.setRGB(...a[0]).lerp(_twc2.setRGB(1, 1, 1), 0.35); }
 const DAWN_HOR = new THREE.Color(0xff8a3a), DAWN_ZEN = new THREE.Color(0x8aa4d6), DUSK_HOR = new THREE.Color(0xb556d8), DUSK_ZEN = new THREE.Color(0x3a2a78);
-let dayPhase = 0;
+let dayPhase = 0, auK = 0;     // auK: how strong the aurora is where you are
 // the axis is placed so the start is at 35° north (an ordinary day and night there), then tilted toward the sun
 const _sx = new THREE.Vector3(), _ab = new THREE.Vector3();
 function sunAt(phase, out){
@@ -233,20 +246,20 @@ const skyMat = new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite: false, depthTest: false,
   uniforms: { up: { value: new THREE.Vector3(0, 1, 0) }, zen: { value: ZEN_DAY.clone() }, hor: { value: HOR_DAY.clone() }, space: { value: new THREE.Color(0x060a14) }, spaceK: { value: 0 },
     sunD: { value: new THREE.Vector3(0, 1, 0) }, twi: { value: new THREE.Color(0xff8f3d) }, twK: { value: 0 }, sunK: { value: 0 },
-    auK: { value: 0 }, auT: { value: 0 }, auX: { value: new THREE.Vector3(1, 0, 0) }, auY: { value: new THREE.Vector3(0, 0, 1) } },
+    auK: { value: 0 }, auT: { value: 0 }, auLo: { value: new THREE.Color(0.15, 1.0, 0.55) }, auHi: { value: new THREE.Color(0.7, 0.3, 1.0) }, auAlt: { value: new THREE.Color(0.2, 0.9, 0.9) }, auX: { value: new THREE.Vector3(1, 0, 0) }, auY: { value: new THREE.Vector3(0, 0, 1) } },
   vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix*vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }',
   // (at sunrise and sunset the horizon glows toward the sun, orange or purple, and fades away from it; the sun is a
   // small disc with a glow round it)
   // auroras (at night, anywhere on the planet): curtains on a sheet high overhead, seen in perspective so they crowd
   // toward the horizon; each is a wavy line that drifts and folds, green at the foot shading to purple above, with
   // fine vertical rays, and the whole display brightens and fades over a minute or so
-  fragmentShader: `uniform vec3 up, zen, hor, space, sunD, twi, auX, auY; uniform float spaceK, twK, sunK, auK, auT; varying vec3 vW;
+  fragmentShader: `uniform vec3 up, zen, hor, space, sunD, twi, auX, auY, auLo, auHi, auAlt; uniform float spaceK, twK, sunK, auK, auT; varying vec3 vW;
     float h1(float n){ return fract(sin(n)*43758.5453); }
     float n1(float x){ float i = floor(x), f = fract(x); return mix(h1(i), h1(i + 1.0), f*f*(3.0 - 2.0*f)); }
     vec3 aurora(vec3 d, float t){
       if (t < 0.0) return vec3(0.0);
       vec3 dh = d - up*t; vec2 q = vec2(dot(dh, auX), dot(dh, auY))/(t + 0.12);          // on the sheet overhead
-      vec3 acc = vec3(0.0);
+      float acc = 0.0, accA = 0.0;
       for (int k = 0; k < 2; k++){
         float fk = float(k), sp = 0.05 + 0.04*fk;
         // parallel curtains across the whole sky (about 1.6 sheet-widths apart), each folding and drifting
@@ -254,10 +267,11 @@ const skyMat = new THREE.ShaderMaterial({
         float line = pow(0.5 + 0.5*cos(y*6.2832), 10.0);
         float rays = 0.5 + 0.5*n1(q.x*5.0 + auT*0.5 + fk*13.0)*n1(q.x*1.7 - auT*0.2 + q.y*0.3);
         float flick = 0.6 + 0.4*n1(auT*0.12 + fk*5.0 + floor(y)*3.7);
-        acc += line*rays*flick*(0.8 - 0.3*fk);
+        float e = line*rays*flick*(0.8 - 0.3*fk); acc += e; accA += e*smoothstep(0.55, 0.85, n1(floor(y)*1.9 + fk*3.0 + auT*0.01));   // some curtains lean to the accent
       }
       float foot = smoothstep(0.0, 0.07, t)*(1.0 - smoothstep(0.6, 1.0, t));
-      vec3 col = mix(vec3(0.15, 1.0, 0.55), vec3(0.7, 0.3, 1.0), smoothstep(0.1, 0.5, t) + 0.25*n1(q.x*0.5 + auT*0.05));
+      vec3 col = mix(auLo, auHi, clamp(smoothstep(0.1, 0.5, t) + 0.25*n1(q.x*0.5 + auT*0.05), 0.0, 1.0));
+      col = mix(col, auAlt, 0.6*accA/max(acc, 1e-4));
       float pulse = 0.6 + 0.4*n1(auT*0.02);
       return col*acc*foot*pulse;
     }
@@ -1329,8 +1343,13 @@ function frame(now){
   skyMat.uniforms.hor.value.copy(HOR_NIGHT).lerp(HOR_DAY, dayK).lerp(twH, twK*0.55); skyMat.uniforms.zen.value.copy(ZEN_NIGHT).lerp(ZEN_DAY, dayK).lerp(twZ, twK*0.6);
   skyMat.uniforms.sunD.value.copy(P.daynight ? sunD : sun.position).normalize(); skyMat.uniforms.twi.value.copy(twH); skyMat.uniforms.twK.value = twK;
   skyMat.uniforms.sunK.value = P.daynight ? smooth01(-0.05, 0.02, n.dot(sunD)) : 0;
-  // auroras once it's properly dark (the sun well below the horizon), fading out in the planet view
-  const auK = P.daynight && P.aurora ? (1 - smooth01(-0.3, -0.12, n.dot(sunD)))*(1 - k) : 0;
+  // auroras: the middle of the night only (day > sunset > night > aurora > night > sunrise > day). they build from about
+  // 22:30, are at their height round midnight and gone by 01:30 (and only while it's dark: not under a midnight sun),
+  // fading out in the planet view
+  auK = 0;
+  if (P.daynight && P.aurora){ const lt = localTime(n, sunD);
+    if (lt !== null){ const fromMid = Math.min(lt, 24 - lt); auK = (1 - smooth01(0.6, 1.5, fromMid))*(1 - smooth01(-0.3, -0.12, n.dot(sunD)))*(1 - k); } }
+  if (auK > 0 && !auOn) pickAurora(); auOn = auK > 0;            // a new night, a new display
   skyMat.uniforms.auK.value = auK; skyMat.uniforms.auT.value = t; skyMat.uniforms.auX.value.copy(ex); skyMat.uniforms.auY.value.copy(ey);
   if (auK > 0){ hemi.color.lerp(AUR_GLOW, auK*0.5); hemi.intensity += 0.08*auK; }
   skyMat.uniforms.spaceK.value = k;
@@ -1378,7 +1397,7 @@ function hud(){
       // the sun circles at a fixed height (its declination) round the axis: past 90° minus that from the equator it never
       // sets (on the tilted-toward side) or never rises
       if (Math.abs(lat) > Math.PI/2 - Math.abs(dec) + D) txt += lat*dec > 0 ? ' · midnight sun' : ' · polar night';
-      else { const se = n.dot(sunD); if (se > -0.28 && se < 0.34) txt += n.dot(_tw.crossVectors(sunD, AXIS)) > 0 ? ' · sunrise' : ' · sunset'; else if (se < 0) txt += ' · night'; }
+      else { const se = n.dot(sunD); if (se > -0.28 && se < 0.34) txt += n.dot(_tw.crossVectors(sunD, AXIS)) > 0 ? ' · sunrise' : ' · sunset'; else if (se < 0) txt += auK > 0.3 ? ' · aurora' : ' · night'; }
       if (!P.dayLen) txt += ' (stopped)'; }
     else txt = 'sun over your shoulder';
     $('hTime').textContent = txt;

@@ -82,6 +82,8 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <p class="note" id="rNote"></p>
   <label class="check"><input id="tLift" type="checkbox"> Curvature lightens you (less friction at speed)</label>
   <label class="check"><input id="tDay" type="checkbox"> Fixed sun (day side and night side)</label>
+  <label for="tFlat">Flatten view<output id="oFlat"></output><input id="tFlat" type="range" min="0" max="0.75" step="0.05" value="0.4"></label>
+  <p class="note" id="flatNote"></p>
   <label for="tCamd">Camera distance<output id="oCamd"></output><input id="tCamd" type="range" min="4" max="40" step="0.5" value="15"></label>
   <label for="tPixel">Pixel size<output id="oPixel"></output><input id="tPixel" type="range" min="1" max="6" step="1" value="4"></label>
   <label for="tMax">Top speed<output id="oMax"></output><input id="tMax" type="range" min="10" max="60" step="1" value="38"></label>
@@ -127,10 +129,11 @@ const P = {
   push: 2.5, tap: 80, klen: 50, turn: 5, turn2: 5, turn3: 15, k180: 8, k180t: 6, kfloor: 15, kwin: 450,
   tfStop: 180, tfMove: 90, tfVlo: 1, tfVhi: 14, decay: 20, snap: 160, splay: 11, fric: 0.4, glide: 0.25, grip: 25,
   gwin: 600, gcut: 95, max: 38, lboost: 1.4, plow: 2.5, tuck: 50, lean: 50, camd: 15, sway: 0.8, cam: 0.6, pixel: 4,
-  R: 800, lift: false, daynight: false, mtn: 1, bld: 1, off: 1.5, trees: 1,
+  R: 800, flat: 0.4, lift: false, daynight: false, mtn: 1, bld: 1, off: 1.5, trees: 1,
 };
 const SETTINGS = [
   ['tR', 'oR', 'R', v => v + ' m'], ['tCamd', 'oCamd', 'camd', v => v.toFixed(1) + ' m'],
+  ['tFlat', 'oFlat', 'flat', v => v ? v.toFixed(2) : 'off'],
   ['tPixel', 'oPixel', 'pixel', v => v > 1 ? v + ' px' : 'off'], ['tMax', 'oMax', 'max', v => v + ' km/h'],
   ['tPush', 'oPush', 'push', v => v.toFixed(2) + ' m/s'],
   ['tOff', 'oOff', 'off', v => '×' + v.toFixed(1)],
@@ -192,7 +195,33 @@ const FACES = [
   [[0,-1,0],[1,0,0],[0,0,1]], [[0,0,1],[1,0,0],[0,1,0]], [[0,0,-1],[-1,0,0],[0,1,0]],
 ];
 const CH = 8;    // chunks per face edge
-const planetMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+// ---------- flatten view: draw the planet less curved than it is (the physics stays on the real sphere) ----------
+// each vertex is raised along the skier's up by k times the drop the curve gives it (d²/2R at d metres out), so the
+// ground looks like a planet of radius R/(1-k) and the horizon is further off. it fades out from about 50° round the
+// planet (well past any horizon) and in the planet view
+const FLATU = { uFlatK: { value: 0 }, uFlatR: { value: 800 }, uFlatC: { value: new THREE.Vector3() }, uFlatN: { value: new THREE.Vector3(0, 1, 0) } };
+function flatPatch(mat){
+  if (mat.userData.flat) return mat;
+  mat.userData.flat = true;
+  mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, FLATU);
+    sh.vertexShader = 'uniform float uFlatK, uFlatR; uniform vec3 uFlatC, uFlatN;\n' + sh.vertexShader.replace('#include <project_vertex>', `
+      vec4 mvPosition = vec4( transformed, 1.0 );
+      #ifdef USE_INSTANCING
+        mvPosition = instanceMatrix * mvPosition;
+      #endif
+      vec4 flatW = modelMatrix * mvPosition;
+      if (uFlatK > 0.0){
+        vec3 rel = flatW.xyz - uFlatC; vec3 hz = rel - uFlatN*dot(rel, uFlatN); float d = length(hz);
+        float fade = smoothstep(0.35, 0.65, dot(normalize(flatW.xyz), uFlatN));
+        flatW.xyz += uFlatN*(uFlatK*d*d/(2.0*uFlatR)*fade);
+      }
+      mvPosition = viewMatrix * flatW;
+      gl_Position = projectionMatrix * mvPosition;`);
+  };
+  return mat;
+}
+const planetMat = flatPatch(new THREE.MeshLambertMaterial({ vertexColors: true }));
 const planet = new THREE.Group(); scene.add(planet);
 let chunks = [];
 // the ground is built a chunk at a time. near the skier a chunk is rebuilt finer (lod 2 or 4: up to four times the points
@@ -304,7 +333,7 @@ const cordTex = (() => {
   for (let x = 0; x < 112; x++){ g.fillStyle = (x < 6 || x > 105) ? '#c9d6e2' : (Math.floor((x - 6)/5) % 2 ? '#eef3f8' : '#fbfdff'); g.fillRect(x, 0, 1, 2); }
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;
 })();
-const trailMat = new THREE.MeshLambertMaterial({ map: cordTex, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+const trailMat = flatPatch(new THREE.MeshLambertMaterial({ map: cordTex, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 }));
 function buildTrails(rnd){
   const R = P.R, V = THREE.Vector3;
   for (const m of trailMeshes){ scene.remove(m); m.geometry.dispose(); }
@@ -429,8 +458,8 @@ function clearBuckets(group){ buckets = buckets.filter(b => { if (b.group !== gr
 // mountains are faceted cones 25-95 m tall with a snow cap. buildings come in villages of 3-9 round a centre, plus a
 // few loners; about one in seven is a tower. each one sits on the lowest ground under its footprint, so nothing floats
 let solids = [], structGeos = [];
-const MTN_MATS = [new THREE.MeshLambertMaterial({ color: 0x7f8d9b }), new THREE.MeshLambertMaterial({ color: 0xf4f8fb })];
-const BLD_MATS = [new THREE.MeshLambertMaterial({ color: 0xffffff }), new THREE.MeshLambertMaterial({ color: 0xf4f8fb })];
+const MTN_MATS = [new THREE.MeshLambertMaterial({ color: 0x7f8d9b }), new THREE.MeshLambertMaterial({ color: 0xf4f8fb })].map(flatPatch);
+const BLD_MATS = [new THREE.MeshLambertMaterial({ color: 0xffffff }), new THREE.MeshLambertMaterial({ color: 0xf4f8fb })].map(flatPatch);
 const flatGeo = g => { const f = g.toNonIndexed(); f.computeVertexNormals(); g.dispose(); return f; };   // faceted look
 function buildStructures(rnd){
   const R = P.R, area = 4*Math.PI*R*R;
@@ -519,7 +548,7 @@ let buildCounts = {};
 // a patchy noise decides where the woods are; trees keep a clear corridor of 3-6 m either side of every trail (as in the
 // game), stay off steep ground, out of the mountains, buildings and beacons, and at least 2.2 m apart. trunks are solid
 let trees = [], treeGrid = new Map();
-const treeMats = [new THREE.MeshLambertMaterial({ color: 0x4d3f35 }), new THREE.MeshLambertMaterial({ color: 0x2f4a43 }), new THREE.MeshLambertMaterial({ color: 0x3e5c53 })];
+const treeMats = [new THREE.MeshLambertMaterial({ color: 0x4d3f35 }), new THREE.MeshLambertMaterial({ color: 0x2f4a43 }), new THREE.MeshLambertMaterial({ color: 0x3e5c53 })].map(flatPatch);
 const TREE_PARTS = [
   { geo: new THREE.CylinderGeometry(0.12, 0.18, 1.6, 6), y: 0.8 },
   { geo: new THREE.ConeGeometry(1.5, 3.4, 8), y: 2.7 },
@@ -565,7 +594,7 @@ function buildTrees(rnd){
 
 // ---------- scattered rocks (solid) and six beacons, so you can see the curve and judge speed ----------
 let rocks = [];
-const ROCK_GEO = new THREE.DodecahedronGeometry(1, 0), ROCK_MAT = new THREE.MeshLambertMaterial({ color: 0x7d8a96 });
+const ROCK_GEO = new THREE.DodecahedronGeometry(1, 0), ROCK_MAT = flatPatch(new THREE.MeshLambertMaterial({ color: 0x7d8a96 }));
 const BEACON_DIRS = [[0,1,0,'red',0xd2462e], [0,-1,0,'violet',0x8a5cd6], [1,0,0,'yellow',0xf2c230], [-1,0,0,'green',0x2f9a5a], [0,0,1,'blue',0x2f6fd6], [0,0,-1,'orange',0xf08a2a]];
 const beacons = new THREE.Group(); scene.add(beacons);
 const beaconList = [];
@@ -577,22 +606,22 @@ function buildLandmarks(){
   beaconList.length = 0;
   const list = LAYOUT ? LAYOUT.landmarks.map(m => ({ d: new THREE.Vector3(...m.d).normalize(), name: m.name, color: new THREE.Color(m.color).getHex(), h: m.height, type: m.type }))
     : BEACON_DIRS.map(([x, y, z, name, color]) => ({ d: new THREE.Vector3(x, y, z).normalize(), name, color, h: 18, type: 'beacon' }));
-  const poleM = new THREE.MeshLambertMaterial({ color: 0x3a4652 });
+  const poleM = flatPatch(new THREE.MeshLambertMaterial({ color: 0x3a4652 }));
   for (const L0 of list){
     const g = new THREE.Group(), h = L0.h, col = L0.color; let r = 2.6;
     g.position.copy(L0.d).multiplyScalar(groundR(L0.d) - 0.3); g.quaternion.setFromUnitVectors(up, L0.d);
     if (L0.type === 'spire'){
       r = Math.max(2, h*0.12);
-      const c = new THREE.Mesh(new THREE.ConeGeometry(r, h, 6), new THREE.MeshLambertMaterial({ color: col })); c.position.y = h/2; g.add(c);
+      const c = new THREE.Mesh(new THREE.ConeGeometry(r, h, 6), flatPatch(new THREE.MeshLambertMaterial({ color: col }))); c.position.y = h/2; g.add(c);
     } else if (L0.type === 'tower'){
       const w = Math.max(3, h*0.14); r = w*0.75;
-      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshLambertMaterial({ color: col })); b.position.y = h/2; g.add(b);
-      const lamp = new THREE.Mesh(new THREE.BoxGeometry(w*0.5, w*0.5, w*0.5), new THREE.MeshBasicMaterial({ color: 0xfff3c4 })); lamp.position.y = h + w*0.25; g.add(lamp);
+      const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), flatPatch(new THREE.MeshLambertMaterial({ color: col }))); b.position.y = h/2; g.add(b);
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(w*0.5, w*0.5, w*0.5), flatPatch(new THREE.MeshBasicMaterial({ color: 0xfff3c4 }))); lamp.position.y = h + w*0.25; g.add(lamp);
     } else {
       const k = Math.max(1, h/18);
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.22*k, 0.32*k, h, 8), poleM); pole.position.y = h/2; g.add(pole);
-      const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.4*k, 1.4*k, 1.4*k), new THREE.MeshBasicMaterial({ color: col })); lamp.position.y = h + 0.6*k; g.add(lamp);
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.6, 0.6, 12), new THREE.MeshLambertMaterial({ color: col })); base.position.y = 0.1; g.add(base);
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.4*k, 1.4*k, 1.4*k), flatPatch(new THREE.MeshBasicMaterial({ color: col }))); lamp.position.y = h + 0.6*k; g.add(lamp);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.6, 0.6, 12), flatPatch(new THREE.MeshLambertMaterial({ color: col }))); base.position.y = 0.1; g.add(base);
     }
     beacons.add(g); beaconList.push({ d: L0.d, name: L0.name, r });
   }
@@ -903,7 +932,7 @@ function collide(){
 // ---------- ski marks: one buffer of quads laid on the surface ----------
 const markPos = new Float32Array(MARKS*6*3);
 const markGeo = new THREE.BufferGeometry(); markGeo.setAttribute('position', new THREE.BufferAttribute(markPos, 3));
-const markMesh = new THREE.Mesh(markGeo, new THREE.MeshBasicMaterial({ color: 0x7d93a8, transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide }));
+const markMesh = new THREE.Mesh(markGeo, flatPatch(new THREE.MeshBasicMaterial({ color: 0x7d93a8, transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide })));
 markMesh.frustumCulled = false; scene.add(markMesh);
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Vector3();
 function updateMarks(){
@@ -1051,18 +1080,22 @@ function frame(now){
   stars.position.copy(camera.position); stars.scale.setScalar(R*7);
   stars.material.opacity = Math.max(k, 1 - dayK) * 0.9;
   scene.fog.color.copy(skyMat.uniforms.hor.value);
-  scene.fog.near = 120 + k*R*20; scene.fog.far = 420 + 0.8*R + k*R*40;
+  // flatten view: drawn as a planet of radius Re (fading out in the planet view)
+  const fk = P.flat*(1 - k), Re = R/(1 - fk);
+  FLATU.uFlatK.value = fk; FLATU.uFlatR.value = R; FLATU.uFlatN.value.copy(n); FLATU.uFlatC.value.copy(n).multiplyScalar(groundR(n));
+  scene.fog.near = 120 + k*R*20; scene.fog.far = 420 + 0.8*Re + k*R*40;
 
   updateLod();
   // only the chunks this side of the horizon (or all of them, in the planet view)
   const camDir = _t.copy(camera.position).normalize(), hc = camera.position.length() - R + 25;
-  const horizon = Math.acos(Math.min(1, R/(R + Math.max(1, hc))));
+  // (how far round the planet the horizon is, for a planet drawn at radius Re)
+  const hzA = h => Math.acos(Math.min(1, Re/(Re + Math.max(1, h))))*Re/R, horizon = hzA(hc);
   // (in the planet view, only the near side)
   for (const c of chunks) c.mesh.visible = k > 0.02 ? c.c.dot(camDir) > -Math.sin(c.ang + 0.1) : c.c.dot(camDir) > Math.cos(Math.min(Math.PI, horizon + c.ang + 0.15));
   for (const b of buckets){
     // (rocks never, and trees only on small planets: from out here they'd be specks)
     if (k > 0.02){ b.mesh.visible = b.group !== 'rocks' && !(b.group === 'trees' && R > 500) && b.c.dot(camDir) > -Math.sin(b.ang + 0.1); continue; }
-    const far = horizon + Math.acos(R/(R + b.h + 12)) + b.ang + 0.03;   // its top can show over the horizon from this far
+    const far = horizon + hzA(b.h + 12) + b.ang + 0.03;   // its top can show over the horizon from this far
     b.mesh.visible = b.c.dot(camDir) > Math.cos(Math.min(Math.PI, far));
   }
   youMark.visible = k > 0.02; youMark.position.copy(n).multiplyScalar(groundR(n) + 2); youMark.quaternion.setFromUnitVectors(_up, n); youMark.scale.setScalar(R*0.012*k + 0.01);
@@ -1157,7 +1190,8 @@ function resetSkier(){
 }
 $('resetBtn').addEventListener('click', e => { resetSkier(); e.currentTarget.blur(); });
 function rNote(){
-  const R = P.R, horizon = Math.sqrt(2*R*P.camd*0.62);
+  const R = P.R, Re = R/(1 - P.flat), horizon = Math.sqrt(2*Re*P.camd*0.62);
+  $('flatNote').textContent = P.flat ? 'Looks like a ' + Math.round(Re) + ' m planet: the horizon is ' + (1/Math.sqrt(1 - P.flat)).toFixed(2) + '× as far off. View only; you still ski the ' + R + ' m one.' : 'The true curve.';
   $('rNote').textContent = 'Circumference ' + fmtM(2*Math.PI*R) + ', surface ' + (4*Math.PI*R*R/1e6).toFixed(2) + ' km², horizon about ' + Math.round(horizon) + ' m from the camera. The 1.0 map is about 0.8 km².';
 }
 function rebuild(reset = false){
@@ -1181,7 +1215,7 @@ for (const [i, o, k, f] of SETTINGS){
   if (saved[i] !== undefined) el.value = saved[i];
   const upd = () => { P[k] = +el.value; $(o).textContent = f(+el.value); };
   upd();
-  el.addEventListener('input', () => { upd(); if (k === 'R') rNote(); if (k === 'pixel') resize(); });
+  el.addEventListener('input', () => { upd(); if (k === 'R' || k === 'flat') rNote(); if (k === 'pixel') resize(); });
   el.addEventListener('change', () => { save(); if (k === 'R'){ el.blur(); rebuild(); } if (k === 'mtn' || k === 'bld' || k === 'trees') buildScatter(); });
 }
 for (const [id, key] of [['tLift', 'lift'], ['tDay', 'daynight']]){

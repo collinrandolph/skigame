@@ -82,6 +82,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <p class="note" id="rNote"></p>
   <label class="check"><input id="tLift" type="checkbox"> Curvature lightens you (less friction at speed)</label>
   <label class="check"><input id="tDay" type="checkbox"> Fixed sun (day side and night side)</label>
+  <label class="check"><input id="tFog" type="checkbox"> Fog (off shows the real draw distance)</label>
   <label for="tFlat">Flatten view<output id="oFlat"></output><input id="tFlat" type="range" min="0" max="0.75" step="0.05" value="0.4"></label>
   <p class="note" id="flatNote"></p>
   <label for="tCamd">Camera distance<output id="oCamd"></output><input id="tCamd" type="range" min="4" max="40" step="0.5" value="15"></label>
@@ -93,6 +94,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <label for="tOff">Ungroomed snow (× friction)<output id="oOff"></output><input id="tOff" type="range" min="1" max="12" step="0.5" value="1.5"></label>
   <label for="tPush">Push per kick<output id="oPush"></output><input id="tPush" type="range" min="0.2" max="2.5" step="0.05" value="2.5"></label>
   <div class="btns"><button id="resetBtn" type="button">Reset skier</button><button id="defaultsBtn" type="button">Defaults</button><button id="procBtn" type="button" hidden>Back to procedural planet</button></div>
+  <label class="check"><input id="tTidy" type="checkbox" checked> Tidy editor layouts as they load (join trails, ease small steep bits)</label>
   <p class="note" id="layoutNote">Drop a planet.json from the planet editor here to ski it.</p>
   <p class="note">Kick, turn and glide tuning are the main game's defaults.</p>
 </details>
@@ -148,7 +150,7 @@ const save = () => { try { const o = { lift: P.lift, daynight: P.daynight }; SET
 // the ground comes from planet-terrain.js (shared with the planet editor): the procedural planet, or a layout's
 // noise, stamps and sculpting when one is loaded
 const PTR = window.PlanetTerrain, noise3 = PTR.noise3;
-let LAYOUT = null, TERRAIN = PTR.terrain(null, P.R);
+let LAYOUT = null, LAYOUT_RAW = null, TIDY = '', TERRAIN = PTR.terrain(null, P.R);
 function heightAt(x, y, z){ return TERRAIN.height(x, y, z); }
 const groundR = d => P.R + heightAt(d.x, d.y, d.z);
 
@@ -234,15 +236,39 @@ function faceDir3(f, i, j, N, out){
   out[0] = x*Math.sqrt(1 - y2/2 - z2/2 + y2*z2/3); out[1] = y*Math.sqrt(1 - z2/2 - x2/2 + z2*x2/3); out[2] = z*Math.sqrt(1 - x2/2 - y2/2 + x2*y2/3);
   return out;
 }
+// a chunk's triangles: the (m+1)^2 grid, then a skirt down from each of its 4 edges (both ways round, so it shows from
+// either side)
+function chunkIndex(m){
+  const V = m + 1, idx = new Uint16Array(m*m*6 + 4*m*12); let q = 0;
+  for (let j = 0; j < m; j++) for (let i = 0; i < m; i++){ const a = j*V + i, b = a + 1, cc = a + V, d = cc + 1; idx[q++] = a; idx[q++] = b; idx[q++] = cc; idx[q++] = b; idx[q++] = d; idx[q++] = cc; }
+  const edge = [t => t, t => m*V + t, t => t*V, t => t*V + m];
+  for (let e = 0; e < 4; e++) for (let t = 0; t < m; t++){
+    const a = edge[e](t), b = edge[e](t + 1), sa = V*V + e*V + t, sb = sa + 1;
+    idx[q++] = a; idx[q++] = b; idx[q++] = sa; idx[q++] = b; idx[q++] = sb; idx[q++] = sa;
+    idx[q++] = a; idx[q++] = sa; idx[q++] = b; idx[q++] = b; idx[q++] = sa; idx[q++] = sb;
+  }
+  return idx;
+}
+// fill the skirt vertices (after the V*V grid): each edge vertex again, `drop` metres lower, same normal (and colour)
+function skirt(pos, nor, col, m, drop, R){
+  const V = m + 1, edge = [t => t, t => m*V + t, t => t*V, t => t*V + m];
+  for (let e = 0; e < 4; e++) for (let t = 0; t <= m; t++){
+    const a = edge[e](t)*3, k = (V*V + e*V + t)*3, x = pos[a], y = pos[a + 1], z = pos[a + 2], r = Math.hypot(x, y, z), f = (r - drop)/r;
+    pos[k] = x*f; pos[k + 1] = y*f; pos[k + 2] = z*f; nor[k] = nor[a]; nor[k + 1] = nor[a + 1]; nor[k + 2] = nor[a + 2];
+    if (col){ col[k] = col[a]; col[k + 1] = col[a + 1]; col[k + 2] = col[a + 2]; }
+  }
+}
 function buildChunk(c){
   const R = P.R, lod = c.lod, N = PN*lod, m = PN/CH*lod, M = m + 3, V = m + 1;
   const Pp = new Float32Array(M*M*3), D = new Float32Array(M*M*3);
   for (let j = 0; j < M; j++) for (let i = 0; i < M; i++){
-    const gi = Math.max(0, Math.min(N, c.ci*m + i - 1)), gj = Math.max(0, Math.min(N, c.cj*m + j - 1)), d = faceDir3(c.f, gi, gj, N, _cd3);
+    const gi = c.ci*m + i - 1, gj = c.cj*m + j - 1, d = faceDir3(c.f, gi, gj, N, _cd3);
+    // the border ring carries on past the face's edge (onto the next face) rather than repeating the edge point
+    if (gi < 0 || gj < 0 || gi > N || gj > N){ const l = Math.hypot(d[0], d[1], d[2]); d[0] /= l; d[1] /= l; d[2] /= l; }
     const r = R + heightAt(d[0], d[1], d[2]), o = (j*M + i)*3;
     D[o] = d[0]; D[o + 1] = d[1]; D[o + 2] = d[2]; Pp[o] = d[0]*r; Pp[o + 1] = d[1]*r; Pp[o + 2] = d[2]*r;
   }
-  const vp = new Float32Array(V*V*3), vn = new Float32Array(V*V*3), vc = new Float32Array(V*V*3), col = c.tmpCol || (c.tmpCol = new THREE.Color());
+  const NV = V*V + 4*V, vp = new Float32Array(NV*3), vn = new Float32Array(NV*3), vc = new Float32Array(NV*3), col = c.tmpCol || (c.tmpCol = new THREE.Color());
   for (let j = 0; j < V; j++) for (let i = 0; i < V; i++){
     const o = ((j + 1)*M + i + 1)*3, k = (j*V + i)*3, a = o + 3, b = o - 3, cc = o + M*3, d = o - M*3;
     vp[k] = Pp[o]; vp[k + 1] = Pp[o + 1]; vp[k + 2] = Pp[o + 2];
@@ -255,12 +281,12 @@ function buildChunk(c){
     col.copy(GC.snow).lerp(GC.hollow, smooth01(2, -6, h)).lerp(GC.shade, Math.min(1, Math.sqrt(slope)*2.4)).lerp(GC.rock, smooth01(GC.cosStop + 0.03, GC.cosStop - 0.03, up));
     vc[k] = col.r; vc[k + 1] = col.g; vc[k + 2] = col.b;
   }
+  // skirts hide the gaps where a finer chunk meets a coarser one
+  { let lo = Infinity, hi = -Infinity; for (let k = 0; k < V*V*3; k += 3){ const h = Math.hypot(vp[k], vp[k + 1], vp[k + 2]); lo = Math.min(lo, h); hi = Math.max(hi, h); } skirt(vp, vn, vc, m, Math.max(2, (hi - lo)*0.3), R); }
   if (c.mesh && c.builtLod !== lod){ planet.remove(c.mesh); c.mesh.geometry.dispose(); c.mesh = null; }
   c.builtLod = lod;
   if (!c.mesh){
-    const idx = new Uint16Array(m*m*6); let q = 0;
-    for (let j = 0; j < m; j++) for (let i = 0; i < m; i++){ const a = j*V + i, b = a + 1, cc = a + V, d = cc + 1; idx[q++] = a; idx[q++] = b; idx[q++] = cc; idx[q++] = b; idx[q++] = d; idx[q++] = cc; }
-    const g = new THREE.BufferGeometry();
+    const idx = chunkIndex(m), g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(vp, 3)); g.setAttribute('normal', new THREE.BufferAttribute(vn, 3)); g.setAttribute('color', new THREE.BufferAttribute(vc, 3));
     g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeBoundingSphere();
     c.mesh = new THREE.Mesh(g, planetMat); planet.add(c.mesh);
@@ -317,15 +343,18 @@ function cellOf(x, y, z){
 // how far (m) a direction is from the nearest trail's centre line, and which trail (only looks within about 8 m)
 function nearestTrailAt(d){
   const list = tgrid.get(cellOf(d.x, d.y, d.z)); if (!list) return { d: Infinity, t: null };
-  let best = Infinity, bt = null;
+  let best = Infinity, bt = null; const per = new Map();
   for (let i = 0; i < list.length; i += 2){
     const tr = trails[list[i]], k = list[i + 1], a = tr.pts[k], b = tr.pts[(k + 1) % tr.pts.length];
     const bx = b.x - a.x, by = b.y - a.y, bz = b.z - a.z, L2 = bx*bx + by*by + bz*bz || 1e-12;
     const u = Math.max(0, Math.min(1, ((d.x - a.x)*bx + (d.y - a.y)*by + (d.z - a.z)*bz)/L2));
     const dist = Math.hypot(d.x - a.x - u*bx, d.y - a.y - u*by, d.z - a.z - u*bz)*P.R;
     if (dist < best){ best = dist; bt = tr; }
+    if (!(per.get(tr) <= dist)) per.set(tr, dist);
   }
-  return { d: best, t: bt };
+  // a stretch two trails share: name them all
+  const names = bt ? [...per].filter(([, x]) => x < best + 0.6).map(([t]) => t.name) : [];
+  return { d: best, t: bt, names };
 }
 // corduroy: ribs along the trail, a slightly darker groomed edge each side
 const cordTex = (() => {
@@ -348,7 +377,7 @@ function buildTrails(rnd){
     .concat(beaconList.map(b => ({ d: b.d, a: (b.r + 6)/R })));
   const tmp = new V(), side = new V(), q = new V();
   // a trail's grid entries and its groomed ribbon. closed trails wrap round; open ones stop at their ends
-  const addTrail = (name, out, closed) => {
+  const addTrail = (name, out, closed, shared) => {
     const ti = trails.length, M = out.length, segN = closed ? M : M - 1;
     let len = 0; for (let k = 0; k < segN; k++) len += out[k].angleTo(out[(k + 1) % M])*R;
     trails.push({ name, pts: out, len, closed });
@@ -375,17 +404,20 @@ function buildTrails(rnd){
     }
     const idx = new Uint32Array(segN*(C7 - 1)*6); let ii = 0;
     for (let k = 0; k < segN; k++) for (let c = 0; c < C7 - 1; c++){
+      if (shared && shared[k] && shared[(k + 1) % M]) continue;      // drawn by the trail it shares this stretch with
       const a = k*C7 + c, b = ((k + 1) % M)*C7 + c;
       idx[ii++] = a; idx[ii++] = a + 1; idx[ii++] = b; idx[ii++] = a + 1; idx[ii++] = b + 1; idx[ii++] = b;   // facing out
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-    g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeBoundingSphere();
+    g.setIndex(new THREE.BufferAttribute(idx.slice(0, ii), 1)); g.computeBoundingSphere();
     const mesh = new THREE.Mesh(g, trailMat); scene.add(mesh); trailMeshes.push(mesh);
   };
   // a layout's own trails (a smooth curve through its points), and nothing else
   if (LAYOUT){
-    for (const t of LAYOUT.trails) if (t.pts.length >= 2) addTrail(t.name, PTR.evenCurve(t.pts, t.closed, 1.5, R).map(a => new V(...a)), !!t.closed);
+    // as one network: where a trail runs alongside an earlier one it's pulled onto it, and that stretch drawn once
+    const net = PTR.trailNetwork(LAYOUT.trails, R, LAYOUT.network ? LAYOUT.network.join : 0, 1.5);
+    LAYOUT.trails.forEach((t, ti) => { if (net.lines[ti].length >= 2) addTrail(t.name, net.lines[ti].map(a => new V(...a)), !!t.closed, net.shared[ti]); });
     return;
   }
   poles.forEach((C, ti) => {
@@ -964,7 +996,7 @@ function step(dt){
   const wK = P.lift ? S.weight : 1;
   const gm = glideMult();
   // groomed or not: ungroomed snow multiplies friction and drag (a held glide works off the trail too, as in the game)
-  const tq = nearestTrailAt(n); S.off = offTrail(tq.d); S.trail = tq.t;
+  const tq = nearestTrailAt(n); S.off = offTrail(tq.d); S.trail = tq.t; S.trailNames = tq.names;
   if (ONB){ S.off = 0; S.trail = null; }      // the deck glides like groomed trail
   const surf = (1 + (P.off - 1)*S.off) * gm;
 
@@ -1200,7 +1232,8 @@ function frame(now){
   // flatten view: drawn as a planet of radius Re (fading out in the planet view)
   const fk = P.flat*(1 - k), Re = R/(1 - fk);
   FLATU.uFlatK.value = fk; FLATU.uFlatR.value = R; FLATU.uFlatN.value.copy(n); FLATU.uFlatC.value.copy(n).multiplyScalar(surfaceR());
-  scene.fog.near = 120 + k*R*20; scene.fog.far = 420 + 0.8*Re + k*R*40;
+  if (document.getElementById('tFog').checked){ scene.fog.near = 120 + k*R*20; scene.fog.far = 420 + 0.8*Re + k*R*40; }
+  else { scene.fog.near = 1e7; scene.fog.far = 2e7; }
 
   updateLod();
   // only the chunks this side of the horizon (or all of them, in the planet view)
@@ -1228,7 +1261,7 @@ const circumference = () => 2*Math.PI*P.R;
 function fmtM(m){ return m >= 1000 ? (m/1000).toFixed(2) + ' km' : Math.round(m) + ' m'; }
 function hud(){
   $('hSpeed').textContent = (speed()*3.6).toFixed(1) + ' km/h';
-  $('hSnow').textContent = ONB ? 'Light bridge · ' + ONB.b.name : S.off < 0.5 && S.trail ? 'Groomed · ' + S.trail.name : 'Ungroomed';
+  $('hSnow').textContent = ONB ? 'Light bridge · ' + ONB.b.name : S.off < 0.5 && S.trail ? 'Groomed · ' + (S.trailNames && S.trailNames.length > 1 ? S.trailNames.join(' / ') : S.trail.name) : 'Ungroomed';
   $('hGrade').textContent = (S.grade >= 0 ? '+' : '') + Math.round(S.grade*100) + '%';
   $('hWeight').textContent = Math.round(S.weight*100) + '%';
   const from = n.angleTo(START_N)*P.R;
@@ -1349,8 +1382,13 @@ $('defaultsBtn').addEventListener('click', () => {
 // ---------- layouts from the planet editor ----------
 // ?layout=editor reads the editor's autosave (or asks the editor window for it); ?layout=some/planet.json fetches one
 // (that needs the page served over http); a planet.json dropped on the page loads it too
+// the game tidies a layout as it loads it (the layout itself is left as it was): see PlanetTerrain.cleanup
+function tidied(Lz){
+  if (!$('tTidy').checked){ TIDY = ''; return Lz; }
+  const r = PTR.cleanup(Lz); TIDY = PTR.cleanupSummary(r.report); return r.L;
+}
 function applyLayout(Lz){
-  LAYOUT = Lz;
+  LAYOUT_RAW = Lz; LAYOUT = tidied(Lz);
   START_N.set(...Lz.start.d).normalize();
   P.R = Lz.radius; $('tR').value = Lz.radius; $('oR').textContent = Lz.radius + ' m';
   for (const [id, o, k, f] of SETTINGS){ const v = { mtn: Lz.scatter.mountains, bld: Lz.scatter.buildings, trees: Lz.scatter.trees }[k]; if (v === undefined) continue; P[k] = v; $(id).value = v; $(o).textContent = f(v); }
@@ -1358,7 +1396,7 @@ function applyLayout(Lz){
 }
 function layoutUI(){
   $('procBtn').hidden = !LAYOUT;
-  $('layoutNote').textContent = LAYOUT ? 'Skiing “' + LAYOUT.name + '” from the planet editor (' + LAYOUT.stamps.length + ' stamps, ' + LAYOUT.trails.length + ' trails, ' + LAYOUT.landmarks.length + ' landmarks).' : 'Drop a planet.json from the planet editor here to ski it.';
+  $('layoutNote').textContent = LAYOUT ? 'Skiing “' + LAYOUT.name + '” from the planet editor (' + LAYOUT.stamps.length + ' stamps, ' + LAYOUT.trails.length + ' trails, ' + LAYOUT.landmarks.length + ' landmarks).' + (TIDY ? ' Tidied: ' + TIDY + '.' : '') : 'Drop a planet.json from the planet editor here to ski it.';
   sizeLabel(); rNote();
 }
 function bootLayout(){
@@ -1380,8 +1418,9 @@ document.addEventListener('drop', e => {
   e.preventDefault(); const f = e.dataTransfer.files[0]; if (!f) return;
   f.text().then(t => { try { applyLayout(PTR.parse(t)); rebuild(true); } catch (err) { $('layoutNote').textContent = 'That file isn’t a planet layout.'; } });
 });
+$('tTidy').addEventListener('change', () => { if (!LAYOUT_RAW) return; LAYOUT = tidied(LAYOUT_RAW); layoutUI(); rebuild(false); });
 $('procBtn').addEventListener('click', e => {
-  LAYOUT = null; START_N.set(0.15, 1, 0.25).normalize(); history.replaceState(null, '', location.pathname); layoutUI(); rebuild(true); e.currentTarget.blur();
+  LAYOUT = LAYOUT_RAW = null; START_N.set(0.15, 1, 0.25).normalize(); history.replaceState(null, '', location.pathname); layoutUI(); rebuild(true); e.currentTarget.blur();
 });
 
 // ---------- go ----------

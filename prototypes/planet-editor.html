@@ -85,6 +85,11 @@ select option{color:#1d2a36}
   <label class="f" for="pMtn">Random mountains (game)<output id="oMtn"></output><input id="pMtn" type="range" min="0" max="3" step="0.25"></label>
   <label class="f" for="pBld">Buildings (game)<output id="oBld"></output><input id="pBld" type="range" min="0" max="3" step="0.25"></label>
   <label class="f" for="pTrees">Trees (game)<output id="oTrees"></output><input id="pTrees" type="range" min="0" max="3" step="0.25"></label>
+  <h3>Clean up</h3>
+  <label class="f" for="nJoin">Join trails within<output id="oJoin"></output><input id="nJoin" type="range" min="0" max="20" step="1"></label>
+  <label class="f" for="nPatch">Ease steep bits under<output id="oPatch"></output><input id="nPatch" type="range" min="0" max="40" step="1"></label>
+  <div class="row"><button id="bClean" type="button">Clean up</button></div>
+  <p class="hint" id="cleanNote">Trails running side by side within the join distance always ski and carve as one. Clean up also thins crowded points, joins points of different trails that nearly meet, snaps loose ends onto the trail they stop short of, and eases small patches too steep to ski (not painted cliffs). The game does the same as it loads, without changing the layout; here it changes the layout (Ctrl+Z undoes it).</p>
   <h3>View</h3>
   <label class="f" for="vContour">Contours every<output id="oContour"></output><input id="vContour" type="range" min="0" max="5" step="1" value="2"></label>
   <label class="f" for="vTilt">Tilt<output id="oTilt"></output><input id="vTilt" type="range" min="0" max="70" step="1" value="0"></label>
@@ -145,11 +150,11 @@ const CH = 8;
 const terrainMat = new THREE.ShaderMaterial({
   extensions: { derivatives: true },
   uniforms: { uR: { value: R }, uLo: { value: -10 }, uHi: { value: 60 }, uCi: { value: 5 }, uLight: { value: new V3(0, 1, 0) }, uSlope: { value: 0 }, uFrom: { value: 0.6 }, uStop: { value: 1.0 } },
-  vertexShader: `varying vec3 vP; varying vec3 vN;
-    void main(){ vP = position; vN = normal; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }`,
-  fragmentShader: `uniform float uR, uLo, uHi, uCi, uSlope, uFrom, uStop; uniform vec3 uLight; varying vec3 vP; varying vec3 vN;
+  vertexShader: `attribute float aH; varying vec3 vP; varying vec3 vN; varying float vH;
+    void main(){ vP = position; vN = normal; vH = aH; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }`,
+  fragmentShader: `uniform float uR, uLo, uHi, uCi, uSlope, uFrom, uStop; uniform vec3 uLight; varying vec3 vP; varying vec3 vN; varying float vH;
     void main(){
-      float h = length(vP) - uR;
+      float h = vH;
       float k = clamp((h - uLo)/max(1.0, uHi - uLo), 0.0, 1.0);
       vec3 lo = vec3(0.42, 0.53, 0.66), mid = vec3(0.86, 0.90, 0.94), hi = vec3(1.0);
       vec3 col = k < 0.5 ? mix(lo, mid, k*2.0) : mix(mid, hi, (k - 0.5)*2.0);
@@ -178,14 +183,36 @@ function spherify(x, y, z, out){
 const FACES = [[[1,0,0],[0,0,-1],[0,1,0]], [[-1,0,0],[0,0,1],[0,1,0]], [[0,1,0],[1,0,0],[0,0,-1]], [[0,-1,0],[1,0,0],[0,0,1]], [[0,0,1],[1,0,0],[0,1,0]], [[0,0,-1],[-1,0,0],[0,1,0]]];
 const _d = new V3();
 function faceDir(f, i, j, out, N = NF){ const [nn, uu, vv] = FACES[f], s = -1 + 2*i/N, t = -1 + 2*j/N; return spherify(nn[0] + uu[0]*s + vv[0]*t, nn[1] + uu[1]*s + vv[1]*t, nn[2] + uu[2]*s + vv[2]*t, out); }
+// a chunk's triangles: the (m+1)^2 grid, then a skirt down from each of its 4 edges (both ways round, so it shows from
+// either side)
+function chunkIndex(m){
+  const V = m + 1, idx = new Uint16Array(m*m*6 + 4*m*12); let q = 0;
+  for (let j = 0; j < m; j++) for (let i = 0; i < m; i++){ const a = j*V + i, b = a + 1, cc = a + V, d = cc + 1; idx[q++] = a; idx[q++] = b; idx[q++] = cc; idx[q++] = b; idx[q++] = d; idx[q++] = cc; }
+  const edge = [t => t, t => m*V + t, t => t*V, t => t*V + m];
+  for (let e = 0; e < 4; e++) for (let t = 0; t < m; t++){
+    const a = edge[e](t), b = edge[e](t + 1), sa = V*V + e*V + t, sb = sa + 1;
+    idx[q++] = a; idx[q++] = b; idx[q++] = sa; idx[q++] = b; idx[q++] = sb; idx[q++] = sa;
+    idx[q++] = a; idx[q++] = sa; idx[q++] = b; idx[q++] = b; idx[q++] = sa; idx[q++] = sb;
+  }
+  return idx;
+}
+// fill the skirt vertices (after the V*V grid): each edge vertex again, `drop` metres lower, same normal (and colour)
+function skirt(pos, nor, col, m, drop, R){
+  const V = m + 1, edge = [t => t, t => m*V + t, t => t*V, t => t*V + m];
+  for (let e = 0; e < 4; e++) for (let t = 0; t <= m; t++){
+    const a = edge[e](t)*3, k = (V*V + e*V + t)*3, x = pos[a], y = pos[a + 1], z = pos[a + 2], r = Math.hypot(x, y, z), f = (r - drop)/r;
+    pos[k] = x*f; pos[k + 1] = y*f; pos[k + 2] = z*f; nor[k] = nor[a]; nor[k + 1] = nor[a + 1]; nor[k + 2] = nor[a + 2];
+    if (col){ col[k] = col[a]; col[k + 1] = col[a + 1]; col[k + 2] = col[a + 2]; }
+  }
+}
 // near the camera a chunk is built finer (lod 2 or 4: up to four times the points each way), so detail shows up close
 function buildChunk(c){
-  const lod = c.lod || 1, N2 = NF*lod, m = NF/CH*lod, M = m + 3, pos = new Float32Array((m + 1)*(m + 1)*3), nor = new Float32Array((m + 1)*(m + 1)*3);
+  const lod = c.lod || 1, N2 = NF*lod, m = NF/CH*lod, M = m + 3, V = m + 1, NV = V*V + 4*V, pos = new Float32Array(NV*3), nor = new Float32Array(NV*3);
   // positions on an (m+3)^2 grid with a one-vertex border, so normals match across chunk edges
   const P = new Float32Array(M*M*3); let lo = Infinity, hi = -Infinity;
   for (let j = 0; j < M; j++) for (let i = 0; i < M; i++){
-    const gi = Math.max(0, Math.min(N2, c.ci*m + i - 1)), gj = Math.max(0, Math.min(N2, c.cj*m + j - 1));
-    faceDir(c.f, gi, gj, _d, N2); const h = T.height(_d.x, _d.y, _d.z), r = R + h, o = (j*M + i)*3;
+    const gi = c.ci*m + i - 1, gj = c.cj*m + j - 1;
+    faceDir(c.f, gi, gj, _d, N2); if (gi < 0 || gj < 0 || gi > N2 || gj > N2) _d.normalize(); const h = T.height(_d.x, _d.y, _d.z), r = R + h, o = (j*M + i)*3;
     P[o] = _d.x*r; P[o + 1] = _d.y*r; P[o + 2] = _d.z*r;
     if (i > 0 && j > 0 && i < M - 1 && j < M - 1){ lo = Math.min(lo, h); hi = Math.max(hi, h); }
   }
@@ -197,17 +224,20 @@ function buildChunk(c){
     nor[k] = nx/Ln; nor[k + 1] = ny/Ln; nor[k + 2] = nz/Ln;
   }
   c.lo = lo; c.hi = hi;
+  // skirts: a strip hanging down from each edge, so where a finer chunk meets a coarser one no gap shows through
+  skirt(pos, nor, null, m, Math.max(2, (hi - lo)*0.3), R);
+  // the height each vertex shades with (a skirt shades as the edge above it, so contours don't smear down it)
+  const hs = new Float32Array(NV); for (let k = 0; k < V*V; k++) hs[k] = Math.hypot(pos[k*3], pos[k*3 + 1], pos[k*3 + 2]) - R;
+  { const edge = [t => t, t => m*V + t, t => t*V, t => t*V + m]; for (let e = 0; e < 4; e++) for (let t = 0; t <= m; t++) hs[V*V + e*V + t] = hs[edge[e](t)]; }
   if (c.mesh && c.builtLod !== lod){ globe.remove(c.mesh); c.mesh.geometry.dispose(); c.mesh = null; }
   c.builtLod = lod;
   if (!c.mesh){
-    const idx = new Uint16Array(m*m*6); let q = 0;
-    for (let j = 0; j < m; j++) for (let i = 0; i < m; i++){ const a = j*(m + 1) + i, b = a + 1, cc = a + m + 1, d = cc + 1; idx[q++] = a; idx[q++] = b; idx[q++] = cc; idx[q++] = b; idx[q++] = d; idx[q++] = cc; }
-    const g = new THREE.BufferGeometry(); g.setIndex(new THREE.BufferAttribute(idx, 1));
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    const g = new THREE.BufferGeometry(); g.setIndex(new THREE.BufferAttribute(chunkIndex(m), 1));
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('aH', new THREE.BufferAttribute(hs, 1));
     c.mesh = new THREE.Mesh(g, terrainMat); globe.add(c.mesh);
   } else {
-    const g = c.mesh.geometry; g.attributes.position.array.set(pos); g.attributes.normal.array.set(nor);
-    g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = true;
+    const g = c.mesh.geometry; g.attributes.position.array.set(pos); g.attributes.normal.array.set(nor); g.attributes.aH.array.set(hs);
+    g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = g.attributes.aH.needsUpdate = true;
   }
   c.mesh.geometry.computeBoundingSphere();
 }
@@ -292,7 +322,8 @@ function rebuildOverlays(){
   }
   for (const t of L.trails){
     const col = isSel('trail', t) ? 0x5b9cf0 : 0xffffff;
-    if (t.pts.length > 1) over.add(lineOn(PT.curve(t.pts, t.closed, 6, R), col, 1.5, false));
+    // drawn as the network skis it: alongside an earlier trail, on top of it
+    if (t.pts.length > 1) over.add(lineOn(PT.trailNetwork(L.trails, R, L.network ? L.network.join : 0, 4).lines[L.trails.indexOf(t)], col, 1.5, false));
     for (let i = 0; i < t.pts.length; i++) addHandle('trail', t, i, t.pts[i], col, 0.8);
   }
   for (const m of L.landmarks){
@@ -354,7 +385,7 @@ function handlePick(px, py, maxPx = 14){
 // undo, autosave
 // ============================================================================================================
 const undoStack = [], redoStack = [];
-function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, bridges: L.bridges, start: L.start, scatter: L.scatter, cliffs: L.cliffs }), sculpt: L.sculpt.data.slice(), detail: PT.cloneDetail(L.detail) }; }
+function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, bridges: L.bridges, start: L.start, scatter: L.scatter, cliffs: L.cliffs, network: L.network }), sculpt: L.sculpt.data.slice(), detail: PT.cloneDetail(L.detail) }; }
 let lastSnap = snapshot();
 function commit(){ undoStack.push(lastSnap); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; lastSnap = snapshot(); autosave(); }
 function restore(s){
@@ -620,7 +651,7 @@ cv.addEventListener('wheel', e => { e.preventDefault(); cam.dist = R + Math.max(
 // ---- sculpting: each frame the mouse is down, the brush works the sculpt layer's points inside it ----
 function sculptStep(dt){
   if (!ptr || ptr.mode !== 'sculpt') return;
-  const d = groundPick(ptr.x, ptr.y); if (!d) return;
+  const d = ptr.dir || groundPick(ptr.x, ptr.y); if (!d) return;
   const sc = L.sculpt, n = sc.n, rad = opts.sculpt.radius, ang = rad/R, cosA = Math.cos(ang);
   let mode = opts.sculpt.mode; if (keys.shift && (mode === 'raise' || mode === 'lower')) mode = mode === 'raise' ? 'lower' : 'raise';
   const rate = opts.sculpt.strength*dt, q = [0, 0, 0];
@@ -639,11 +670,13 @@ function sculptStep(dt){
     if (mode === 'raise') g[o] += rate*w;
     else if (mode === 'lower') g[o] -= rate*w;
     else if (mode === 'smooth'){
-      const at = (ii, jj) => g[f*n*n + Math.max(0, Math.min(n - 1, jj))*n + Math.max(0, Math.min(n - 1, ii))];
-      const avg = (at(i - 1, j) + at(i + 1, j) + at(i, j - 1) + at(i, j + 1))/4;
+      // neighbours one grid step away, read off the sphere, so past a face's edge they come from the next face
+      const du = 2/(n - 1), u = -1 + i*du, v = -1 + j*du, at = (a, b) => PT.sampleSculpt(sc, ...PT.dirFromFace(f, a, b, q));
+      const avg = (at(u - du, v) + at(u + du, v) + at(u, v - du) + at(u, v + du))/4;
       g[o] += (avg - g[o])*Math.min(1, w*dt*opts.sculpt.strength*0.6);
     } else { const total = T.height(x, y, z); g[o] += (ptr.target - total)*Math.min(1, w*dt*opts.sculpt.strength*0.3); }
   }
+  PT.weldSculpt(sc);
   rebuildCaps([[d, ang + 0.01]]);
 }
 
@@ -652,7 +685,7 @@ function sculptStep(dt){
 // part of the way there. so one stroke settles on its cliff shape, and another stroke over it sharpens it again
 function cliffStep(dt){
   if (!ptr || ptr.mode !== 'cliff') return;
-  const d = groundPick(ptr.x, ptr.y); if (!d) return;
+  const d = ptr.dir || groundPick(ptr.x, ptr.y); if (!d) return;
   const dl = L.detail, n = dl.n, rad = opts.cliff.radius, ang = rad/R, cosA = Math.cos(ang), q = [0, 0, 0], C = L.cliffs;
   const rate = Math.min(1, opts.cliff.strength*dt*2), c = [d.x, d.y, d.z];
   const slopeAt = (x, y, z) => {
@@ -677,6 +710,7 @@ function cliffStep(dt){
       PT.detailAdd(dl, f, i, j, (g - cur)*rate*w);
     }
   }
+  PT.weldDetail(dl);
   rebuildCaps([[d, ang + 0.004]]);
 }
 
@@ -782,8 +816,18 @@ function syncPlanetUI(){
   $('pName').value = L.name;
   const set = (id, o, v, f) => { $(id).value = v; $(o).textContent = f(v); };
   set('pR', 'oR', L.radius, v => v + ' m'); set('pAmp', 'oAmp', L.noise.amp, v => '×' + (+v).toFixed(2));
+  if (!L.network) L.network = PT.networkDefaults();
+  set('nJoin', 'oJoin', L.network.join, v => +v ? v + ' m' : 'off'); set('nPatch', 'oPatch', L.network.patch, v => +v ? v + ' m' : 'off');
   set('pMtn', 'oMtn', L.scatter.mountains, v => +v ? '×' + v : 'none'); set('pBld', 'oBld', L.scatter.buildings, v => +v ? '×' + v : 'none'); set('pTrees', 'oTrees', L.scatter.trees, v => +v ? '×' + v : 'none');
 }
+$('nJoin').addEventListener('input', () => { $('oJoin').textContent = +$('nJoin').value ? $('nJoin').value + ' m' : 'off'; });
+$('nJoin').addEventListener('change', () => { L.network.join = +$('nJoin').value; busy(() => { rebuildCaps(L.trails.filter(t => t.carve && t.pts.length > 1).map(trailCap)); rebuildOverlays(); }); commit(); $('nJoin').blur(); });
+$('nPatch').addEventListener('input', () => { $('oPatch').textContent = +$('nPatch').value ? $('nPatch').value + ' m' : 'off'; });
+$('nPatch').addEventListener('change', () => { L.network.patch = +$('nPatch').value; commit(); $('nPatch').blur(); });
+$('bClean').addEventListener('click', () => {
+  busy(() => { const r = PT.cleanup(L); replaceLayout(r.L); $('cleanNote').textContent = 'Cleaned up: ' + PT.cleanupSummary(r.report) + '. Ctrl+Z undoes it.'; });
+  $('bClean').blur();
+});
 $('pName').addEventListener('input', () => { L.name = $('pName').value; }); $('pName').addEventListener('change', () => { commit(); $('pName').blur(); });
 $('pR').addEventListener('input', () => { $('oR').textContent = $('pR').value + ' m'; });
 $('pR').addEventListener('change', () => { const old = L.radius; L.radius = +$('pR').value; cam.dist *= L.radius/old; busy(() => { buildGlobe(); rebuildOverlays(); miniDirty(); }); commit(); $('pR').blur(); });
@@ -857,7 +901,8 @@ resize(); syncPlanetUI(); syncSlopeUniforms(); setTool('orbit');
 $('oContour').textContent = CONTOURS[2] + ' m'; terrainMat.uniforms.uCi.value = CONTOURS[2]; $('oTilt').textContent = '0°';
 busy(() => {
   buildGlobe(); rebuildOverlays(); renderMiniTerrain(); showSel();
-  window.__editor = { get L(){ return L; }, get T(){ return T; }, setTool, undo, redo, commit, groundPick, handlePick, cam, get sel(){ return sel; }, finishDrawing, get chunks(){ return chunks; }, camera };   // test hook
+  window.__editor = { get L(){ return L; }, get T(){ return T; }, setTool, undo, redo, commit, opts,
+    stroke(mode, dir, frames, dt = 1/30){ ptr = { mode, dir: new V3(dir.x, dir.y, dir.z).normalize(), goals: new Map(), target: 0 }; for (let i = 0; i < frames; i++) mode === 'cliff' ? cliffStep(dt) : sculptStep(dt); ptr = null; }, groundPick, handlePick, cam, get sel(){ return sel; }, finishDrawing, get chunks(){ return chunks; }, camera };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 });
 </script>

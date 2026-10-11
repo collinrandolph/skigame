@@ -147,8 +147,10 @@ PT.curve = function(pts, closed, spacing, R){
   return out;
 };
 // the same curve, resampled to an even spacing (metres) along its length
-PT.evenCurve = function(pts, closed, spacing, R){
-  const raw = PT.curve(pts, closed, spacing/3, R); if (raw.length < 2) return raw;
+PT.evenCurve = function(pts, closed, spacing, R){ return PT.resampleLine(PT.curve(pts, closed, spacing/3, R), closed, spacing, R); };
+// a line of unit directions, resampled to an even spacing (metres)
+PT.resampleLine = function(raw, closed, spacing, R){
+  if (raw.length < 2) return raw;
   const seq = closed ? raw.concat([raw[0]]) : raw, cum = [0];
   for (let i = 1; i < seq.length; i++){ const a = seq[i - 1], b = seq[i]; cum.push(cum[i - 1] + Math.acos(Math.min(1, a[0]*b[0] + a[1]*b[1] + a[2]*b[2]))*R); }
   const total = cum[cum.length - 1], M = Math.max(2, Math.round(total/spacing)), out = []; let j = 0;
@@ -192,6 +194,46 @@ PT.sampleDetail = function(dl, x, y, z){
   const fx = gx - i, fy = gy - j, g = (a, b) => PT.detailGet(dl, f, a, b);
   return (g(i, j)*(1 - fx) + g(i + 1, j)*fx)*(1 - fy) + (g(i, j + 1)*(1 - fx) + g(i + 1, j + 1)*fx)*fy;
 };
+// ---------- seams: the points along a cube-face edge are kept twice (once on each face; three times at a corner). they
+// must hold the same height or the ground steps where the faces meet. weld: set every twin to their average. with
+// `heal` rows, the change at the edge is eased back into each face over that many rows, so an old step becomes a slope
+const FAX = [[0, 1, 2, 1], [0, 1, 2, -1], [1, 0, 2, 1], [1, 0, 2, -1], [2, 0, 1, 1], [2, 0, 1, -1]];   // normal axis, u axis, v axis, sign
+const twinCache = new Map();
+// groups of [face, i, j, inward di, inward dj] that are the same point, for an n x n grid per face
+function twinGroups(n){
+  if (twinCache.has(n)) return twinCache.get(n);
+  const seen = new Set(), groups = [], q = [0, 0, 0], key = (f, i, j) => (f*n + j)*n + i;
+  for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++){
+    if (i && j && i < n - 1 && j < n - 1) continue;
+    if (seen.has(key(f, i, j))) continue;
+    PT.dirFromFace(f, -1 + 2*i/(n - 1), -1 + 2*j/(n - 1), q);
+    const m = Math.max(Math.abs(q[0]), Math.abs(q[1]), Math.abs(q[2])), g = [];
+    for (let f2 = 0; f2 < 6; f2++){
+      const [na, ua, va, sg] = FAX[f2], comp = q[na]*sg; if (comp < m - 1e-9) continue;
+      const i2 = Math.round((q[ua]/comp + 1)/2*(n - 1)), j2 = Math.round((q[va]/comp + 1)/2*(n - 1));
+      seen.add(key(f2, i2, j2));
+      g.push([f2, i2, j2, i2 === 0 ? 1 : i2 === n - 1 ? -1 : 0, j2 === 0 ? 1 : j2 === n - 1 ? -1 : 0]);
+    }
+    if (g.length > 1) groups.push(g);
+  }
+  twinCache.set(n, groups); return groups;
+}
+function weld(n, get, add, heal){
+  let worst = 0;
+  for (const g of twinGroups(n)){
+    let sum = 0; const v = g.map(([f, i, j]) => { const x = get(f, i, j); sum += x; return x; }); const avg = sum/g.length;
+    g.forEach(([f, i, j, di, dj], k) => {
+      const dv = avg - v[k]; if (Math.abs(dv) < 1e-4) return; worst = Math.max(worst, Math.abs(dv));
+      add(f, i, j, dv);
+      // ease it in along the row going into the face (a corner point only along one of its two edges)
+      if (heal) for (let r = 1; r < heal; r++){ const ii = i + di*r, jj = j + (di ? 0 : dj*r); if (ii < 0 || jj < 0 || ii >= n || jj >= n) break; add(f, ii, jj, dv*(1 - r/heal)*(1 - r/heal)); }
+    });
+  }
+  return worst;
+}
+// returns the biggest correction made (metres)
+PT.weldSculpt = function(sc, heal){ const n = sc.n, d = sc.data; return weld(n, (f, i, j) => d[(f*n + j)*n + i], (f, i, j, v) => { d[(f*n + j)*n + i] += v; }, heal || 0); };
+PT.weldDetail = function(dl, heal){ if (!dl.tiles.size) return 0; return weld(dl.n, (f, i, j) => PT.detailGet(dl, f, i, j), (f, i, j, v) => PT.detailAdd(dl, f, i, j, v), heal || 0); };
 PT.cloneDetail = dl => ({ n: dl.n, tiles: new Map([...dl.tiles].map(([k, t]) => [k, t.slice()])) });
 function b64FromBytes(bytes){ let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
 function bytesFromB64(b){ const s = atob(b), out = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i); return out; }
@@ -277,11 +319,229 @@ PT.bridgeDeck = function(b, height, R){
   return { pts, g, s, h, L, width: Math.max(0.8, b.width ?? 2.5), rampGrade: k, climb, desc, highest: high };
 };
 
+// ---------- the trail network ----------
+// join: trails closer than this (m) are made one. patch: the steep bits smaller than this across (m) are eased
+PT.networkDefaults = () => ({ join: 8, patch: 15 });
+const ang3 = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0]*b[0] + a[1]*b[1] + a[2]*b[2])));
+// a spatial hash of a line's points (cells `cell` metres), for finding the nearest point of the line quickly
+function lineHash(pts, R, cell){
+  const map = new Map(), k = (x, y, z) => Math.floor(x*R/cell) + ',' + Math.floor(y*R/cell) + ',' + Math.floor(z*R/cell);
+  pts.forEach((p, i) => { const key = k(p[0], p[1], p[2]); let l = map.get(key); if (!l) map.set(key, l = []); l.push(i); });
+  return { map, cell, R, pts, near(p){
+    const cx = Math.floor(p[0]*R/cell), cy = Math.floor(p[1]*R/cell), cz = Math.floor(p[2]*R/cell), out = [];
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++){ const l = map.get((cx + a) + ',' + (cy + b) + ',' + (cz + c)); if (l) for (const i of l) out.push(i); }
+    return out;
+  } };
+}
+// the nearest point of a line (within about a cell): distance (m), the point, its direction along the line, where (k, u)
+function nearestOn(H, p, closed){
+  const P = H.pts, M = P.length, R = H.R; let best = null;
+  for (const i of H.near(p)) for (const k of [i - 1, i]){
+    if (k < 0 && !closed) continue; const k0 = (k + M) % M, k1 = (k0 + 1) % M; if (!closed && k0 === M - 1) continue;
+    const a = P[k0], b = P[k1], ex = b[0] - a[0], ey = b[1] - a[1], ez = b[2] - a[2], L2 = ex*ex + ey*ey + ez*ez || 1e-18;
+    const u = Math.max(0, Math.min(1, ((p[0] - a[0])*ex + (p[1] - a[1])*ey + (p[2] - a[2])*ez)/L2));
+    const q = [a[0] + ex*u, a[1] + ey*u, a[2] + ez*u], d = Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2])*R;
+    if (!best || d < best.d){ const Ll = Math.sqrt(L2); best = { d, q, t: [ex/Ll, ey/Ll, ez/Ll], k: k0, u }; }
+  }
+  if (best){ const l = Math.hypot(...best.q); best.q = best.q.map(v => v/l); }
+  return best;
+}
+const tangentAt = (P, i, closed) => {
+  const M = P.length, a = closed ? P[(i + 1) % M] : P[Math.min(M - 1, i + 1)], b = closed ? P[(i - 1 + M) % M] : P[Math.max(0, i - 1)];
+  const t = [a[0] - b[0], a[1] - b[1], a[2] - b[2]], l = Math.hypot(...t) || 1; return [t[0]/l, t[1]/l, t[2]/l];
+};
+// every trail as an even line of points `spacing` m apart, with the runs where a trail goes alongside an earlier one
+// (within `join` m, for at least twice that, roughly the same way) pulled onto it, eased in and out over 2 x join.
+// shared[t][i] is 1 + the earlier trail point i of trail t now lies on (0 if none): draw it once, name both
+const netCache = new Map();
+PT.trailNetwork = function(trails, R, join, spacing){
+  const key = JSON.stringify([R, join, spacing, trails.map(t => [t.pts, !!t.closed])]);
+  if (netCache.has(key)) return netCache.get(key);
+  const lines = trails.map(t => t.pts && t.pts.length >= 2 ? PT.evenCurve(t.pts, !!t.closed, spacing, R) : []);
+  const shared = lines.map(l => new Uint8Array(l.length)), merged = [];
+  if (join > 0) for (let b = 1; b < lines.length; b++){
+    const closed = !!trails[b].closed;
+    for (let a = 0; a < b; a++){
+      const A = lines[a], B = lines[b], M = B.length; if (A.length < 2 || M < 3) continue;
+      const H = lineHash(A, R, Math.max(4, join*1.5)), raw = new Uint8Array(M), Q = new Array(M);
+      for (let i = 0; i < M; i++){
+        const nq = nearestOn(H, B[i], !!trails[a].closed); if (!nq || nq.d > join*3) continue;
+        Q[i] = nq.q; const tb = tangentAt(B, i, closed);
+        if (nq.d < join && Math.abs(tb[0]*nq.t[0] + tb[1]*nq.t[1] + tb[2]*nq.t[2]) > 0.8) raw[i] = 1;
+      }
+      // keep only the runs at least 2 x join long (so a crossing stays a crossing)
+      const need = Math.max(2, Math.round(2*join/spacing)); let any = false, start = 0;
+      if (closed){ start = raw.indexOf(0); if (start < 0) start = 0; }
+      for (let s0 = 0; s0 < M; ){
+        const i0 = (start + s0) % M; if (!raw[i0]){ s0++; continue; }
+        let len = 0; while (s0 + len < M && raw[(start + s0 + len) % M]) len++;
+        if (len < need) for (let k = 0; k < len; k++) raw[(start + s0 + k) % M] = 0; else any = true;
+        s0 += len;
+      }
+      if (!any) continue;
+      // ease: a running average of the runs, then smoothstep
+      const E = Math.max(1, Math.round(2*join/spacing)), w = new Float64Array(M);
+      for (let i = 0; i < M; i++){
+        let sum = 0, n = 0;
+        for (let k = -E; k <= E; k++){ let j = i + k; if (closed) j = (j % M + M) % M; else if (j < 0 || j >= M) continue; sum += raw[j]; n++; }
+        const t = Math.min(1, 2*sum/n); w[i] = t*t*(3 - 2*t);
+      }
+      for (let i = 0; i < M; i++) if (w[i] > 0 && Q[i]){
+        const p = B[i], q = Q[i], x = p[0] + (q[0] - p[0])*w[i], y = p[1] + (q[1] - p[1])*w[i], z = p[2] + (q[2] - p[2])*w[i], l = Math.hypot(x, y, z);
+        B[i] = [x/l, y/l, z/l];
+      }
+      lines[b] = PT.resampleLine(B, closed, spacing, R);
+      merged.push([a, b]);
+    }
+    // which of its points now lie on an earlier trail
+    const B = lines[b], sh = shared[b] = new Uint8Array(B.length);
+    for (let a = 0; a < b; a++){
+      if (lines[a].length < 2) continue; const H = lineHash(lines[a], R, 4);
+      for (let i = 0; i < B.length; i++){ if (sh[i]) continue; const nq = nearestOn(H, B[i], !!trails[a].closed); if (nq && nq.d < 0.3) sh[i] = a + 1; }
+    }
+  }
+  const out = { lines, shared, merged };
+  if (netCache.size > 6) netCache.delete(netCache.keys().next().value);
+  netCache.set(key, out); return out;
+};
+
+// ---------- cleanup: what a layout's trails and steep bits need before skiing ----------
+// thin crowded points, join a trail's ends into a loop when they meet, bring control points of different trails that
+// nearly meet together (a junction), snap loose ends onto the trail they stop short of, and ease the small patches of
+// ground too steep to ski (leaving painted cliffs alone). returns a new layout and what changed
+PT.cleanup = function(L0, opt){
+  const L = PT.parse(PT.serialize(L0)), R = L.radius, net = Object.assign(PT.networkDefaults(), L.network || {}, opt || {});
+  const join = net.join, rep = { thinned: 0, closed: 0, junctions: 0, ends: 0, patches: 0, patchesLeft: 0 };
+  const dist = (a, b) => ang3(a, b)*R;
+  if (join > 0){
+    // thin: drop a point closer than join/2 to the last one kept (an open trail keeps its ends)
+    for (const t of L.trails){
+      const P = t.pts, min = t.closed ? 3 : 2; if (P.length <= min) continue;
+      const keep = [P[0]];
+      for (let i = 1; i < P.length; i++){
+        const last = !t.closed && i === P.length - 1;
+        if (dist(P[i], keep[keep.length - 1]) >= join/2) keep.push(P[i]);
+        else if (last && keep.length > 1) keep[keep.length - 1] = P[i];
+        else if (last) keep.push(P[i]);
+      }
+      if (t.closed && keep.length > min && dist(keep[keep.length - 1], keep[0]) < join/2) keep.pop();
+      if (keep.length >= min && keep.length < P.length){ rep.thinned += P.length - keep.length; t.pts = keep; }
+    }
+    // an open trail whose ends meet becomes a loop
+    for (const t of L.trails) if (!t.closed && t.pts.length >= 4 && dist(t.pts[0], t.pts[t.pts.length - 1]) < join){ t.pts.pop(); t.closed = true; rep.closed++; }
+    // junctions: control points of different trails within join of each other move to where they meet
+    const all = []; L.trails.forEach((t, ti) => t.pts.forEach((p, pi) => all.push([ti, pi])));
+    const par = all.map((_, i) => i), find = i => par[i] === i ? i : (par[i] = find(par[i]));
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++){
+      const [ti, pi] = all[i], [tj, pj] = all[j]; if (ti === tj) continue;
+      if (dist(L.trails[ti].pts[pi], L.trails[tj].pts[pj]) < join) par[find(i)] = find(j);
+    }
+    const groups = new Map(); all.forEach((_, i) => { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(all[i]); });
+    const inJunction = new Set();
+    for (const g of groups.values()){
+      if (g.length < 2) continue;
+      const c = [0, 0, 0]; for (const [ti, pi] of g){ const p = L.trails[ti].pts[pi]; c[0] += p[0]; c[1] += p[1]; c[2] += p[2]; }
+      const l = Math.hypot(...c), q = [c[0]/l, c[1]/l, c[2]/l]; let moved = false;
+      for (const [ti, pi] of g){ if (dist(L.trails[ti].pts[pi], q) > 0.01) moved = true; L.trails[ti].pts[pi] = q.slice(); inJunction.add(ti + ':' + pi); }
+      if (moved) rep.junctions++;
+    }
+    // loose ends: an open trail's end within join of another trail (and not already at a junction) goes onto it
+    const lines = L.trails.map(t => t.pts.length >= 2 ? PT.evenCurve(t.pts, !!t.closed, 1, R) : []), hashes = lines.map(l => l.length ? lineHash(l, R, Math.max(4, join*1.5)) : null);
+    L.trails.forEach((t, ti) => {
+      if (t.closed || t.pts.length < 2) return;
+      for (const pi of [0, t.pts.length - 1]){
+        if (inJunction.has(ti + ':' + pi)) continue;
+        let best = null;
+        L.trails.forEach((o, oi) => { if (oi === ti || !hashes[oi]) return; const nq = nearestOn(hashes[oi], t.pts[pi], !!o.closed); if (nq && nq.d < join && nq.d > 0.05 && (!best || nq.d < best.d)) best = nq; });
+        if (best){ t.pts[pi] = best.q; rep.ends++; }
+      }
+    });
+  }
+  if (net.patch > 0){ const r = easePatches(L, R, net.patch); rep.patches = r.eased; rep.patchesLeft = r.left; }
+  return { L, report: rep };
+};
+PT.cleanupSummary = function(r){
+  const parts = [];
+  if (r.thinned) parts.push(r.thinned + ' crowded point' + (r.thinned > 1 ? 's' : '') + ' thinned');
+  if (r.closed) parts.push(r.closed + ' trail' + (r.closed > 1 ? 's' : '') + ' closed into a loop');
+  if (r.junctions) parts.push(r.junctions + ' junction' + (r.junctions > 1 ? 's' : '') + ' joined');
+  if (r.ends) parts.push(r.ends + ' loose end' + (r.ends > 1 ? 's' : '') + ' snapped on');
+  if (r.patches) parts.push(r.patches + ' small steep patch' + (r.patches > 1 ? 'es' : '') + ' eased');
+  if (r.patchesLeft) parts.push(r.patchesLeft + ' left steep (too big or painted cliffs)');
+  return parts.length ? parts.join(', ') : 'nothing needed tidying';
+};
+// find the patches of ground too steep to ski (on a grid about 5 m apart), and those smaller than `size` across that
+// aren't painted cliffs, ease: on the detail layer, relax the ground there a little at a time until it's just under
+// the ski limit, fading out round the patch
+function easePatches(L, R, size){
+  const T = PT.terrain(L, R), stop = T.stop, n = Math.max(48, Math.min(640, Math.round(Math.PI/2*R/2.5))), N2 = n*n;
+  const H = new Float32Array(6*N2), D = new Float32Array(6*N2*3), q = [0, 0, 0];
+  for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++){
+    PT.dirFromFace(f, -1 + 2*i/(n - 1), -1 + 2*j/(n - 1), q); const o = f*N2 + j*n + i;
+    D[o*3] = q[0]; D[o*3 + 1] = q[1]; D[o*3 + 2] = q[2]; H[o] = T.height(q[0], q[1], q[2]);
+  }
+  const dir = o => [D[o*3], D[o*3 + 1], D[o*3 + 2]];
+  const grade = new Float32Array(6*N2);
+  for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++){
+    const o = f*N2 + j*n + i, i0 = Math.max(0, i - 1), i1 = Math.min(n - 1, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(n - 1, j + 1);
+    const a = f*N2 + j*n + i0, b = f*N2 + j*n + i1, c = f*N2 + j0*n + i, d = f*N2 + j1*n + i;
+    const gx = (H[b] - H[a])/(ang3(dir(a), dir(b))*R), gy = (H[d] - H[c])/(ang3(dir(c), dir(d))*R);
+    grade[o] = Math.hypot(gx, gy);
+  }
+  // the steep points, joined into patches (across face edges too)
+  const lim = stop*0.75, par = new Int32Array(6*N2).map((_, i) => i), find = i => { while (par[i] !== i){ par[i] = par[par[i]]; i = par[i]; } return i; };
+  const steep = i => grade[i] > lim, uni = (a, b) => { a = find(a); b = find(b); if (a !== b) par[a] = b; };
+  for (let f = 0; f < 6; f++) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++){
+    const o = f*N2 + j*n + i; if (!steep(o)) continue;
+    if (i + 1 < n && steep(o + 1)) uni(o, o + 1); if (j + 1 < n && steep(o + n)) uni(o, o + n);
+    if (i + 1 < n && j + 1 < n && steep(o + n + 1)) uni(o, o + n + 1); if (i > 0 && j + 1 < n && steep(o + n - 1)) uni(o, o + n - 1);
+  }
+  for (const g of twinGroups(n)) for (let k = 1; k < g.length; k++){ const a = g[0][0]*N2 + g[0][2]*n + g[0][1], b = g[k][0]*N2 + g[k][2]*n + g[k][1]; if (steep(a) && steep(b)) uni(a, b); }
+  const comps = new Map();
+  for (let o = 0; o < 6*N2; o++) if (steep(o)){ const r = find(o); let c = comps.get(r); if (!c) comps.set(r, c = []); c.push(o); }
+  const dl = L.detail; let eased = 0, left = 0;
+  for (const c of comps.values()){
+    let top = 0; for (const o of c) top = Math.max(top, grade[o]);
+    if (top < stop*0.9) continue;                                               // never quite unskiable here
+    const m = [0, 0, 0]; for (const o of c){ m[0] += D[o*3]; m[1] += D[o*3 + 1]; m[2] += D[o*3 + 2]; }
+    const ml = Math.hypot(...m), cen = [m[0]/ml, m[1]/ml, m[2]/ml]; let rad = 0; for (const o of c) rad = Math.max(rad, ang3(cen, dir(o))*R);
+    if (2*rad + 5 > size){ left++; continue; }                                  // a real slope: leave it
+    let painted = false; for (const o of c){ const p = dir(o); if (Math.abs(PT.sampleDetail(dl, p[0], p[1], p[2])) > 0.05){ painted = true; break; } }
+    if (painted){ left++; continue; }                                           // a cliff-erator cliff: leave it
+    if (easeAt(T, dl, cen, rad + 3, Math.max(5, size*0.4), stop, R)) eased++;
+  }
+  PT.weldDetail(dl);
+  return { eased, left };
+}
+// relax the ground on the detail grid within `core` m of cen (fading to nothing `margin` m further out) until no
+// point in the core is steeper than 80% of the limit (node to node, about a metre)
+function easeAt(T, dl, cen, core, margin, stop, R){
+  const [f, u, v] = PT.faceUV(cen[0], cen[1], cen[2]), n = dl.n, ci = (u + 1)/2*(n - 1), cj = (v + 1)/2*(n - 1);
+  const rr = core + margin, half = Math.ceil(rr/R*(n - 1)/2*1.6) + 2;
+  const i0 = Math.max(0, Math.floor(ci - half)), i1 = Math.min(n - 1, Math.ceil(ci + half)), j0 = Math.max(0, Math.floor(cj - half)), j1 = Math.min(n - 1, Math.ceil(cj + half));
+  const W = i1 - i0 + 1, Hh = j1 - j0 + 1, h0 = new Float64Array(W*Hh), wt = new Float64Array(W*Hh), q = [0, 0, 0];
+  for (let j = 0; j < Hh; j++) for (let i = 0; i < W; i++){
+    PT.dirFromFace(f, -1 + 2*(i0 + i)/(n - 1), -1 + 2*(j0 + j)/(n - 1), q); const k = j*W + i, d = ang3(q, cen)*R;
+    h0[k] = T.height(q[0], q[1], q[2]); const t = d <= core ? 0 : Math.min(1, (d - core)/margin); wt[k] = 1 - t*t*(3 - 2*t);
+  }
+  // node spacing (m) across and along, at the middle
+  const mid = (a, b) => { const p = [0, 0, 0], r = [0, 0, 0]; PT.dirFromFace(f, -1 + 2*a/(n - 1), -1 + 2*b/(n - 1), p); return p; };
+  const sx = ang3(mid(ci, cj), mid(ci + 1, cj))*R, sy = ang3(mid(ci, cj), mid(ci, cj + 1))*R;
+  const h = h0.slice(), worst = () => { let g = 0; for (let j = 1; j < Hh - 1; j++) for (let i = 1; i < W - 1; i++){ const k = j*W + i; if (wt[k] < 0.99) continue; g = Math.max(g, Math.hypot((h[k + 1] - h[k])/sx, (h[k + W] - h[k])/sy), Math.hypot((h[k] - h[k - 1])/sx, (h[k] - h[k - W])/sy)); } return g; };
+  if (worst() <= stop) return false;
+  for (let it = 0; it < 200 && worst() > stop*0.8; it++){
+    const o = h.slice();
+    for (let j = 1; j < Hh - 1; j++) for (let i = 1; i < W - 1; i++){ const k = j*W + i; if (!wt[k]) continue; h[k] += 0.5*wt[k]*((o[k - 1] + o[k + 1] + o[k - W] + o[k + W])/4 - o[k]); }
+  }
+  for (let j = 0; j < Hh; j++) for (let i = 0; i < W; i++){ const k = j*W + i, d = h[k] - h0[k]; if (Math.abs(d) > 0.005) PT.detailAdd(dl, f, i0 + i, j0 + j, d); }
+  return true;
+}
+
 // ---------- layouts ----------
 const norm = p => { const L = Math.hypot(p[0], p[1], p[2]) || 1; return [p[0]/L, p[1]/L, p[2]/L]; };
 PT.START = norm([0.15, 1, 0.25]);
 PT.cliffDefaults = () => ({ from: 0.6, band: 12, sharp: 8, stop: 1.0 });
-PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), detail: PT.newDetail(1024), trails: [], landmarks: [], bridges: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults() });
+PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), detail: PT.newDetail(1024), trails: [], landmarks: [], bridges: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults(), network: PT.networkDefaults() });
 // a small example so every tool has something to show: a peak, a ridge, a crater, a basin and a trail past them
 PT.exampleLayout = function(R){
   R = R || 800;
@@ -309,12 +569,12 @@ PT.serialize = function(L){
     trails: L.trails.map(t => ({ name: t.name, closed: !!t.closed, pts: t.pts.map(r5), carve: !!t.carve, bed: t.bed, shoulder: t.shoulder, smooth: t.smooth, maxGrade: t.maxGrade })),
     landmarks: L.landmarks.map(m => ({ name: m.name, type: m.type, d: r5(m.d), height: m.height, color: m.color })),
     bridges: (L.bridges || []).map(b => ({ name: b.name, pts: b.pts.map(r5), clearance: b.clearance, ramp: b.ramp, width: b.width, maxGrade: b.maxGrade })),
-    start: { d: r5(L.start.d) }, scatter: Object.assign({}, L.scatter), cliffs: Object.assign({}, L.cliffs),
+    start: { d: r5(L.start.d) }, scatter: Object.assign({}, L.scatter), cliffs: Object.assign({}, L.cliffs), network: Object.assign(PT.networkDefaults(), L.network || {}),
   });
 };
 PT.parse = function(json){
   const o = typeof json === 'string' ? JSON.parse(json) : json, B = PT.blankLayout(o.radius || 800);
-  return {
+  const L = {
     version: 1, name: o.name || B.name, radius: o.radius || 800, noise: { amp: o.noise && o.noise.amp !== undefined ? o.noise.amp : 1 },
     stamps: (o.stamps || []).map(s => ({ type: s.type, pts: s.pts.map(norm), radius: +s.radius, height: +s.height, sharp: s.sharp ?? 0.3 })),
     sculpt: PT.decodeSculpt(o.sculpt), detail: PT.decodeDetail(o.detail),
@@ -323,7 +583,11 @@ PT.parse = function(json){
     bridges: (o.bridges || []).filter(b => b.pts && b.pts.length >= 2).map(b => Object.assign({ name: b.name || 'Light bridge', pts: b.pts.map(norm) }, PT.bridgeDefaults(), pick(b, ['clearance', 'ramp', 'width', 'maxGrade']))),
     start: { d: norm(o.start && o.start.d || B.start.d) }, scatter: Object.assign({}, B.scatter, o.scatter || {}),
     cliffs: Object.assign(PT.cliffDefaults(), pick(o.cliffs || {}, ['from', 'band', 'sharp', 'stop'])),
+    network: Object.assign(PT.networkDefaults(), pick(o.network || {}, ['join', 'patch'])),
   };
+  // older layouts may have steps where the cube faces meet: weld them, easing the change back into each face
+  PT.weldSculpt(L.sculpt, 3); PT.weldDetail(L.detail, 8);
+  return L;
 };
 
 // ---------- the ground: height (metres above the base radius) at a unit direction ----------
@@ -336,10 +600,12 @@ PT.terrain = function(L, R){
   const under = (x, y, z) => shaped(x, y, z) + (sc ? PT.sampleSculpt(sc, x, y, z) : 0) + (dl ? PT.sampleDetail(dl, x, y, z) : 0);
   // carved trails: each one's line (2 m apart) and bed profile, and a grid of its segments
   const carves = [], grid = carveGrid(R), STEP = 2;
-  if (L) for (const t of L.trails){
-    if (!t.carve || !t.pts || t.pts.length < 2) continue;
-    const pts = PT.evenCurve(t.pts, !!t.closed, STEP, R), M = pts.length; if (M < 2) continue;
-    const c = { closed: !!t.closed, M, bed: Math.max(0.5, t.bed ?? 4), sh: Math.max(0.5, t.shoulder ?? 10), P: new Float64Array(M*3),
+  // the trails as one network (runs alongside each other made one), so carved beds that share ground agree
+  const join = L && L.network ? L.network.join : 0, net = L && L.trails.length ? PT.trailNetwork(L.trails, R, join, STEP) : null;
+  if (L) L.trails.forEach((t, ti) => {
+    if (!t.carve || !t.pts || t.pts.length < 2) return;
+    const pts = net.lines[ti], M = pts.length; if (M < 2) return;
+    const c = { ti, pts, closed: !!t.closed, M, bed: Math.max(0.5, t.bed ?? 4), sh: Math.max(0.5, t.shoulder ?? 10), smooth: t.smooth ?? 40, P: new Float64Array(M*3),
       prof: carveProfile(pts, !!t.closed, under, t.smooth ?? 40, t.maxGrade ?? 0.2, STEP) };
     pts.forEach((p, i) => { c.P[i*3] = p[0]; c.P[i*3 + 1] = p[1]; c.P[i*3 + 2] = p[2]; });
     const ci = carves.length; carves.push(c);
@@ -356,6 +622,27 @@ PT.terrain = function(L, R){
       }
       for (const key of keys){ let l = grid.map.get(key); if (!l) grid.map.set(key, l = []); l.push(ci, k); }
     }
+  });
+  // junctions: where a carved trail meets or runs along an earlier one, its bed takes the earlier one's height there,
+  // eased back to its own over its smoothing length either side
+  for (let b = 1; b < carves.length; b++){
+    const B = carves[b], cor = new Float64Array(B.M), has = new Uint8Array(B.M);
+    for (let a = 0; a < b; a++){
+      const A = carves[a], H = lineHash(A.pts, R, Math.max(4, A.bed + B.bed));
+      for (let i = 0; i < B.M; i++){
+        const nq = nearestOn(H, B.pts[i], A.closed); if (!nq || nq.d > Math.min(A.bed, B.bed)) continue;
+        const k2 = (nq.k + 1) % A.M; cor[i] = A.prof[nq.k] + (A.prof[k2] - A.prof[nq.k])*nq.u - B.prof[i]; has[i] = 1;
+      }
+    }
+    if (!has.some(x => x)) continue;
+    // spread: each point takes the correction of the nearest junction point along the line, faded by distance
+    const span = Math.max(20, B.smooth)/STEP, M = B.M, out = new Float64Array(M), dist = new Float64Array(M).fill(Infinity), val = new Float64Array(M);
+    const sweep = (dirn) => {
+      let d = Infinity, v = 0; const n = B.closed ? 2*M : M;
+      for (let s = 0; s < n; s++){ const i = dirn > 0 ? s % M : (M - 1 - (s % M)); if (has[i]){ d = 0; v = cor[i]; } else d++; if (d < dist[i]){ dist[i] = d; val[i] = v; } }
+    };
+    sweep(1); sweep(-1);
+    for (let i = 0; i < M; i++){ const t = Math.min(1, dist[i]/span), w = 1 - t*t*(3 - 2*t); B.prof[i] += val[i]*w; }
   }
   // the bed under a point: the carved trail it's most inside (distance across, the bed's height there)
   const carveAt = (x, y, z) => {
@@ -371,7 +658,7 @@ PT.terrain = function(L, R){
     return best;
   };
   return {
-    R, stamps, carves: carves.length, stop: L && L.cliffs ? L.cliffs.stop : 1.0,
+    R, stamps, carves: carves.length, net, stop: L && L.cliffs ? L.cliffs.stop : 1.0,
     height(x, y, z){
       let h = under(x, y, z);
       if (carves.length){ const q = carveAt(x, y, z); if (q){ const t = q.d <= q.bed ? 0 : (q.d - q.bed)/q.sh, w = t*t*(3 - 2*t); h = q.hb + (h - q.hb)*w; } }

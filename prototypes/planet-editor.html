@@ -370,11 +370,18 @@ function groundPick(px, py){
   }
   return null;
 }
+// can the camera see this point, or is the planet in the way? (the line to it dips under the lowest ground)
+const _sv = new V3();
+function seen(p){
+  const c = camera.position, Lp = _sv.copy(p).sub(c).length(); _sv.divideScalar(Lp || 1);
+  const t = -c.dot(_sv); if (t <= 0 || t >= Lp) return true;
+  const r = R + terrainMat.uniforms.uLo.value - 0.5; return c.lengthSq() - t*t > r*r;
+}
 function handlePick(px, py, maxPx = 14){
   let best = null, bd = maxPx;
   for (const h of handles){
     const p = h.obj.position.clone().project(camera); if (p.z > 1) continue;
-    const toCam = camera.position.clone().sub(h.obj.position); if (toCam.dot(h.obj.position) < 0) continue;   // far side
+    if (!seen(h.obj.position)) continue;   // behind the planet
     const sx = (p.x + 1)/2*W, sy = (1 - p.y)/2*H, dd = Math.hypot(sx - px, sy - py);
     if (dd < bd){ bd = dd; best = h; }
   }
@@ -764,8 +771,8 @@ function drawLabels(){
   while (labelsEl.children.length < items.length) labelsEl.appendChild(document.createElement('div'));
   while (labelsEl.children.length > items.length) labelsEl.lastChild.remove();
   items.forEach((it, i) => {
-    const el = labelsEl.children[i], p = surf(it.d, it.lift), toCam = camera.position.clone().sub(p);
-    const s = p.clone().project(camera), vis = toCam.dot(p) > 0 && s.z < 1;
+    const el = labelsEl.children[i], p = surf(it.d, it.lift);
+    const s = p.clone().project(camera), vis = seen(p) && s.z < 1;
     el.style.display = vis ? '' : 'none'; if (!vis) return;
     el.textContent = it.text; el.className = it.cls;
     el.style.left = ((s.x + 1)/2*W) + 'px'; el.style.top = ((1 - s.y)/2*H) + 'px';
@@ -879,7 +886,8 @@ function frame(now){
   const right = new V3().crossVectors(fwd, camera.up).normalize();
   terrainMat.uniforms.uLight.value.copy(camera.up).multiplyScalar(0.8).addScaledVector(right, -0.6).addScaledVector(fwd, -0.5).normalize();
   // handles keep the same size on screen
-  for (const h of handles){ const s = camera.position.distanceTo(h.obj.position)*0.006*h.obj.userData.big; h.obj.scale.setScalar(s); }
+  // (and only those on the side of the planet you can see: they draw over the ground, so the planet won't hide them)
+  for (const h of handles){ const s = camera.position.distanceTo(h.obj.position)*0.006*h.obj.userData.big; h.obj.scale.setScalar(s); h.obj.visible = seen(h.obj.position); }
   // only the near side of the globe
   const cd = camera.position.clone().normalize(), horizon = Math.acos(Math.min(1, R/camera.position.length()));
   for (const c of chunks) c.mesh.visible = c.c.dot(cd) > Math.cos(Math.min(Math.PI, horizon + c.ang + 0.25));

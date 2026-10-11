@@ -83,6 +83,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <p class="note" id="rNote"></p>
   <label class="check"><input id="tLift" type="checkbox"> Curvature lightens you (less friction at speed)</label>
   <label class="check"><input id="tDay" type="checkbox" checked> Day and night (off: the sun stays over your shoulder)</label>
+  <label class="check"><input id="tAurora" type="checkbox" checked> Auroras at night</label>
   <label for="tDayLen">Day length<output id="oDayLen"></output><input id="tDayLen" type="range" min="0" max="60" step="1" value="20"></label>
   <label for="tTilt">Axis tilt<output id="oTilt"></output><input id="tTilt" type="range" min="0" max="60" step="1" value="25"></label>
   <label for="tClock">Time here<output id="oClock"></output><input id="tClock" type="range" min="0" max="24" step="0.05" value="9"></label>
@@ -149,7 +150,7 @@ const SETTINGS = [
 const STORE = 'skate-planetoid';
 const DEFAULTS = {}; SETTINGS.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
 let saved = {}; try { saved = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch (e) {}
-const save = () => { try { const o = { lift: P.lift, cycle: P.daynight }; SETTINGS.forEach(([i]) => { o[i] = $(i).value; }); localStorage.setItem(STORE, JSON.stringify(o)); } catch (e) {} };
+const save = () => { try { const o = { lift: P.lift, cycle: P.daynight, aurora: P.aurora }; SETTINGS.forEach(([i]) => { o[i] = $(i).value; }); localStorage.setItem(STORE, JSON.stringify(o)); } catch (e) {} };
 
 // ---------- terrain: 3D gradient noise sampled on the sphere, in metres ----------
 // the ground comes from planet-terrain.js (shared with the planet editor): the procedural planet, or a layout's
@@ -172,6 +173,7 @@ const sun = new THREE.DirectionalLight(0xffffff, 0.65); scene.add(sun);
 // sets and near the other it never rises. dayPhase is how far it has turned (whole turns). sunD is the sun's direction
 const _tw = new THREE.Vector3(), _twc = new THREE.Color(), _twc2 = new THREE.Color();
 const SUN0 = new THREE.Vector3(1, 0, 0), AXIS = new THREE.Vector3(0, 1, 0), sunD = new THREE.Vector3(1, 0, 0);
+const AUR_GLOW = new THREE.Color(0.45, 1.0, 0.7);
 const DAWN_HOR = new THREE.Color(0xff8a3a), DAWN_ZEN = new THREE.Color(0x8aa4d6), DUSK_HOR = new THREE.Color(0xb556d8), DUSK_ZEN = new THREE.Color(0x3a2a78);
 let dayPhase = 0;
 // the axis is placed so the start is at 35° north (an ordinary day and night there), then tilted toward the sun
@@ -230,11 +232,35 @@ addEventListener('resize', resize);
 const skyMat = new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite: false, depthTest: false,
   uniforms: { up: { value: new THREE.Vector3(0, 1, 0) }, zen: { value: ZEN_DAY.clone() }, hor: { value: HOR_DAY.clone() }, space: { value: new THREE.Color(0x060a14) }, spaceK: { value: 0 },
-    sunD: { value: new THREE.Vector3(0, 1, 0) }, twi: { value: new THREE.Color(0xff8f3d) }, twK: { value: 0 }, sunK: { value: 0 } },
+    sunD: { value: new THREE.Vector3(0, 1, 0) }, twi: { value: new THREE.Color(0xff8f3d) }, twK: { value: 0 }, sunK: { value: 0 },
+    auK: { value: 0 }, auT: { value: 0 }, auX: { value: new THREE.Vector3(1, 0, 0) }, auY: { value: new THREE.Vector3(0, 0, 1) } },
   vertexShader: 'varying vec3 vW; void main(){ vec4 w = modelMatrix*vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }',
   // (at sunrise and sunset the horizon glows toward the sun, orange or purple, and fades away from it; the sun is a
   // small disc with a glow round it)
-  fragmentShader: `uniform vec3 up, zen, hor, space, sunD, twi; uniform float spaceK, twK, sunK; varying vec3 vW;
+  // auroras (at night, anywhere on the planet): curtains on a sheet high overhead, seen in perspective so they crowd
+  // toward the horizon; each is a wavy line that drifts and folds, green at the foot shading to purple above, with
+  // fine vertical rays, and the whole display brightens and fades over a minute or so
+  fragmentShader: `uniform vec3 up, zen, hor, space, sunD, twi, auX, auY; uniform float spaceK, twK, sunK, auK, auT; varying vec3 vW;
+    float h1(float n){ return fract(sin(n)*43758.5453); }
+    float n1(float x){ float i = floor(x), f = fract(x); return mix(h1(i), h1(i + 1.0), f*f*(3.0 - 2.0*f)); }
+    vec3 aurora(vec3 d, float t){
+      if (t < 0.0) return vec3(0.0);
+      vec3 dh = d - up*t; vec2 q = vec2(dot(dh, auX), dot(dh, auY))/(t + 0.12);          // on the sheet overhead
+      vec3 acc = vec3(0.0);
+      for (int k = 0; k < 2; k++){
+        float fk = float(k), sp = 0.05 + 0.04*fk;
+        // parallel curtains across the whole sky (about 1.6 sheet-widths apart), each folding and drifting
+        float y = q.y*(0.6 + 0.25*fk) + 0.8*sin(q.x*0.3 + auT*sp + fk*2.1) + 0.35*sin(q.x*0.85 - auT*sp*1.7 + fk) + 0.7*n1(q.x*0.2 + auT*0.03 + fk*7.0);
+        float line = pow(0.5 + 0.5*cos(y*6.2832), 10.0);
+        float rays = 0.5 + 0.5*n1(q.x*5.0 + auT*0.5 + fk*13.0)*n1(q.x*1.7 - auT*0.2 + q.y*0.3);
+        float flick = 0.6 + 0.4*n1(auT*0.12 + fk*5.0 + floor(y)*3.7);
+        acc += line*rays*flick*(0.8 - 0.3*fk);
+      }
+      float foot = smoothstep(0.0, 0.07, t)*(1.0 - smoothstep(0.6, 1.0, t));
+      vec3 col = mix(vec3(0.15, 1.0, 0.55), vec3(0.7, 0.3, 1.0), smoothstep(0.1, 0.5, t) + 0.25*n1(q.x*0.5 + auT*0.05));
+      float pulse = 0.6 + 0.4*n1(auT*0.02);
+      return col*acc*foot*pulse;
+    }
     void main(){ vec3 d = normalize(vW - cameraPosition); float t = dot(d, up);
       vec3 c = mix(hor, zen, smoothstep(0.0, 0.7, t)); c = mix(c, hor*0.92, smoothstep(0.0, -0.4, t));
       vec3 dh = d - up*t, sh = sunD - up*dot(sunD, up); float az = dot(normalize(dh + 1e-5), normalize(sh + 1e-5));
@@ -243,6 +269,7 @@ const skyMat = new THREE.ShaderMaterial({
       float sd = max(0.0, dot(d, sunD));
       c += twi*twK*0.5*pow(sd, 10.0) + vec3(1.0, 0.92, 0.8)*0.25*sunK*pow(sd, 60.0);
       c = mix(c, mix(vec3(1.0, 0.97, 0.88), twi*1.3 + 0.3, twK), smoothstep(0.9990, 0.9994, sd)*sunK);
+      c += aurora(d, t)*auK*0.9;
       gl_FragColor = vec4(mix(c, space, spaceK), 1.0); }`,
 });
 const sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), skyMat);
@@ -1302,6 +1329,10 @@ function frame(now){
   skyMat.uniforms.hor.value.copy(HOR_NIGHT).lerp(HOR_DAY, dayK).lerp(twH, twK*0.55); skyMat.uniforms.zen.value.copy(ZEN_NIGHT).lerp(ZEN_DAY, dayK).lerp(twZ, twK*0.6);
   skyMat.uniforms.sunD.value.copy(P.daynight ? sunD : sun.position).normalize(); skyMat.uniforms.twi.value.copy(twH); skyMat.uniforms.twK.value = twK;
   skyMat.uniforms.sunK.value = P.daynight ? smooth01(-0.05, 0.02, n.dot(sunD)) : 0;
+  // auroras once it's properly dark (the sun well below the horizon), fading out in the planet view
+  const auK = P.daynight && P.aurora ? (1 - smooth01(-0.3, -0.12, n.dot(sunD)))*(1 - k) : 0;
+  skyMat.uniforms.auK.value = auK; skyMat.uniforms.auT.value = t; skyMat.uniforms.auX.value.copy(ex); skyMat.uniforms.auY.value.copy(ey);
+  if (auK > 0){ hemi.color.lerp(AUR_GLOW, auK*0.5); hemi.intensity += 0.08*auK; }
   skyMat.uniforms.spaceK.value = k;
   sky.position.copy(camera.position); sky.scale.setScalar(R*8);
   stars.position.copy(camera.position); stars.scale.setScalar(R*7);
@@ -1459,7 +1490,7 @@ for (const [i, o, k, f] of SETTINGS){
   el.addEventListener('input', () => { upd(); if (k === 'R' || k === 'flat') rNote(); if (k === 'pixel') resize(); });
   el.addEventListener('change', () => { save(); if (k === 'R'){ el.blur(); rebuild(); } if (k === 'mtn' || k === 'bld' || k === 'trees') buildScatter(); });
 }
-for (const [id, key, sk] of [['tLift', 'lift', 'lift'], ['tDay', 'daynight', 'cycle']]){
+for (const [id, key, sk] of [['tLift', 'lift', 'lift'], ['tDay', 'daynight', 'cycle'], ['tAurora', 'aurora', 'aurora']]){
   const el = $(id); if (saved[sk] !== undefined) el.checked = !!saved[sk];
   P[key] = el.checked; el.addEventListener('change', () => { P[key] = el.checked; save(); });
 }
@@ -1469,7 +1500,7 @@ $('tClock').addEventListener('change', () => $('tClock').blur());
 $('defaultsBtn').addEventListener('click', () => {
   const oldR = P.R, oldS = P.mtn + ',' + P.bld + ',' + P.trees;
   for (const [i, o, k, f] of SETTINGS){ $(i).value = DEFAULTS[i]; P[k] = +DEFAULTS[i]; $(o).textContent = f(P[k]); }
-  $('tLift').checked = P.lift = false; $('tDay').checked = P.daynight = true;
+  $('tLift').checked = P.lift = false; $('tDay').checked = P.daynight = true; $('tAurora').checked = P.aurora = true;
   save(); rNote(); resize(); if (P.R !== oldR) rebuild(); else if (P.mtn + ',' + P.bld + ',' + P.trees !== oldS) buildScatter();
 });
 

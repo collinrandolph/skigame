@@ -54,12 +54,32 @@ select option{color:#1d2a36}
 #labels div.trail{color:#e6f0ff;font-weight:500;transform:translate(-50%,-50%)}
 #busy{position:fixed;left:50%;top:14px;transform:translateX(-50%);padding:6px 12px;display:none}
 @media (max-width:900px){ #side{width:240px} #status{right:264px} #mini canvas{width:200px;height:100px} }
+button.icon{width:44px;height:44px;padding:0;display:grid;place-items:center;background:var(--panel)}
+button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.mob{display:none !important}
+/* phones: no map or hints; the tools (wrench) and the side panel (gear) open from buttons, one at a time */
+@media (max-width:760px){
+  .mob{display:grid !important;position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:5}
+  #bWrench{left:8px} #bGear{right:8px}
+  #bSkiM{left:50%;transform:translateX(-50%);height:44px;padding:0 22px;background:var(--accent);border-color:var(--accent);color:#fff;font:700 16px var(--display);letter-spacing:.08em;text-transform:uppercase;place-items:center}
+  #mini, #status, .hint, #tools button kbd{display:none !important}
+  #tools{display:none;top:calc(env(safe-area-inset-top,0px) + 60px);left:8px;right:8px;flex-direction:row;flex-wrap:wrap;z-index:4}
+  #tools button{width:auto;flex:1 1 30%;text-align:center;padding:10px 6px}
+  body.mt #tools{display:flex}
+  #side{display:none;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 60px);bottom:calc(env(safe-area-inset-bottom,0px) + 8px);width:auto;z-index:4;overscroll-behavior:contain}
+  body.ms #side{display:block}
+  #busy{top:calc(env(safe-area-inset-top,0px) + 14px)}
+}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="labels"></div>
 <div id="busy" class="panel">Rebuilding…</div>
+<!-- on a phone: the tools and the side panel open from these -->
+<button id="bWrench" class="icon mob" type="button" aria-expanded="false" aria-label="Tools"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M14.5 3.5a5 5 0 0 0-4.7 6.6L3.4 16.5a2 2 0 0 0 2.9 2.9l6.4-6.4a5 5 0 0 0 6.6-4.7l-2.9 2.9-2.6-.5-.5-2.6 2.9-2.9a5 5 0 0 0-1.7-1.7z"/></svg></button>
+<button id="bSkiM" class="mob" type="button" title="Ski this planet">Ski</button>
+<button id="bGear" class="icon mob" type="button" aria-expanded="false" aria-label="Settings and selection"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="8.2" stroke-width="3.2" stroke-dasharray="3.2 3.24"/><circle cx="12" cy="12" r="6" stroke-width="1.8"/><circle cx="12" cy="12" r="2.2" stroke-width="1.8"/></svg></button>
 
 <div id="tools" class="panel" role="toolbar" aria-label="Tools">
   <button data-tool="orbit" type="button">Orbit <kbd>1</kbd></button>
@@ -731,6 +751,38 @@ function cliffStep(dt){
   PT.weldDetail(dl);
   rebuildCaps([[d, ang + 0.004]]);
 }
+
+// ---- phones: the wrench opens the tools, the gear the side panel (one at a time); picking a tool closes the tools ----
+const mobile = matchMedia('(max-width:760px)');
+function openPanel(which){
+  const b = document.body, t = which === 'tools' && !b.classList.contains('mt'), g = which === 'side' && !b.classList.contains('ms');
+  b.classList.toggle('mt', t); b.classList.toggle('ms', g);
+  $('bWrench').classList.toggle('on', t); $('bWrench').setAttribute('aria-expanded', t);
+  $('bGear').classList.toggle('on', g); $('bGear').setAttribute('aria-expanded', g);
+}
+$('bWrench').addEventListener('click', e => { openPanel('tools'); e.currentTarget.blur(); });
+$('bGear').addEventListener('click', e => { openPanel('side'); e.currentTarget.blur(); });
+$('bSkiM').addEventListener('click', () => $('bSki').click());     // the same as Ski here
+document.querySelectorAll('#tools button').forEach(b => b.addEventListener('click', () => { if (mobile.matches && document.body.classList.contains('mt')) openPanel('tools'); }));
+// ---- two fingers, in any tool: pinch to zoom, drag to orbit (whatever one finger was doing stops) ----
+const touches = new Map(); let pinch = null;
+const pinchInfo = () => { const [a, b] = [...touches.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x)/2, y: (a.y + b.y)/2 }; };
+cv.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch') return;
+  touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (touches.size === 2){ endPtr(); pinch = Object.assign(pinchInfo(), { dist: cam.dist }); ptr = null; e.stopImmediatePropagation(); }
+}, true);
+cv.addEventListener('pointermove', e => {
+  if (!touches.has(e.pointerId)) return; touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (!pinch || touches.size < 2) return; e.stopImmediatePropagation();
+  const p = pinchInfo(), dx = p.x - pinch.x, dy = p.y - pinch.y; pinch.x = p.x; pinch.y = p.y;
+  cam.dist = R + Math.max(R*0.03, Math.min(R*6, (pinch.dist - R)*pinch.d/Math.max(10, p.d)));
+  const k = Math.max(0.0004, (cam.dist - R)/R*0.0016), right = new V3().crossVectors(cam.up, cam.dir).normalize();
+  const q1 = new THREE.Quaternion().setFromAxisAngle(cam.up, -dx*k), q2 = new THREE.Quaternion().setFromAxisAngle(right, -dy*k);
+  cam.dir.applyQuaternion(q1).applyQuaternion(q2).normalize(); cam.up.applyQuaternion(q2); fixUp();
+}, true);
+const touchEnd = e => { if (!touches.delete(e.pointerId)) return; if (pinch){ e.stopImmediatePropagation(); if (touches.size < 2) pinch = null; ptr = null; } };
+cv.addEventListener('pointerup', touchEnd, true); cv.addEventListener('pointercancel', touchEnd, true);
 
 // ---- keyboard ----
 const keys = { shift: false };

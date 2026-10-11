@@ -285,6 +285,8 @@ function stampCap(s){
 // ============================================================================================================
 const over = new THREE.Group(); scene.add(over);
 const handleGeo = new THREE.SphereGeometry(1, 12, 8);
+// handles draw over the ground (so bumps don't hide them); each frame, those the ground hides from the camera are hidden
+function handleMat(color){ return new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true }); }
 const TYPE_COL = { peak: 0xf08a2a, pit: 0xf08a2a, ridge: 0xf2c230, valley: 0xf2c230, plateau: 0x2f9a5a, basin: 0x2f9a5a, crater: 0xd2462e };
 let handles = [];      // { obj, kind, ref, i, p (V3 surface point) }
 let sel = null;        // { kind: 'stamp'|'trail'|'landmark'|'start', ref, i }
@@ -307,7 +309,7 @@ function circlePts(c, r){
   return out;
 }
 function addHandle(kind, ref, i, d, color, big = 1){
-  const m = new THREE.Mesh(handleGeo, new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true }));
+  const m = new THREE.Mesh(handleGeo, handleMat(color));
   m.renderOrder = 10; m.position.copy(surf(d, 1)); m.userData.big = big; over.add(m);
   handles.push({ obj: m, kind, ref, i, d });
 }
@@ -370,20 +372,29 @@ function groundPick(px, py){
   }
   return null;
 }
-// can the camera see this point, or is the planet in the way? (the line to it dips under the lowest ground)
-const _sv = new V3();
+// can the camera see this point, or is the ground in the way? walks the line from the point (starting
+// 2 m toward the camera) to where it leaves the highest ground, checking it stays above the ground. cheap for most:
+// a near-side point's line leaves the ground's range in a few steps, a far-side one goes underground at once
+const _sv = new V3(), _sq = new V3();
 function seen(p){
-  const c = camera.position, Lp = _sv.copy(p).sub(c).length(); _sv.divideScalar(Lp || 1);
-  const t = -c.dot(_sv); if (t <= 0 || t >= Lp) return true;
-  const r = R + terrainMat.uniforms.uLo.value - 0.5; return c.lengthSq() - t*t > r*r;
+  const c = camera.position, Lp = _sv.copy(c).sub(p).length(); _sv.divideScalar(Lp || 1);
+  const t0 = Math.min(Lp, 2), hiR = R + terrainMat.uniforms.uHi.value + 1;
+  // how far along the line it stays inside the highest ground's sphere
+  const b = p.dot(_sv), cc = p.lengthSq() - hiR*hiR, disc = b*b - cc, t1 = disc > 0 ? Math.min(Lp, -b + Math.sqrt(disc)) : 0;
+  if (t1 <= t0) return true;
+  const n = Math.min(160, Math.max(8, Math.ceil((t1 - t0)/3)));
+  for (let k = 0; k <= n; k++){
+    _sq.copy(p).addScaledVector(_sv, t0 + (t1 - t0)*k/n); const r = _sq.length();
+    if (r < R + T.height(_sq.x/r, _sq.y/r, _sq.z/r)) return false;
+  }
+  return true;
 }
 function handlePick(px, py, maxPx = 14){
   let best = null, bd = maxPx;
   for (const h of handles){
     const p = h.obj.position.clone().project(camera); if (p.z > 1) continue;
-    if (!seen(h.obj.position)) continue;   // behind the planet
     const sx = (p.x + 1)/2*W, sy = (1 - p.y)/2*H, dd = Math.hypot(sx - px, sy - py);
-    if (dd < bd){ bd = dd; best = h; }
+    if (dd < bd && seen(h.obj.position)){ bd = dd; best = h; }      // (not one hidden behind the ground)
   }
   return best;
 }
@@ -886,7 +897,6 @@ function frame(now){
   const right = new V3().crossVectors(fwd, camera.up).normalize();
   terrainMat.uniforms.uLight.value.copy(camera.up).multiplyScalar(0.8).addScaledVector(right, -0.6).addScaledVector(fwd, -0.5).normalize();
   // handles keep the same size on screen
-  // (and only those on the side of the planet you can see: they draw over the ground, so the planet won't hide them)
   for (const h of handles){ const s = camera.position.distanceTo(h.obj.position)*0.006*h.obj.userData.big; h.obj.scale.setScalar(s); h.obj.visible = seen(h.obj.position); }
   // only the near side of the globe
   const cd = camera.position.clone().normalize(), horizon = Math.acos(Math.min(1, R/camera.position.length()));
@@ -910,7 +920,7 @@ $('oContour').textContent = CONTOURS[2] + ' m'; terrainMat.uniforms.uCi.value = 
 busy(() => {
   buildGlobe(); rebuildOverlays(); renderMiniTerrain(); showSel();
   window.__editor = { get L(){ return L; }, get T(){ return T; }, setTool, undo, redo, commit, opts,
-    stroke(mode, dir, frames, dt = 1/30){ ptr = { mode, dir: new V3(dir.x, dir.y, dir.z).normalize(), goals: new Map(), target: 0 }; for (let i = 0; i < frames; i++) mode === 'cliff' ? cliffStep(dt) : sculptStep(dt); ptr = null; }, groundPick, handlePick, cam, get sel(){ return sel; }, finishDrawing, get chunks(){ return chunks; }, camera };   // test hook
+    stroke(mode, dir, frames, dt = 1/30){ ptr = { mode, dir: new V3(dir.x, dir.y, dir.z).normalize(), goals: new Map(), target: 0 }; for (let i = 0; i < frames; i++) mode === 'cliff' ? cliffStep(dt) : sculptStep(dt); ptr = null; }, groundPick, handlePick, cam, get sel(){ return sel; }, finishDrawing, get chunks(){ return chunks; }, get handles(){ return handles; }, camera };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 });
 </script>

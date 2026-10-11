@@ -69,6 +69,7 @@ select option{color:#1d2a36}
   <button data-tool="trail" type="button">Trail <kbd>5</kbd></button>
   <button data-tool="landmark" type="button">Landmark <kbd>6</kbd></button>
   <button data-tool="start" type="button">Start <kbd>7</kbd></button>
+  <button data-tool="cliffs" type="button">Cliffs <kbd>8</kbd></button>
 </div>
 
 <div id="side" class="panel">
@@ -86,12 +87,12 @@ select option{color:#1d2a36}
   <h3>View</h3>
   <label class="f" for="vContour">Contours every<output id="oContour"></output><input id="vContour" type="range" min="0" max="5" step="1" value="2"></label>
   <label class="f" for="vTilt">Tilt<output id="oTilt"></output><input id="vTilt" type="range" min="0" max="70" step="1" value="0"></label>
-  <label class="c"><input id="vSlope" type="checkbox"> Mark steep ground (over 35%)</label>
+  <label class="c"><input id="vSlope" type="checkbox"> Show steep ground</label><p class="hint" id="slopeKey">Orange: steep enough for the cliff-erator. Red: too steep to ski (stops you at the edge).</p>
   <h3>File</h3>
   <div class="row"><button id="bSki" type="button" title="Save and open the game here (K)">Ski here</button><button id="bExport" type="button">Export</button><button id="bImport" type="button">Import</button></div>
   <div class="row"><button id="bUndo" type="button">Undo</button><button id="bRedo" type="button">Redo</button><button id="bNew" type="button">New</button><button id="bExample" type="button">Example</button></div>
   <input id="fileIn" type="file" accept=".json,application/json" hidden>
-  <p class="hint">Saves in this browser as you work. Export writes planet.json; Ski here opens the game on this layout.<br>Right-drag orbits in any tool, wheel zooms, Shift+right-drag tilts. Ctrl+Z undo.</p>
+  <p class="hint">Saves in this browser as you work. Export writes planet.json; Ski here opens the game on this layout.<br>Right-drag orbits in any tool, wheel zooms, Shift+right-drag tilts. Ctrl+Z undo. Keys 1-8 pick tools.</p>
 </div>
 
 <div id="mini" class="panel" title="Click to go there"><canvas id="miniC" width="360" height="180"></canvas></div>
@@ -141,17 +142,19 @@ const groundAt = d => T.height(d.x, d.y, d.z);
 const CH = 8;
 const terrainMat = new THREE.ShaderMaterial({
   extensions: { derivatives: true },
-  uniforms: { uR: { value: R }, uLo: { value: -10 }, uHi: { value: 60 }, uCi: { value: 5 }, uLight: { value: new V3(0, 1, 0) }, uSlope: { value: 0 } },
+  uniforms: { uR: { value: R }, uLo: { value: -10 }, uHi: { value: 60 }, uCi: { value: 5 }, uLight: { value: new V3(0, 1, 0) }, uSlope: { value: 0 }, uFrom: { value: 0.6 }, uStop: { value: 1.0 } },
   vertexShader: `varying vec3 vP; varying vec3 vN;
     void main(){ vP = position; vN = normal; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }`,
-  fragmentShader: `uniform float uR, uLo, uHi, uCi, uSlope; uniform vec3 uLight; varying vec3 vP; varying vec3 vN;
+  fragmentShader: `uniform float uR, uLo, uHi, uCi, uSlope, uFrom, uStop; uniform vec3 uLight; varying vec3 vP; varying vec3 vN;
     void main(){
       float h = length(vP) - uR;
       float k = clamp((h - uLo)/max(1.0, uHi - uLo), 0.0, 1.0);
       vec3 lo = vec3(0.42, 0.53, 0.66), mid = vec3(0.86, 0.90, 0.94), hi = vec3(1.0);
       vec3 col = k < 0.5 ? mix(lo, mid, k*2.0) : mix(mid, hi, (k - 0.5)*2.0);
       vec3 n = normalize(vN), up = normalize(vP);
-      if (uSlope > 0.5){ float c = clamp(dot(n, up), 0.0, 1.0); float grade = sqrt(max(0.0, 1.0 - c*c))/max(c, 0.05); col = mix(col, vec3(0.86, 0.3, 0.25), smoothstep(0.33, 0.38, grade)*0.75); }
+      if (uSlope > 0.5){ float c = clamp(dot(n, up), 0.0, 1.0); float grade = sqrt(max(0.0, 1.0 - c*c))/max(c, 0.05);
+        col = mix(col, vec3(0.95, 0.6, 0.2), smoothstep(uFrom*0.97, uFrom*1.03, grade)*0.6);
+        col = mix(col, vec3(0.88, 0.22, 0.2), smoothstep(uStop*0.97, uStop*1.03, grade)*0.85); }
       float diff = max(dot(n, normalize(uLight)), 0.0);
       col *= 0.5 + 0.6*diff;
       if (uCi > 0.0){
@@ -219,6 +222,8 @@ function buildGlobe(){
 // rebuild only the chunks touching a cap (centre direction, angular radius)
 function rebuildCaps(caps){
   T = PT.terrain(L, R);
+  // a carved trail's bed follows the ground under it, averaged along the line: an edit near one moves its bed a little way off
+  { const cs = carved(); if (cs.length){ const extra = Math.max(...cs.map(t => (t.bed || 4) + (t.shoulder || 10) + (t.smooth || 40)))/R; caps = caps.map(([d, a]) => [d, a + extra]); } }
   for (const c of chunks) if (caps.some(([d, a]) => c.c.angleTo(d) < a + c.ang + 0.002)) buildChunk(c);
   updateRange(); miniDirty();
 }
@@ -226,6 +231,13 @@ function updateRange(){
   let lo = Infinity, hi = -Infinity; for (const c of chunks){ lo = Math.min(lo, c.lo); hi = Math.max(hi, c.hi); }
   terrainMat.uniforms.uLo.value = lo; terrainMat.uniforms.uHi.value = Math.max(hi, lo + 10);
 }
+// the cap a carved trail reaches (its line, plus its bed, shoulders and smoothing)
+function trailCap(t){
+  const pts = t.pts.map(p => new V3(...p)), c = pts.reduce((a, p) => a.add(p), new V3()).normalize();
+  let ang = 0; for (const p of PT.curve(t.pts, t.closed, 20, R)) ang = Math.max(ang, c.angleTo(new V3(...p)));
+  return [c, ang + ((t.bed || 4) + (t.shoulder || 10) + (t.smooth || 40) + 6)/R];
+}
+const carved = () => L.trails.filter(t => t.carve && t.pts.length >= 2);
 // the cap a stamp covers (to rebuild what it touches)
 function stampCap(s){
   const pts = s.pts.map(p => new V3(...p)), c = pts.reduce((a, p) => a.add(p), new V3()).normalize();
@@ -320,14 +332,14 @@ function handlePick(px, py, maxPx = 14){
 // undo, autosave
 // ============================================================================================================
 const undoStack = [], redoStack = [];
-function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, start: L.start, scatter: L.scatter }), sculpt: L.sculpt.data.slice() }; }
+function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, start: L.start, scatter: L.scatter, cliffs: L.cliffs }), sculpt: L.sculpt.data.slice() }; }
 let lastSnap = snapshot();
 function commit(){ undoStack.push(lastSnap); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; lastSnap = snapshot(); autosave(); }
 function restore(s){
   const o = JSON.parse(s.json); const oldR = L.radius;
   Object.assign(L, o); L.sculpt.data.set(s.sculpt); lastSnap = s; sel = null;
   if (L.radius !== oldR) cam.dist *= L.radius/oldR;
-  buildGlobe(); rebuildOverlays(); syncPlanetUI(); showSel(); autosave();
+  buildGlobe(); rebuildOverlays(); syncPlanetUI(); syncSlopeUniforms(); showSel(); autosave(); if (tool === 'cliffs') setTool('cliffs');
 }
 function undo(){ if (!undoStack.length) return; redoStack.push(snapshot()); restore(undoStack.pop()); }
 function redo(){ if (!redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); }
@@ -344,15 +356,16 @@ function autosave(){
 // tools
 // ============================================================================================================
 let tool = 'orbit', drawing = null;      // drawing: a ridge, valley or trail being clicked out point by point
-const opts = { sculpt: { mode: 'raise', radius: 60, strength: 6 }, stamp: { type: 'peak', radius: 80, height: 60, sharp: 0.3 }, trail: { closed: true }, landmark: { type: 'spire', height: 40, color: '#8a5cd6' } };
+const opts = { sculpt: { mode: 'raise', radius: 60, strength: 6 }, stamp: { type: 'peak', radius: 80, height: 60, sharp: 0.3 }, trail: { closed: true, carve: true }, landmark: { type: 'spire', height: 40, color: '#8a5cd6' } };
 const TOOL_HELP = {
   orbit: 'Drag to turn the planet. Wheel to zoom.',
   select: 'Click a handle to select it, drag to move it. Delete removes it (for a trail or ridge, the point; Shift+Delete the whole thing).',
   sculpt: 'Drag over the ground to sculpt. Shift swaps raise and lower. [ and ] change the brush size.',
   stamp: 'Click to place. Ridges and valleys: click each point, then Enter (or double-click) to finish.',
-  trail: 'Click points along the route; Enter (or double-click) finishes. Esc drops the last point.',
+  trail: 'Click points along the route; Enter (or double-click) finishes. Esc drops the last point. A carved trail cuts a level bed into the ground, its grade smoothed along the line.',
   landmark: 'Click to place a landmark.',
   start: 'Click where the skier should start.',
+  cliffs: 'The cliff-erator steps steep ground into cliff bands (flat ledges and sheer risers) and leaves gentler ground alone. Changes rebuild the planet when you let go of a slider.',
 };
 function slider(id, label, min, max, step, get, set, fmt){
   return { html: `<label class="f" for="${id}">${label}<output id="${id}o"></output><input id="${id}" type="range" min="${min}" max="${max}" step="${step}"></label>`,
@@ -362,11 +375,12 @@ function seg(id, items, cur, onPick){
   return { html: `<div class="seg" id="${id}">${items.map(([k, l]) => `<button type="button" data-k="${k}" class="${k === cur() ? 'on' : ''}">${l}</button>`).join('')}</div>`,
     bind(){ $(id).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; onPick(b.dataset.k); for (const x of $(id).children) x.classList.toggle('on', x === b); b.blur(); }); } };
 }
+function syncSlopeUniforms(){ terrainMat.uniforms.uFrom.value = L.cliffs.from; terrainMat.uniforms.uStop.value = L.cliffs.stop; }
 function setTool(t){
   if (drawing) finishDrawing();
   tool = t;
   for (const b of document.querySelectorAll('#tools button')) b.classList.toggle('on', b.dataset.tool === t);
-  $('toolTitle').textContent = { orbit: 'Orbit', select: 'Select', sculpt: 'Sculpt', stamp: 'Stamp', trail: 'Trail', landmark: 'Landmark', start: 'Start' }[t];
+  $('toolTitle').textContent = { orbit: 'Orbit', select: 'Select', sculpt: 'Sculpt', stamp: 'Stamp', trail: 'Trail', landmark: 'Landmark', start: 'Start', cliffs: 'Cliffs' }[t];
   const parts = [];
   if (t === 'sculpt'){
     parts.push(seg('sMode', [['raise', 'Raise'], ['lower', 'Lower'], ['smooth', 'Smooth'], ['flatten', 'Flatten']], () => opts.sculpt.mode, k => opts.sculpt.mode = k));
@@ -379,10 +393,25 @@ function setTool(t){
     parts.push(slider('stH', 'Height (depth)', 2, 250, 1, () => opts.stamp.height, v => opts.stamp.height = v, v => v + ' m'));
     parts.push(slider('stSh', 'Sharpness', 0, 1, 0.05, () => opts.stamp.sharp, v => opts.stamp.sharp = v, v => v ? Math.round(v*100) + '%' : 'rounded'));
   }
-  if (t === 'trail') parts.push({ html: '<label class="c"><input id="trClosed" type="checkbox"> Close into a loop</label>', bind(){ const el = $('trClosed'); el.checked = opts.trail.closed; el.addEventListener('change', () => { opts.trail.closed = el.checked; el.blur(); }); } });
+  if (t === 'trail') parts.push({ html: '<label class="c"><input id="trClosed" type="checkbox"> Close into a loop</label><label class="c"><input id="trCarve" type="checkbox"> Carve into the ground</label>', bind(){
+    const el = $('trClosed'), cv2 = $('trCarve'); el.checked = opts.trail.closed; cv2.checked = opts.trail.carve;
+    el.addEventListener('change', () => { opts.trail.closed = el.checked; el.blur(); }); cv2.addEventListener('change', () => { opts.trail.carve = cv2.checked; cv2.blur(); }); } });
   if (t === 'landmark'){
     parts.push({ html: `<label class="f" for="lmType">Type<select id="lmType" style="grid-column:1/-1">${Object.entries(PT.LANDMARK_TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>`, bind(){ const el = $('lmType'); el.value = opts.landmark.type; el.addEventListener('change', () => { opts.landmark.type = el.value; el.blur(); }); } });
     parts.push(slider('lmH', 'Height', 2, 250, 1, () => opts.landmark.height, v => opts.landmark.height = v, v => v + ' m'));
+  }
+  if (t === 'cliffs'){
+    const C = L.cliffs, redo = () => { busy(() => { buildGlobe(); rebuildOverlays(); miniDirty(); syncSlopeUniforms(); }); commit(); };
+    parts.push({ html: '<label class="c"><input id="clOn" type="checkbox"> Turn steep faces into cliffs</label>', bind(){ const el = $('clOn'); el.checked = !!C.on; el.addEventListener('change', () => { C.on = el.checked; redo(); el.blur(); }); } });
+    const cs = (id, label, min, max, step, key, fmt) => { const sl = slider(id, label, min, max, step, () => C[key], v => { C[key] = v; if (key === 'from' || key === 'stop') syncSlopeUniforms(); }, fmt); const b0 = sl.bind; sl.bind = () => { b0(); $(id).addEventListener('change', redo); }; return sl; };
+    const pct = v => Math.round(v*100) + '% (' + Math.round(Math.atan(v)/D2R) + '°)';
+    parts.push(cs('clFrom', 'Faces steeper than', 0.3, 1.5, 0.05, 'from', pct));
+    parts.push(cs('clBand', 'Cliff band height', 3, 40, 1, 'band', v => v + ' m'));
+    parts.push(cs('clSharp', 'Sharpness (riser steepness × slope)', 2, 16, 1, 'sharp', v => '×' + v));
+    parts.push(cs('clStop', 'Too steep to ski (edge stop)', 0.4, 2, 0.05, 'stop', pct));
+    const sp = Math.PI/2*L.radius/Math.min(320, Math.ceil(Math.PI/2*L.radius/2.5/8)*8);
+    parts.push({ html: `<p class="hint">The game's ground has a point every ${sp.toFixed(1)} m, so a ${L.cliffs.band} m band can stand at up to about ${Math.round(Math.atan(L.cliffs.band/sp)/D2R)}° there.</p>`, bind(){} });
+    $('vSlope').checked = true; terrainMat.uniforms.uSlope.value = 1;
   }
   $('toolOpts').innerHTML = parts.map(p => p.html).join('') + `<p class="hint">${TOOL_HELP[t]}</p>`;
   for (const p of parts) p.bind();
@@ -410,10 +439,20 @@ function showSel(){
   }
   if (sel.kind === 'trail'){
     const t = sel.ref, len = trailLength(t);
-    parts.push({ html: `<label class="f" for="slName">Name<input id="slName" type="text" style="grid-column:1/-1"></label><label class="c"><input id="slClosed" type="checkbox"> Loop</label><p class="hint">${t.pts.length} points, ${fmtM(len)} long${t.closed ? ', a loop' : ''}.</p>`,
-      bind(){ const n = $('slName'), c = $('slClosed'); n.value = t.name; c.checked = t.closed;
+    parts.push({ html: `<label class="f" for="slName">Name<input id="slName" type="text" style="grid-column:1/-1"></label><label class="c"><input id="slClosed" type="checkbox"> Loop</label><label class="c"><input id="slCarve" type="checkbox"> Carve into the ground</label><p class="hint">${t.pts.length} points, ${fmtM(len)} long${t.closed ? ', a loop' : ''}.</p>`,
+      bind(){ const n = $('slName'), c = $('slClosed'), k = $('slCarve'); n.value = t.name; c.checked = t.closed; k.checked = !!t.carve;
         n.addEventListener('input', () => { t.name = n.value; drawLabels(); }); n.addEventListener('change', () => { commit(); n.blur(); });
-        c.addEventListener('change', () => { t.closed = c.checked; rebuildOverlays(); commit(); c.blur(); }); } });
+        c.addEventListener('change', () => { const cap = trailCap(t); t.closed = c.checked; if (t.carve) rebuildCaps([cap, trailCap(t)]); rebuildOverlays(); commit(); c.blur(); });
+        k.addEventListener('change', () => { t.carve = k.checked; if (t.bed === undefined) Object.assign(t, PT.carveDefaults(), { carve: k.checked }); rebuildCaps([trailCap(t)]); rebuildOverlays(); commit(); showSel(); k.blur(); }); } });
+    if (t.carve){
+      // the bed rebuilds when a slider is let go (each one changes the ground along the whole trail)
+      const carveSlider = (id, label, min, max, step, key, fmt) => { const sl = slider(id, label, min, max, step, () => t[key], v => { t[key] = v; }, fmt); const b0 = sl.bind; sl.bind = () => { b0(); $(id).addEventListener('change', () => { rebuildCaps([trailCap(t)]); rebuildOverlays(); setTimeout(showSel, 0); }); }; return sl; };
+      parts.push(carveSlider('slBed', 'Bed half-width (level)', 1, 15, 0.5, 'bed', v => v + ' m'));
+      parts.push(carveSlider('slSh', 'Shoulders (blend to the land)', 1, 40, 1, 'shoulder', v => v + ' m'));
+      parts.push(carveSlider('slSm', 'Smooth the grade over', 0, 150, 5, 'smooth', v => v ? v + ' m' : 'off'));
+      parts.push(carveSlider('slGr', 'Steepest grade', 0.03, 0.4, 0.01, 'maxGrade', v => Math.round(v*100) + '%'));
+      parts.push({ html: `<p class="hint">${carveReport(t)}</p>`, bind(){} });
+    }
   }
   if (sel.kind === 'landmark'){
     const m = sel.ref;
@@ -435,6 +474,13 @@ function showSel(){
   // commit slider edits when let go
   for (const el of P.querySelectorAll('input[type=range]')) el.addEventListener('change', () => commit());
 }
+// how much a carved trail cuts and fills, and its steepest bit
+function carveReport(t){
+  const line = PT.evenCurve(t.pts, t.closed, 4, R); if (line.length < 2) return '';
+  let cut = 0, fill = 0, steep = 0, prev = null;
+  for (const p of line){ const h = T.height(...p), u = T.under(...p); cut = Math.max(cut, u - h); fill = Math.max(fill, h - u); if (prev !== null) steep = Math.max(steep, Math.abs(h - prev)/4); prev = h; }
+  return `Cuts up to ${cut.toFixed(1)} m into rises, builds up to ${fill.toFixed(1)} m over dips; steepest ${Math.round(steep*100)}%.`;
+}
 function deleteSel(all){
   if (!sel) return;
   const r = sel.ref;
@@ -443,7 +489,7 @@ function deleteSel(all){
     if (!all && PT.STAMP_TYPES[r.type].line && r.pts.length > 2) r.pts.splice(sel.i, 1); else L.stamps.splice(L.stamps.indexOf(r), 1);
     rebuildCaps([cap]);
   }
-  if (sel.kind === 'trail'){ if (!all && r.pts.length > 2) r.pts.splice(sel.i, 1); else L.trails.splice(L.trails.indexOf(r), 1); }
+  if (sel.kind === 'trail'){ const cap = trailCap(r); if (!all && r.pts.length > 2) r.pts.splice(sel.i, 1); else L.trails.splice(L.trails.indexOf(r), 1); if (r.carve) rebuildCaps([cap]); }
   if (sel.kind === 'landmark') L.landmarks.splice(L.landmarks.indexOf(r), 1);
   sel = null; rebuildOverlays(); showSel(); commit();
 }
@@ -451,8 +497,9 @@ function finishDrawing(){
   const d = drawing; drawing = null;
   if (!d) return;
   if (d.kind === 'trail' && d.pts.length >= 2){
-    const t = { name: 'Trail ' + (L.trails.length + 1), closed: opts.trail.closed && d.pts.length >= 3, pts: d.pts };
+    const t = Object.assign({ name: 'Trail ' + (L.trails.length + 1), closed: opts.trail.closed && d.pts.length >= 3, pts: d.pts }, PT.carveDefaults(), { carve: opts.trail.carve });
     L.trails.push(t); sel = { kind: 'trail', ref: t, i: 0 };
+    if (t.carve) rebuildCaps([trailCap(t)]);
   }
   if (d.kind === 'line' && d.pts.length >= 2){
     const s = { type: opts.stamp.type, pts: d.pts, radius: opts.stamp.radius, height: opts.stamp.height, sharp: opts.stamp.sharp };
@@ -472,7 +519,7 @@ cv.addEventListener('pointerdown', e => {
   if (tool === 'select'){
     const h = handlePick(px, py);
     sel = h ? { kind: h.kind, ref: h.ref, i: h.i } : null; rebuildOverlays(); showSel();
-    if (h) ptr = { mode: 'move', h, moved: false, cap0: h.kind === 'stamp' ? stampCap(h.ref) : null };
+    if (h) ptr = { mode: 'move', h, moved: false, cap0: h.kind === 'stamp' ? stampCap(h.ref) : h.kind === 'trail' && h.ref.carve ? trailCap(h.ref) : null };
     return;
   }
   const d = groundPick(px, py); if (!d) return;
@@ -517,7 +564,7 @@ cv.addEventListener('pointermove', e => {
 });
 const endPtr = () => {
   if (!ptr) return;
-  if (ptr.mode === 'move'){ if (ptr.moved){ commit(); showSel(); } }
+  if (ptr.mode === 'move'){ if (ptr.moved){ if (ptr.h.kind === 'trail' && ptr.h.ref.carve){ rebuildCaps([ptr.cap0, trailCap(ptr.h.ref)]); rebuildOverlays(); } commit(); showSel(); } }
   if (ptr.mode === 'sculpt') commit();
   ptr = null; if (tool === 'orbit') cv.style.cursor = 'grab';
 };
@@ -563,8 +610,8 @@ addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'y'){ e.preventDefault(); redo(); return; }
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
-  const tools = ['orbit', 'select', 'sculpt', 'stamp', 'trail', 'landmark', 'start'];
-  if (k >= '1' && k <= '7'){ setTool(tools[+k - 1]); return; }
+  const tools = ['orbit', 'select', 'sculpt', 'stamp', 'trail', 'landmark', 'start', 'cliffs'];
+  if (k >= '1' && k <= '8'){ setTool(tools[+k - 1]); return; }
   if (k === 'Enter'){ if (drawing) finishDrawing(); return; }
   if (k === 'Escape'){ if (drawing){ drawing.pts.pop(); if (!drawing.pts.length) drawing = null; rebuildOverlays(); } else { sel = null; rebuildOverlays(); showSel(); } return; }
   if (k === 'Delete' || k === 'Backspace'){ e.preventDefault(); deleteSel(e.shiftKey); return; }
@@ -591,7 +638,7 @@ function readout(px, py){
   const g = Math.hypot(at(2, 0) - at(-2, 0), at(0, 2) - at(0, -2))/4;
   $('sPos').textContent = latLon(d.toArray());
   $('sH').innerHTML = `height <b>${h >= 0 ? '+' : ''}${h.toFixed(1)} m</b>`;
-  $('sSlope').innerHTML = `slope <b>${Math.round(g*100)}%</b>`;
+  $('sSlope').innerHTML = `slope <b>${Math.round(g*100)}%</b>${g > L.cliffs.stop ? ' <b style="color:var(--accent)">too steep to ski</b>' : ''}`;
 }
 let cursorDir = null;
 const labelsEl = $('labels');
@@ -667,7 +714,7 @@ $('vTilt').addEventListener('input', () => { cam.tilt = +$('vTilt').value; $('oT
 $('vTilt').addEventListener('change', () => $('vTilt').blur());
 $('vSlope').addEventListener('change', () => { terrainMat.uniforms.uSlope.value = $('vSlope').checked ? 1 : 0; $('vSlope').blur(); });
 function busy(fn){ $('busy').style.display = 'block'; requestAnimationFrame(() => setTimeout(() => { fn(); $('busy').style.display = 'none'; }, 0)); }
-function replaceLayout(NL){ undoStack.push(snapshot()); redoStack.length = 0; const old = L.radius; L = NL; cam.dist *= L.radius/old; sel = null; drawing = null; lastSnap = snapshot(); busy(() => { buildGlobe(); rebuildOverlays(); miniDirty(); }); syncPlanetUI(); showSel(); autosave(); }
+function replaceLayout(NL){ undoStack.push(snapshot()); redoStack.length = 0; const old = L.radius; L = NL; syncSlopeUniforms(); cam.dist *= L.radius/old; sel = null; drawing = null; lastSnap = snapshot(); busy(() => { buildGlobe(); rebuildOverlays(); miniDirty(); }); syncPlanetUI(); showSel(); autosave(); }
 $('bNew').addEventListener('click', () => { if (confirmReplace()) replaceLayout(Object.assign(PT.blankLayout(L.radius), { sculpt: PT.newSculpt(128) })); });
 $('bExample').addEventListener('click', () => { if (confirmReplace()) replaceLayout(PT.exampleLayout(L.radius)); });
 function confirmReplace(){ return true; }   // (undo brings the old one back)
@@ -711,7 +758,7 @@ function frame(now){
   drawLabels(); drawMini();
   requestAnimationFrame(frame);
 }
-resize(); syncPlanetUI(); setTool('orbit');
+resize(); syncPlanetUI(); syncSlopeUniforms(); setTool('orbit');
 $('oContour').textContent = CONTOURS[2] + ' m'; terrainMat.uniforms.uCi.value = CONTOURS[2]; $('oTilt').textContent = '0°';
 busy(() => {
   buildGlobe(); rebuildOverlays(); renderMiniTerrain(); showSel();

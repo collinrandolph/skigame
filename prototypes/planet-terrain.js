@@ -8,9 +8,14 @@
 //                 into a pit, a valley, a basin or a crater-shaped dome. each has a centre (or, for a ridge, points), a
 //                 radius (half-width for a ridge), a height and a sharpness (0 = rounded, 1 = straight-sided)
 //   sculpt        a hand-sculpted height layer: n x n points on each of the cube's 6 faces, in centimetres
-//   trails        named lines of control points (a smooth curve runs through them), closed into loops or not
+//   trails        named lines of control points (a smooth curve runs through them), closed into loops or not. a trail
+//                 can carve its own bed into the ground: level across, its height smoothed along the line (with a
+//                 steepest grade), cutting into rises and building up over dips, with shoulders back to the land
 //   landmarks     named places with a height and a colour
 //   start         where the skier starts
+//   cliffs        the cliff-erator: ground steeper than `from` (0.6 = 60%) is stepped into cliff bands `band` metres
+//                 high (flat ledges, risers about `sharp` times steeper than the slope was); gentler ground is left
+//                 alone. `stop` is the steepest grade you can ski: anything steeper stops you at its edge
 //   scatter       how many random mountains, buildings and trees the game adds (mountains default to none, since
 //                 the layout has its own topography)
 // Directions are unit vectors [x, y, z] from the planet's centre (y is the planet's north).
@@ -174,10 +179,40 @@ PT.decodeSculpt = function(o){
   return sc;
 };
 
+// ---------- trail carving ----------
+// bed: half-width of the level bed (m). shoulder: how far it blends back to the land (m). smooth: how far along the line
+// its height is averaged (m). maxGrade: the steepest the bed may climb or drop (0.2 = 20%)
+PT.carveDefaults = () => ({ carve: true, bed: 4, shoulder: 10, smooth: 40, maxGrade: 0.2 });
+const pick = (o, keys) => { const r = {}; for (const k of keys) if (o[k] !== undefined && o[k] !== null && isFinite(o[k])) r[k] = +o[k]; return r; };
+// the bed's height along a trail: the ground under it, averaged over `smooth` metres, then held to the steepest grade
+function carveProfile(pts, closed, under, smooth, maxGrade, step){
+  const M = pts.length, raw = new Float64Array(M);
+  for (let i = 0; i < M; i++) raw[i] = under(pts[i][0], pts[i][1], pts[i][2]);
+  const w = Math.max(0, Math.round(smooth/2/step)), prof = new Float64Array(M);
+  for (let i = 0; i < M; i++){
+    let sum = 0, n = 0;
+    for (let k = -w; k <= w; k++){ let j = i + k; if (closed) j = (j % M + M) % M; else if (j < 0 || j >= M) continue; const wt = 1 - Math.abs(k)/(w + 1); sum += raw[j]*wt; n += wt; }
+    prof[i] = sum/n;
+  }
+  // hold the grade: relax forward and back a few times (round the loop, for a closed trail)
+  const g = Math.max(0.01, maxGrade)*step;
+  for (let it = 0; it < 4; it++){
+    for (let i = 1; i < M + (closed ? M : 0); i++){ const a = prof[(i - 1) % M], j = i % M; prof[j] = Math.max(a - g, Math.min(a + g, prof[j])); }
+    for (let i = M - 2 + (closed ? M : 0); i >= 0; i--){ const a = prof[(i + 1) % M], j = i % M; prof[j] = Math.max(a - g, Math.min(a + g, prof[j])); }
+  }
+  return prof;
+}
+// a cube-sphere grid for finding the carved segments near a point (cells about 12 m across)
+function carveGrid(R){
+  const G = Math.max(16, Math.min(256, Math.round(Math.PI/2*R/12)));
+  return { G, map: new Map(), key(x, y, z){ const [f, u, v] = PT.faceUV(x, y, z); return (f*G + Math.min(G - 1, Math.floor((u + 1)/2*G)))*G + Math.min(G - 1, Math.floor((v + 1)/2*G)); } };
+}
+
 // ---------- layouts ----------
 const norm = p => { const L = Math.hypot(p[0], p[1], p[2]) || 1; return [p[0]/L, p[1]/L, p[2]/L]; };
 PT.START = norm([0.15, 1, 0.25]);
-PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), trails: [], landmarks: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 } });
+PT.cliffDefaults = () => ({ on: false, from: 0.6, band: 12, sharp: 8, stop: 1.0 });
+PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), trails: [], landmarks: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults() });
 // a small example so every tool has something to show: a peak, a ridge, a crater, a basin and a trail past them
 PT.exampleLayout = function(R){
   R = R || 800;
@@ -188,8 +223,8 @@ PT.exampleLayout = function(R){
   L.stamps.push({ type: 'ridge', pts: [at(70, -40), at(62, -15), at(48, -5), at(38, -25)], radius: 45, height: 35, sharp: 0.3 });
   L.stamps.push({ type: 'crater', pts: [at(35, 30)], radius: 70, height: 18, sharp: 0.4 });
   L.stamps.push({ type: 'basin', pts: [at(50, 60)], radius: 90, height: 14, sharp: 0.5 });
-  L.trails.push({ name: 'Summit Loop', closed: true, pts: [at(60, 10), at(56, 22), at(44, 18), at(40, 2), at(48, -14), at(58, -8)] });
-  L.trails.push({ name: 'Long Way Round', closed: true, pts: Array.from({ length: 12 }, (_, i) => at(45 + 12*Math.sin(i*1.7), i*30 + 10)) });
+  L.trails.push(Object.assign({ name: 'Summit Loop', closed: true, pts: [at(60, 10), at(56, 22), at(44, 18), at(40, 2), at(48, -14), at(58, -8)] }, PT.carveDefaults()));
+  L.trails.push(Object.assign({ name: 'Long Way Round', closed: true, pts: Array.from({ length: 12 }, (_, i) => at(45 + 12*Math.sin(i*1.7), i*30 + 10)) }, PT.carveDefaults()));
   L.landmarks.push({ name: 'The Spire', type: 'spire', d: at(44, 18), height: 60, color: '#8a5cd6' });
   L.landmarks.push({ name: 'Camp', type: 'camp', d: at(60, 13), height: 8, color: '#d2462e' });
   return L;
@@ -202,9 +237,9 @@ PT.serialize = function(L){
     version: 1, name: L.name, radius: L.radius, noise: { amp: L.noise.amp },
     stamps: L.stamps.map(s => ({ type: s.type, pts: s.pts.map(r5), radius: s.radius, height: s.height, sharp: s.sharp })),
     sculpt: PT.encodeSculpt(L.sculpt),
-    trails: L.trails.map(t => ({ name: t.name, closed: !!t.closed, pts: t.pts.map(r5) })),
+    trails: L.trails.map(t => ({ name: t.name, closed: !!t.closed, pts: t.pts.map(r5), carve: !!t.carve, bed: t.bed, shoulder: t.shoulder, smooth: t.smooth, maxGrade: t.maxGrade })),
     landmarks: L.landmarks.map(m => ({ name: m.name, type: m.type, d: r5(m.d), height: m.height, color: m.color })),
-    start: { d: r5(L.start.d) }, scatter: Object.assign({}, L.scatter),
+    start: { d: r5(L.start.d) }, scatter: Object.assign({}, L.scatter), cliffs: Object.assign({}, L.cliffs),
   });
 };
 PT.parse = function(json){
@@ -213,9 +248,10 @@ PT.parse = function(json){
     version: 1, name: o.name || B.name, radius: o.radius || 800, noise: { amp: o.noise && o.noise.amp !== undefined ? o.noise.amp : 1 },
     stamps: (o.stamps || []).map(s => ({ type: s.type, pts: s.pts.map(norm), radius: +s.radius, height: +s.height, sharp: s.sharp ?? 0.3 })),
     sculpt: PT.decodeSculpt(o.sculpt),
-    trails: (o.trails || []).map(t => ({ name: t.name || 'Trail', closed: !!t.closed, pts: t.pts.map(norm) })),
+    trails: (o.trails || []).map(t => Object.assign({ name: t.name || 'Trail', closed: !!t.closed, pts: t.pts.map(norm) }, PT.carveDefaults(), { carve: !!t.carve }, pick(t, ['bed', 'shoulder', 'smooth', 'maxGrade']))),
     landmarks: (o.landmarks || []).map(m => ({ name: m.name || 'Landmark', type: m.type || 'marker', d: norm(m.d), height: +m.height || 10, color: m.color || '#d2462e' })),
     start: { d: norm(o.start && o.start.d || B.start.d) }, scatter: Object.assign({}, B.scatter, o.scatter || {}),
+    cliffs: Object.assign(PT.cliffDefaults(), pick(o.cliffs || {}, ['from', 'band', 'sharp', 'stop']), { on: !!(o.cliffs && o.cliffs.on) }),
   };
 };
 
@@ -223,16 +259,78 @@ PT.parse = function(json){
 // with no layout it's the procedural planet. R may differ from the layout's radius (stamps stay in metres)
 PT.terrain = function(L, R){
   const amp = L ? L.noise.amp : 1, stamps = L ? L.stamps.filter(s => s.pts && s.pts.length).map(s => compileStamp(s, R)) : [], sc = L ? L.sculpt : null;
+  // everything but the trails' carving
+  const shaped = (x, y, z) => { let h = amp ? amp*PT.baseNoise(x, y, z, R) : 0; for (let i = 0; i < stamps.length; i++) h += stampAt(stamps[i], x, y, z, R); return h; };
+  const raw = (x, y, z) => shaped(x, y, z) + (sc ? PT.sampleSculpt(sc, x, y, z) : 0);
+  // the cliff-erator: where the ground is steeper than cl.from, step its height into bands (ledge, then riser). the
+  // effect fades in from 3/4 of the threshold, so ground gentler than that is untouched
+  const cl = L && L.cliffs && L.cliffs.on ? L.cliffs : null, E = 1.5/R;
+  // only stamps and sculpting make ground that steep (unless the base noise is turned well up), so elsewhere it's skipped
+  const noiseSteep = cl && amp*0.35 >= cl.from*0.75;
+  const mayBeSteep = (x, y, z) => {
+    if (noiseSteep) return true;
+    for (let i = 0; i < stamps.length; i++){ const st = stamps[i]; if (x*st.bx + y*st.by + z*st.bz >= st.cosB) return true; }
+    return !!(sc && PT.sampleSculpt(sc, x, y, z) !== 0);
+  };
+  const under = !cl ? raw : (x, y, z) => {
+    const h = raw(x, y, z);
+    if (!mayBeSteep(x, y, z)) return h;
+    let ax = 0, ay = 1, az = 0; if (Math.abs(y) > 0.9){ ax = 1; ay = 0; }
+    let t1x = ay*z - az*y, t1y = az*x - ax*z, t1z = ax*y - ay*x; const l1 = Math.hypot(t1x, t1y, t1z); t1x /= l1; t1y /= l1; t1z /= l1;
+    const t2x = y*t1z - z*t1y, t2y = z*t1x - x*t1z, t2z = x*t1y - y*t1x;
+    const at = (a, b) => { const px = x + (t1x*a + t2x*b)*E, py = y + (t1y*a + t2y*b)*E, pz = z + (t1z*a + t2z*b)*E, l = Math.hypot(px, py, pz); return raw(px/l, py/l, pz/l); };
+    const s = Math.hypot(at(1, 0) - h, at(0, 1) - h)/1.5;                    // grade over 1.5 m
+    const t = (s - cl.from*0.75)/(cl.from*0.25); if (t <= 0) return h;
+    const w = t >= 1 ? 1 : t*t*(3 - 2*t), S = Math.max(1, cl.band), base = Math.floor(h/S)*S, f = (h - base)/S;
+    return h + (base + S*Math.pow(f, Math.max(1, cl.sharp)) - h)*w;
+  };
+  // carved trails: each one's line (2 m apart) and bed profile, and a grid of its segments
+  const carves = [], grid = carveGrid(R), STEP = 2;
+  if (L) for (const t of L.trails){
+    if (!t.carve || !t.pts || t.pts.length < 2) continue;
+    const pts = PT.evenCurve(t.pts, !!t.closed, STEP, R), M = pts.length; if (M < 2) continue;
+    const c = { closed: !!t.closed, M, bed: Math.max(0.5, t.bed ?? 4), sh: Math.max(0.5, t.shoulder ?? 10), P: new Float64Array(M*3),
+      prof: carveProfile(pts, !!t.closed, under, t.smooth ?? 40, t.maxGrade ?? 0.2, STEP) };
+    pts.forEach((p, i) => { c.P[i*3] = p[0]; c.P[i*3 + 1] = p[1]; c.P[i*3 + 2] = p[2]; });
+    const ci = carves.length; carves.push(c);
+    const reach = c.bed + c.sh + 1, segN = c.closed ? M : M - 1, q = [0, 0, 0];
+    for (let k = 0; k < segN; k++){
+      const a = pts[k], b = pts[(k + 1) % M], m = [a[0] + b[0], a[1] + b[1], a[2] + b[2]], Lm = Math.hypot(m[0], m[1], m[2]); m[0] /= Lm; m[1] /= Lm; m[2] /= Lm;
+      const ax = Math.abs(m[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+      const t1 = [ax[1]*m[2] - ax[2]*m[1], ax[2]*m[0] - ax[0]*m[2], ax[0]*m[1] - ax[1]*m[0]], L1 = Math.hypot(t1[0], t1[1], t1[2]); t1[0] /= L1; t1[1] /= L1; t1[2] /= L1;
+      const t2 = [m[1]*t1[2] - m[2]*t1[1], m[2]*t1[0] - m[0]*t1[2], m[0]*t1[1] - m[1]*t1[0]];
+      const keys = new Set([grid.key(m[0], m[1], m[2])]);
+      for (const rr of [reach/2, reach]) for (let i = 0; i < 12; i++){
+        const an = i/12*Math.PI*2, ox = Math.cos(an)*rr/R, oy = Math.sin(an)*rr/R;
+        q[0] = m[0] + t1[0]*ox + t2[0]*oy; q[1] = m[1] + t1[1]*ox + t2[1]*oy; q[2] = m[2] + t1[2]*ox + t2[2]*oy; keys.add(grid.key(q[0], q[1], q[2]));
+      }
+      for (const key of keys){ let l = grid.map.get(key); if (!l) grid.map.set(key, l = []); l.push(ci, k); }
+    }
+  }
+  // the bed under a point: the carved trail it's most inside (distance across, the bed's height there)
+  const carveAt = (x, y, z) => {
+    const list = grid.map.get(grid.key(x, y, z)); if (!list) return null;
+    let best = null, bs = Infinity;
+    for (let i = 0; i < list.length; i += 2){
+      const c = carves[list[i]], k = list[i + 1], k2 = (k + 1) % c.M, P = c.P;
+      const ax = P[k*3], ay = P[k*3 + 1], az = P[k*3 + 2], ex = P[k2*3] - ax, ey = P[k2*3 + 1] - ay, ez = P[k2*3 + 2] - az, L2 = ex*ex + ey*ey + ez*ez || 1e-12;
+      const u = Math.max(0, Math.min(1, ((x - ax)*ex + (y - ay)*ey + (z - az)*ez)/L2));
+      const d = Math.hypot(x - ax - u*ex, y - ay - u*ey, z - az - u*ez)*R, score = d - c.bed;
+      if (score < bs && d < c.bed + c.sh){ bs = score; best = { d, hb: c.prof[k] + (c.prof[k2] - c.prof[k])*u, bed: c.bed, sh: c.sh }; }
+    }
+    return best;
+  };
   return {
-    R, stamps,
+    R, stamps, carves: carves.length, stop: L && L.cliffs ? L.cliffs.stop : 1.0,
     height(x, y, z){
-      let h = amp ? amp*PT.baseNoise(x, y, z, R) : 0;
-      for (let i = 0; i < stamps.length; i++) h += stampAt(stamps[i], x, y, z, R);
-      if (sc) h += PT.sampleSculpt(sc, x, y, z);
+      let h = under(x, y, z);
+      if (carves.length){ const q = carveAt(x, y, z); if (q){ const t = q.d <= q.bed ? 0 : (q.d - q.bed)/q.sh, w = t*t*(3 - 2*t); h = q.hb + (h - q.hb)*w; } }
       return h;
     },
-    // everything but the sculpt layer (the flatten brush needs it)
-    shaped(x, y, z){ let h = amp ? amp*PT.baseNoise(x, y, z, R) : 0; for (let i = 0; i < stamps.length; i++) h += stampAt(stamps[i], x, y, z, R); return h; },
+    // everything but the sculpt layer and the carving (the flatten brush needs it)
+    shaped,
+    // the ground before the trails carve it
+    under,
   };
 };
 PT.STORE = 'skate-planet-layout';

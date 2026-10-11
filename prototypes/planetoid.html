@@ -53,6 +53,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 .pad.on{background:var(--skier);color:#fff;border-color:var(--skier)}
 @media (max-width:560px){ .top-right{flex-direction:column;align-items:flex-end} .rad{gap:6px;padding:5px 8px} .rad span{display:none} .rad input{width:60px} .rad output{min-width:40px} .hud{min-width:0;max-width:calc(100vw - 172px);padding:10px 12px} .hud .opt,.hud .help{display:none} .hud h1{font-size:18px} }
 @media (pointer:coarse){ .pads{display:flex} details{bottom:calc(env(safe-area-inset-bottom,0px) + 140px)} .help{display:none} }
+#steepBan{position:fixed;left:50%;top:22%;transform:translateX(-50%);padding:8px 16px;border-radius:6px;background:var(--skier);color:#fff;font:700 18px var(--display);letter-spacing:.06em;text-transform:uppercase;display:none;pointer-events:none}
 #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);pointer-events:none}
 </style>
 </head>
@@ -73,6 +74,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <div class="help"><b>← →</b> kick (hold to ride the glide) · <b>Space</b> + kick: loaded stroke · <b>↑</b> tuck, <b>← →</b> lean · <b>↓</b> snow plow · <b>V</b> planet view · <b>P</b> 800 m / 300 m planet · <b>R</b> reset</div>
 </div>
 
+<div id="steepBan" role="status">Too steep to ski</div>
 <div class="top-right"><label class="rad panel" for="tR"><span>Radius</span><input id="tR" type="range" min="150" max="1200" step="50" value="800"><output id="oR"></output></label><button id="sizeBtn" type="button" title="Switch between an 800 m and a 300 m planet (P)">Try 300 m</button><button id="viewBtn" type="button">Planet view</button></div>
 
 <details class="panel" id="settings">
@@ -201,6 +203,7 @@ function buildPlanet(){
   // about 2.5 m between vertices, capped for big planets (the terrain's smallest bumps are ~24 m, so it holds up)
   const N = Math.min(320, Math.ceil(Math.PI/2*R/2.5/CH)*CH), n = N/CH, M = N + 1;
   const pos = new Float32Array(M*M*3), dir = new Float32Array(M*M*3);
+  const cosStop = 1/Math.sqrt(1 + TERRAIN.stop*TERRAIN.stop), rockCol = new THREE.Color(0x7d8794);
   const col = new THREE.Color(), snow = new THREE.Color(0xe6edf3), shade = new THREE.Color(0xb3c4d6), hollow = new THREE.Color(0xd5e0eb);
   for (const [nn, uu, vv] of FACES){
     for (let j = 0; j < M; j++) for (let i = 0; i < M; i++){
@@ -226,6 +229,8 @@ function buildPlanet(){
         const slope = 1 - (nx*dir[k] + ny*dir[k+1] + nz*dir[k+2]);
         const h = Math.hypot(pos[k], pos[k+1], pos[k+2]) - R;
         col.copy(snow).lerp(hollow, smooth01(2, -6, h)).lerp(shade, Math.min(1, Math.sqrt(slope)*2.4));
+        // ground too steep to ski is bare rock (snow doesn't hold there), so cliffs read as cliffs
+        col.lerp(rockCol, smooth01(cosStop + 0.03, cosStop - 0.03, 1 - slope));
         vc[o] = col.r; vc[o+1] = col.g; vc[o+2] = col.b;
       }
       const idx = new Uint16Array(n*n*6); let q = 0;
@@ -655,6 +660,7 @@ function grad(){ const e = 0.5; return [(hLocal(e, 0) - hLocal(-e, 0))/(2*e), (h
 // ============================================================================================================
 // the skier: the main game's skating model (kicks, kick turns, glide, splay, ski marks, tuck, snow plow)
 // ============================================================================================================
+let steepT = 0;      // how long the "too steep" banner stays up
 const S = { x: 0, y: 0, vx: 0, vy: 0, th: 0, thv: 0, tgt: 0, dist: 0, grade: 0, weight: 1, off: 0, trail: null };
 const PUSH_LEN = 0.7, REACH = 0.6, STANCE = 0.12, PLOW_STANCE = 0.35, CAM_RELEASE_MS = 1500;
 let skis = [], lastSki = { L: null, R: null }, weightLeg = null, lastLeg = null, lastKickAt = 0, camPending = 0, mode = null;
@@ -817,6 +823,14 @@ function step(dt){
   lat = mode === 'tuck' ? 0 : lat * Math.exp(-P.grip*dt);
   S.vx = fx*fwd + (-fy)*lat; S.vy = fy*fwd + fx*lat;
 
+  // too steep to ski: ground just ahead that's steeper than the limit (a cliff edge going down, a cliff face going up)
+  // stops you there. only the part of your speed across it is taken away, so you can slide along its edge
+  { const v = speed();
+    if (v > 0.02 && !TEST.ghost){
+      const a = Math.max(0.6, v*dt*1.5), px = S.vx/v*a, py = S.vy/v*a, e = 0.5;
+      const gx = (hLocal(px + e, py) - hLocal(px - e, py))/(2*e), gy = (hLocal(px, py + e) - hLocal(px, py - e))/(2*e), g = Math.hypot(gx, gy);
+      if (g > TERRAIN.stop){ const nx = gx/g, ny = gy/g, vn = S.vx*nx + S.vy*ny; S.vx -= nx*vn; S.vy -= ny*vn; if (Math.abs(vn) > 0.3) steepT = 1.2; }
+    } }
   // move: in the 2D model, and round the planet
   const mvx = S.vx*dt, mvy = S.vy*dt;
   S.x += mvx; S.y += mvy; moveLocal(mvx, mvy);
@@ -1037,6 +1051,7 @@ function frame(now){
   youMark.visible = k > 0.02; youMark.position.copy(n).multiplyScalar(groundR(n) + 2); youMark.quaternion.setFromUnitVectors(_up, n); youMark.scale.setScalar(R*0.012*k + 0.01);
 
   renderer.render(scene, camera);
+  steepT = Math.max(0, steepT - dt); $('steepBan').style.display = steepT > 0 ? 'block' : 'none';
   if (now - hudT > 100){ hudT = now; hud(); }
   requestAnimationFrame(frame);
 }

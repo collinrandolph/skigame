@@ -70,6 +70,7 @@ select option{color:#1d2a36}
   <button data-tool="landmark" type="button">Landmark <kbd>6</kbd></button>
   <button data-tool="start" type="button">Start <kbd>7</kbd></button>
   <button data-tool="cliffs" type="button">Cliffs <kbd>8</kbd></button>
+  <button data-tool="bridge" type="button">Bridge <kbd>9</kbd></button>
 </div>
 
 <div id="side" class="panel">
@@ -92,7 +93,7 @@ select option{color:#1d2a36}
   <div class="row"><button id="bSki" type="button" title="Save and open the game here (K)">Ski here</button><button id="bExport" type="button">Export</button><button id="bImport" type="button">Import</button></div>
   <div class="row"><button id="bUndo" type="button">Undo</button><button id="bRedo" type="button">Redo</button><button id="bNew" type="button">New</button><button id="bExample" type="button">Example</button></div>
   <input id="fileIn" type="file" accept=".json,application/json" hidden>
-  <p class="hint">Saves in this browser as you work. Export writes planet.json; Ski here opens the game on this layout.<br>Right-drag orbits in any tool, wheel zooms, Shift+right-drag tilts. Ctrl+Z undo. Keys 1-8 pick tools.</p>
+  <p class="hint">Saves in this browser as you work. Export writes planet.json; Ski here opens the game on this layout.<br>Right-drag orbits in any tool, wheel zooms, Shift+right-drag tilts. Ctrl+Z undo. Keys 1-9 pick tools.</p>
 </div>
 
 <div id="mini" class="panel" title="Click to go there"><canvas id="miniC" width="360" height="180"></canvas></div>
@@ -257,6 +258,13 @@ const handleGeo = new THREE.SphereGeometry(1, 12, 8);
 const TYPE_COL = { peak: 0xf08a2a, pit: 0xf08a2a, ridge: 0xf2c230, valley: 0xf2c230, plateau: 0x2f9a5a, basin: 0x2f9a5a, crater: 0xd2462e };
 let handles = [];      // { obj, kind, ref, i, p (V3 surface point) }
 let sel = null;        // { kind: 'stamp'|'trail'|'landmark'|'start', ref, i }
+// a bridge's deck, worked out again only when the bridge or the ground changes
+const deckCache = new WeakMap();
+function deckOf(b){
+  const key = JSON.stringify([b.pts, b.clearance, b.ramp, b.width, b.maxGrade, R]), c = deckCache.get(b);
+  if (c && c.key === key && c.T === T) return c.D;
+  const D = PT.bridgeDeck(b, (x, y, z) => T.height(x, y, z), R); deckCache.set(b, { key, T, D }); return D;
+}
 const surf = (d, lift = 0) => new V3(...d).normalize().multiplyScalar(R + groundAt(new V3(...d).normalize()) + lift);
 function lineOn(pts, color, lift, closed, opacity = 1){
   const arr = pts.map(p => surf(p, lift)); if (closed && arr.length > 2) arr.push(arr[0].clone());
@@ -293,6 +301,16 @@ function rebuildOverlays(){
     pole.position.copy(base).addScaledVector(dir, m.height/2); pole.quaternion.setFromUnitVectors(new V3(0, 1, 0), dir);
     pole.scale.set(Math.max(1, R*0.003), m.height, Math.max(1, R*0.003)); pole.userData.pole = true; over.add(pole);
     addHandle('landmark', m, 0, m.d, isSel('landmark', m) ? 0x5b9cf0 : col.getHex(), 1.2);
+  }
+  for (const b of L.bridges){
+    const on = isSel('bridge', b), D = deckOf(b), col = on ? 0x5b9cf0 : 0xb79cff;
+    const deck = D.pts.map((p, i) => new V3(...p).multiplyScalar(R + D.h[i] + 0.3));
+    over.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(deck), new THREE.LineBasicMaterial({ color: col })));
+    // pylons where the deck is high, about every 40 m
+    const py = []; let last = -1e9;
+    for (let i = 0; i < D.pts.length; i++) if (D.h[i] - D.g[i] > 6 && D.s[i] - last > 40){ last = D.s[i]; const d = new V3(...D.pts[i]); py.push(d.clone().multiplyScalar(R + D.g[i]), d.clone().multiplyScalar(R + D.h[i])); }
+    if (py.length) over.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(py), new THREE.LineBasicMaterial({ color: 0x8a7fa8 })));
+    b.pts.forEach((p, i) => addHandle('bridge', b, i, p, col, i === 0 || i === b.pts.length - 1 ? 1.3 : 0.8));
   }
   addHandle('start', L.start, 0, L.start.d, isSel('start', L.start) ? 0x5b9cf0 : 0x2fd06a, 1.4);
   drawing && drawing.pts.length && over.add(lineOn(drawing.kind === 'trail' ? PT.curve(drawing.pts, false, 6, R) : PT.curve(drawing.pts, false, 6, R), 0x5b9cf0, 2.5, false));
@@ -336,7 +354,7 @@ function handlePick(px, py, maxPx = 14){
 // undo, autosave
 // ============================================================================================================
 const undoStack = [], redoStack = [];
-function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, start: L.start, scatter: L.scatter, cliffs: L.cliffs }), sculpt: L.sculpt.data.slice(), detail: PT.cloneDetail(L.detail) }; }
+function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, bridges: L.bridges, start: L.start, scatter: L.scatter, cliffs: L.cliffs }), sculpt: L.sculpt.data.slice(), detail: PT.cloneDetail(L.detail) }; }
 let lastSnap = snapshot();
 function commit(){ undoStack.push(lastSnap); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; lastSnap = snapshot(); autosave(); }
 function restore(s){
@@ -360,7 +378,7 @@ function autosave(){
 // tools
 // ============================================================================================================
 let tool = 'orbit', drawing = null;      // drawing: a ridge, valley or trail being clicked out point by point
-const opts = { cliff: { radius: 30, strength: 3 }, sculpt: { mode: 'raise', radius: 60, strength: 6 }, stamp: { type: 'peak', radius: 80, height: 60, sharp: 0.3 }, trail: { closed: true, carve: true }, landmark: { type: 'spire', height: 40, color: '#8a5cd6' } };
+const opts = { bridge: PT.bridgeDefaults(), cliff: { radius: 30, strength: 3 }, sculpt: { mode: 'raise', radius: 60, strength: 6 }, stamp: { type: 'peak', radius: 80, height: 60, sharp: 0.3 }, trail: { closed: true, carve: true }, landmark: { type: 'spire', height: 40, color: '#8a5cd6' } };
 const TOOL_HELP = {
   orbit: 'Drag to turn the planet. Wheel to zoom.',
   select: 'Click a handle to select it, drag to move it. Delete removes it (for a trail or ridge, the point; Shift+Delete the whole thing).',
@@ -369,6 +387,7 @@ const TOOL_HELP = {
   trail: 'Click points along the route; Enter (or double-click) finishes. Esc drops the last point. A carved trail cuts a level bed into the ground, its grade smoothed along the line.',
   landmark: 'Click to place a landmark.',
   start: 'Click where the skier should start.',
+  bridge: 'Click the start ramp’s foot, any bends, then the end ramp’s foot; Enter (or double-click) finishes. The deck rises at each ramp and clears the ground between. You get on and off only at the feet (through a portal), heading in.',
   cliffs: 'Cliff-erator brush: drag over steep ground to cut it into cliff bands. Brushing over it again sharpens it further. [ and ] change the brush size.',
 };
 function slider(id, label, min, max, step, get, set, fmt){
@@ -384,7 +403,7 @@ function setTool(t){
   if (drawing) finishDrawing();
   tool = t;
   for (const b of document.querySelectorAll('#tools button')) b.classList.toggle('on', b.dataset.tool === t);
-  $('toolTitle').textContent = { orbit: 'Orbit', select: 'Select', sculpt: 'Sculpt', stamp: 'Stamp', trail: 'Trail', landmark: 'Landmark', start: 'Start', cliffs: 'Cliffs' }[t];
+  $('toolTitle').textContent = { orbit: 'Orbit', select: 'Select', sculpt: 'Sculpt', stamp: 'Stamp', trail: 'Trail', landmark: 'Landmark', start: 'Start', cliffs: 'Cliffs', bridge: 'Light bridge' }[t];
   const parts = [];
   if (t === 'sculpt'){
     parts.push(seg('sMode', [['raise', 'Raise'], ['lower', 'Lower'], ['smooth', 'Smooth'], ['flatten', 'Flatten']], () => opts.sculpt.mode, k => opts.sculpt.mode = k));
@@ -403,6 +422,12 @@ function setTool(t){
   if (t === 'landmark'){
     parts.push({ html: `<label class="f" for="lmType">Type<select id="lmType" style="grid-column:1/-1">${Object.entries(PT.LANDMARK_TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>`, bind(){ const el = $('lmType'); el.value = opts.landmark.type; el.addEventListener('change', () => { opts.landmark.type = el.value; el.blur(); }); } });
     parts.push(slider('lmH', 'Height', 2, 250, 1, () => opts.landmark.height, v => opts.landmark.height = v, v => v + ' m'));
+  }
+  if (t === 'bridge'){
+    const B = opts.bridge;
+    parts.push(slider('brC', 'Height over the ground', 3, 60, 1, () => B.clearance, v => B.clearance = v, v => v + ' m'));
+    parts.push(slider('brR', 'Ramp length', 10, 200, 5, () => B.ramp, v => B.ramp = v, v => v + ' m'));
+    parts.push(slider('brW', 'Deck half-width', 1, 6, 0.5, () => B.width, v => B.width = v, v => v + ' m'));
   }
   if (t === 'cliffs'){
     const C = L.cliffs, pct = v => Math.round(v*100) + '% (' + Math.round(Math.atan(v)/D2R) + '°)';
@@ -468,9 +493,20 @@ function showSel(){
     const seen = Math.round(Math.sqrt(2*R*m.height) + Math.sqrt(2*R*9));
     parts.push({ html: `<p class="hint">Its top shows over the horizon from about ${fmtM(seen)} away (from the game's camera).</p>`, bind(){} });
   }
+  if (sel.kind === 'bridge'){
+    const b = sel.ref, D = deckOf(b), pc = v => Math.round(v*100) + '%';
+    parts.push({ html: `<label class="f" for="slName">Name<input id="slName" type="text" style="grid-column:1/-1"></label>`, bind(){ const n = $('slName'); n.value = b.name; n.addEventListener('input', () => { b.name = n.value; drawLabels(); }); n.addEventListener('change', () => { commit(); n.blur(); }); } });
+    const bs = (id, label, min, max, step, key, fmt) => { const sl = slider(id, label, min, max, step, () => b[key], v => { b[key] = v; rebuildOverlays(); }, fmt); const b0 = sl.bind; sl.bind = () => { b0(); $(id).addEventListener('change', () => setTimeout(showSel, 0)); }; return sl; };
+    parts.push(bs('slBC', 'Height over the ground', 3, 60, 1, 'clearance', v => v + ' m'));
+    parts.push(bs('slBR', 'Ramp length', 10, 200, 5, 'ramp', v => v + ' m'));
+    parts.push(bs('slBW', 'Deck half-width', 1, 6, 0.5, 'width', v => v + ' m'));
+    parts.push(bs('slBG', 'Steepest descent on the span', 0.05, 0.5, 0.01, 'maxGrade', pc));
+    const warn = D.desc > Math.max(b.maxGrade, D.rampGrade) + 0.05 ? ` <b style="color:var(--accent)">Steeper than set: the ground near a ramp rises faster than the ramp can climb. Move that foot to flatter ground or lengthen the ramp.</b>` : '';
+    parts.push({ html: `<p class="hint">${fmtM(D.L)} long, up to ${D.highest.toFixed(0)} m over the ground. Ramps ${pc(D.rampGrade)}; steepest climb ${pc(D.climb)}, steepest descent ${pc(D.desc)}.${warn} The big handles are the ramps’ feet.</p>`, bind(){} });
+  }
   if (sel.kind === 'start') parts.push({ html: `<p class="hint">The skier starts here${nearTrailName(sel.ref.d) ? ', on ' + nearTrailName(sel.ref.d) : ''}.</p>`, bind(){} });
   const ll = latLon(sel.kind === 'landmark' || sel.kind === 'start' ? (sel.ref.d) : sel.ref.pts[sel.i]);
-  parts.push({ html: `<p class="hint">${ll}</p><div class="row">${sel.kind !== 'start' ? '<button id="slDel" type="button">Delete</button>' : ''}${(sel.kind === 'trail' || (sel.kind === 'stamp' && PT.STAMP_TYPES[sel.ref.type].line)) ? '<button id="slDelPt" type="button">Delete point</button>' : ''}<button id="slGo" type="button">Ski here</button></div>`,
+  parts.push({ html: `<p class="hint">${ll}</p><div class="row">${sel.kind !== 'start' ? '<button id="slDel" type="button">Delete</button>' : ''}${(sel.kind === 'trail' || sel.kind === 'bridge' || (sel.kind === 'stamp' && PT.STAMP_TYPES[sel.ref.type].line)) ? '<button id="slDelPt" type="button">Delete point</button>' : ''}<button id="slGo" type="button">Ski here</button></div>`,
     bind(){ $('slDel') && $('slDel').addEventListener('click', () => deleteSel(true)); $('slDelPt') && $('slDelPt').addEventListener('click', () => deleteSel(false)); $('slGo').addEventListener('click', skiHere); } });
   P.innerHTML = parts.map(p => p.html).join('');
   for (const p of parts) p.bind();
@@ -494,6 +530,7 @@ function deleteSel(all){
   }
   if (sel.kind === 'trail'){ const cap = trailCap(r); if (!all && r.pts.length > 2) r.pts.splice(sel.i, 1); else L.trails.splice(L.trails.indexOf(r), 1); if (r.carve) rebuildCaps([cap]); }
   if (sel.kind === 'landmark') L.landmarks.splice(L.landmarks.indexOf(r), 1);
+  if (sel.kind === 'bridge'){ if (!all && r.pts.length > 2) r.pts.splice(sel.i, 1); else L.bridges.splice(L.bridges.indexOf(r), 1); }
   sel = null; rebuildOverlays(); showSel(); commit();
 }
 function finishDrawing(){
@@ -503,6 +540,10 @@ function finishDrawing(){
     const t = Object.assign({ name: 'Trail ' + (L.trails.length + 1), closed: opts.trail.closed && d.pts.length >= 3, pts: d.pts }, PT.carveDefaults(), { carve: opts.trail.carve });
     L.trails.push(t); sel = { kind: 'trail', ref: t, i: 0 };
     if (t.carve) rebuildCaps([trailCap(t)]);
+  }
+  if (d.kind === 'bridge' && d.pts.length >= 2){
+    const b = Object.assign({ name: 'Light bridge ' + (L.bridges.length + 1), pts: d.pts }, opts.bridge);
+    L.bridges.push(b); sel = { kind: 'bridge', ref: b, i: 0 };
   }
   if (d.kind === 'line' && d.pts.length >= 2){
     const s = { type: opts.stamp.type, pts: d.pts, radius: opts.stamp.radius, height: opts.stamp.height, sharp: opts.stamp.sharp };
@@ -535,6 +576,7 @@ cv.addEventListener('pointerdown', e => {
     return;
   }
   if (tool === 'trail'){ if (!drawing) drawing = { kind: 'trail', pts: [] }; drawing.pts.push(arr); rebuildOverlays(); return; }
+  if (tool === 'bridge'){ if (!drawing) drawing = { kind: 'bridge', pts: [] }; drawing.pts.push(arr); rebuildOverlays(); return; }
   if (tool === 'landmark'){
     const m = { name: PT.LANDMARK_TYPES[opts.landmark.type] + ' ' + (L.landmarks.length + 1), type: opts.landmark.type, d: arr, height: opts.landmark.height, color: opts.landmark.color };
     L.landmarks.push(m); sel = { kind: 'landmark', ref: m, i: 0 }; rebuildOverlays(); showSel(); commit(); return;
@@ -558,7 +600,7 @@ cv.addEventListener('pointermove', e => {
   if (ptr.mode === 'move'){
     const d = groundPick(px, py); if (!d) return;
     const h = ptr.h, a = d.toArray();
-    if (h.kind === 'stamp') h.ref.pts[h.i] = a; else if (h.kind === 'trail') h.ref.pts[h.i] = a; else h.ref.d = a;
+    if (h.kind === 'stamp' || h.kind === 'trail' || h.kind === 'bridge') h.ref.pts[h.i] = a; else h.ref.d = a;
     ptr.moved = true;
     if (h.kind === 'stamp'){ const c = stampCap(h.ref); rebuildCaps([ptr.cap0, c]); ptr.cap0 = c; }
     rebuildOverlays();
@@ -647,8 +689,8 @@ addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'y'){ e.preventDefault(); redo(); return; }
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
-  const tools = ['orbit', 'select', 'sculpt', 'stamp', 'trail', 'landmark', 'start', 'cliffs'];
-  if (k >= '1' && k <= '8'){ setTool(tools[+k - 1]); return; }
+  const tools = ['orbit', 'select', 'sculpt', 'stamp', 'trail', 'landmark', 'start', 'cliffs', 'bridge'];
+  if (k >= '1' && k <= '9'){ setTool(tools[+k - 1]); return; }
   if (k === 'Enter'){ if (drawing) finishDrawing(); return; }
   if (k === 'Escape'){ if (drawing){ drawing.pts.pop(); if (!drawing.pts.length) drawing = null; rebuildOverlays(); } else { sel = null; rebuildOverlays(); showSel(); } return; }
   if (k === 'Delete' || k === 'Backspace'){ e.preventDefault(); deleteSel(e.shiftKey); return; }
@@ -683,7 +725,8 @@ let cursorDir = null;
 const labelsEl = $('labels');
 function drawLabels(){
   const items = L.landmarks.map(m => ({ text: m.name, d: m.d, lift: m.height + 4, cls: '' }))
-    .concat(L.trails.filter(t => t.pts.length).map(t => ({ text: t.name, d: t.pts[Math.floor(t.pts.length/2)], lift: 6, cls: 'trail' })));
+    .concat(L.trails.filter(t => t.pts.length).map(t => ({ text: t.name, d: t.pts[Math.floor(t.pts.length/2)], lift: 6, cls: 'trail' })))
+    .concat(L.bridges.map(b => { const D = deckOf(b), i = Math.floor(D.pts.length/2); return { text: b.name, d: D.pts[i], lift: D.h[i] - D.g[i] + 5, cls: 'trail' }; }));
   while (labelsEl.children.length < items.length) labelsEl.appendChild(document.createElement('div'));
   while (labelsEl.children.length > items.length) labelsEl.lastChild.remove();
   items.forEach((it, i) => {
@@ -718,6 +761,9 @@ function drawMini(){
     const p = PT.curve(t.pts, t.closed, 15, R).map(toMap); mg.strokeStyle = sel && sel.ref === t ? '#5b9cf0' : '#fff'; mg.beginPath();
     p.forEach((q, i) => { if (i && Math.abs(q[0] - p[i - 1][0]) > MW/2) mg.moveTo(q[0], q[1]); else i ? mg.lineTo(q[0], q[1]) : mg.moveTo(q[0], q[1]); }); mg.stroke();
   }
+  mg.setLineDash([4, 3]);
+  for (const b of L.bridges){ const p = PT.curve(b.pts, false, 15, R).map(toMap); mg.strokeStyle = sel && sel.ref === b ? '#5b9cf0' : '#b79cff'; mg.beginPath(); p.forEach((q, i) => i ? mg.lineTo(q[0], q[1]) : mg.moveTo(q[0], q[1])); mg.stroke(); }
+  mg.setLineDash([]);
   for (const m of L.landmarks){ const [x, y] = toMap(m.d); mg.fillStyle = m.color; mg.fillRect(x - 2.5, y - 2.5, 5, 5); mg.strokeStyle = '#000'; mg.strokeRect(x - 2.5, y - 2.5, 5, 5); }
   { const [x, y] = toMap(L.start.d); mg.fillStyle = '#2fd06a'; mg.beginPath(); mg.arc(x, y, 3.5, 0, Math.PI*2); mg.fill(); }
   const [vx, vy] = toMap(cam.dir.toArray()); mg.strokeStyle = '#ff6a4d'; mg.lineWidth = 1.5; mg.beginPath(); mg.arc(vx, vy, 6, 0, Math.PI*2); mg.stroke();

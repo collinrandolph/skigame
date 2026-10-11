@@ -507,7 +507,7 @@ function buildStructures(rnd){
   const blds = [], maxB = 1500;
   const addBld = (dir, spin, tower) => {
     const w = 4 + 6*rnd(), dp = 4 + 6*rnd(), h = tower ? 12 + 16*rnd() : 3 + 6*rnd(), r = Math.hypot(w, dp)/2;
-    if (!clear(dir, r) || !trailClear(dir, r)) return false;
+    if (!clear(dir, r) || !trailClear(dir, r) || !bridgeClear(dir, r, true)) return false;
     // not on steep ground: the footprint's corners may differ by at most a quarter of its width
     { tangents(dir); let lo = Infinity, hi = -Infinity; for (let i = 0; i < 4; i++){ const an = i*Math.PI/2; p.copy(dir).multiplyScalar(R).addScaledVector(t1, Math.cos(an)*r).addScaledVector(t2, Math.sin(an)*r).normalize(); const g = groundR(p); lo = Math.min(lo, g); hi = Math.max(hi, g); } if (hi - lo > r*0.5) return false; }
     const b = baseR(dir, r), sink = groundR(dir) - b;
@@ -566,7 +566,7 @@ function buildTrees(rnd){
     const f = 0.65*noise3(d.x*R/75 + 11.1, d.y*R/75 - 4.2, d.z*R/75 + 7.7) + 0.35*noise3(d.x*R/30 - 3.3, d.y*R/30 + 9.9, d.z*R/30 + 1.4);
     if (rnd() > 0.04 + 0.92*smooth01(-0.05, 0.3, f)) continue;
     if (d.angleTo(START_N)*R < 14) continue;
-    if (nearestTrailAt(d).d < TRAIL_W/2 + 3 + rnd()*3) continue;
+    if (nearestTrailAt(d).d < TRAIL_W/2 + 3 + rnd()*3 || !bridgeClear(d, 1.5)) continue;
     if (beaconDirs.some(b => d.angleTo(b)*R < 5)) continue;
     if (solids.some(o => d.dot(o.d) > Math.cos((o.r + 1.5)/R))) continue;
     // not on steep ground
@@ -629,6 +629,7 @@ function buildLandmarks(){
 function buildScatter(){
   const R = P.R;
   buildLandmarks();
+  buildBridges();
   clearBuckets('rocks'); rocks = [];
   { let s2 = 777; buildStructures(() => (s2 = (s2 * 16807) % 2147483647) / 2147483647); }
   { let s4 = 2468; buildTrees(() => (s4 = (s4 * 16807) % 2147483647) / 2147483647); }
@@ -643,7 +644,7 @@ function buildScatter(){
     if (d.angleTo(START_N)*R < 14) continue;                       // keep the start clear
     if (solids.some(o => d.angleTo(o.d)*R < o.r + 1)) continue;     // and out of the mountains and buildings
     const size = 0.35 + 1.3*Math.pow(rnd(), 2.2);
-    if (nearestTrailAt(d).d < TRAIL_W/2 + size + 0.5) continue;    // and off the trails
+    if (nearestTrailAt(d).d < TRAIL_W/2 + size + 0.5 || !bridgeClear(d, size)) continue;    // and off the trails and the bridges' ramps
     { const tl = treeGrid.get(cellOf(d.x, d.y, d.z)); if (tl && tl.some(t => t.d.angleTo(d)*R < size + 1)) continue; }   // and clear of the trees
     p.copy(d).multiplyScalar(groundR(d) - 0.3*size);
     q.setFromUnitVectors(up, d); q2.setFromAxisAngle(up, rnd()*Math.PI*2); q.multiply(q2);
@@ -679,7 +680,7 @@ const n = new THREE.Vector3(), ex = new THREE.Vector3(), ey = new THREE.Vector3(
 let AT_ONCE = null;      // ?at=x,y,z (from the editor's Ski here): where to put the skier the first time
 { const a = new URLSearchParams(location.search).get('at'); if (a){ const v = a.split(',').map(Number); if (v.length === 3 && v.every(isFinite)) AT_ONCE = new THREE.Vector3(...v).normalize(); } }
 function placeAtStart(){
-  n.copy(AT_ONCE || START_N); AT_ONCE = null;
+  n.copy(AT_ONCE || START_N); AT_ONCE = null; ONB = null; exitLock = null;
   ex.set(1, 0, 0).addScaledVector(n, -n.x).normalize();
   ey.crossVectors(ex, n).normalize();        // as in the game's 3D: X east, Y up, Z south (east × up = south)
 }
@@ -705,6 +706,118 @@ function grad(){ const e = 0.5; return [(hLocal(e, 0) - hLocal(-e, 0))/(2*e), (h
 // the skier: the main game's skating model (kicks, kick turns, glide, splay, ski marks, tuck, snow plow)
 // ============================================================================================================
 let steepT = 0;      // how long the "too steep" banner stays up
+
+// ---------- light bridges (from a layout) ----------
+// a deck of light that rises at a ramp from each foot and clears the ground between (its heights come from
+// planet-terrain.js, the same as the editor's). you get on only through the portal at a foot, heading in (within 55°),
+// and off at a foot. the deck glides like groomed trail and a climb costs you no speed (only a descent's pull counts);
+// glowing railings keep you on. pylons hold it up where it's high, and they're solid
+let bridgesG = [], ONB = null, exitLock = null, pylons = [], bridgeGrid = new Map();
+const bridgeGroup = new THREE.Group(); scene.add(bridgeGroup);
+const BR_MATS = {
+  deck: flatPatch(new THREE.MeshBasicMaterial({ color: 0xa69be6, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })),
+  rail: flatPatch(new THREE.MeshBasicMaterial({ color: 0xe2d9ff, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false })),
+  pylon: flatPatch(new THREE.MeshLambertMaterial({ color: 0x9aa3b5 })),
+  pole: flatPatch(new THREE.MeshLambertMaterial({ color: 0xf4f6fa })),
+  arch: flatPatch(new THREE.MeshBasicMaterial({ color: 0xc7b8ff })),
+};
+const local3 = (x, y, out = new THREE.Vector3()) => out.set(0, 0, 0).addScaledVector(ex, x).addScaledVector(ey, y);
+function buildBridges(){
+  const R = P.R, V = THREE.Vector3;
+  while (bridgeGroup.children.length){ const c = bridgeGroup.children[0]; bridgeGroup.remove(c); c.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+  bridgesG = []; pylons = []; bridgeGrid = new Map(); ONB = null; exitLock = null;
+  TG = Math.max(16, Math.min(160, Math.round(Math.PI/2*R/8)));
+  if (!LAYOUT || !LAYOUT.bridges) return;
+  const up = new V(0, 1, 0), tmp = new V(), side = new V();
+  for (const b of LAYOUT.bridges){
+    const D = PTR.bridgeDeck(b, heightAt, R), Vs = D.pts.map(p => new V(...p)), M = Vs.length; if (M < 3) continue;
+    const w = D.width, sideAt = i => side.crossVectors(tmp.copy(Vs[Math.min(M - 1, i + 1)]).sub(Vs[Math.max(0, i - 1)]), Vs[i]).normalize();
+    // deck and railings: ribbons along the line
+    const ribbon = (offs, lift0, lift1, mat) => {
+      const pos = new Float32Array(M*offs.length*3), idx = [];
+      for (let i = 0; i < M; i++){ sideAt(i); offs.forEach((o, c) => { const q = Vs[i].clone().multiplyScalar(R).addScaledVector(side, o[0]).normalize().multiplyScalar(R + D.h[i] + (c % 2 ? lift1 : lift0)), k = (i*offs.length + c)*3; pos[k] = q.x; pos[k + 1] = q.y; pos[k + 2] = q.z; }); }
+      for (let i = 0; i < M - 1; i++) for (let c = 0; c < offs.length; c += 2){ const a = i*offs.length + c, bb = a + 1, cc = a + offs.length, d = cc + 1; idx.push(a, cc, bb, bb, cc, d); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(idx); g.computeBoundingSphere();
+      const m = new THREE.Mesh(g, mat); m.renderOrder = 2; bridgeGroup.add(m);
+    };
+    ribbon([[-w], [w]], 0.04, 0.04, BR_MATS.deck);
+    ribbon([[-w], [-w], [w], [w]], 0.04, 1.05, BR_MATS.rail);
+    // pylons where the deck is high, about every 40 m (solid)
+    let last = -1e9;
+    for (let i = 0; i < M; i++) if (D.h[i] - D.g[i] > 6 && D.s[i] - last > 40 && D.s[i] > 20 && D.L - D.s[i] > 20){
+      last = D.s[i]; const ht = D.h[i] - D.g[i] + 1;
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, ht, 8), BR_MATS.pylon);
+      c.position.copy(Vs[i]).multiplyScalar(R + D.g[i] - 1 + ht/2); c.quaternion.setFromUnitVectors(up, Vs[i]); bridgeGroup.add(c);
+      pylons.push({ d: Vs[i].clone(), r: 0.8 });
+    }
+    // a portal at each foot: two white poles and an arch of light over the way in
+    const tIn = [];
+    for (const f of [0, 1]){
+      const i = f ? M - 1 : 0, j = f ? M - 3 : 2, t = Vs[j].clone().sub(Vs[i]).normalize(); tIn.push(t);
+      sideAt(i); const g = new THREE.Group(); g.position.copy(Vs[i]).multiplyScalar(R + D.g[i] - 0.2);
+      const m = new THREE.Matrix4().makeBasis(side.clone(), Vs[i].clone(), t.clone().negate()); g.quaternion.setFromRotationMatrix(m);
+      for (const sg of [-1, 1]){ const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.18, 4.6, 8), BR_MATS.pole); pole.position.set(sg*(w + 0.5), 2.3, 0); g.add(pole); }
+      const arch = new THREE.Mesh(new THREE.TorusGeometry(w + 0.5, 0.12, 6, 24, Math.PI), BR_MATS.arch); arch.position.y = 4.6; g.add(arch);
+      bridgeGroup.add(g);
+    }
+    const B = { name: b.name, D, V: Vs, w, tIn };
+    bridgesG.push(B);
+    // keep the ground clear: buildings from under the whole bridge, trees and rocks where the deck is low (and round
+    // the portals)
+    const reach = w + 4;
+    for (let i = 0; i < M; i++){
+      const low = !(D.h[i] - D.g[i] > 7 && D.s[i] > 12 && D.L - D.s[i] > 12);
+      const keys = new Set([cellOf(Vs[i].x, Vs[i].y, Vs[i].z)]);
+      t1b.copy(Math.abs(Vs[i].y) < 0.9 ? up : new V(1, 0, 0)).cross(Vs[i]).normalize(); t2b.crossVectors(Vs[i], t1b);
+      for (let k = 0; k < 8; k++){ const an = k/8*Math.PI*2; tmp.copy(Vs[i]).multiplyScalar(R).addScaledVector(t1b, Math.cos(an)*reach).addScaledVector(t2b, Math.sin(an)*reach).normalize(); keys.add(cellOf(tmp.x, tmp.y, tmp.z)); }
+      for (const key of keys){ let l = bridgeGrid.get(key); if (!l) bridgeGrid.set(key, l = []); l.push(Vs[i], w, low); }
+    }
+  }
+}
+const t1b = new THREE.Vector3(), t2b = new THREE.Vector3();
+// is a spot r metres across clear of the bridges (all of them, or only where their decks are low)?
+function bridgeClear(d, r, all = false){
+  const l = bridgeGrid.get(cellOf(d.x, d.y, d.z)); if (!l) return true;
+  for (let i = 0; i < l.length; i += 3) if ((all || l[i + 2]) && l[i].angleTo(d)*P.R < l[i + 1] + r + 1.5) return false;
+  return true;
+}
+// where you are on the bridge: the nearest deck point (searching round the last one), and the deck's height there
+function bridgeAt(){
+  const B = ONB.b, Vs = B.V, M = Vs.length; let bi = ONB.i, bd = Infinity;
+  for (let k = Math.max(0, ONB.i - 8); k <= Math.min(M - 1, ONB.i + 8); k++){ const a = Vs[k].angleTo(n); if (a < bd){ bd = a; bi = k; } }
+  ONB.i = bi;
+  const k1 = Math.max(0, bi - 1), k2 = Math.min(M - 1, bi + 1), D = B.D;
+  const t3 = Vs[k2].clone().sub(Vs[k1]).normalize(), along = n.clone().sub(Vs[bi]).dot(t3)*P.R;
+  const nb = along >= 0 ? k2 : k1, seg = Math.max(0.01, Math.abs(D.s[nb] - D.s[bi])), u = Math.min(1, Math.abs(along)/seg);
+  return { bi, t3, h: D.h[bi] + (D.h[nb] - D.h[bi])*u, grade: (D.h[k2] - D.h[k1])/Math.max(0.01, D.s[k2] - D.s[k1]) };
+}
+const surfaceR = () => ONB ? P.R + bridgeAt().h : groundR(n);
+// on and off, and the railings (after each move)
+function bridgeStep(){
+  const R = P.R;
+  if (ONB){
+    const B = ONB.b, M = B.V.length, at = bridgeAt(), bi = at.bi;
+    if (bi === 0 || bi === M - 1){
+      const out = B.tIn[bi === 0 ? 0 : 1].clone().negate(), mv = local3(S.vx, S.vy);
+      if (mv.dot(out) > 0 || speed() < 0.05){ exitLock = { B, foot: bi === 0 ? 0 : 1 }; ONB = null; return; }
+    }
+    const side3 = new THREE.Vector3().crossVectors(at.t3, B.V[bi]).normalize(), lat = n.clone().sub(B.V[bi]).dot(side3)*R, lim = B.w - 0.35;
+    if (Math.abs(lat) > lim){
+      const sx = side3.dot(ex), sy = side3.dot(ey), L2 = Math.hypot(sx, sy) || 1, ux = sx/L2*Math.sign(lat), uy = sy/L2*Math.sign(lat), push = Math.abs(lat) - lim;
+      S.x -= ux*push; S.y -= uy*push; moveLocal(-ux*push, -uy*push);
+      const vn = S.vx*ux + S.vy*uy; if (vn > 0){ S.vx -= ux*vn; S.vy -= uy*vn; }
+    }
+    return;
+  }
+  const v = speed(); if (v < 0.3 || !bridgesG.length) return;
+  const mv = local3(S.vx/v, S.vy/v);
+  for (const B of bridgesG) for (const f of [0, 1]){
+    const foot = f ? B.V[B.V.length - 1] : B.V[0], d = foot.angleTo(n)*R;
+    if (exitLock && exitLock.B === B && exitLock.foot === f){ if (d > 10) exitLock = null; else continue; }
+    if (d > B.w + 0.6 || mv.dot(B.tIn[f]) < Math.cos(55*D2R)) continue;
+    ONB = { b: B, i: f ? B.V.length - 1 : 0 }; return;
+  }
+}
 const S = { x: 0, y: 0, vx: 0, vy: 0, th: 0, thv: 0, tgt: 0, dist: 0, grade: 0, weight: 1, off: 0, trail: null };
 const PUSH_LEN = 0.7, REACH = 0.6, STANCE = 0.12, PLOW_STANCE = 0.35, CAM_RELEASE_MS = 1500;
 let skis = [], lastSki = { L: null, R: null }, weightLeg = null, lastLeg = null, lastKickAt = 0, camPending = 0, mode = null;
@@ -737,7 +850,7 @@ function footAt(side, th){ return [S.x + Math.cos(th)*side*STANCE, S.y + Math.si
 const MARKS = 1200;
 let markSlot = 0;
 function newSki(side, ang, ax = S.x, ay = S.y){
-  const s = { ax, ay, dx: Math.sin(ang), dy: -Math.cos(ang), len: 0, live: true, side, dirty: true, slot: markSlot++ % MARKS, w: 0.09 };
+  const s = { ax, ay, dx: Math.sin(ang), dy: -Math.cos(ang), len: 0, live: true, side, dirty: true, slot: markSlot++ % MARKS, w: 0.09, rFix: ONB ? surfaceR() + 0.08 : null };
   s.p3 = dirLocal(ax - S.x, ay - S.y);
   s.t3 = new THREE.Vector3().addScaledVector(ex, s.dx).addScaledVector(ey, s.dy).normalize();
   skis.push(s); if (skis.length > MARKS) skis.shift();
@@ -842,7 +955,8 @@ function step(dt){
   else { const w = 5000/P.snap, h = dt/4; for (let i = 0; i < 4; i++){ S.thv += (w*w*(S.tgt - S.th) - 2*w*S.thv)*h; S.th += S.thv*h; } }
 
   // the hill: gravity pulls along the skis, by the slope under you (measured in your own frame)
-  const [hx, hy] = grad(), [mx, my] = moveDir();
+  // (on a bridge, the deck's slope along its line instead of the ground's)
+  const [hx, hy] = ONB ? (() => { const a = bridgeAt(), tx = a.t3.dot(ex), ty = a.t3.dot(ey), Lt = Math.hypot(tx, ty) || 1; return [tx/Lt*a.grade, ty/Lt*a.grade]; })() : grad(), [mx, my] = moveDir();
   S.grade = hx*mx + hy*my;
   // how heavy you are: going round a planet this small, part of gravity just keeps you on the curve
   const r = groundR(n);
@@ -851,6 +965,7 @@ function step(dt){
   const gm = glideMult();
   // groomed or not: ungroomed snow multiplies friction and drag (a held glide works off the trail too, as in the game)
   const tq = nearestTrailAt(n); S.off = offTrail(tq.d); S.trail = tq.t;
+  if (ONB){ S.off = 0; S.trail = null; }      // the deck glides like groomed trail
   const surf = (1 + (P.off - 1)*S.off) * gm;
 
   const ws = weightLeg && lastSki[weightLeg], onSki = ws && ws.live && ws.glide;
@@ -859,7 +974,7 @@ function step(dt){
   const plowHold = mode === 'plow' && Math.abs(fwd) < 0.15 && Math.abs(lat) < 0.15;
   if (plowHold){ fwd = 0; lat = 0; }
   else {
-    fwd -= G*(hx*fx + hy*fy)*dt;
+    { const gp = G*(hx*fx + hy*fy)*dt; if (!ONB || gp*fwd < 0 || Math.abs(fwd) < 0.05) fwd -= gp; }   // on a bridge a climb costs no speed
     fwd *= Math.exp(-P.glide * surf * (mode === 'tuck' ? 1 - P.tuck/100 : 1) * dt);
     const dec = (P.fric * surf * wK + (mode === 'plow' ? P.plow : 0)) * dt;
     fwd = Math.abs(fwd) <= dec ? 0 : fwd - Math.sign(fwd)*dec;
@@ -871,7 +986,7 @@ function step(dt){
   // stops you there. only the part of your speed across it is taken away, so you can slide along its edge
   { const v = speed();
     // (only from skiable ground: if you're already on a face that steep, nothing holds you and you slide off it)
-    if (v > 0.02 && !TEST.ghost && Math.hypot(hx, hy) <= TERRAIN.stop){
+    if (v > 0.02 && !TEST.ghost && !ONB && Math.hypot(hx, hy) <= TERRAIN.stop){
       const a = Math.max(0.6, v*dt*1.5), px = S.vx/v*a, py = S.vy/v*a, e = 0.5;
       const gx = (hLocal(px + e, py) - hLocal(px - e, py))/(2*e), gy = (hLocal(px, py + e) - hLocal(px, py - e))/(2*e), g = Math.hypot(gx, gy);
       if (g > TERRAIN.stop){ const nx = gx/g, ny = gy/g, vn = S.vx*nx + S.vy*ny; S.vx -= nx*vn; S.vy -= ny*vn; if (Math.abs(vn) > 0.3) steepT = 1.2; }
@@ -880,7 +995,8 @@ function step(dt){
   const mvx = S.vx*dt, mvy = S.vy*dt;
   S.x += mvx; S.y += mvy; moveLocal(mvx, mvy);
   frameMove[0] += mvx; frameMove[1] += mvy;
-  collide();
+  if (!ONB) collide();
+  bridgeStep();
   S.dist += Math.hypot(mvx, mvy);
 
   // planted skis: the mark grows along the ski as the body travels; lifted and re-set when the body drifts off it
@@ -912,6 +1028,7 @@ function collide(){
   };
   for (const k of rocks) if (k.x*n.x + k.y*n.y + k.z*n.z > lim) hit(k.x, k.y, k.z, k.r);
   for (const b of beaconList) if (b.d.dot(n) > lim) hit(b.d.x, b.d.y, b.d.z, b.r);
+  for (const p of pylons) if (p.d.dot(n) > lim) hit(p.d.x, p.d.y, p.d.z, p.r);
   { const tl = treeGrid.get(cellOf(n.x, n.y, n.z)); if (tl) for (const t of tl) hit(t.d.x, t.d.y, t.d.z, 0.18*t.s + 0.05); }   // tree trunks
   for (const o of solids){
     if (o.d.dot(n) < o.lim) continue;
@@ -942,7 +1059,7 @@ function updateMarks(){
     const R = P.R, len = Math.max(0.05, s.len);
     _a.copy(s.p3); _b.copy(s.p3).multiplyScalar(R).addScaledVector(s.t3, len).normalize();
     _s.crossVectors(s.t3, s.p3).normalize().multiplyScalar(s.w/2/R);
-    const corner = (base, sign, o) => { _c.copy(base).addScaledVector(_s, sign).normalize(); const rr = groundR(_c) + 0.09; markPos[o] = _c.x*rr; markPos[o+1] = _c.y*rr; markPos[o+2] = _c.z*rr; };
+    const corner = (base, sign, o) => { _c.copy(base).addScaledVector(_s, sign).normalize(); const rr = s.rFix !== null && s.rFix !== undefined ? s.rFix : groundR(_c) + 0.09; markPos[o] = _c.x*rr; markPos[o+1] = _c.y*rr; markPos[o+2] = _c.z*rr; };
     const o = s.slot*18;
     corner(_a, -1, o); corner(_b, -1, o + 3); corner(_a, 1, o + 6);
     corner(_b, -1, o + 9); corner(_b, 1, o + 12); corner(_a, 1, o + 15);
@@ -952,7 +1069,7 @@ function updateMarks(){
 function clearMarks(){ markPos.fill(0); markGeo.attributes.position.needsUpdate = true; skis = []; lastSki = { L: null, R: null }; }
 
 const TEST = { ghost: false,     // test hook: ghost turns collisions off; place(dir) puts the skier there
-  place(d){ n.copy(d).normalize(); ex.set(1, 0, 0).addScaledVector(n, -n.x).normalize(); ey.crossVectors(ex, n).normalize(); camR = null; } };
+  place(d){ ONB = null; exitLock = null; n.copy(d).normalize(); ex.set(1, 0, 0).addScaledVector(n, -n.x).normalize(); ey.crossVectors(ex, n).normalize(); camR = null; } };
 
 // ---------- the skier's figure ----------
 const fig = new THREE.Group(); scene.add(fig);
@@ -977,7 +1094,7 @@ function poseFigure(dt){
   _right.crossVectors(_f, n).normalize(); _back.copy(_f).negate();
   _m4.makeBasis(_right, n, _back);
   fig.quaternion.setFromRotationMatrix(_m4);
-  fig.position.copy(n).multiplyScalar(groundR(n));
+  fig.position.copy(n).multiplyScalar(surfaceR());
   // feet: on each planted ski where it passes under the body; a lifted ski trails out to its side
   const r2 = [Math.cos(th), Math.sin(th)], b2 = [-Math.sin(th), Math.cos(th)];
   const feet = {};
@@ -1037,7 +1154,7 @@ function placeCamera(dt){
   for (let i = 0; i < 4; i++){ focusV += (ws*ws*(0 - focusLat) - 2*ws*focusV)*hs; focusLat += focusV*hs; }
   focusLat = Math.max(-3, Math.min(3, focusLat));
   const fox = -dy*focusLat, foy = dx*focusLat;
-  const gr0 = groundR(n); camR = camR === null ? gr0 : camR + (gr0 - camR)*Math.min(1, dt*4);
+  const gr0 = surfaceR(); camR = camR === null ? gr0 : camR + (gr0 - camR)*Math.min(1, dt*4);
   dirLocal(fox - dx*back, foy - dy*back, _cd);
   _cp.copy(_cd).multiplyScalar(Math.max(camR + up, groundR(_cd) + 1.5));
   dirLocal(fox + dx*ahead, foy + dy*ahead, _cl).multiplyScalar(camR + 0.4);
@@ -1082,7 +1199,7 @@ function frame(now){
   scene.fog.color.copy(skyMat.uniforms.hor.value);
   // flatten view: drawn as a planet of radius Re (fading out in the planet view)
   const fk = P.flat*(1 - k), Re = R/(1 - fk);
-  FLATU.uFlatK.value = fk; FLATU.uFlatR.value = R; FLATU.uFlatN.value.copy(n); FLATU.uFlatC.value.copy(n).multiplyScalar(groundR(n));
+  FLATU.uFlatK.value = fk; FLATU.uFlatR.value = R; FLATU.uFlatN.value.copy(n); FLATU.uFlatC.value.copy(n).multiplyScalar(surfaceR());
   scene.fog.near = 120 + k*R*20; scene.fog.far = 420 + 0.8*Re + k*R*40;
 
   updateLod();
@@ -1098,7 +1215,7 @@ function frame(now){
     const far = horizon + hzA(b.h + 12) + b.ang + 0.03;   // its top can show over the horizon from this far
     b.mesh.visible = b.c.dot(camDir) > Math.cos(Math.min(Math.PI, far));
   }
-  youMark.visible = k > 0.02; youMark.position.copy(n).multiplyScalar(groundR(n) + 2); youMark.quaternion.setFromUnitVectors(_up, n); youMark.scale.setScalar(R*0.012*k + 0.01);
+  youMark.visible = k > 0.02; youMark.position.copy(n).multiplyScalar(surfaceR() + 2); youMark.quaternion.setFromUnitVectors(_up, n); youMark.scale.setScalar(R*0.012*k + 0.01);
 
   renderer.render(scene, camera);
   steepT = Math.max(0, steepT - dt); $('steepBan').style.display = steepT > 0 ? 'block' : 'none';
@@ -1111,7 +1228,7 @@ const circumference = () => 2*Math.PI*P.R;
 function fmtM(m){ return m >= 1000 ? (m/1000).toFixed(2) + ' km' : Math.round(m) + ' m'; }
 function hud(){
   $('hSpeed').textContent = (speed()*3.6).toFixed(1) + ' km/h';
-  $('hSnow').textContent = S.off < 0.5 && S.trail ? 'Groomed · ' + S.trail.name : 'Ungroomed';
+  $('hSnow').textContent = ONB ? 'Light bridge · ' + ONB.b.name : S.off < 0.5 && S.trail ? 'Groomed · ' + S.trail.name : 'Ungroomed';
   $('hGrade').textContent = (S.grade >= 0 ? '+' : '') + Math.round(S.grade*100) + '%';
   $('hWeight').textContent = Math.round(S.weight*100) + '%';
   const from = n.angleTo(START_N)*P.R;
@@ -1273,7 +1390,7 @@ bootLayout().then(() => {
   placeAtStart();
   buildPlanet(); faceTrail();
   $('loading').style.display = 'none';
-  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length }, buildCounts), drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList };   // test hook
+  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 });
 </script>

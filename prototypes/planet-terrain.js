@@ -12,6 +12,9 @@
 //                 can carve its own bed into the ground: level across, its height smoothed along the line (with a
 //                 steepest grade), cutting into rises and building up over dips, with shoulders back to the land
 //   landmarks     named places with a height and a colour
+//   bridges       light bridges: a line of points from the start ramp's foot to the end ramp's foot. the deck rises at
+//                 the ramps to `clearance` metres above the ground (over `ramp` metres), keeps at least that over the
+//                 ground in between (smoothed, its descents no steeper than `maxGrade`), and is `width` metres either side
 //   start         where the skier starts
 //   detail        a fine sculpt layer (about a metre between points), stored only in the 32 x 32 tiles that have been
 //                 painted: the cliff-erator brush writes here
@@ -246,11 +249,39 @@ function carveGrid(R){
   return { G, map: new Map(), key(x, y, z){ const [f, u, v] = PT.faceUV(x, y, z); return (f*G + Math.min(G - 1, Math.floor((u + 1)/2*G)))*G + Math.min(G - 1, Math.floor((v + 1)/2*G)); } };
 }
 
+// ---------- light bridges ----------
+PT.bridgeDefaults = () => ({ clearance: 10, ramp: 50, width: 2.5, maxGrade: 0.25 });
+// the deck along a bridge: points 2 m apart (unit directions), the deck's and the ground's height at each (metres above
+// the base radius), the distance along it, and its length. `height(x, y, z)` is the ground (terrain.height)
+PT.bridgeDeck = function(b, height, R){
+  const STEP = 2, pts = PT.evenCurve(b.pts, false, STEP, R), M = pts.length;
+  const g = new Float64Array(M), s = new Float64Array(M), h = new Float64Array(M);
+  for (let i = 0; i < M; i++){ g[i] = height(pts[i][0], pts[i][1], pts[i][2]); if (i) s[i] = s[i - 1] + Math.acos(Math.min(1, pts[i][0]*pts[i - 1][0] + pts[i][1]*pts[i - 1][1] + pts[i][2]*pts[i - 1][2]))*R; }
+  const L = s[M - 1], C = Math.max(1, b.clearance ?? 10), W = 4, A = 10;
+  // clear the highest ground a little either way, then even it out along the line, never closer than 60% of the clearance
+  const top = new Float64Array(M);
+  for (let i = 0; i < M; i++){ let m = -Infinity; for (let j = Math.max(0, i - W); j <= Math.min(M - 1, i + W); j++) m = Math.max(m, g[j]); top[i] = m + C; }
+  for (let i = 0; i < M; i++){ let sum = 0, n = 0; for (let j = Math.max(0, i - A); j <= Math.min(M - 1, i + A); j++){ sum += top[j]; n++; } h[i] = Math.max(sum/n, g[i] + C*0.6); }
+  // descents no steeper than maxGrade: raise the low points (forward and back)
+  const G = Math.max(0.02, b.maxGrade ?? 0.25);
+  for (let it = 0; it < 2; it++){
+    for (let i = 1; i < M; i++) h[i] = Math.max(h[i], h[i - 1] - G*(s[i] - s[i - 1]));
+    for (let i = M - 2; i >= 0; i--) h[i] = Math.max(h[i], h[i + 1] - G*(s[i + 1] - s[i]));
+  }
+  // the ramps: up from each foot at clearance/ramp, until they meet the deck
+  const k = C/Math.max(5, b.ramp ?? 50);
+  // (where the ground climbs faster than a ramp can, the deck keeps 1.5 m over it, less only right at the feet)
+  for (let i = 0; i < M; i++) h[i] = Math.max(g[i] + Math.min(1.5, 0.3*Math.min(s[i], L - s[i])), Math.min(h[i], g[0] + s[i]*k, g[M - 1] + (L - s[i])*k));
+  let climb = 0, desc = 0, high = 0;
+  for (let i = 1; i < M; i++){ const gr = (h[i] - h[i - 1])/Math.max(1e-6, s[i] - s[i - 1]); climb = Math.max(climb, gr); desc = Math.max(desc, -gr); high = Math.max(high, h[i] - g[i]); }
+  return { pts, g, s, h, L, width: Math.max(0.8, b.width ?? 2.5), rampGrade: k, climb, desc, highest: high };
+};
+
 // ---------- layouts ----------
 const norm = p => { const L = Math.hypot(p[0], p[1], p[2]) || 1; return [p[0]/L, p[1]/L, p[2]/L]; };
 PT.START = norm([0.15, 1, 0.25]);
 PT.cliffDefaults = () => ({ from: 0.6, band: 12, sharp: 8, stop: 1.0 });
-PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), detail: PT.newDetail(1024), trails: [], landmarks: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults() });
+PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), detail: PT.newDetail(1024), trails: [], landmarks: [], bridges: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults() });
 // a small example so every tool has something to show: a peak, a ridge, a crater, a basin and a trail past them
 PT.exampleLayout = function(R){
   R = R || 800;
@@ -277,6 +308,7 @@ PT.serialize = function(L){
     sculpt: PT.encodeSculpt(L.sculpt), detail: PT.encodeDetail(L.detail),
     trails: L.trails.map(t => ({ name: t.name, closed: !!t.closed, pts: t.pts.map(r5), carve: !!t.carve, bed: t.bed, shoulder: t.shoulder, smooth: t.smooth, maxGrade: t.maxGrade })),
     landmarks: L.landmarks.map(m => ({ name: m.name, type: m.type, d: r5(m.d), height: m.height, color: m.color })),
+    bridges: (L.bridges || []).map(b => ({ name: b.name, pts: b.pts.map(r5), clearance: b.clearance, ramp: b.ramp, width: b.width, maxGrade: b.maxGrade })),
     start: { d: r5(L.start.d) }, scatter: Object.assign({}, L.scatter), cliffs: Object.assign({}, L.cliffs),
   });
 };
@@ -288,6 +320,7 @@ PT.parse = function(json){
     sculpt: PT.decodeSculpt(o.sculpt), detail: PT.decodeDetail(o.detail),
     trails: (o.trails || []).map(t => Object.assign({ name: t.name || 'Trail', closed: !!t.closed, pts: t.pts.map(norm) }, PT.carveDefaults(), { carve: !!t.carve }, pick(t, ['bed', 'shoulder', 'smooth', 'maxGrade']))),
     landmarks: (o.landmarks || []).map(m => ({ name: m.name || 'Landmark', type: m.type || 'marker', d: norm(m.d), height: +m.height || 10, color: m.color || '#d2462e' })),
+    bridges: (o.bridges || []).filter(b => b.pts && b.pts.length >= 2).map(b => Object.assign({ name: b.name || 'Light bridge', pts: b.pts.map(norm) }, PT.bridgeDefaults(), pick(b, ['clearance', 'ramp', 'width', 'maxGrade']))),
     start: { d: norm(o.start && o.start.d || B.start.d) }, scatter: Object.assign({}, B.scatter, o.scatter || {}),
     cliffs: Object.assign(PT.cliffDefaults(), pick(o.cliffs || {}, ['from', 'band', 'sharp', 'stop'])),
   };

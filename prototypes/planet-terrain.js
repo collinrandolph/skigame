@@ -13,9 +13,11 @@
 //                 steepest grade), cutting into rises and building up over dips, with shoulders back to the land
 //   landmarks     named places with a height and a colour
 //   start         where the skier starts
-//   cliffs        the cliff-erator: ground steeper than `from` (0.6 = 60%) is stepped into cliff bands `band` metres
-//                 high (flat ledges, risers about `sharp` times steeper than the slope was); gentler ground is left
-//                 alone. `stop` is the steepest grade you can ski: anything steeper stops you at its edge
+//   detail        a fine sculpt layer (about a metre between points), stored only in the 32 x 32 tiles that have been
+//                 painted: the cliff-erator brush writes here
+//   cliffs        `stop` is the steepest grade you can ski (1 = 100%): anything steeper stops you at its edge. `from`,
+//                 `band` and `sharp` are the cliff-erator brush's settings (it steps ground steeper than `from` into
+//                 cliff bands `band` metres high, with risers about `sharp` times steeper than the slope was)
 //   scatter       how many random mountains, buildings and trees the game adds (mountains default to none, since
 //                 the layout has its own topography)
 // Directions are unit vectors [x, y, z] from the planet's centre (y is the planet's north).
@@ -166,8 +168,44 @@ PT.sampleSculpt = function(sc, x, y, z){
   const a = d[o + j*n + i], b = d[o + j*n + i + 1], c = d[o + (j + 1)*n + i], e = d[o + (j + 1)*n + i + 1];
   return (a*(1 - fx) + b*fx)*(1 - fy) + (c*(1 - fx) + e*fx)*fy;
 };
+// ---------- the detail layer: n x n points per cube face (1024: about a metre apart), kept in 32 x 32 tiles, only
+// where painted ----------
+const DT = 32;
+PT.newDetail = n => ({ n: n || 1024, tiles: new Map() });
+const dKey = (dl, f, ti, tj) => (f*(dl.n/DT) + tj)*(dl.n/DT) + ti;
+PT.detailGet = function(dl, f, i, j){ const t = dl.tiles.get(dKey(dl, f, i >> 5, j >> 5)); return t ? t[(j & 31)*DT + (i & 31)] : 0; };
+PT.detailAdd = function(dl, f, i, j, v){
+  const k = dKey(dl, f, i >> 5, j >> 5); let t = dl.tiles.get(k);
+  if (!t){ t = new Float32Array(DT*DT); dl.tiles.set(k, t); }
+  t[(j & 31)*DT + (i & 31)] += v; return t[(j & 31)*DT + (i & 31)];
+};
+PT.sampleDetail = function(dl, x, y, z){
+  if (!dl || !dl.tiles.size) return 0;
+  const [f, u, v] = PT.faceUV(x, y, z), n = dl.n, gx = (u + 1)/2*(n - 1), gy = (v + 1)/2*(n - 1);
+  const i = Math.min(n - 2, Math.floor(gx)), j = Math.min(n - 2, Math.floor(gy));
+  // nothing painted in this tile or its neighbours: skip the lookups
+  const ti0 = i >> 5, ti1 = (i + 1) >> 5, tj0 = j >> 5, tj1 = (j + 1) >> 5, T = dl.tiles;
+  if (!T.has(dKey(dl, f, ti0, tj0)) && !T.has(dKey(dl, f, ti1, tj0)) && !T.has(dKey(dl, f, ti0, tj1)) && !T.has(dKey(dl, f, ti1, tj1))) return 0;
+  const fx = gx - i, fy = gy - j, g = (a, b) => PT.detailGet(dl, f, a, b);
+  return (g(i, j)*(1 - fx) + g(i + 1, j)*fx)*(1 - fy) + (g(i, j + 1)*(1 - fx) + g(i + 1, j + 1)*fx)*fy;
+};
+PT.cloneDetail = dl => ({ n: dl.n, tiles: new Map([...dl.tiles].map(([k, t]) => [k, t.slice()])) });
 function b64FromBytes(bytes){ let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); }
 function bytesFromB64(b){ const s = atob(b), out = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i); return out; }
+PT.encodeDetail = function(dl){
+  const tiles = [];
+  for (const [k, t] of dl.tiles){
+    const q = new Int16Array(t.length); let any = false;
+    for (let i = 0; i < q.length; i++){ q[i] = Math.max(-32767, Math.min(32767, Math.round(t[i]*100))); if (q[i]) any = true; }
+    if (any) tiles.push([k, b64FromBytes(new Uint8Array(q.buffer))]);
+  }
+  return { n: dl.n, tiles };
+};
+PT.decodeDetail = function(o){
+  const dl = PT.newDetail(o && o.n || 1024);
+  if (o && o.tiles) for (const [k, b] of o.tiles){ const q = new Int16Array(bytesFromB64(b).buffer), t = new Float32Array(DT*DT); for (let i = 0; i < t.length; i++) t[i] = q[i]/100; dl.tiles.set(k, t); }
+  return dl;
+};
 PT.encodeSculpt = function(sc){
   const q = new Int16Array(sc.data.length); let any = false;
   for (let i = 0; i < q.length; i++){ const v = Math.round(sc.data[i]*100); q[i] = Math.max(-32767, Math.min(32767, v)); if (q[i]) any = true; }
@@ -211,8 +249,8 @@ function carveGrid(R){
 // ---------- layouts ----------
 const norm = p => { const L = Math.hypot(p[0], p[1], p[2]) || 1; return [p[0]/L, p[1]/L, p[2]/L]; };
 PT.START = norm([0.15, 1, 0.25]);
-PT.cliffDefaults = () => ({ on: false, from: 0.6, band: 12, sharp: 8, stop: 1.0 });
-PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), trails: [], landmarks: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults() });
+PT.cliffDefaults = () => ({ from: 0.6, band: 12, sharp: 8, stop: 1.0 });
+PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), detail: PT.newDetail(1024), trails: [], landmarks: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults() });
 // a small example so every tool has something to show: a peak, a ridge, a crater, a basin and a trail past them
 PT.exampleLayout = function(R){
   R = R || 800;
@@ -236,7 +274,7 @@ PT.serialize = function(L){
   return JSON.stringify({
     version: 1, name: L.name, radius: L.radius, noise: { amp: L.noise.amp },
     stamps: L.stamps.map(s => ({ type: s.type, pts: s.pts.map(r5), radius: s.radius, height: s.height, sharp: s.sharp })),
-    sculpt: PT.encodeSculpt(L.sculpt),
+    sculpt: PT.encodeSculpt(L.sculpt), detail: PT.encodeDetail(L.detail),
     trails: L.trails.map(t => ({ name: t.name, closed: !!t.closed, pts: t.pts.map(r5), carve: !!t.carve, bed: t.bed, shoulder: t.shoulder, smooth: t.smooth, maxGrade: t.maxGrade })),
     landmarks: L.landmarks.map(m => ({ name: m.name, type: m.type, d: r5(m.d), height: m.height, color: m.color })),
     start: { d: r5(L.start.d) }, scatter: Object.assign({}, L.scatter), cliffs: Object.assign({}, L.cliffs),
@@ -247,11 +285,11 @@ PT.parse = function(json){
   return {
     version: 1, name: o.name || B.name, radius: o.radius || 800, noise: { amp: o.noise && o.noise.amp !== undefined ? o.noise.amp : 1 },
     stamps: (o.stamps || []).map(s => ({ type: s.type, pts: s.pts.map(norm), radius: +s.radius, height: +s.height, sharp: s.sharp ?? 0.3 })),
-    sculpt: PT.decodeSculpt(o.sculpt),
+    sculpt: PT.decodeSculpt(o.sculpt), detail: PT.decodeDetail(o.detail),
     trails: (o.trails || []).map(t => Object.assign({ name: t.name || 'Trail', closed: !!t.closed, pts: t.pts.map(norm) }, PT.carveDefaults(), { carve: !!t.carve }, pick(t, ['bed', 'shoulder', 'smooth', 'maxGrade']))),
     landmarks: (o.landmarks || []).map(m => ({ name: m.name || 'Landmark', type: m.type || 'marker', d: norm(m.d), height: +m.height || 10, color: m.color || '#d2462e' })),
     start: { d: norm(o.start && o.start.d || B.start.d) }, scatter: Object.assign({}, B.scatter, o.scatter || {}),
-    cliffs: Object.assign(PT.cliffDefaults(), pick(o.cliffs || {}, ['from', 'band', 'sharp', 'stop']), { on: !!(o.cliffs && o.cliffs.on) }),
+    cliffs: Object.assign(PT.cliffDefaults(), pick(o.cliffs || {}, ['from', 'band', 'sharp', 'stop'])),
   };
 };
 
@@ -261,29 +299,8 @@ PT.terrain = function(L, R){
   const amp = L ? L.noise.amp : 1, stamps = L ? L.stamps.filter(s => s.pts && s.pts.length).map(s => compileStamp(s, R)) : [], sc = L ? L.sculpt : null;
   // everything but the trails' carving
   const shaped = (x, y, z) => { let h = amp ? amp*PT.baseNoise(x, y, z, R) : 0; for (let i = 0; i < stamps.length; i++) h += stampAt(stamps[i], x, y, z, R); return h; };
-  const raw = (x, y, z) => shaped(x, y, z) + (sc ? PT.sampleSculpt(sc, x, y, z) : 0);
-  // the cliff-erator: where the ground is steeper than cl.from, step its height into bands (ledge, then riser). the
-  // effect fades in from 3/4 of the threshold, so ground gentler than that is untouched
-  const cl = L && L.cliffs && L.cliffs.on ? L.cliffs : null, E = 1.5/R;
-  // only stamps and sculpting make ground that steep (unless the base noise is turned well up), so elsewhere it's skipped
-  const noiseSteep = cl && amp*0.35 >= cl.from*0.75;
-  const mayBeSteep = (x, y, z) => {
-    if (noiseSteep) return true;
-    for (let i = 0; i < stamps.length; i++){ const st = stamps[i]; if (x*st.bx + y*st.by + z*st.bz >= st.cosB) return true; }
-    return !!(sc && PT.sampleSculpt(sc, x, y, z) !== 0);
-  };
-  const under = !cl ? raw : (x, y, z) => {
-    const h = raw(x, y, z);
-    if (!mayBeSteep(x, y, z)) return h;
-    let ax = 0, ay = 1, az = 0; if (Math.abs(y) > 0.9){ ax = 1; ay = 0; }
-    let t1x = ay*z - az*y, t1y = az*x - ax*z, t1z = ax*y - ay*x; const l1 = Math.hypot(t1x, t1y, t1z); t1x /= l1; t1y /= l1; t1z /= l1;
-    const t2x = y*t1z - z*t1y, t2y = z*t1x - x*t1z, t2z = x*t1y - y*t1x;
-    const at = (a, b) => { const px = x + (t1x*a + t2x*b)*E, py = y + (t1y*a + t2y*b)*E, pz = z + (t1z*a + t2z*b)*E, l = Math.hypot(px, py, pz); return raw(px/l, py/l, pz/l); };
-    const s = Math.hypot(at(1, 0) - h, at(0, 1) - h)/1.5;                    // grade over 1.5 m
-    const t = (s - cl.from*0.75)/(cl.from*0.25); if (t <= 0) return h;
-    const w = t >= 1 ? 1 : t*t*(3 - 2*t), S = Math.max(1, cl.band), base = Math.floor(h/S)*S, f = (h - base)/S;
-    return h + (base + S*Math.pow(f, Math.max(1, cl.sharp)) - h)*w;
-  };
+  const dl = L && L.detail && L.detail.tiles.size ? L.detail : null;
+  const under = (x, y, z) => shaped(x, y, z) + (sc ? PT.sampleSculpt(sc, x, y, z) : 0) + (dl ? PT.sampleDetail(dl, x, y, z) : 0);
   // carved trails: each one's line (2 m apart) and bed profile, and a grid of its segments
   const carves = [], grid = carveGrid(R), STEP = 2;
   if (L) for (const t of L.trails){
@@ -327,11 +344,18 @@ PT.terrain = function(L, R){
       if (carves.length){ const q = carveAt(x, y, z); if (q){ const t = q.d <= q.bed ? 0 : (q.d - q.bed)/q.sh, w = t*t*(3 - 2*t); h = q.hb + (h - q.hb)*w; } }
       return h;
     },
-    // everything but the sculpt layer and the carving (the flatten brush needs it)
+    // everything but the sculpt and detail layers and the carving
     shaped,
     // the ground before the trails carve it
     under,
   };
+};
+// the cliff-erator's target for a height h on ground of grade s: stepped into bands `band` high (a flat ledge, then a
+// riser), by as much as the ground is steep (none below 3/4 of `from`, all of it from `from` up)
+PT.cliffTarget = function(h, s, c){
+  const t = (s - c.from*0.75)/(c.from*0.25); if (t <= 0) return h;
+  const w = t >= 1 ? 1 : t*t*(3 - 2*t), S = Math.max(1, c.band), base = Math.floor(h/S)*S, f = (h - base)/S;
+  return h + (base + S*Math.pow(f, Math.max(1, c.sharp)) - h)*w;
 };
 PT.STORE = 'skate-planet-layout';
 window.PlanetTerrain = PT;

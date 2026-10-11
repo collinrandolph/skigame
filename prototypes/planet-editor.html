@@ -128,6 +128,7 @@ const cam = { dir: new V3(...L.start.d), up: new V3(0, 1, 0), dist: R*3, tilt: 0
 function fixUp(){ cam.up.addScaledVector(cam.dir, -cam.up.dot(cam.dir)); if (cam.up.lengthSq() < 1e-6) cam.up.set(1, 0, 0).addScaledVector(cam.dir, -cam.dir.x); cam.up.normalize(); }
 fixUp();
 function placeCamera(){
+  fixUp();
   const h = cam.dist - R, t = cam.tilt*D2R, target = cam.dir.clone().multiplyScalar(R + (h < R*0.5 ? groundAt(cam.dir) : 0));
   camera.position.copy(target).addScaledVector(cam.dir, h*Math.cos(t)).addScaledVector(cam.up, -h*Math.sin(t));
   camera.up.copy(cam.dir).multiplyScalar(Math.sin(t)).addScaledVector(cam.up, Math.cos(t));
@@ -175,14 +176,15 @@ function spherify(x, y, z, out){
 }
 const FACES = [[[1,0,0],[0,0,-1],[0,1,0]], [[-1,0,0],[0,0,1],[0,1,0]], [[0,1,0],[1,0,0],[0,0,-1]], [[0,-1,0],[1,0,0],[0,0,1]], [[0,0,1],[1,0,0],[0,1,0]], [[0,0,-1],[-1,0,0],[0,1,0]]];
 const _d = new V3();
-function faceDir(f, i, j, out){ const [nn, uu, vv] = FACES[f], s = -1 + 2*i/NF, t = -1 + 2*j/NF; return spherify(nn[0] + uu[0]*s + vv[0]*t, nn[1] + uu[1]*s + vv[1]*t, nn[2] + uu[2]*s + vv[2]*t, out); }
+function faceDir(f, i, j, out, N = NF){ const [nn, uu, vv] = FACES[f], s = -1 + 2*i/N, t = -1 + 2*j/N; return spherify(nn[0] + uu[0]*s + vv[0]*t, nn[1] + uu[1]*s + vv[1]*t, nn[2] + uu[2]*s + vv[2]*t, out); }
+// near the camera a chunk is built finer (lod 2 or 4: up to four times the points each way), so detail shows up close
 function buildChunk(c){
-  const m = NF/CH, M = m + 3, pos = new Float32Array((m + 1)*(m + 1)*3), nor = new Float32Array((m + 1)*(m + 1)*3);
+  const lod = c.lod || 1, N2 = NF*lod, m = NF/CH*lod, M = m + 3, pos = new Float32Array((m + 1)*(m + 1)*3), nor = new Float32Array((m + 1)*(m + 1)*3);
   // positions on an (m+3)^2 grid with a one-vertex border, so normals match across chunk edges
   const P = new Float32Array(M*M*3); let lo = Infinity, hi = -Infinity;
   for (let j = 0; j < M; j++) for (let i = 0; i < M; i++){
-    const gi = Math.max(0, Math.min(NF, c.ci*m + i - 1)), gj = Math.max(0, Math.min(NF, c.cj*m + j - 1));
-    faceDir(c.f, gi, gj, _d); const h = T.height(_d.x, _d.y, _d.z), r = R + h, o = (j*M + i)*3;
+    const gi = Math.max(0, Math.min(N2, c.ci*m + i - 1)), gj = Math.max(0, Math.min(N2, c.cj*m + j - 1));
+    faceDir(c.f, gi, gj, _d, N2); const h = T.height(_d.x, _d.y, _d.z), r = R + h, o = (j*M + i)*3;
     P[o] = _d.x*r; P[o + 1] = _d.y*r; P[o + 2] = _d.z*r;
     if (i > 0 && j > 0 && i < M - 1 && j < M - 1){ lo = Math.min(lo, h); hi = Math.max(hi, h); }
   }
@@ -194,6 +196,8 @@ function buildChunk(c){
     nor[k] = nx/Ln; nor[k + 1] = ny/Ln; nor[k + 2] = nz/Ln;
   }
   c.lo = lo; c.hi = hi;
+  if (c.mesh && c.builtLod !== lod){ globe.remove(c.mesh); c.mesh.geometry.dispose(); c.mesh = null; }
+  c.builtLod = lod;
   if (!c.mesh){
     const idx = new Uint16Array(m*m*6); let q = 0;
     for (let j = 0; j < m; j++) for (let i = 0; i < m; i++){ const a = j*(m + 1) + i, b = a + 1, cc = a + m + 1, d = cc + 1; idx[q++] = a; idx[q++] = b; idx[q++] = cc; idx[q++] = b; idx[q++] = d; idx[q++] = cc; }
@@ -212,7 +216,7 @@ function buildGlobe(){
   NF = Math.min(256, Math.max(64, Math.ceil(Math.PI/2*R/6/CH)*CH));
   const m = NF/CH;
   for (let f = 0; f < 6; f++) for (let cj = 0; cj < CH; cj++) for (let ci = 0; ci < CH; ci++){
-    const c = { f, ci, cj, c: new V3(), ang: 0 };
+    const c = { f, ci, cj, c: new V3(), ang: 0, lod: 1 };
     faceDir(f, ci*m + m/2, cj*m + m/2, c.c); c.c.normalize();
     for (const [a, b] of [[0, 0], [m, 0], [0, m], [m, m]]){ faceDir(f, ci*m + a, cj*m + b, _d); c.ang = Math.max(c.ang, c.c.angleTo(_d)); }
     buildChunk(c); chunks.push(c);
@@ -332,12 +336,12 @@ function handlePick(px, py, maxPx = 14){
 // undo, autosave
 // ============================================================================================================
 const undoStack = [], redoStack = [];
-function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, start: L.start, scatter: L.scatter, cliffs: L.cliffs }), sculpt: L.sculpt.data.slice() }; }
+function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, start: L.start, scatter: L.scatter, cliffs: L.cliffs }), sculpt: L.sculpt.data.slice(), detail: PT.cloneDetail(L.detail) }; }
 let lastSnap = snapshot();
 function commit(){ undoStack.push(lastSnap); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; lastSnap = snapshot(); autosave(); }
 function restore(s){
   const o = JSON.parse(s.json); const oldR = L.radius;
-  Object.assign(L, o); L.sculpt.data.set(s.sculpt); lastSnap = s; sel = null;
+  Object.assign(L, o); L.sculpt.data.set(s.sculpt); L.detail = PT.cloneDetail(s.detail); lastSnap = s; sel = null;
   if (L.radius !== oldR) cam.dist *= L.radius/oldR;
   buildGlobe(); rebuildOverlays(); syncPlanetUI(); syncSlopeUniforms(); showSel(); autosave(); if (tool === 'cliffs') setTool('cliffs');
 }
@@ -356,7 +360,7 @@ function autosave(){
 // tools
 // ============================================================================================================
 let tool = 'orbit', drawing = null;      // drawing: a ridge, valley or trail being clicked out point by point
-const opts = { sculpt: { mode: 'raise', radius: 60, strength: 6 }, stamp: { type: 'peak', radius: 80, height: 60, sharp: 0.3 }, trail: { closed: true, carve: true }, landmark: { type: 'spire', height: 40, color: '#8a5cd6' } };
+const opts = { cliff: { radius: 30, strength: 3 }, sculpt: { mode: 'raise', radius: 60, strength: 6 }, stamp: { type: 'peak', radius: 80, height: 60, sharp: 0.3 }, trail: { closed: true, carve: true }, landmark: { type: 'spire', height: 40, color: '#8a5cd6' } };
 const TOOL_HELP = {
   orbit: 'Drag to turn the planet. Wheel to zoom.',
   select: 'Click a handle to select it, drag to move it. Delete removes it (for a trail or ridge, the point; Shift+Delete the whole thing).',
@@ -365,7 +369,7 @@ const TOOL_HELP = {
   trail: 'Click points along the route; Enter (or double-click) finishes. Esc drops the last point. A carved trail cuts a level bed into the ground, its grade smoothed along the line.',
   landmark: 'Click to place a landmark.',
   start: 'Click where the skier should start.',
-  cliffs: 'The cliff-erator steps steep ground into cliff bands (flat ledges and sheer risers) and leaves gentler ground alone. Changes rebuild the planet when you let go of a slider.',
+  cliffs: 'Cliff-erator brush: drag over steep ground to cut it into cliff bands. Brushing over it again sharpens it further. [ and ] change the brush size.',
 };
 function slider(id, label, min, max, step, get, set, fmt){
   return { html: `<label class="f" for="${id}">${label}<output id="${id}o"></output><input id="${id}" type="range" min="${min}" max="${max}" step="${step}"></label>`,
@@ -401,16 +405,15 @@ function setTool(t){
     parts.push(slider('lmH', 'Height', 2, 250, 1, () => opts.landmark.height, v => opts.landmark.height = v, v => v + ' m'));
   }
   if (t === 'cliffs'){
-    const C = L.cliffs, redo = () => { busy(() => { buildGlobe(); rebuildOverlays(); miniDirty(); syncSlopeUniforms(); }); commit(); };
-    parts.push({ html: '<label class="c"><input id="clOn" type="checkbox"> Turn steep faces into cliffs</label>', bind(){ const el = $('clOn'); el.checked = !!C.on; el.addEventListener('change', () => { C.on = el.checked; redo(); el.blur(); }); } });
-    const cs = (id, label, min, max, step, key, fmt) => { const sl = slider(id, label, min, max, step, () => C[key], v => { C[key] = v; if (key === 'from' || key === 'stop') syncSlopeUniforms(); }, fmt); const b0 = sl.bind; sl.bind = () => { b0(); $(id).addEventListener('change', redo); }; return sl; };
-    const pct = v => Math.round(v*100) + '% (' + Math.round(Math.atan(v)/D2R) + '°)';
-    parts.push(cs('clFrom', 'Faces steeper than', 0.3, 1.5, 0.05, 'from', pct));
-    parts.push(cs('clBand', 'Cliff band height', 3, 40, 1, 'band', v => v + ' m'));
-    parts.push(cs('clSharp', 'Sharpness (riser steepness × slope)', 2, 16, 1, 'sharp', v => '×' + v));
-    parts.push(cs('clStop', 'Too steep to ski (edge stop)', 0.4, 2, 0.05, 'stop', pct));
+    const C = L.cliffs, pct = v => Math.round(v*100) + '% (' + Math.round(Math.atan(v)/D2R) + '°)';
+    parts.push(slider('clRad', 'Brush radius', 5, 120, 1, () => opts.cliff.radius, v => opts.cliff.radius = v, v => v + ' m'));
+    parts.push(slider('clStr', 'Strength', 1, 10, 0.5, () => opts.cliff.strength, v => opts.cliff.strength = v, v => '×' + v));
+    parts.push(slider('clFrom', 'Works on ground steeper than', 0.3, 1.5, 0.05, () => C.from, v => { C.from = v; syncSlopeUniforms(); }, pct));
+    parts.push(slider('clBand', 'Cliff band height', 3, 40, 1, () => C.band, v => C.band = v, v => v + ' m'));
+    parts.push(slider('clSharp', 'Sharpness (riser steepness × slope)', 2, 16, 1, () => C.sharp, v => C.sharp = v, v => '×' + v));
+    parts.push(slider('clStop', 'Too steep to ski (the game stops you)', 0.4, 2, 0.05, () => C.stop, v => { C.stop = v; syncSlopeUniforms(); }, pct));
     const sp = Math.PI/2*L.radius/Math.min(320, Math.ceil(Math.PI/2*L.radius/2.5/8)*8);
-    parts.push({ html: `<p class="hint">The game's ground has a point every ${sp.toFixed(1)} m, so a ${L.cliffs.band} m band can stand at up to about ${Math.round(Math.atan(L.cliffs.band/sp)/D2R)}° there.</p>`, bind(){} });
+    parts.push({ html: `<p class="hint">Brushed ground is stepped into cliff bands: ledges flattened, risers pushed toward sheer. Ground gentler than ${Math.round(C.from*75)}% under the brush is left alone. The brush works on a fine layer (a point every ${(Math.PI/2*L.radius/1023).toFixed(1)} m); the game draws it finest within about 120 m of you.</p>`, bind(){} });
     $('vSlope').checked = true; terrainMat.uniforms.uSlope.value = 1;
   }
   $('toolOpts').innerHTML = parts.map(p => p.html).join('') + `<p class="hint">${TOOL_HELP[t]}</p>`;
@@ -525,6 +528,7 @@ cv.addEventListener('pointerdown', e => {
   const d = groundPick(px, py); if (!d) return;
   const arr = d.toArray();
   if (tool === 'sculpt'){ ptr = { mode: 'sculpt', x: px, y: py, target: groundAt(d), last: performance.now() }; return; }
+  if (tool === 'cliffs'){ ptr = { mode: 'cliff', x: px, y: py, goals: new Map() }; return; }
   if (tool === 'stamp'){
     if (PT.STAMP_TYPES[opts.stamp.type].line){ if (!drawing) drawing = { kind: 'line', pts: [] }; drawing.pts.push(arr); rebuildOverlays(); }
     else { const s = { type: opts.stamp.type, pts: [arr], radius: opts.stamp.radius, height: opts.stamp.height, sharp: opts.stamp.sharp }; L.stamps.push(s); rebuildCaps([stampCap(s)]); sel = { kind: 'stamp', ref: s, i: 0 }; rebuildOverlays(); showSel(); commit(); }
@@ -560,12 +564,12 @@ cv.addEventListener('pointermove', e => {
     rebuildOverlays();
     return;
   }
-  if (ptr.mode === 'sculpt'){ ptr.x = px; ptr.y = py; }
+  if (ptr.mode === 'sculpt' || ptr.mode === 'cliff'){ ptr.x = px; ptr.y = py; }
 });
 const endPtr = () => {
   if (!ptr) return;
   if (ptr.mode === 'move'){ if (ptr.moved){ if (ptr.h.kind === 'trail' && ptr.h.ref.carve){ rebuildCaps([ptr.cap0, trailCap(ptr.h.ref)]); rebuildOverlays(); } commit(); showSel(); } }
-  if (ptr.mode === 'sculpt') commit();
+  if (ptr.mode === 'sculpt' || ptr.mode === 'cliff') commit();
   ptr = null; if (tool === 'orbit') cv.style.cursor = 'grab';
 };
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
@@ -601,6 +605,39 @@ function sculptStep(dt){
   rebuildCaps([[d, ang + 0.01]]);
 }
 
+// ---- the cliff-erator brush: works the detail layer's points under it. the first time a point is touched in a stroke,
+// its target is worked out from the ground as it was (its height and how steep it is there); then each frame moves it
+// part of the way there. so one stroke settles on its cliff shape, and another stroke over it sharpens it again
+function cliffStep(dt){
+  if (!ptr || ptr.mode !== 'cliff') return;
+  const d = groundPick(ptr.x, ptr.y); if (!d) return;
+  const dl = L.detail, n = dl.n, rad = opts.cliff.radius, ang = rad/R, cosA = Math.cos(ang), q = [0, 0, 0], C = L.cliffs;
+  const rate = Math.min(1, opts.cliff.strength*dt*2), c = [d.x, d.y, d.z];
+  const slopeAt = (x, y, z) => {
+    let ax = 0, ay = 1, az = 0; if (Math.abs(y) > 0.9){ ax = 1; ay = 0; }
+    let t1x = ay*z - az*y, t1y = az*x - ax*z, t1z = ax*y - ay*x; const l1 = Math.hypot(t1x, t1y, t1z); t1x /= l1; t1y /= l1; t1z /= l1;
+    const t2x = y*t1z - z*t1y, t2y = z*t1x - x*t1z, t2z = x*t1y - y*t1x, e = 1/R;
+    const at = (a, b) => { const px = x + (t1x*a + t2x*b)*e, py = y + (t1y*a + t2y*b)*e, pz = z + (t1z*a + t2z*b)*e, l = Math.hypot(px, py, pz); return T.height(px/l, py/l, pz/l); };
+    return Math.hypot(at(1, 0) - at(-1, 0), at(0, 1) - at(0, -1))/2;
+  };
+  const AX = [[0, 1, 2, 1], [0, 1, 2, -1], [1, 0, 2, 1], [1, 0, 2, -1], [2, 0, 1, 1], [2, 0, 1, -1]];   // per face: normal axis, u axis, v axis, sign
+  for (let f = 0; f < 6; f++){
+    const [na, ua, va, sg] = AX[f], comp = c[na]*sg; if (comp < 0.3) continue;
+    const u = c[ua]/comp, v = c[va]/comp, half = ang*3*(n - 1)/2 + 2, ci = (u + 1)/2*(n - 1), cj = (v + 1)/2*(n - 1);
+    const i0 = Math.max(0, Math.floor(ci - half)), i1 = Math.min(n - 1, Math.ceil(ci + half)), j0 = Math.max(0, Math.floor(cj - half)), j1 = Math.min(n - 1, Math.ceil(cj + half));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){
+      PT.dirFromFace(f, -1 + 2*i/(n - 1), -1 + 2*j/(n - 1), q);
+      const dot = q[0]*c[0] + q[1]*c[1] + q[2]*c[2]; if (dot < cosA) continue;
+      const key = (f*n + j)*n + i; let g = ptr.goals.get(key);
+      if (g === undefined){ const h = T.height(q[0], q[1], q[2]), tgt = PT.cliffTarget(h, slopeAt(q[0], q[1], q[2]), C); g = tgt === h ? null : PT.detailGet(dl, f, i, j) + (tgt - h); ptr.goals.set(key, g); }
+      if (g === null) continue;
+      const w = PT.profile(Math.acos(Math.min(1, dot))/ang, 0), cur = PT.detailGet(dl, f, i, j);
+      PT.detailAdd(dl, f, i, j, (g - cur)*rate*w);
+    }
+  }
+  rebuildCaps([[d, ang + 0.004]]);
+}
+
 // ---- keyboard ----
 const keys = { shift: false };
 addEventListener('keydown', e => {
@@ -615,7 +652,9 @@ addEventListener('keydown', e => {
   if (k === 'Enter'){ if (drawing) finishDrawing(); return; }
   if (k === 'Escape'){ if (drawing){ drawing.pts.pop(); if (!drawing.pts.length) drawing = null; rebuildOverlays(); } else { sel = null; rebuildOverlays(); showSel(); } return; }
   if (k === 'Delete' || k === 'Backspace'){ e.preventDefault(); deleteSel(e.shiftKey); return; }
-  if (k === '[' || k === ']'){ opts.sculpt.radius = Math.max(5, Math.min(300, opts.sculpt.radius + (k === ']' ? 5 : -5))); if (tool === 'sculpt') setTool('sculpt'); return; }
+  if (k === '[' || k === ']'){
+    if (tool === 'cliffs'){ opts.cliff.radius = Math.max(5, Math.min(120, opts.cliff.radius + (k === ']' ? 3 : -3))); setTool('cliffs'); return; }
+    opts.sculpt.radius = Math.max(5, Math.min(300, opts.sculpt.radius + (k === ']' ? 5 : -5))); if (tool === 'sculpt') setTool('sculpt'); return; }
   if (k === 'k' || k === 'K') skiHere();
   if (k === 'f' || k === 'F'){ const d = selDir(); if (d){ cam.dir.copy(d); fixUp(); } }
 });
@@ -743,7 +782,7 @@ addEventListener('message', e => { if (e.data === 'planetoid:need-layout' && e.s
 let last = performance.now();
 function frame(now){
   const dt = Math.min(0.1, (now - last)/1000); last = now;
-  sculptStep(dt);
+  sculptStep(dt); cliffStep(dt);
   placeCamera();
   // light from over the viewer's shoulder, so relief always reads
   const fwd = new V3(); camera.getWorldDirection(fwd);
@@ -754,6 +793,16 @@ function frame(now){
   // only the near side of the globe
   const cd = camera.position.clone().normalize(), horizon = Math.acos(Math.min(1, R/camera.position.length()));
   for (const c of chunks) c.mesh.visible = c.c.dot(cd) > Math.cos(Math.min(Math.PI, horizon + c.ang + 0.25));
+  // finer chunks near the camera: up to two rebuilt a frame, nearest first
+  { const want = [];
+    for (const c of chunks){
+      if (!c.mesh.visible){ continue; }
+      const d = Math.max(0, camera.position.distanceTo(c.c.clone().multiplyScalar(R)) - c.ang*R*0.7), lod = d < 260 ? 4 : d < 650 ? 2 : 1;
+      if (lod !== c.lod) want.push([d, c, lod]);
+    }
+    want.sort((a, b) => a[0] - b[0]);
+    for (const [, c, lod] of want.slice(0, 2)){ c.lod = lod; buildChunk(c); }
+  }
   renderer.render(scene, camera);
   drawLabels(); drawMini();
   requestAnimationFrame(frame);

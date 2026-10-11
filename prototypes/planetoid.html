@@ -41,6 +41,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
 details{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);padding:10px 14px;width:min(270px,calc(100vw - 32px));max-height:calc(100vh - 120px);overflow:auto}
 summary{cursor:pointer;font-family:var(--display);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:14px}
 details label{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:11px;color:var(--muted);margin-top:10px}
+details select{grid-column:1 / -1;width:100%;font:inherit;font-size:11px;padding:3px 4px;background:var(--panel, #fff);color:var(--ink);border:1px solid rgba(120,130,150,.4);border-radius:4px}
 details label input[type=range]{grid-column:1 / -1;width:100%;accent-color:var(--skier)}
 details label output{color:var(--ink);font-variant-numeric:tabular-nums}
 details .check{display:flex;align-items:center;gap:8px;grid-template-columns:none}
@@ -67,6 +68,7 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <div class="row"><span>Snow</span><b id="hSnow">–</b></div>
   <div class="row"><span>Grade</span><b id="hGrade">0%</b></div>
   <div class="row"><span>Local time</span><b id="hTime">–</b></div>
+  <div class="row"><span>Weather</span><b id="hWeather">–</b></div>
   <div class="row opt"><span>Weight</span><b id="hWeight">100%</b></div>
   <div class="row"><span>From start</span><b id="hFrom">0 m</b></div>
   <div class="row opt"><span>Skied</span><b id="hDist">0 m</b></div>
@@ -84,6 +86,8 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
   <label class="check"><input id="tLift" type="checkbox"> Curvature lightens you (less friction at speed)</label>
   <label class="check"><input id="tDay" type="checkbox" checked> Day and night (off: the sun stays over your shoulder)</label>
   <label class="check"><input id="tAurora" type="checkbox" checked> Auroras at night</label>
+  <label for="tWeather">Weather<select id="tWeather"><option value="random" selected>Random (changes every few minutes)</option><option value="clear">Clear</option><option value="flurries">Flurries</option><option value="snow">Snow</option><option value="heavy">Heavy snow</option><option value="blizzard">Blizzard</option></select></label>
+  <label class="check"><input id="tWind" type="checkbox" checked> Wind pushes the skier</label>
   <label for="tDayLen">Day length<output id="oDayLen"></output><input id="tDayLen" type="range" min="0" max="60" step="1" value="20"></label>
   <label for="tTilt">Axis tilt<output id="oTilt"></output><input id="tTilt" type="range" min="0" max="60" step="1" value="25"></label>
   <label for="tClock">Time here<output id="oClock"></output><input id="tClock" type="range" min="0" max="24" step="0.05" value="9"></label>
@@ -150,7 +154,7 @@ const SETTINGS = [
 const STORE = 'skate-planetoid';
 const DEFAULTS = {}; SETTINGS.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
 let saved = {}; try { saved = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch (e) {}
-const save = () => { try { const o = { lift: P.lift, cycle: P.daynight, aurora: P.aurora }; SETTINGS.forEach(([i]) => { o[i] = $(i).value; }); localStorage.setItem(STORE, JSON.stringify(o)); } catch (e) {} };
+const save = () => { try { const o = { lift: P.lift, cycle: P.daynight, aurora: P.aurora, wind: P.windPush, weather: $('tWeather').value }; SETTINGS.forEach(([i]) => { o[i] = $(i).value; }); localStorage.setItem(STORE, JSON.stringify(o)); } catch (e) {} };
 
 // ---------- terrain: 3D gradient noise sampled on the sphere, in metres ----------
 // the ground comes from planet-terrain.js (shared with the planet editor): the procedural planet, or a layout's
@@ -296,6 +300,61 @@ const stars = (() => {
   m.frustumCulled = false; m.renderOrder = -9; scene.add(m); return m;
 })();
 
+// ---------- weather: snowfall, cloud and wind. random spells (a few minutes each) blend into one another ----------
+// snow: how much falls (0..1). cloud: how overcast (greys the sky, hides the sun, stars and auroras). wind: mean m/s.
+// vis: how far you can see in it (m)
+const WEATHER = {
+  clear:    { label: 'Clear',      snow: 0,    cloud: 0,    wind: 2,  vis: 1e6,  next: [['clear', 0.35], ['flurries', 0.5], ['snow', 0.15]] },
+  flurries: { label: 'Flurries',   snow: 0.22, cloud: 0.45, wind: 3,  vis: 700,  next: [['clear', 0.4], ['snow', 0.45], ['flurries', 0.15]] },
+  snow:     { label: 'Snow',       snow: 0.5,  cloud: 0.75, wind: 4.5, vis: 260, next: [['flurries', 0.35], ['heavy', 0.4], ['snow', 0.15], ['clear', 0.1]] },
+  heavy:    { label: 'Heavy snow', snow: 0.8,  cloud: 0.9,  wind: 7,  vis: 120,  next: [['snow', 0.5], ['blizzard', 0.3], ['heavy', 0.2]] },
+  blizzard: { label: 'Blizzard',   snow: 1,    cloud: 1,    wind: 13, vis: 45,   next: [['heavy', 0.7], ['snow', 0.3]] },
+};
+const WX = { state: 'clear', left: 60, snow: 0, cloud: 0, wind: 2, vis: 1e6, gust: 0, dir: new THREE.Vector3(1, 0, 0), vel: new THREE.Vector3(), fall: 0, disp: new THREE.Vector3() };
+const wxNoise = (x, s) => { const h = n => { const v = Math.sin(n*127.1 + s*311.7)*43758.5453; return v - Math.floor(v); }; const i = Math.floor(x), f = x - i; return h(i) + (h(i + 1) - h(i))*f*f*(3 - 2*f); };
+function weatherStep(dt, t){
+  // the spell: Random picks the next one when this one runs out (1.5 to 4 minutes); a fixed choice just holds it
+  const pick = $('tWeather').value;
+  if (pick !== 'random') WX.state = pick;
+  else if ((WX.left -= dt) <= 0){ let r = Math.random(); for (const [k, pr] of WEATHER[WX.state].next){ if ((r -= pr) <= 0){ WX.state = k; break; } } WX.left = 90 + Math.random()*150; }
+  // blend toward it over about half a minute
+  const W = WEATHER[WX.state], a = Math.min(1, dt/12);
+  WX.snow += (W.snow - WX.snow)*a; WX.cloud += (W.cloud - WX.cloud)*a; WX.wind += (W.wind - WX.wind)*a;
+  WX.vis = Math.exp(Math.log(WX.vis) + (Math.log(W.vis) - Math.log(WX.vis))*a);
+  // wind: its direction wanders slowly, gusts come and go; kept flat to the ground where you are
+  WX.dir.addScaledVector(n, -WX.dir.dot(n)); if (WX.dir.lengthSq() < 1e-6) WX.dir.copy(ex); WX.dir.normalize();
+  WX.dir.applyAxisAngle(n, (wxNoise(t*0.05, 3) - 0.5)*0.25*dt);
+  WX.gust = Math.max(0, wxNoise(t*0.35, 7)*1.6 - 0.5)*(0.4 + WX.snow);            // gusts, stronger in a storm
+  WX.vel.copy(WX.dir).multiplyScalar(WX.wind*(0.75 + WX.gust));
+  // how far the snow has blown and fallen (for the flakes)
+  WX.disp.addScaledVector(WX.vel, dt).addScaledVector(n, -1.2*dt);
+}
+// the flakes: points in a box round the camera that wraps, so they're everywhere you look. each flake has its own fall
+// speed and a little wobble; how many show goes with how hard it's snowing
+const snowMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false,
+  uniforms: { uCam: { value: new THREE.Vector3() }, uDisp: { value: new THREE.Vector3() }, uT: { value: 0 }, uBox: { value: 70 }, uAmt: { value: 0 }, uScale: { value: 400 }, uCol: { value: new THREE.Color(1, 1, 1) }, uStreak: { value: 0 } },
+  vertexShader: `attribute vec3 aP; attribute float aR; uniform vec3 uCam, uDisp; uniform float uT, uBox, uAmt, uScale; varying float vA;
+    void main(){
+      if (aR > uAmt){ gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 0.0; vA = 0.0; return; }
+      float r2 = fract(aR*17.3), r3 = fract(aR*41.7);
+      vec3 wob = vec3(sin(uT*0.9 + aR*40.0), cos(uT*0.7 + aR*23.0), sin(uT*1.1 + aR*11.0))*0.5;
+      vec3 p = mod(aP*uBox + uDisp*(0.75 + 0.5*r2) + wob - uCam, uBox) - 0.5*uBox;
+      vec4 mv = viewMatrix*vec4(uCam + p, 1.0);
+      gl_Position = projectionMatrix*mv;
+      gl_PointSize = clamp((0.06 + 0.06*r3)*uScale/max(0.5, -mv.z), 1.0, 6.0);
+      vA = (1.0 - smoothstep(0.3*uBox, 0.5*uBox, length(p)))*(0.55 + 0.45*r3);
+    }`,
+  fragmentShader: 'uniform vec3 uCol; varying float vA; void main(){ if (vA <= 0.0) discard; gl_FragColor = vec4(uCol, vA); }',
+});
+const snowPts = (() => {
+  const N = 9000, P3 = new Float32Array(N*3), R1 = new Float32Array(N);
+  for (let i = 0; i < N; i++){ P3[i*3] = Math.random(); P3[i*3 + 1] = Math.random(); P3[i*3 + 2] = Math.random(); R1[i] = Math.random(); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('aP', new THREE.BufferAttribute(P3, 3)); g.setAttribute('aR', new THREE.BufferAttribute(R1, 1));
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N*3), 3));
+  const m = new THREE.Points(g, snowMat); m.frustumCulled = false; m.renderOrder = 5; scene.add(m); return m;
+})();
+const OVERCAST_DAY = new THREE.Color(0xc4ccd6), OVERCAST_NIGHT = new THREE.Color(0x1c2128), _ov = new THREE.Color();
 // ---------- the planet: a cube-sphere, each face split into chunks so what's past the horizon isn't drawn ----------
 const FACES = [
   [[1,0,0],[0,0,-1],[0,1,0]], [[-1,0,0],[0,0,1],[0,1,0]], [[0,1,0],[1,0,0],[0,0,-1]],
@@ -1112,6 +1171,10 @@ function step(dt){
   if (plowHold){ fwd = 0; lat = 0; }
   else {
     { const gp = G*(hx*fx + hy*fy)*dt; if (!ONB || gp*fwd < 0 || Math.abs(fwd) < 0.05) fwd -= gp; }   // on a bridge a climb costs no speed
+    // wind: the air drag of moving through moving air, less the still-air drag the glide already counts (so no wind,
+    // no change). a skier's drag area ~0.5 m² upright, ~0.3 tucked, 75 kg: a 10 m/s headwind at speed costs ~1 m/s²
+    if (P.windPush){ const wf = WX.vel.dot(ex)*fx + WX.vel.dot(ey)*fy, kd = 0.004*(mode === 'tuck' ? 0.6 : 1), rel = wf - fwd;
+      fwd += kd*(Math.abs(rel)*rel + Math.abs(fwd)*fwd)*dt; }
     fwd *= Math.exp(-P.glide * surf * (mode === 'tuck' ? 1 - P.tuck/100 : 1) * dt);
     const dec = (P.fric * surf * wK + (mode === 'plow' ? P.plow : 0)) * dt;
     fwd = Math.abs(fwd) <= dec ? 0 : fwd - Math.sign(fwd)*dec;
@@ -1364,6 +1427,20 @@ function frame(now){
   FLATU.uFlatK.value = fk; FLATU.uFlatR.value = R; FLATU.uFlatN.value.copy(n); FLATU.uFlatC.value.copy(n).multiplyScalar(surfaceR());
   if (document.getElementById('tFog').checked){ scene.fog.near = 120 + k*R*20; scene.fog.far = 420 + 0.8*Re + k*R*40; }
   else { scene.fog.near = 1e7; scene.fog.far = 2e7; }
+  // weather: cloud greys the sky and hides the sun, stars and auroras; falling snow closes the distance in (whatever the
+  // Fog setting); the flakes blow with the wind. all of it fades out in the planet view
+  weatherStep(dt, t);
+  { const cl = WX.cloud*(1 - k), u = skyMat.uniforms;
+    _ov.copy(OVERCAST_NIGHT).lerp(OVERCAST_DAY, dayK);
+    u.hor.value.lerp(_ov, cl*0.85); u.zen.value.lerp(_ov, cl*0.8); u.twK.value *= 1 - 0.7*cl; u.sunK.value *= 1 - cl;
+    auK *= 1 - cl; u.auK.value = auK; stars.material.opacity *= 1 - cl;
+    sun.intensity *= 1 - 0.6*cl; hemi.intensity += 0.12*cl*dayK;
+    scene.fog.color.copy(u.hor.value);
+    const sv = WX.snow*(1 - k), vis = WX.vis/Math.max(0.05, 1 - k);
+    if (vis < scene.fog.far){ scene.fog.far = vis; scene.fog.near = Math.min(scene.fog.near, vis*0.12); }
+    const su = snowMat.uniforms; su.uCam.value.copy(camera.position); su.uDisp.value.copy(WX.disp); su.uT.value = t; su.uAmt.value = sv;
+    su.uScale.value = H/(2*Math.tan(camera.fov*Math.PI/360)); su.uCol.value.setRGB(1, 1, 1).multiplyScalar(0.35 + 0.65*dayK).lerp(AUR_GLOW, auK*0.3);
+    snowPts.visible = sv > 0.005; }
 
   updateLod();
   // only the chunks this side of the horizon (or all of them, in the planet view)
@@ -1401,6 +1478,10 @@ function hud(){
       if (!P.dayLen) txt += ' (stopped)'; }
     else txt = 'sun over your shoulder';
     $('hTime').textContent = txt;
+    // the weather here, and the wind as it meets you
+    { const wv = WX.vel.length(), fx = Math.sin(S.th), fy = -Math.cos(S.th), wf = (WX.vel.dot(ex)*fx + WX.vel.dot(ey)*fy)/Math.max(0.01, wv);
+      const rel = wv < 1 ? 'calm' : wf < -0.5 ? 'headwind' : wf > 0.5 ? 'tailwind' : 'crosswind';
+      $('hWeather').textContent = WEATHER[WX.state].label + ' · ' + (wv < 1 ? 'calm' : wv.toFixed(0) + ' m/s ' + rel); }
     if (lt !== null && document.activeElement !== $('tClock')){ $('tClock').value = lt.toFixed(2); $('oClock').textContent = fmtTime(lt); } }
   $('hSnow').textContent = ONB ? 'Light bridge · ' + ONB.b.name : S.off < 0.5 && S.trail ? 'Groomed · ' + (S.trailNames && S.trailNames.length > 1 ? S.trailNames.join(' / ') : S.trail.name) : 'Ungroomed';
   $('hGrade').textContent = (S.grade >= 0 ? '+' : '') + Math.round(S.grade*100) + '%';
@@ -1509,17 +1590,19 @@ for (const [i, o, k, f] of SETTINGS){
   el.addEventListener('input', () => { upd(); if (k === 'R' || k === 'flat') rNote(); if (k === 'pixel') resize(); });
   el.addEventListener('change', () => { save(); if (k === 'R'){ el.blur(); rebuild(); } if (k === 'mtn' || k === 'bld' || k === 'trees') buildScatter(); });
 }
-for (const [id, key, sk] of [['tLift', 'lift', 'lift'], ['tDay', 'daynight', 'cycle'], ['tAurora', 'aurora', 'aurora']]){
+for (const [id, key, sk] of [['tLift', 'lift', 'lift'], ['tDay', 'daynight', 'cycle'], ['tAurora', 'aurora', 'aurora'], ['tWind', 'windPush', 'wind']]){
   const el = $(id); if (saved[sk] !== undefined) el.checked = !!saved[sk];
   P[key] = el.checked; el.addEventListener('change', () => { P[key] = el.checked; save(); });
 }
+if (saved.weather && WEATHER[saved.weather] || saved.weather === 'random') $('tWeather').value = saved.weather;
+$('tWeather').addEventListener('change', () => { save(); $('tWeather').blur(); });
 // drag Time here to turn the planet to that time of day where you are
 $('tClock').addEventListener('input', () => { const h = +$('tClock').value; setLocalTime(h, n); $('oClock').textContent = fmtTime(h); });
 $('tClock').addEventListener('change', () => $('tClock').blur());
 $('defaultsBtn').addEventListener('click', () => {
   const oldR = P.R, oldS = P.mtn + ',' + P.bld + ',' + P.trees;
   for (const [i, o, k, f] of SETTINGS){ $(i).value = DEFAULTS[i]; P[k] = +DEFAULTS[i]; $(o).textContent = f(P[k]); }
-  $('tLift').checked = P.lift = false; $('tDay').checked = P.daynight = true; $('tAurora').checked = P.aurora = true;
+  $('tLift').checked = P.lift = false; $('tDay').checked = P.daynight = true; $('tAurora').checked = P.aurora = true; $('tWind').checked = P.windPush = true; $('tWeather').value = 'random';
   save(); rNote(); resize(); if (P.R !== oldR) rebuild(); else if (P.mtn + ',' + P.bld + ',' + P.trees !== oldS) buildScatter();
 });
 
@@ -1574,7 +1657,7 @@ bootLayout().then(() => {
   buildPlanet(); faceTrail();
   $('loading').style.display = 'none';
   window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList,
-    sun: { setTime: h => setLocalTime(h, n), get time(){ return localTime(n, sunD); }, get dir(){ return sunD; }, get axis(){ return AXIS; }, get phase(){ return dayPhase; }, set phase(v){ dayPhase = v; } } };   // test hook
+    weather: WX, sun: { setTime: h => setLocalTime(h, n), get time(){ return localTime(n, sunD); }, get dir(){ return sunD; }, get axis(){ return AXIS; }, get phase(){ return dayPhase; }, set phase(v){ dayPhase = v; } } };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 });
 </script>

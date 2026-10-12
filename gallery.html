@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Model Gallery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* every model in the game, built by models.js (the same code index.html uses) */
+:root{
+  --bg:#eef2f6; --panel:#fff; --line:#c4d1dd; --ink:#1d2a36; --muted:#5d7083; --accent:#d2462e; --sel:#2f6fd6;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){ --bg:#0d131a; --panel:#141d27; --line:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4; --accent:#ff6a4d; --sel:#5b9cf0; }}
+:root[data-theme="dark"]{ --bg:#0d131a; --panel:#141d27; --line:#2c3e50; --ink:#e3ebf2; --muted:#8aa0b4; --accent:#ff6a4d; --sel:#5b9cf0; }
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:12px/1.5 var(--mono)}
+header{padding:22px 16px 6px;max-width:1280px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:end}
+h1{font:700 30px/1 var(--display);letter-spacing:.04em;text-transform:uppercase;margin:0}
+header p{margin:0;color:var(--muted);flex:1 1 280px}
+header input{font:12px var(--mono);color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:7px 9px;width:220px;max-width:100%}
+main{max-width:1280px;margin:0 auto;padding:0 16px 40px}
+h2{font:700 16px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:26px 0 10px;display:flex;gap:8px;align-items:baseline}
+h2 small{font:11px var(--mono);letter-spacing:0;text-transform:none}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden;cursor:pointer;text-align:left;padding:0;font:inherit;color:inherit;display:flex;flex-direction:column}
+.card:hover{border-color:var(--muted)}
+.card:focus-visible{outline:2px solid var(--sel);outline-offset:1px}
+.card canvas{display:block;width:100%;aspect-ratio:4/3;background:#1a2633}
+.card b{display:block;font:700 15px var(--display);letter-spacing:.03em;padding:7px 9px 0}
+.card span{display:block;color:var(--muted);font-size:11px;padding:0 9px 8px}
+.inplace{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 14px}
+.inplace dt{font:700 15px var(--display);letter-spacing:.03em;margin-top:10px}
+.inplace dd{margin:0 0 10px;color:var(--muted)}
+/* the viewer */
+#view{position:fixed;inset:0;display:none;background:#0b1118;z-index:5}
+#view.open{display:block}
+#vc{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+#vc:active{cursor:grabbing}
+#info{position:absolute;top:12px;right:12px;bottom:12px;width:310px;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px}
+#info h3{font:700 24px/1.05 var(--display);letter-spacing:.03em;margin:0 30px 4px 0}
+#info .g{color:var(--muted);font:700 12px var(--display);letter-spacing:.08em;text-transform:uppercase}
+#info p{margin:8px 0}
+#info .where{color:var(--muted)}
+#stats{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:10px 0;font-variant-numeric:tabular-nums}
+#stats dt{color:var(--muted)}
+#stats dd{margin:0}
+.row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+button{font:500 12px var(--mono);color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:5px;padding:6px 9px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+button:focus-visible{outline:2px solid var(--sel);outline-offset:1px}
+#close{position:absolute;top:10px;right:10px;border:0;font-size:20px;line-height:1;padding:4px 8px}
+#nav{position:absolute;left:12px;bottom:12px;display:flex;gap:6px}
+#nav button{background:var(--panel)}
+#vhint{position:absolute;left:12px;top:12px;color:#8aa0b4;font-size:11px;pointer-events:none}
+@media (max-width:760px){
+  header{padding-top:16px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  #info{top:auto;left:8px;right:8px;bottom:8px;width:auto;max-height:44vh;padding:12px}
+  #info h3{font-size:20px}
+  #nav{left:auto;right:8px;bottom:auto;top:8px}
+  #vhint{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Model Gallery</h1>
+  <p id="sub">Every model in the game, built by <code>models.js</code>, the same code the game runs.</p>
+  <input id="q" type="search" placeholder="Filter…" aria-label="Filter models">
+</header>
+<main id="main"></main>
+
+<div id="view" role="dialog" aria-modal="true" aria-labelledby="vName">
+  <canvas id="vc"></canvas>
+  <div id="vhint">Drag to orbit · scroll or pinch to zoom · ← → for the next model</div>
+  <div id="nav"><button id="prev" aria-label="Previous model">←</button><button id="next" aria-label="Next model">→</button></div>
+  <div id="info">
+    <button id="close" aria-label="Close">×</button>
+    <div class="g" id="vGroup"></div>
+    <h3 id="vName"></h3>
+    <p id="vAbout"></p>
+    <p class="where" id="vWhere"></p>
+    <div class="row" id="vVars"></div>
+    <dl id="stats"></dl>
+    <div class="row">
+      <button id="bSpin" class="on">Turntable</button>
+      <button id="bMan" class="on">Person for scale</button>
+      <button id="bGrid" class="on">1 m grid</button>
+      <button id="bRoll" hidden>Re-roll</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="models.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const S = window.SkiModels, CAT = S.CATALOG;
+
+// ---- one look for thumbnails and the viewer: a cold blue evening, a snow floor
+function makeStage(){
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1a2633);
+  scene.add(new THREE.HemisphereLight(0xdfeaf5, 0x46566a, 0.75));
+  const sun = new THREE.DirectionalLight(0xfff4e6, 0.85); sun.position.set(0.6, 1, 0.45); scene.add(sun);
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(1, 64), new THREE.MeshLambertMaterial({ color: 0xe8eef4 }));
+  floor.rotation.x = -Math.PI/2; floor.position.y = -0.02; scene.add(floor);
+  return { scene, floor };
+}
+// build an entry, centred on the origin over its own footprint
+function build(e, v, seed){
+  const obj = S.rootOf(e.build(v, S.seeded(seed)));
+  const holder = new THREE.Group(); holder.add(obj);
+  holder.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(holder);
+  obj.position.x -= (box.min.x + box.max.x)/2; obj.position.z -= (box.min.z + box.max.z)/2;
+  holder.updateMatrixWorld(true);
+  box.setFromObject(holder);
+  return { holder, box };
+}
+const fitDist = (box, fov, aspect) => {
+  const s = box.getSize(new THREE.Vector3()), r = Math.max(0.5, s.length()/2);
+  const f = Math.tan(fov*Math.PI/360), fit = Math.min(f, f*aspect);
+  return r/fit*1.05;
+};
+
+// ---- thumbnails: one hidden renderer draws each in turn, copied to the card's own canvas
+const TW = 320, TH = 240;
+const thumbR = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+thumbR.setPixelRatio(1); thumbR.setSize(TW, TH);
+const T = makeStage(), tCam = new THREE.PerspectiveCamera(35, TW/TH, 0.1, 4000);
+function drawThumb(e, cv){
+  let b;
+  try { b = build(e, 0, 1); } catch (err){ console.error(e.id, err); return; }
+  T.scene.add(b.holder);
+  const c = b.box.getCenter(new THREE.Vector3()), d = fitDist(b.box, 35, TW/TH)*0.92;
+  const s = b.box.getSize(new THREE.Vector3());
+  T.floor.scale.setScalar(Math.max(s.x, s.z)*1.2 + 2);
+  tCam.position.set(c.x + d*0.62, c.y + d*0.42, c.z + d*0.66); tCam.lookAt(c);
+  tCam.near = d/100; tCam.far = d*10; tCam.updateProjectionMatrix();
+  thumbR.render(T.scene, tCam);
+  T.scene.remove(b.holder);
+  cv.getContext('2d').drawImage(thumbR.domElement, 0, 0, cv.width, cv.height);
+}
+
+// ---- the page
+const groups = [];
+for (const e of CAT){ let g = groups.find(x => x.name === e.group); if (!g) groups.push(g = { name: e.group, items: [] }); g.items.push(e); }
+const main = $('main'), cards = [];
+for (const g of groups){
+  const sec = document.createElement('section');
+  sec.innerHTML = `<h2>${g.name} <small>${g.items.length}</small></h2>`;
+  const grid = document.createElement('div'); grid.className = 'grid';
+  for (const e of g.items){
+    const b = document.createElement('button'); b.className = 'card';
+    const cv = document.createElement('canvas'); cv.width = TW; cv.height = TH;
+    const n = (e.variants ? e.variants.length + ' versions' : '') + (e.random ? (e.variants ? ', ' : '') + 'varies' : '');
+    b.append(cv); b.insertAdjacentHTML('beforeend', `<b>${e.name}</b><span>${n || '&nbsp;'}</span>`);
+    b.onclick = () => openView(CAT.indexOf(e));
+    grid.append(b); cards.push({ e, el: b, cv, sec });
+  }
+  sec.append(grid); main.append(sec);
+}
+{ // what isn't here
+  const sec = document.createElement('section');
+  sec.innerHTML = `<h2>Built in place <small>fitted to the ground or a route, so they live in index.html</small></h2>
+    <dl class="inplace">${S.IN_PLACE.map(([n, a]) => `<dt>${n}</dt><dd>${a}</dd>`).join('')}</dl>`;
+  main.append(sec);
+}
+$('sub').textContent = `${CAT.length} models in ${groups.length} groups, built by models.js, the same code the game runs.`;
+// draw the thumbnails a few at a time so the page stays responsive
+{ let i = 0; const step = () => { const t0 = performance.now(); while (i < cards.length && performance.now() - t0 < 30) drawThumb(cards[i].e, cards[i++].cv); if (i < cards.length) setTimeout(step, 0); else document.body.dataset.thumbs = 'done'; }; setTimeout(step, 0); }
+$('q').oninput = () => {
+  const q = $('q').value.trim().toLowerCase();
+  for (const c of cards) c.el.hidden = !!q && !(c.e.name + ' ' + c.e.group + ' ' + c.e.where + ' ' + c.e.about).toLowerCase().includes(q);
+  for (const s of new Set(cards.map(c => c.sec))) s.hidden = [...s.querySelectorAll('.card')].every(el => el.hidden);
+};
+
+// ---- the viewer
+const vc = $('vc'), R = new THREE.WebGLRenderer({ canvas: vc, antialias: true });
+R.setPixelRatio(Math.min(2, devicePixelRatio));
+const V = makeStage(), cam = new THREE.PerspectiveCamera(40, 1, 0.1, 5000);
+let gridObj = new THREE.GridHelper(1, 1); const gridMat = gridObj.material; gridMat.vertexColors = true; gridMat.transparent = true; gridMat.opacity = 0.5;
+const man = S.buildHuman(S.seeded(11)).root; V.scene.add(man);
+let cur = -1, vari = 0, seed = 1, model = null, center = new THREE.Vector3(), dist = 10, minD = 1, maxD = 100;
+let yaw = 0.8, pitch = 0.32, spin = true, lastT = performance.now();
+const fmt = x => x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x.toFixed(2);
+function count(o){
+  let meshes = 0, tris = 0;
+  o.traverse(m => {
+    if (!m.isMesh || !m.visible) return;
+    const g = m.geometry, n = (g.index ? g.index.count : g.attributes.position.count)/3;
+    const k = m.isInstancedMesh ? m.count : 1; meshes++; tris += n*k;
+  });
+  return { meshes, tris: Math.round(tris) };
+}
+function show(){
+  const e = CAT[cur];
+  if (model) V.scene.remove(model);
+  let b;
+  try { b = build(e, vari, seed); } catch (err){ console.error(e.id, err); $('vAbout').textContent = 'This one failed to build: ' + err.message; return; }
+  model = b.holder; V.scene.add(model);
+  const s = b.box.getSize(new THREE.Vector3()); b.box.getCenter(center);
+  const foot = Math.max(s.x, s.z);
+  // the floor, a 1 m grid and the person sit beside it
+  V.floor.scale.setScalar(Math.max(foot*1.6, s.y) + 6);
+  const gs = Math.min(400, Math.ceil(foot*1.3 + 4));
+  V.scene.remove(gridObj); gridObj.geometry.dispose();
+  gridObj = new THREE.GridHelper(gs, gs, 0x7d90a3, 0xb7c4d1); gridObj.material = gridMat; gridObj.position.y = 0.005;
+  gridObj.visible = $('bGrid').classList.contains('on'); V.scene.add(gridObj);
+  man.position.set(b.box.max.x + Math.max(0.8, foot*0.08), 0, 0); man.rotation.y = -0.6;
+  dist = fitDist(b.box, 40, vc.clientWidth/Math.max(1, vc.clientHeight))*1.1;
+  minD = Math.max(0.6, dist*0.12); maxD = dist*4;
+  cam.near = Math.max(0.02, dist/200); cam.far = dist*30; cam.updateProjectionMatrix();
+  const c = count(model);
+  $('stats').innerHTML = `<dt>Size</dt><dd>${fmt(s.x)} × ${fmt(s.z)} m, ${fmt(s.y)} m tall</dd><dt>Meshes</dt><dd>${c.meshes}</dd><dt>Triangles</dt><dd>${c.tris.toLocaleString()}</dd>`;
+}
+function openView(i){
+  cur = (i + CAT.length) % CAT.length; vari = 0; seed = 1;
+  const e = CAT[cur];
+  $('vGroup').textContent = e.group; $('vName').textContent = e.name; $('vAbout').textContent = e.about; $('vWhere').textContent = e.where;
+  const vv = $('vVars'); vv.innerHTML = '';
+  (e.variants || []).forEach((n, k) => { const b = document.createElement('button'); b.textContent = n; b.classList.toggle('on', k === 0);
+    b.onclick = () => { vari = k; [...vv.children].forEach((x, j) => x.classList.toggle('on', j === k)); show(); }; vv.append(b); });
+  $('bRoll').hidden = !e.random;
+  $('view').classList.add('open'); document.body.style.overflow = 'hidden';
+  show(); resize();
+  if (location.hash.slice(1) !== e.id) history.replaceState(null, '', '#' + e.id);
+}
+function closeView(){ $('view').classList.remove('open'); document.body.style.overflow = ''; cur = -1; history.replaceState(null, '', location.pathname + location.search); }
+$('close').onclick = closeView;
+$('prev').onclick = () => openView(cur - 1);
+$('next').onclick = () => openView(cur + 1);
+$('bRoll').onclick = () => { seed = 1 + ((Math.random()*2e9) | 0); show(); };
+const tog = (id, f) => $(id).onclick = () => { const on = $(id).classList.toggle('on'); f(on); };
+tog('bSpin', on => spin = on);
+tog('bMan', on => man.visible = on);
+tog('bGrid', on => gridObj.visible = on);
+addEventListener('keydown', ev => {
+  if (cur < 0) return;
+  if (ev.key === 'Escape') closeView();
+  else if (ev.key === 'ArrowRight') openView(cur + 1);
+  else if (ev.key === 'ArrowLeft') openView(cur - 1);
+});
+// orbit, zoom and pinch
+const pts = new Map(); let pinch0 = 0, dist0 = 0;
+vc.addEventListener('pointerdown', ev => { pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY }); try { vc.setPointerCapture(ev.pointerId); } catch (_){}
+  if (pts.size === 2){ const [a, b] = [...pts.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); dist0 = dist; } });
+vc.addEventListener('pointermove', ev => {
+  const p = pts.get(ev.pointerId); if (!p) return;
+  if (pts.size === 1){ yaw -= (ev.clientX - p.x)*0.008; pitch = Math.max(-0.1, Math.min(1.45, pitch + (ev.clientY - p.y)*0.006)); }
+  p.x = ev.clientX; p.y = ev.clientY;
+  if (pts.size === 2 && pinch0){ const [a, b] = [...pts.values()]; dist = Math.max(minD, Math.min(maxD, dist0*pinch0/Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)))); }
+});
+const up = ev => { pts.delete(ev.pointerId); if (pts.size < 2) pinch0 = 0; };
+vc.addEventListener('pointerup', up); vc.addEventListener('pointercancel', up);
+vc.addEventListener('wheel', ev => { ev.preventDefault(); dist = Math.max(minD, Math.min(maxD, dist*Math.exp(ev.deltaY*0.0012))); }, { passive: false });
+function resize(){
+  const w = vc.clientWidth, h = vc.clientHeight; if (!w || !h) return;
+  R.setSize(w, h, false); cam.aspect = w/h;
+  // the panel covers the right side (on a phone, the bottom): aim the model into the space that's left
+  const phone = matchMedia('(max-width:760px)').matches, ib = $('info').getBoundingClientRect();
+  cam.setViewOffset(w, h, phone ? 0 : (w - ib.left)/2, phone ? (h - ib.top)/2 : 0, w, h); cam.updateProjectionMatrix();
+}
+addEventListener('resize', () => cur >= 0 && resize());
+function frame(t){
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.1, (t - lastT)/1000); lastT = t;
+  if (cur < 0) return;
+  if (spin && !pts.size) yaw += dt*0.35;
+  const cp = Math.cos(pitch);
+  cam.position.set(center.x + Math.sin(yaw)*cp*dist, center.y + Math.sin(pitch)*dist, center.z + Math.cos(yaw)*cp*dist);
+  cam.lookAt(center);
+  R.render(V.scene, cam);
+}
+requestAnimationFrame(frame);
+// open straight to a model: gallery.html#moose
+const fromHash = () => { const h = location.hash.slice(1), i = CAT.findIndex(e => e.id === h); if (i >= 0 && i !== cur) openView(i); else if (!h && cur >= 0) closeView(); };
+addEventListener('hashchange', fromHash); fromHash();
+})();
+</script>
+</body>
+</html>

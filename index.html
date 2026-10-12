@@ -269,7 +269,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
 <button class="gearbtn" id="gearBtn" type="button" aria-label="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/><circle cx="12" cy="12" r="6.6"/></svg></button>
 <div class="prompt" id="setMenu" role="dialog" aria-modal="true" aria-labelledby="setTitle" hidden><div class="pcard" style="width:min(380px,100%)">
   <h3 id="setTitle">Settings</h3>
-  <div class="setlist"><div class="setvol"><button id="setMusic" type="button">Music <b></b></button><input id="setMusicVol" type="range" min="0" max="100" step="5" aria-label="Music volume"></div><div class="setvol"><button id="setFx" type="button">Sound effects <b></b></button><input id="setFxVol" type="range" min="0" max="100" step="5" aria-label="Sound effects volume"></div><button id="setPads" class="touchonly" type="button">Controller buttons <b></b></button><label for="setPixel">Pixelation <b id="setPixelOut"></b><input id="setPixel" type="range" min="1" max="6" step="1"></label><label for="setCamd" class="mouseonly">Camera distance <b id="setCamdOut"></b><input id="setCamd" type="range" min="4" max="24" step="0.5"></label><button id="setTilt" class="touchonly" type="button">Lean with <b></b></button><button id="setTut" class="touchonly" type="button">Tutorial <b>›</b></button><button id="setMap" class="mouseonly" type="button">Minimap <b></b></button><button id="setDiag" class="mouseonly" type="button">Controller diagram <b></b></button><button id="setCp" type="button">Checkpoints <b>›</b></button><button id="setDev" class="mouseonly" type="button">Dev mode <b></b></button></div>
+  <div class="setlist"><div class="setvol"><button id="setMusic" type="button">Music <b></b></button><input id="setMusicVol" type="range" min="0" max="100" step="5" aria-label="Music volume"></div><div class="setvol"><button id="setFx" type="button">Sound effects <b></b></button><input id="setFxVol" type="range" min="0" max="100" step="5" aria-label="Sound effects volume"></div><button id="setPads" class="touchonly" type="button">Controller buttons <b></b></button><label for="setPixel">Pixelation <b id="setPixelOut"></b><input id="setPixel" type="range" min="1" max="6" step="1"></label><label for="setCamd" class="mouseonly">Camera distance <b id="setCamdOut"></b><input id="setCamd" type="range" min="4" max="24" step="0.5"></label><label for="setCtilt">Camera tilt <b id="setCtiltOut"></b><input id="setCtilt" type="range" min="0.3" max="1.6" step="0.05"></label><button id="setTilt" class="touchonly" type="button">Lean with <b></b></button><button id="setTut" class="touchonly" type="button">Tutorial <b>›</b></button><button id="setMap" class="mouseonly" type="button">Minimap <b></b></button><button id="setDiag" class="mouseonly" type="button">Controller diagram <b></b></button><button id="setCp" type="button">Checkpoints <b>›</b></button><button id="setDev" class="mouseonly" type="button">Dev mode <b></b></button></div>
   <div class="pbtns"><button id="setClose" type="button" class="ghostbtn">Close</button></div>
 </div></div>
 <div class="prompt" id="cpMenu" role="dialog" aria-modal="true" aria-labelledby="cpTitle" hidden><div class="pcard" style="width:min(440px,100%)">
@@ -387,6 +387,7 @@ body.dev .hud{top:calc(env(safe-area-inset-top,0px) + 64px)}
     <label for="tAramp">Trail assist ease-in (ms)<output id="oAramp"></output><input id="tAramp" type="range" min="0" max="4000" step="100" value="1500"></label>
     <h4>Camera</h4>
     <label for="tCamd">Camera distance (m)<output id="oCamd"></output><input id="tCamd" type="range" min="4" max="24" step="0.5" value="15"></label>
+    <label for="tCtilt">Camera tilt (height ×)<output id="oCtilt"></output><input id="tCtilt" type="range" min="0.3" max="1.6" step="0.05" value="1"></label>
     <label for="tPixel">Pixel size (big, chunky pixels like A Short Hike; 1 is off)<output id="oPixel"></output><input id="tPixel" type="range" min="1" max="6" step="1" value="4"></label>
     <label for="tSway">Camera side-follow (s)<output id="oSway"></output><input id="tSway" type="range" min="0.1" max="2" step="0.05" value="0.8"></label>
     <label for="tCam">Camera smoothing (s)<output id="oCam"></output><input id="tCam" type="range" min="0.1" max="1.5" step="0.05" value="0.6"></label>
@@ -447,7 +448,7 @@ if (window.visualViewport) visualViewport.addEventListener('resize', resize);
 const $ = id => document.getElementById(id);
 const P = {};
 const tune = [['tPixel','oPixel','pixel',v=>v > 1 ? v.toFixed(0) + ' px' : 'off'],['tSky','oSky','sky',v=>v ? 'on' : 'when the crystal gate opens'],['tMagnet','oMagnet','magnet',v=>v ? v.toFixed(1) : 'off'],['tRumble','oRumble','rumble',v=>v ? v.toFixed(0)+'%' : 'off'],['tRumble2','oRumble2','rumble2',v=>v ? v.toFixed(0)+'%' : 'off'],['tRumbleL','oRumbleL','rumbleL',v=>v ? v.toFixed(1)+'%' : 'off'],['tMarks','oMarks','marks',v=>v.toFixed(0)+'%'],['tLboost','oLboost','lboost',v=>v.toFixed(2)+'×'],['tSwait','oSwait','swait',v=>v.toFixed(0)],['tSthrow','oSthrow','sthrow',v=>v.toFixed(0)],['tRest','oRest','rest',v=>v.toFixed(0)],['tTmin','oTmin','tmin',v=>v.toFixed(2)],['tV1side','oV1side','v1side',v=>v ? 'Right' : 'Left'],['tFedge','oFedge','fedge',v=>Math.round(v*100)+'%'],['tAssist','oAssist','assist',v=>Math.round(v*100)+'%'],['tAcap','oAcap','acap',v=>v.toFixed(0)],['tAlook','oAlook','alook',v=>v.toFixed(1)],['tAcenter','oAcenter','acenter',v=>v ? v.toFixed(1)+'×' : 'off (centre line)'],['tAjunc','oAjunc','ajunc',v=>v ? v.toFixed(0) : 'never'],['tBsnap','oBsnap','bsnap',v=>v ? v.toFixed(0) : 'off'],['tAswitch','oAswitch','aswitch',v=>v.toFixed(0)],['tAramp','oAramp','aramp',v=>v.toFixed(0)],['tAhug','oAhug','ahug',v=>Math.round(v*100)+'%'],['tPush','oPush','push',v=>v.toFixed(2)],['tTap','oTap','tap',v=>v.toFixed(0)],['tKlen','oKlen','klen',v=>v.toFixed(0)],['tTurn','oTurn','turn',v=>v.toFixed(1)],['tTurn2','oTurn2','turn2',v=>v.toFixed(1)],['tTurn3','oTurn3','turn3',v=>v.toFixed(1)],['tKfloor','oKfloor','kfloor',v=>v.toFixed(1)],['tKwin','oKwin','kwin',v=>v.toFixed(0)],['tK180','oK180','k180',v=>v.toFixed(0) + ' kicks'],['tK180t','oK180t','k180t',v=>v.toFixed(0) + ' kicks'],['tTfStop','oTfStop','tfStop',v=>v.toFixed(0)],['tTfMove','oTfMove','tfMove',v=>v.toFixed(0)],['tTfVlo','oTfVlo','tfVlo',v=>v.toFixed(0)],['tTfVhi','oTfVhi','tfVhi',v=>v.toFixed(0)],['tDecay','oDecay','decay',v=>v.toFixed(0)],['tSplay','oSplay','splay',v=>v.toFixed(0)],
-  ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tOffglide','oOffglide','offglide',v=>v.toFixed(0)+'%'],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tMax','oMax','max',v=>v.toFixed(0)]];
+  ['tGwin','oGwin','gwin',v=>v.toFixed(0)],['tGcut','oGcut','gcut',v=>v.toFixed(0)],['tPlow','oPlow','plow',v=>v.toFixed(1)],['tPole','oPole','pole',v=>v.toFixed(2)],['tLean','oLean','lean',v=>v.toFixed(0)],['tClassic','oClassic','classic',v=>v.toFixed(2)],['tPlowhold','oPlowhold','plowhold',v=>v.toFixed(0)],['tTuck','oTuck','tuck',v=>v.toFixed(0)],['tFric','oFric','fric',v=>v.toFixed(2)],['tGlide','oGlide','glide',v=>v.toFixed(2)],['tOff','oOff','off',v=>v.toFixed(1)],['tOffglide','oOffglide','offglide',v=>v.toFixed(0)+'%'],['tGrip','oGrip','grip',v=>v.toFixed(1)],['tSnap','oSnap','snap',v=>v.toFixed(0)],['tCam','oCam','cam',v=>v.toFixed(2)],['tSway','oSway','sway',v=>v.toFixed(2)],['tCamd','oCamd','camd',v=>v.toFixed(1)],['tCtilt','oCtilt','ctilt',v=>Math.round(v*100)+'%'],['tMax','oMax','max',v=>v.toFixed(0)]];
 // sliders: remember this viewer's tuning in the browser, and offer it as text to copy
 const DEFAULTS = {}; tune.forEach(([i]) => { DEFAULTS[i] = $(i).value; });
 // only sliders you've actually moved are remembered, so everything else follows the current defaults. (the old format
@@ -2585,7 +2586,7 @@ function dualMove(){
   const span = Math.abs(a.x - b.x), mid = (a.x + b.x)/2;
   // thumbs moving apart or together (not both the same way) is a pinch: it takes over from the tuck
   if (dual.act === 'tuck' && !dual.leaned && Math.abs(span - dual.s0) > 40 && Math.abs(mid - dual.lx) < 15 && Math.abs(ua) < T*1.5 && Math.abs(ub) < T*1.5){
-    setSkateTuck(false); touchLean = 0; dual.act = 'pinch'; dual.s0 = span; dual.c0 = P.camd;
+    setSkateTuck(false); touchLean = 0; dual.act = 'pinch'; dual.s0 = span; dual.c0 = P.camd; dual.my = (a.y + b.y)/2; dual.k0 = P.ctilt;
   }
   // pulling both thumbs back switches a tuck to a plow, and pushing them forward again switches back, without lifting.
   // a tuck turns into a plow only once both thumbs are well behind where the tuck began (72 px; 24 px in the first
@@ -2610,7 +2611,16 @@ function dualMove(){
     const el = $('tCamd'), lo = +el.min, hi = +el.max, st = +el.step || 0.5;
     const v = Math.max(lo, Math.min(hi, Math.round(dual.c0*Math.max(40, dual.s0)/Math.max(40, span)/st)*st));
     if (+el.value !== v){ el.value = v; el.dispatchEvent(new Event('input')); }
+    pinchTilt(dual.k0, dual.my - (a.y + b.y)/2);
   }
+}
+// once two fingers are zooming, sliding both up or down together tilts the camera: up raises it to look down more,
+// down lowers it toward the horizon (the full range over about 300 px)
+function pinchTilt(k0, rise){
+  const el = $('tCtilt'), lo = +el.min, hi = +el.max, st = +el.step || 0.05;
+  const r = Math.abs(rise) < 12 ? 0 : rise - Math.sign(rise)*12;
+  const v = +Math.max(lo, Math.min(hi, Math.round((k0 + r/200)/st)*st)).toFixed(2);
+  if (+el.value !== v){ el.value = v; el.dispatchEvent(new Event('input')); }
 }
 function dualEnd(){
   if (!dual) return;
@@ -2683,11 +2693,12 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
 {
   const gl = $('gl'); let plowPtr = null; const pts = new Map(); let pinch = null;
   const span = () => { const [a, b] = [...pts.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+  const midY = () => { const [a, b] = [...pts.values()]; return (a.y + b.y)/2; };
   gl.addEventListener('pointerdown', e => {
     if (e.pointerType === 'mouse') return;
     e.preventDefault(); try { gl.setPointerCapture(e.pointerId); } catch(_){}
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); anyInputAt = performance.now();
-    if (pts.size === 2) pinch = { d0: Math.max(20, span()), c0: P.camd };   // (one finger on the scene does nothing now: the plow is the two-thumb pull back)
+    if (pts.size === 2) pinch = { d0: Math.max(20, span()), c0: P.camd, my: midY(), k0: P.ctilt };   // (one finger on the scene does nothing now: the plow is the two-thumb pull back)
   });
   gl.addEventListener('pointermove', e => {
     if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -2695,6 +2706,7 @@ for (const [id, leg] of [['padL','L'],['padR','R']]){
       const el = $('tCamd'), lo = +el.min, hi = +el.max, st = +el.step || 0.5;
       const v = Math.max(lo, Math.min(hi, Math.round(pinch.c0*pinch.d0/Math.max(20, span())/st)*st));
       if (+el.value !== v){ el.value = v; el.dispatchEvent(new Event('input')); }
+      pinchTilt(pinch.k0, pinch.my - midY());
     }
   });
   for (const ev of ['pointerup','pointercancel']) gl.addEventListener(ev, e => {
@@ -7249,7 +7261,11 @@ function draw(){
   const ckE = caveCamK*caveCamK*(3 - 2*caveCamK);
   // on the crown room's spiral ramp the camera tucks in close and low, under the turn above it
   const onSpiral = !!(CAVE_DECK && CAVE_DECK.d.kind === 'spiral'), spK = onSpiral ? 1 : 0;
-  const dx = Math.sin(camTh), dy = -Math.cos(camTh), back = P.camd*(1 - 0.6*ckE)*(1 - 0.35*spK), up = P.camd * 0.62*(1 - 0.66*ckE)*(1 - 0.4*spK), ahead = P.camd * 0.55*(1 - 0.3*ckE)*(1 - 0.5*spK);
+  // camera tilt (Settings, or a two-thumb pinch slid up or down) raises or lowers the camera over the same distance:
+  // higher looks down more, lower looks out toward the horizon. underground and on the spiral it fades back to the
+  // normal height, so the close-in cave camera keeps clear of the roof
+  const tk = 1 + (Math.max(0.3, Math.min(1.6, P.ctilt || 1)) - 1)*(1 - ckE)*(1 - spK);
+  const dx = Math.sin(camTh), dy = -Math.cos(camTh), back = P.camd*(1 - 0.6*ckE)*(1 - 0.35*spK)*(1 - 0.22*(tk - 1)), up = P.camd * 0.62*tk*(1 - 0.66*ckE)*(1 - 0.4*spK), ahead = P.camd * 0.55*(1 - 0.3*ckE)*(1 - 0.5*spK)*Math.max(0.35, 1 - 0.75*Math.max(0, tk - 1));   // (looking down from higher, the gaze comes in nearer so you stay mid-screen)
   const now = performance.now(), fdt = Math.min(0.05, (now - lastDraw)/1000); lastDraw = now;
   if (!focus) focus = { x:S.x, y:S.y, v:0 };
   {
@@ -9074,7 +9090,7 @@ let padUI = true; try { padUI = localStorage.getItem('skate-padui') !== 'off'; }
 const applyPadUI = () => document.body.classList.toggle('nopadui', !padUI);
 applyPadUI();
 function setLabels(){ $('setMap').querySelector('b').textContent = uiOpt.minimap ? 'on' : 'off'; $('setDiag').querySelector('b').textContent = uiOpt.diagram ? 'on' : 'off'; $('setDev').querySelector('b').textContent = devView ? 'on' : '›'; $('setTilt').querySelector('b').textContent = typeof tilt !== 'undefined' && tilt.on ? 'phone tilt' : 'thumbs'; $('setMusicVol').value = music.vol; $('setFxVol').value = sfx.vol; $('setFx').querySelector('b').textContent = sfx.on ? 'on' : 'off';
-  $('setMusicVol').parentNode.classList.toggle('off', !music.on); $('setFxVol').parentNode.classList.toggle('off', !sfx.on); $('setPixel').value = $('tPixel').value; $('setPixelOut').textContent = $('oPixel').textContent; $('setCamd').value = $('tCamd').value; $('setCamdOut').textContent = $('oCamd').textContent + ' m'; $('setMusic').querySelector('b').textContent = $('musicBtn').getAttribute('aria-pressed') === 'false' ? 'off' : 'on'; $('setPads').querySelector('b').textContent = padUI ? 'on' : 'off'; }
+  $('setMusicVol').parentNode.classList.toggle('off', !music.on); $('setFxVol').parentNode.classList.toggle('off', !sfx.on); $('setPixel').value = $('tPixel').value; $('setPixelOut').textContent = $('oPixel').textContent; $('setCamd').value = $('tCamd').value; $('setCamdOut').textContent = $('oCamd').textContent + ' m'; $('setCtilt').value = $('tCtilt').value; $('setCtiltOut').textContent = $('oCtilt').textContent; $('setMusic').querySelector('b').textContent = $('musicBtn').getAttribute('aria-pressed') === 'false' ? 'off' : 'on'; $('setPads').querySelector('b').textContent = padUI ? 'on' : 'off'; }
 function openSettings(){ setLabels(); $('setMenu').hidden = false; promptCtx = promptCtx || { cp: true }; }
 function closeSettings(){ $('setMenu').hidden = true; if (promptCtx && promptCtx.cp) promptCtx = null; }
 $('gearBtn').addEventListener('click', openSettings);
@@ -9139,6 +9155,7 @@ const tut = (() => {
     { t: () => 'While tucking, slide both thumbs <b>left or right</b> to lean and steer', hl: ['padL', 'padR'], poll: st => { if (mode !== 'tuck' || Math.abs(touchLean) < 0.4){ st.h = 0; return false; } st.h = st.h || performance.now(); return performance.now() - st.h > 300; } },
     { t: () => 'With both thumbs down, <b>pull both back</b> toward you to snow plow and slow down. Push forward again to tuck', hl: ['padL', 'padR'], poll: st => { if (mode !== 'plow'){ st.h = 0; return false; } st.h = st.h || performance.now(); return performance.now() - st.h > 400; } },
     { t: () => '<b>Spread or pinch</b> two fingers to bring the camera closer or further away', poll: st => Math.abs(P.camd - st.c0) >= 1, init: st => { st.c0 = P.camd; } },
+    { t: () => 'Keep both fingers down and <b>slide them up or down together</b> to tilt the camera: up looks down from higher, down looks out toward the horizon', poll: st => Math.abs(P.ctilt - st.k0) >= 0.15, init: st => { st.k0 = P.ctilt; } },
     { t: () => 'Tap the <b>map</b> button in the top right corner. Your goals are marked on it', hl: ['mapBtn'], poll: () => mapOpen },
     { t: () => '<b>Red squares</b> are terminals waiting to start, yellow is running, green is done. Find the nearest red one: that\'s your first terminal. Then close the map', poll: () => !mapOpen },
     { t: () => 'The label at the top is your <b>goal</b>. Ski into a <b>terminal</b> to start it, then collect its orbs', hl: ['orbHud'], button: true },
@@ -9178,6 +9195,7 @@ const tut = (() => {
 // first game on a touch screen (nothing saved yet): start it once the page has settled
 try { if (matchMedia('(pointer:coarse)').matches && localStorage.getItem('skate-tut') !== 'done' && !localStorage.getItem(PROGRESS_KEY)) setTimeout(() => { if (!tut.on) tut.start(); }, 1500); } catch(e){}
 // the camera's distance (the same as the dev slider, and saved with it): pulled in close to far back
+$('setCtilt').addEventListener('input', () => { const el = $('tCtilt'); el.value = $('setCtilt').value; el.dispatchEvent(new Event('input')); $('setCtiltOut').textContent = $('oCtilt').textContent; });
 $('setCamd').addEventListener('input', () => { const el = $('tCamd'); el.value = $('setCamd').value; el.dispatchEvent(new Event('input')); $('setCamdOut').textContent = $('oCamd').textContent + ' m'; });
 $('setPixel').addEventListener('input', () => { const el = $('tPixel'); el.value = $('setPixel').value; el.dispatchEvent(new Event('input')); $('setPixelOut').textContent = $('oPixel').textContent; });
 // exact positions, for reporting a spot: copy where you (and the camera) are; paste one back in to go there

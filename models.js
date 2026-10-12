@@ -1066,13 +1066,244 @@ function buildMinePortal(){
   return { g, gates };
 }
 
+// ---- the skier: a simple jointed figure built from boxes and cylinders, posed every frame from the game's state. the
+// pose is for looks only and never feeds back into movement. buildSkier() makes one; its pose(G) poses it (see there).
+// the game and the planetoid both use it
+const SK_UP = new THREE.Vector3(0, 1, 0), _ska = new THREE.Vector3(), _skb = new THREE.Vector3(), _skd = new THREE.Vector3();
+function setLimb(m, a, b){
+  // stretch a unit cylinder between two points in the rig's frame
+  _ska.set(...a); _skb.set(...b); _skd.subVectors(_skb, _ska); const L = _skd.length() || 1e-3;
+  m.position.addVectors(_ska, _skb).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(SK_UP, _skd.divideScalar(L)); m.scale.set(1, L, 1);
+}
+function buildSkier(){
+  const rig = new THREE.Group();                                  // the body, turned to the torso's heading
+  const jacket = new THREE.MeshLambertMaterial({ color: 0xd2462e });   // jacket and hat, the theme's skier colour
+  const pants = new THREE.MeshLambertMaterial({ color: 0x2f3b48 });
+  const skin = new THREE.MeshLambertMaterial({ color: 0xd9b8a0 });
+  const ski = new THREE.MeshLambertMaterial({ color: 0x2c3a49, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -6 });   // always in front of the marks
+  const pole = new THREE.MeshLambertMaterial({ color: 0x8a939c });
+  const limb = (r, mat) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 1, 8), mat); rig.add(m); return m; };
+  const body = {
+    torso: limb(0.13, jacket), head: new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 10), skin),
+    hat: new THREE.Mesh(new THREE.SphereGeometry(0.115, 14, 8, 0, Math.PI*2, 0, Math.PI/2), jacket),
+    thigh: { L: limb(0.065, pants), R: limb(0.065, pants) }, shin: { L: limb(0.05, pants), R: limb(0.05, pants) },
+    upper: { L: limb(0.045, jacket), R: limb(0.045, jacket) }, fore: { L: limb(0.04, jacket), R: limb(0.04, jacket) },
+    pole: { L: limb(0.012, pole), R: limb(0.012, pole) },
+    ski: { L: new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.025, 1.75), ski), R: new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.025, 1.75), ski) },
+  };
+  rig.add(body.head, body.hat, body.ski.L, body.ski.R);
+  // the reward outfit: the court's crown, a gold belt and the court's diamond on your back (purple jacket: setOutfit)
+  const regalia = (() => {
+    const gold = new THREE.MeshLambertMaterial({ color: 0xe6bf4f }); gold.flatShading = true;
+    const crown = buildCrown(); crown.scale.setScalar(0.42); crown.position.y = 0.035; body.hat.add(crown);   // the court's crown, sized to your hat
+    const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.1335, 0.1335, 1, 16, 1, true), gold); belt.scale.y = 0.085; belt.position.y = -0.36; body.torso.add(belt);
+    const emblem = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), gold); emblem.position.set(0, 0.08, 0.128); emblem.scale.set(0.06, 0.16, 0.012); body.torso.add(emblem);   // the court's diamond, on your back
+    return { crown, belt, emblem };
+  })();
+  for (const k of ['L','R']) body.ski[k].geometry.translate(0, 0, -0.15);   // binding a little behind the ski's middle
+  const sk = { rig, body, regalia, mats: { jacket, pants, skin, ski, pole }, state: { bodyVis: null, poleT: 0, loadW: 0 } };
+  sk.setOutfit = (on, colour = 0xd2462e) => { regalia.crown.visible = regalia.belt.visible = regalia.emblem.visible = on; jacket.color.setHex(on ? 0x7b3fe0 : colour); };
+  sk.pose = G => poseSkier(sk, G);
+  return sk;
+}
+// pose the figure. frame: x to the skier's right, y up, -z forward along the torso heading. it doesn't place the rig:
+// it returns the heading the body faces (th), and the caller puts the rig at the skier, turned to -th about its up.
+// G, the game's state:
+//   x, y        where the skier is (the 2D model: x east, y south), h0 the snow's height there
+//   ground(x,y) the snow's height anywhere near, in the same frame
+//   face        the heading the body turns toward (it eases after it)
+//   now         the time (ms); dt the frame (s, 1/60 by default)
+//   mode        null (skating), 'tuck', 'plow' or 'classic'; tuckDeep 0..1
+//   ld          the loading pose: { depth 0..1, leg 'L'/'R' or null, both } (a stick pulled into its load)
+//   tk          seconds since the last push (legs); tka seconds since the arms' last push, or null while undecided
+//   rock        how far the hips sit over the gliding ski (m, + right)
+//   lastSki     { L, R }: each ski's current mark { live, ax, ay, dx, dy, len } or null; lastLeg the leg that last pushed
+//   legFlash    { L, R }: 1 at a kick, fading
+//   v1, v1side  V1 (offset) arms, and the hang side (true: right); classicFwd(k) each foot's fore/aft in classic
+// st.poleT is set to 1 at a double pole (it drives the arm swing as it counts down)
+function poseSkier(sk, G){
+  const { body } = sk, st = sk.state, now = G.now, mode = G.mode, ld = G.ld, lastSki = G.lastSki, legFlash = G.legFlash, lastLeg = G.lastLeg, ground = G.ground, h0 = G.h0;
+  const fdt = G.dt || 1/60;
+  const faceTh = G.face;
+  if (st.bodyVis === null) st.bodyVis = faceTh;
+  let dv = faceTh - st.bodyVis; dv -= Math.round(dv/(2*Math.PI))*2*Math.PI;
+  st.bodyVis += dv * Math.min(1, fdt * 8);
+  const th = st.bodyVis;
+  st.poleT = Math.max(0, st.poleT - fdt * 2);
+  const poleT = st.poleT;
+  // skating follows the V2 cycle (a double pole with every skate):
+  //   load   - before the push: tall, hips high, legs nearly straight, arms up and forward, recovering foot drawn in
+  //            beside the gliding foot, weight fully over the gliding ski
+  //   push   - poles plant and drive back while the leg extends; the body compresses and the hips move across
+  //   recover- rising again as the arms swing forward and up past the hips
+  //   glide  - riding the new ski, mid height, arms relaxed forward
+  const tk = G.tk;
+  let v2 = 'glide', vp = 0;
+  if (!mode){
+    // timing from reference footage (10 fps, about 1.2 s per skate): high/load ~25%, pole push ~45%, recovery ~30%
+    if (tk < 0.5){ v2 = 'push'; vp = tk / 0.5; }
+    else if (tk < 0.85){ v2 = 'recover'; vp = (tk - 0.5) / 0.35; }
+  }
+  // the arms run the same cycle from their own start, and hold the glide pose while a touch kick is still undecided
+  const tka = G.tka;
+  let v2a = 'glide', vpa = 0;
+  if (!mode && tka !== null){
+    if (tka < 0.5){ v2a = 'push'; vpa = tka / 0.5; }
+    else if (tka < 0.85){ v2a = 'recover'; vpa = (tka - 0.5) / 0.35; }
+  }
+  const ease = x => x*x*(3 - 2*x);
+  let crouch, leanDeg;
+  if (mode === 'tuck'){ crouch = 0.42 + 0.06*G.tuckDeep; leanDeg = 62 + 8*G.tuckDeep; }
+  else if (mode === 'plow'){ crouch = 0.14; leanDeg = 8; }
+  else if (mode === 'classic'){ crouch = 0.1; leanDeg = 18; }
+  else if (ld.both){ crouch = 0.04 + 0.04*ld.depth; leanDeg = 10 + 6*ld.depth; }          // double-pole load: tall
+  else if (v2 === 'push'){ crouch = 0.02 + 0.3*ease(vp); leanDeg = 8 + 42*ease(vp); }    // folding at the hips to about 50°
+  else if (v2 === 'recover'){ crouch = 0.32 - 0.24*ease(vp); leanDeg = 50 - 34*ease(vp); }
+  else { crouch = 0.08; leanDeg = 16; }
+  // loading blends in over the cycle instead of replacing it: it eases toward the stick's depth over about a tenth
+  // of a second, and can't take over a pole push until that push is mostly done, so there's no snap between poses
+  const cap = v2 === 'push' ? ease(vp) : 1;
+  const want = (!mode && ld.leg) ? ld.depth : 0;
+  st.loadW += (Math.min(want, cap) - st.loadW) * Math.min(1, fdt * 9);
+  const loadW = st.loadW;
+  if (!mode){ crouch += (0.01 - crouch) * loadW; leanDeg += (8 - leanDeg) * loadW; }   // tall, legs nearly straight
+  const lean = leanDeg * Math.PI/180;
+  // full weight transfer: nose, knee and toe over the gliding ski
+  const hip = [G.rock * 2.2, 0.95 - crouch*0.55, 0.05 + crouch*0.15];
+  const side = { L: -1, R: 1 };
+  const classicFwd = G.classicFwd || (() => 0);
+  const feet = {};
+  for (const k of ['L','R']){
+    const sd = side[k], sk = lastSki[k], down = mode || (sk && sk.live);
+    // where the foot is: under its hip, wider in a plow, pushed out to the side on a kick, fore/aft in classic
+    let fx = sd * (mode === 'plow' ? 0.32 : 0.14), fy = 0.05, fz = classicFwd(k);
+    if (sk && sk.live && sk.len > 0.05){
+      // a planted ski sits on the end of its own track: the track grows to the ski, so the binding goes at the
+      // track's leading point (converted into the skier's frame), kept within a leg's reach of the hips
+      const hx = sk.ax + sk.dx*sk.len - G.x, hy = sk.ay + sk.dy*sk.len - G.y;
+      const lx = hx*Math.cos(th) + hy*Math.sin(th), lz = -(hx*Math.sin(th) - hy*Math.cos(th));
+      fx = Math.max(-0.7, Math.min(0.7, lx)); fz += Math.max(-0.6, Math.min(0.6, lz));
+      fx = sd > 0 ? Math.max(fx, 0.05) : Math.min(fx, -0.05);   // a foot never crosses to the other side of the body
+    }
+    // the pushing leg extends out and back through the pole push, then is drawn in during recovery
+    const ext = (!mode && k === lastLeg) ? (v2 === 'push' ? ease(vp) : v2 === 'recover' ? 1 - ease(vp) : 0) : 0;
+    fx += sd * 0.42 * ext; fz += 0.3 * ext;
+    if (!down){ fy = 0.05 + (v2 === 'push' ? 0.08 * Math.max(0, vp - 0.6) / 0.4 : 0.11); fz += 0.12; }   // lifted ski, carried a little behind
+    if (!mode && !down && ld.leg && loadW > 0){                              // load: recovering foot comes in beside the gliding one
+      const gk = ld.leg, g = lastSki[gk];
+      const gx = (g && g.live) ? Math.max(-0.7, Math.min(0.7, (g.ax + g.dx*g.len - G.x)*Math.cos(th) + (g.ay + g.dy*g.len - G.y)*Math.sin(th))) : side[gk]*0.14;
+      const w = ease(loadW);
+      fx = fx + (gx + sd*0.16 - fx) * w; fy = fy + (0.05 - fy) * w; fz = fz * (1 - w);
+    }
+    // the snow under this foot can sit higher or lower than under the body on a slope: lift or drop the foot to it
+    const cT = Math.cos(th), sT = Math.sin(th), wx = G.x + fx*cT - fz*sT, wy = G.y + fx*sT + fz*cT;
+    const gB = ground(wx, wy);
+    fy += gB - h0;
+    feet[k] = [fx, fy, fz];
+    // ski: planted skis point exactly along their tracks; a plow turns the tips in; lifted skis follow the body
+    let yaw = 0;
+    if (mode === 'plow') yaw = sd * 0.38;   // tips together, tails apart
+    else if (sk && sk.live){ let r = Math.atan2(sk.dx, -sk.dy) - th; r -= Math.round(r/(2*Math.PI))*2*Math.PI; yaw = -r; }
+    else if (ext > 0) yaw = sd * 0.35 * ext;                              // pushing ski angled out as it leaves
+    const ski = body.ski[k];
+    // a ski on the snow lies along the slope under it: pitched to the ground at tip and tail, rolled to the ground
+    // either side, its base a little above its own track so the mark never shows through it
+    let pitch = -0.12, roll = 0;
+    if (down){
+      const ph = yaw - th, fwx = -Math.sin(ph), fwy = -Math.cos(ph), rx = Math.cos(ph), ry = -Math.sin(ph);
+      const tip = ground(wx + fwx*1.0, wy + fwy*1.0), tail = ground(wx - fwx*0.72, wy - fwy*0.72);
+      pitch = Math.atan2(tip - tail, 1.72);
+      roll = Math.atan2(ground(wx + rx*0.2, wy + ry*0.2) - ground(wx - rx*0.2, wy - ry*0.2), 0.4);
+      fy = gB - h0 + 0.05;
+    }
+    ski.rotation.order = 'YXZ';
+    ski.position.set(fx, fy - (down ? 0 : 0.005), fz);
+    ski.rotation.set(pitch, yaw, roll);
+    // leg: hip to knee to foot, the knee pushed forward more the deeper the crouch
+    const hp = [hip[0] + sd*0.1, hip[1], hip[2]];
+    const kb = 0.06 + crouch*0.45;
+    const knee = [(hp[0] + fx)/2, (hp[1] + fy)/2 + 0.02, (hp[2] + fz)/2 - kb];
+    setLimb(body.thigh[k], hp, knee); setLimb(body.shin[k], knee, [fx, fy + 0.06, fz]);
+  }
+  // torso and head, leaning forward from the hips and a little toward the gliding ski
+  const tl = 0.55, side_lean = G.rock * 0.8;
+  const sh = [hip[0] + side_lean, hip[1] + Math.cos(lean)*tl, hip[2] - Math.sin(lean)*tl];
+  setLimb(body.torso, hip, sh);
+  const hd = [sh[0], sh[1] + Math.cos(lean*0.7)*0.18, sh[2] - Math.sin(lean*0.7)*0.18];
+  body.head.position.set(...hd); body.hat.position.set(hd[0], hd[1] + 0.01, hd[2]);
+  // arms and poles
+  for (const k of ['L','R']){
+    const v2 = v2a, vp = vpa;
+    const sd = side[k];
+    const s0 = [sh[0] + sd*0.2, sh[1] - 0.04, sh[2]];
+    let hand, tip;
+    if (ld.both && poleT <= 0){
+      hand = [s0[0], s0[1] + 0.05*ld.depth, s0[2] - 0.5*ld.depth - 0.1];   // double-pole load: poles reaching forward
+      tip = [hand[0] + sd*0.05, 0.02, hand[2] - 0.15];
+    } else if (mode === 'tuck' && poleT <= 0){
+      hand = [s0[0] - sd*0.08, hip[1] + 0.05, hip[2] - 0.45];        // hands in front of the knees, poles tucked under the arms
+      tip = [hand[0] + sd*0.05, hand[1] + 0.15, hand[2] + 1.15];
+    } else if (poleT > 0){
+      const p = 1 - poleT;                                            // double pole: reach forward, then drive down and back
+      hand = [s0[0], s0[1] - 0.15 - 0.45*p, s0[2] - 0.45 + 0.85*p];
+      tip = [hand[0] + sd*0.05, 0.02, hand[2] + 0.2 + 0.6*p];
+    } else if (!mode && G.v1){
+      // V1 (offset), for trigger and key kicks in either scheme: one staggered double pole every second skate, made as you step onto the hang-side
+      // ski, with the two poles and that ski landing together. the hang-side hand is high, just ahead of the head,
+      // its pole near vertical; the other hand is lower with its pole angled back. follow-through stops just past the
+      // hips. on the off-side skate the arms just come back up to the ready position.
+      const hang = G.v1side ? 'R' : 'L', mine = k === hang;
+      const onto = lastLeg === 'L' ? 'R' : 'L';               // the ski just stepped onto
+      const poling = onto === hang;
+      const READY = mine
+        ? { h: [s0[0] - sd*0.02, s0[1] + 0.28, s0[2] - 0.32], t: [s0[0] + sd*0.06, 0.03, s0[2] - 0.12] }   // high, pole near vertical by the foot
+        : { h: [s0[0] - sd*0.06, s0[1] + 0.06, s0[2] - 0.42], t: [s0[0] + sd*0.22, 0.03, s0[2] + 0.3] };   // lower, pole angled back
+      const BACK = { h: [s0[0] + sd*0.05, hip[1] + 0.05, hip[2] + 0.22], t: [s0[0] + sd*0.12, hip[1] + 0.25, hip[2] + 1.05] };  // short follow-through
+      const mix = (a, b, f) => a.map((v, i) => v + (b[i] - v) * f);
+      let A = READY, B = READY, f = 0;
+      if (poling){
+        if (v2 === 'push'){ A = READY; B = BACK; f = ease(vp); }
+        else if (v2 === 'recover'){ A = BACK; B = READY; f = ease(vp); }
+      }
+      hand = mix(A.h, B.h, f); tip = mix(A.t, B.t, f);
+      if (poling && v2 === 'push' && vp < 0.5) tip[1] = 0.02;              // planted with the ski
+      if (!poling || v2 === 'glide'){ tip[1] = 0.25; }                       // carried just off the snow, ready
+    } else if (!mode){
+      // V2 arms: both together. key poses, blended by phase
+      // from the footage: hands come right up to chin height with elbows bent before the plant, and at the end of the
+      // push the arm is straight back with the pole close to horizontal
+      const HIGH = { h: [s0[0] + sd*0.02, s0[1] + 0.2, s0[2] - 0.3], t: [s0[0] + sd*0.14, 0.03, s0[2] + 0.05] };     // hands at the chin, tips by the feet
+      const BACK = { h: [s0[0] + sd*0.05, hip[1] + 0.12, hip[2] + 0.55], t: [s0[0] + sd*0.1, hip[1] + 0.3, hip[2] + 1.75] }; // arm straight back, pole level
+      const MID  = { h: [s0[0] + sd*0.06, s0[1] - 0.22, s0[2] - 0.32], t: [s0[0] + sd*0.14, 0.3, s0[2] + 0.35] };   // relaxed, tips off the snow
+      const mix = (a, b, f) => a.map((v, i) => v + (b[i] - v) * f);
+      let A, B, f;
+      if (v2 === 'push'){ A = HIGH; B = BACK; f = ease(vp); }
+      else if (v2 === 'recover'){ A = BACK; B = MID; f = ease(vp); }
+      else { A = MID; B = MID; f = 0; }
+      hand = mix(A.h, B.h, f); tip = mix(A.t, B.t, f);
+      if (v2 === 'push' && vp < 0.55) tip[1] = 0.02;                        // poles stay planted for about half the push
+      if (loadW > 0){ const w = ease(loadW); hand = mix(hand, HIGH.h, w); tip = mix(tip, HIGH.t, w); }   // arms rising for the plant
+    } else {
+      // classic: the arm opposite the forward leg swings forward
+      const other = k === 'L' ? 'R' : 'L';
+      const swing = mode === 'classic' ? -classicFwd(other) * 0.9 : (legFlash[other] - legFlash[k]) * 0.35;
+      hand = [s0[0] + sd*0.05, s0[1] - 0.5, s0[2] - 0.15 - swing];
+      tip = [hand[0] + sd*0.12, 0.02, hand[2] + 0.55];
+    }
+    const elbow = [(s0[0] + hand[0])/2 + sd*0.06, (s0[1] + hand[1])/2, (s0[2] + hand[2])/2 + 0.06];
+    setLimb(body.upper[k], s0, elbow); setLimb(body.fore[k], elbow, hand); setLimb(body.pole[k], hand, tip);
+  }
+  return th;
+}
+
 Object.assign(M, { lam, SM, bx, cy, orbGlowTex, dome, pt, lines, geoDome, arch, BUILD, V, tube, beam, flag, mergeModel,
   buildOrb, orbCoreGeo, orbCoreMat, KIOSK_LOOK, buildKiosk, buildGate, buildControlPost, treeMats, TREE_PARTS, buildTree, BOULDER, buildBoulder,
   MOOSE_MAT, MG, mpart, buildMoose, NPC_MAT, NG, npart, buildHuman, buildAlien,
   CRYSTAL_MAT, GOLD, GOLD_2S, ROYAL, ROYAL_MAT, DRAPES, DG, dressMoose, buildCrown, buildAltar, buildCrystal, buildCrystalGate,
   OUTCROP_MATS, buildOutcrop, PLATEAU_MATS, buildPlateauCrystal, poseGiant, buildObservatory, MUSICIAN_MATS: { robes, sash, brass, hide, wood }, MUSIC_KINDS, dressMusician,
   ATTEND_MATS: { white, white2 }, dressAttendant, buildCourtDiamond,
-  lampMat, MINE_MATS, MINE_KIT, buildMineProp, STATION_MATS, buildStationHub, buildShip, buildCargoBin, portalArrowGeo, buildSkyPortal, buildMinePortal });
+  lampMat, MINE_MATS, MINE_KIT, buildMineProp, STATION_MATS, buildStationHub, buildShip, buildCargoBin, portalArrowGeo, buildSkyPortal, buildMinePortal,
+  setLimb, buildSkier, poseSkier });
 
 // ---- the catalogue: every model, for the gallery (gallery.html). build(v, rnd) makes variant v (an index into
 // variants) with a seeded random stream rnd for the ones that vary; random: re-rolling gives a different one
@@ -1132,6 +1363,15 @@ add('The wild', 'boulder', 'Ice boulder', 'Scattered through the open snow and a
 add('The wild', 'outcrop', 'Crystal outcrop', 'Zone 4, over the snowfields', 'A cluster of long faceted purple crystals and a few stones (just rock, no glow), merged into one mesh.', (v, rnd) => buildOutcrop(2.2, 1 + ((rnd()*1e6) | 0)), { random: true });
 add('The wild', 'plateau', 'Plateau crystals', 'Zone 5, across the plateau and along the cliff (about 110)', 'Three to seven long crystals round a big one; now and then the big one glows.', (v, rnd) => buildPlateauCrystal(1.8, rnd), { random: true });
 // creatures and people
+{ // your skier, posed by the game's own code from a made-up moment of the game
+  const planted = x => ({ live: true, ax: x, ay: 0.6, dx: 0, dy: -1, len: 0.6 });
+  const POSES = [['Gliding', {}], ['Pushing off', { tk: 0.25, lastLeg: 'R', R: null }], ['V1 (ready)', { v1: true }], ['Tuck', { mode: 'tuck', tuckDeep: 0.5 }], ['Snow plow', { mode: 'plow' }], ['Reward outfit', { outfit: true }]];
+  add('Creatures and people', 'skier', 'Your skier', 'Everywhere: you', 'A jointed figure in the theme\'s red (purple in the reward outfit, with the court\'s crown, a gold belt and the diamond on the back), posed every frame from the skating: kicks, the V1 and V2 arms, tuck and plow.',
+    v => { const o = POSES[v][1], sk = buildSkier(), tk = o.tk === undefined ? 2 : o.tk; sk.setOutfit(!!o.outfit);
+      sk.pose({ x: 0, y: 0, h0: 0, ground: () => 0, face: 0, now: 0, mode: o.mode || null, tuckDeep: o.tuckDeep || 0, ld: { depth: 0, leg: null, both: false },
+        tk, tka: tk, rock: 0, lastSki: { L: planted(-0.14), R: 'R' in o ? o.R : planted(0.14) }, lastLeg: o.lastLeg || 'L', legFlash: { L: 0, R: 0 }, v1: !!o.v1, v1side: false });
+      return sk.rig; }, { variants: POSES.map(p => p[0]) });
+}
 add('Creatures and people', 'moose', 'Tentacle moose', 'One roams zone 2, ten roam zone 3, and the herds of zone 4', 'Six-legged and purple, palmate antlers, a beard of tentacles on the muzzle and chest. Walks a tripod gait, three legs at a time.', () => buildMoose(false).root);
 add('Creatures and people', 'calf', 'Moose calf', 'Zone 4\'s herds; the one that follows you', 'A grown moose without antlers, shown here at the herd\'s calf size (0.75).', () => { const r = buildMoose(true).root; r.scale.setScalar(0.75); return r; });
 add('Creatures and people', 'giant', 'The sleeping giant', 'Zone 4', 'A grown moose eleven times over, legs folded under, head down, breathing slow clouds of vapour (shown here at 1/11 size).', () => poseGiant(buildMoose(false)).root);
@@ -1164,7 +1404,6 @@ add('Energy bridges', 'skyportal', 'Bridge portal', 'The foot of every energy br
   v => { const r = buildSkyPortal(5, v === 2); for (const m of r.lit) m.visible = v > 0; r.pad.material.opacity = v > 0 ? 0.3 : 0; return r.g; }, { variants: ['Unlit', 'Lit (one way)', 'Lit (both ways)'] });
 // what's built in place, fitted to the ground or the route, and so not in this file
 const IN_PLACE = [
-  ['Your skier', 'Posed live every frame from the physics (kicks, glide, tuck, poles); the regalia (crown, gold belt, diamond) goes on with the reward outfit.'],
   ['Drawbridges', 'Their ramps are fitted to the river banks; the leaf, lifting towers and chains are built with them.'],
   ['Energy bridge decks and pylons', 'Laid along each route: the decks follow the route\'s heights, the pylons stand where there\'s room.'],
   ['The mine\'s terraces, village and ruins', 'Fitted to the cave: the terraces are light bridges along their routes; Plateau 2\'s adobe houses and Plateau 3\'s ruins are instanced boxes laid out from the village plan.'],

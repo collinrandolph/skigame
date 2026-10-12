@@ -126,6 +126,7 @@ body.clean.nopads .pads{display:none !important}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="planet-terrain.js"></script>
+<script src="../models.js"></script>   <!-- the game's models, the skier among them -->
 <script>
 'use strict';
 // ============================================================================================================
@@ -1130,7 +1131,7 @@ function kick(leg, opt = {}){
   weightLeg = other; lastSki[leg] = null;
   lastLeg = leg; lastKickAt = performance.now(); legFlash[leg] = 1;
 }
-function press(leg, boost = 1, src = null){ mode = null; held[leg] = true; kick(leg, { boost, src }); glideLeg = leg; glideStart = performance.now(); }
+function press(leg, boost = 1, src = null){ mode = null; strideV1 = boost <= 1; held[leg] = true; kick(leg, { boost, src }); glideLeg = leg; glideStart = performance.now(); }
 function release(leg){ held[leg] = false; }
 function glideMult(){
   if (!glideLeg || !held[glideLeg]) return 1;
@@ -1290,65 +1291,34 @@ function clearMarks(){ markPos.fill(0); markGeo.attributes.position.needsUpdate 
 const TEST = { ghost: false,     // test hook: ghost turns collisions off; place(dir) puts the skier there
   place(d){ ONB = null; exitLock = null; n.copy(d).normalize(); ex.set(1, 0, 0).addScaledVector(n, -n.x).normalize(); ey.crossVectors(ex, n).normalize(); camR = null; } };
 
-// ---------- the skier's figure ----------
+// ---------- the skier's figure: the main game's own (models.js), posed by the game's own code ----------
+// the figure stands in a frame on the planet at the skier: x along ex, y up (n), z along ey, the 2D model's axes, so
+// the game's pose (worked out in the flat 2D model) fits it unchanged. on a bridge the snow under the feet is the deck
 const fig = new THREE.Group(); scene.add(fig);
-const M = c => new THREE.MeshLambertMaterial({ color: c });
-const jacket = M(0xd2462e), pants = M(0x2b3a4a), dark = M(0x1d2a36), skin = M(0xe2b49a);
-const body = new THREE.Group(); fig.add(body);
-const hips = new THREE.Group(); body.add(hips);
-const torso = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, 0.26), jacket); torso.position.y = 0.31; hips.add(torso);
-const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), skin); head.position.y = 0.78; hips.add(head);
-const hat = new THREE.Mesh(new THREE.SphereGeometry(0.135, 12, 6, 0, Math.PI*2, 0, Math.PI/2), jacket); hat.position.y = 0.8; hips.add(hat);
-const arms = []; for (const sd of [-1, 1]){ const a = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.55, 0.1), jacket); a.position.set(sd*0.27, 0.32, 0); a.geometry.translate(0, -0.25, 0); a.position.y = 0.58; hips.add(a); arms.push(a); }
-const legGeo = new THREE.CylinderGeometry(0.075, 0.065, 1, 8); legGeo.translate(0, 0.5, 0);
-const legs = { L: new THREE.Mesh(legGeo, pants), R: new THREE.Mesh(legGeo, pants) }; fig.add(legs.L, legs.R);
-const skiGeo = new THREE.BoxGeometry(0.08, 0.03, 1.75);
-const skiMesh = { L: new THREE.Mesh(skiGeo, dark), R: new THREE.Mesh(skiGeo, dark) }; fig.add(skiMesh.L, skiMesh.R);
+const SKIER = SkiModels.buildSkier(); fig.add(SKIER.rig);
+SKIER.setOutfit(false);
+const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.45, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.16, depthWrite: false }));
+shadow.rotation.x = -Math.PI/2; shadow.scale.set(0.8, 1.3, 1); fig.add(shadow);
 const youMark = new THREE.Mesh(new THREE.ConeGeometry(1, 2.4, 12), new THREE.MeshBasicMaterial({ color: 0xd2462e })); youMark.geometry.rotateX(Math.PI); youMark.geometry.translate(0, 1.2, 0); scene.add(youMark);
-const _right = new THREE.Vector3(), _back = new THREE.Vector3(), _f = new THREE.Vector3(), _m4 = new THREE.Matrix4(), _hip = new THREE.Vector3(), _foot = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
-let rock = 0, rockV = 0;
+const _m4 = new THREE.Matrix4(), _up = new THREE.Vector3(0, 1, 0), _f = new THREE.Vector3();
+const NO_LOAD = { depth: 0, leg: null, both: false };
+let rock = 0, rockV = 0, strideV1 = true;     // plain kicks animate as V1 (offset), boosted ones as V2, as in the game
 function poseFigure(dt){
-  const th = S.th;
-  _f.set(0, 0, 0).addScaledVector(ex, Math.sin(th)).addScaledVector(ey, -Math.cos(th));
-  _right.crossVectors(_f, n).normalize(); _back.copy(_f).negate();
-  _m4.makeBasis(_right, n, _back);
+  _m4.makeBasis(ex, n, ey);
   fig.quaternion.setFromRotationMatrix(_m4);
-  fig.position.copy(n).multiplyScalar(surfaceR());
-  // feet: on each planted ski where it passes under the body; a lifted ski trails out to its side
-  const r2 = [Math.cos(th), Math.sin(th)], b2 = [-Math.sin(th), Math.cos(th)];
-  const feet = {};
-  for (const k of ['L', 'R']){
-    const sd = k === 'L' ? -1 : 1, s = lastSki[k], m = skiMesh[k];
-    if (s && s.live){
-      const rx = S.x - s.ax, ry = S.y - s.ay, along = Math.max(0, rx*s.dx + ry*s.dy);
-      const ox = s.ax + s.dx*along - S.x, oy = s.ay + s.dy*along - S.y;
-      let fxl = ox*r2[0] + oy*r2[1], fzl = ox*b2[0] + oy*b2[1];
-      const L = Math.hypot(fxl, fzl); if (L > 0.6){ fxl *= 0.6/L; fzl *= 0.6/L; }
-      feet[k] = [fxl, 0.04, fzl];
-      m.rotation.set(0, -(headingOf(s.dx, s.dy) - th), 0);
-    } else {
-      const sp = splayNow()*D2R*1.6;
-      feet[k] = [sd*0.3, 0.16, 0.3];
-      m.rotation.set(0.12, -sd*sp, 0);
-    }
-    m.position.set(feet[k][0], feet[k][1], feet[k][2]);
-  }
-  // the body rocks over the ski it's standing on
-  const target = mode ? 0 : weightLeg === 'L' ? -0.1 : weightLeg === 'R' ? 0.1 : 0;
-  const w = 9, h = dt/4; for (let i = 0; i < 4; i++){ rockV += (w*w*(target - rock) - 2*w*rockV)*h; rock += rockV*h; }
-  const tuckK = mode === 'tuck' ? 1 : 0;
-  body.position.set(rock, 0, 0);
-  hips.position.set(0, 0.92 - 0.3*tuckK - (mode === 'plow' ? 0.08 : 0), 0);
-  hips.rotation.set(-(0.18 + 0.75*tuckK), 0, -rock*0.8);
-  for (const [i, a] of arms.entries()) a.rotation.set(tuckK ? 1.3 : 0.25 + 0.5*Math.max(legFlash.L, legFlash.R), 0, (i ? -1 : 1)*0.12);
-  // legs: from the hips to each foot
-  for (const k of ['L', 'R']){
-    const sd = k === 'L' ? -1 : 1;
-    _hip.set(rock + sd*0.11, hips.position.y, 0);
-    _foot.set(feet[k][0], feet[k][1] + 0.05, feet[k][2]);
-    const leg = legs[k], d = _foot.sub(_hip), L = d.length();
-    leg.position.copy(_hip); leg.scale.set(1, L, 1); leg.quaternion.setFromUnitVectors(_up, d.multiplyScalar(-1/L).negate());
-  }
+  const sr = surfaceR(), h0 = sr - P.R;
+  fig.position.copy(n).multiplyScalar(sr);
+  // the hips rock over the ski you're gliding on alone, and back to the middle when both are down (as the game)
+  const ws = weightLeg && lastSki[weightLeg], other = weightLeg && lastSki[weightLeg === 'L' ? 'R' : 'L'];
+  const single = !mode && ws && ws.live && ws.glide && !(other && other.live);
+  const target = single ? ws.side*STANCE : 0;
+  const w = 9, h = Math.min(0.05, dt)/4; for (let i = 0; i < 4; i++){ rockV += (w*w*(target - rock) - 2*w*rockV)*h; rock += rockV*h; }
+  rock = Math.max(-STANCE, Math.min(STANCE, rock));
+  const now = performance.now();
+  const th = SKIER.pose({ x: S.x, y: S.y, h0, ground: ONB ? () => h0 : (x, y) => hLocal(x - S.x, y - S.y), face: S.th, now, dt, mode, tuckDeep: 0,
+    ld: NO_LOAD, tk: (now - lastKickAt)/1000, tka: (now - lastKickAt)/1000, rock, lastSki, lastLeg, legFlash, v1: strideV1, v1side: false });
+  SKIER.rig.position.set(0, 0, 0); SKIER.rig.rotation.y = -th;
+  shadow.position.set(Math.cos(th)*rock, 0.04, Math.sin(th)*rock); shadow.rotation.z = -th;
 }
 
 // ---------- the chase camera (as the main game), and the planet view ----------

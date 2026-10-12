@@ -214,8 +214,10 @@ function show(){
   V.scene.remove(gridObj); gridObj.geometry.dispose();
   gridObj = new THREE.GridHelper(gs, gs, 0x7d90a3, 0xb7c4d1); gridObj.material = gridMat; gridObj.position.y = 0.005;
   gridObj.visible = $('bGrid').classList.contains('on'); V.scene.add(gridObj);
-  man.position.set(b.box.max.x + Math.max(0.8, foot*0.08), 0, 0); man.rotation.y = -0.6;
-  dist = fitDist(b.box, 40, vc.clientWidth/Math.max(1, vc.clientHeight))*1.1;
+  man.position.set(b.box.max.x + Math.max(1.2, foot*0.08), 0, b.box.min.z*0.6); man.rotation.y = -0.6;   // off to the side, a little back
+  // frame the model and the person beside it (the view stays centred on the model)
+  const both = b.box.clone().union(new THREE.Box3().setFromObject(man)), half = both.max.clone().sub(center).max(center.clone().sub(both.min));
+  dist = fitDist(new THREE.Box3(center.clone().sub(half), center.clone().add(half)), 40, vc.clientWidth/Math.max(1, vc.clientHeight))*1.1;
   minD = Math.max(0.6, dist*0.12); maxD = dist*4;
   cam.near = Math.max(0.02, dist/200); cam.far = dist*30; cam.updateProjectionMatrix();
   const c = count(model);

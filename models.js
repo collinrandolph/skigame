@@ -1410,5 +1410,85 @@ const IN_PLACE = [
   ['The station\'s decks and walkways', 'Built from the station\'s plan: the ring decks, walkways, railings and the spiral ramp.'],
   ['The ice planet, the black hole, the Starway and fireworks', 'Effects of zone 5 and the station: drawn, not modelled.'],
 ];
-Object.assign(M, { CATALOG: C, IN_PLACE, seeded, rootOf });
+// ---- footprints: what's solid round a model at a skier's height, from its own triangles. the triangles between the
+// snow and 2.1 m above it mark their cells (0.25 m) solid, spaces they close in are filled, and the result is kept as a
+// signed distance (negative inside). objs are measured in world space (x, z); height(x, z) is the snow there. the game's
+// buildings and the planetoid's placed models both use it
+const FOOT_CELL = 0.25, FOOT_PAD = 2.5;
+function footprint(objs, height){
+  const tris = [], v = new THREE.Vector3();
+  for (const o of objs){
+    o.updateMatrixWorld(true);
+    o.traverse(m => {
+      if (!m.isMesh) return;
+      const pa = m.geometry.attributes.position, idx = m.geometry.index, n = idx ? idx.count : pa.count;
+      for (let k = 0; k < n; k++){ v.fromBufferAttribute(pa, idx ? idx.getX(k) : k).applyMatrix4(m.matrixWorld); tris.push(v.x, v.y, v.z); }
+    });
+  }
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+  for (let i = 0; i < tris.length; i += 3){ x0 = Math.min(x0, tris[i]); x1 = Math.max(x1, tris[i]); z0 = Math.min(z0, tris[i+2]); z1 = Math.max(z1, tris[i+2]); }
+  x0 -= FOOT_PAD; z0 -= FOOT_PAD; x1 += FOOT_PAD; z1 += FOOT_PAD;
+  const C0 = FOOT_CELL, nx = Math.ceil((x1 - x0)/C0) + 1, nz = Math.ceil((z1 - z0)/C0) + 1;
+  // the snow under the model on a 1 m lattice, looked up bilinearly
+  const gw = Math.ceil(x1 - x0) + 2, gh = Math.ceil(z1 - z0) + 2, gH = new Float32Array(gw*gh);
+  for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) gH[j*gw + i] = height(x0 + i, z0 + j);
+  const ground = (x, z) => { const fx = Math.max(0, Math.min(gw - 1.001, x - x0)), fz = Math.max(0, Math.min(gh - 1.001, z - z0)), i = fx|0, j = fz|0, a = fx - i, b = fz - j;
+    return (gH[j*gw+i]*(1-a) + gH[j*gw+i+1]*a)*(1-b) + (gH[(j+1)*gw+i]*(1-a) + gH[(j+1)*gw+i+1]*a)*b; };
+  let gLo = Infinity, gHi = -Infinity; for (const h of gH){ gLo = Math.min(gLo, h); gHi = Math.max(gHi, h); }
+  const solid = new Uint8Array(nx*nz), cover = new Uint8Array(nx*nz), STEP = 0.15;
+  for (let t = 0; t < tris.length; t += 9){
+    const ax = tris[t], ay = tris[t+1], az = tris[t+2], bxx = tris[t+3], by = tris[t+4], bz = tris[t+5], cx = tris[t+6], cyy = tris[t+7], cz = tris[t+8];
+    const lowY = Math.min(ay, by, cyy), hiY = Math.max(ay, by, cyy);
+    if (hiY < gLo + 0.08) continue;                                       // buried entirely in the snow
+    const band = lowY < gHi + 2.1;                                        // could reach the skier's height somewhere
+    const n = Math.max(1, Math.ceil(Math.max(Math.hypot(bxx - ax, by - ay, bz - az), Math.hypot(cx - ax, cyy - ay, cz - az), Math.hypot(cx - bxx, cyy - by, cz - bz)) / STEP));
+    for (let i = 0; i <= n; i++) for (let j = 0; j <= n - i; j++){
+      const u = i/n, w = j/n, x = ax + (bxx - ax)*u + (cx - ax)*w, y = ay + (by - ay)*u + (cyy - ay)*w, z = az + (bz - az)*u + (cz - az)*w;
+      const ci = Math.round((x - x0)/C0), cj = Math.round((z - z0)/C0), q = cj*nx + ci;
+      const g = ground(x, z); if (y < g + 0.08) continue;
+      cover[q] = 1;
+      if (band && y < g + 2.1) solid[q] = 1;
+    }
+  }
+  // fill enclosed spaces: flood the open cells from the border; whatever the flood can't reach is inside
+  const seen = new Uint8Array(nx*nz), stack = [];
+  for (let i = 0; i < nx; i++){ stack.push(i, (nz - 1)*nx + i); } for (let j = 0; j < nz; j++){ stack.push(j*nx, j*nx + nx - 1); }
+  while (stack.length){ const q = stack.pop(); if (seen[q] || solid[q]) continue; seen[q] = 1; const i = q % nx, j = (q / nx) | 0;
+    if (i > 0) stack.push(q - 1); if (i < nx - 1) stack.push(q + 1); if (j > 0) stack.push(q - nx); if (j < nz - 1) stack.push(q + nx); }
+  for (let q = 0; q < solid.length; q++) if (!seen[q]) solid[q] = 1;
+  // signed distance from a two-pass chamfer transform, both ways
+  const chamfer = inside => {
+    const D = new Float32Array(nx*nz), BIG = 1e6, R2 = Math.SQRT2;
+    for (let q = 0; q < D.length; q++) D[q] = (solid[q] === 1) === inside ? BIG : 0;
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++){ const q = j*nx + i; let d = D[q]; if (!d) continue;
+      if (i > 0) d = Math.min(d, D[q-1] + 1); if (j > 0){ d = Math.min(d, D[q-nx] + 1); if (i > 0) d = Math.min(d, D[q-nx-1] + R2); if (i < nx - 1) d = Math.min(d, D[q-nx+1] + R2); } D[q] = d; }
+    for (let j = nz - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--){ const q = j*nx + i; let d = D[q]; if (!d) continue;
+      if (i < nx - 1) d = Math.min(d, D[q+1] + 1); if (j < nz - 1){ d = Math.min(d, D[q+nx] + 1); if (i < nx - 1) d = Math.min(d, D[q+nx+1] + R2); if (i > 0) d = Math.min(d, D[q+nx-1] + R2); } D[q] = d; }
+    return D;
+  };
+  const out = chamfer(false), ins = chamfer(true), sd = new Float32Array(nx*nz);
+  for (let q = 0; q < sd.length; q++) sd[q] = solid[q] ? -(ins[q] - 0.5)*C0 : (out[q] - 0.5)*C0;
+  return { x0, z0, nx, nz, sd, cover, bx: [x0, z0, x0 + (nx - 1)*C0, z0 + (nz - 1)*C0] };
+}
+function footSD(f, x, y){
+  const b = f.bx;
+  if (x < b[0] || x > b[2] || y < b[1] || y > b[3]){
+    // outside the grid: at least the margin away, plus however far out of the box
+    return FOOT_PAD - 0.3 + Math.hypot(Math.max(b[0] - x, 0, x - b[2]), Math.max(b[1] - y, 0, y - b[3]));
+  }
+  const fx = Math.min(f.nx - 1.001, (x - f.x0)/FOOT_CELL), fz = Math.min(f.nz - 1.001, (y - f.z0)/FOOT_CELL), i = fx|0, j = fz|0, a = fx - i, c = fz - j, n = f.nx, D = f.sd, q = j*n + i;
+  return (D[q]*(1-a) + D[q+1]*a)*(1-c) + (D[q+n]*(1-a) + D[q+n+1]*a)*c;
+}
+// one catalogue model, ready to place (the planet editor and the planetoid): version v, random stream from seed, centred
+// over its footprint with its base where it was built (y = 0). box: its bounds, as built (unscaled)
+function make(id, v = 0, seed = 1){
+  const e = C.find(x => x.id === id); if (!e) return null;
+  const obj = rootOf(e.build(Math.max(0, Math.min(v | 0, (e.variants || [0]).length - 1)), seeded(Math.max(1, seed | 0))));
+  const g = new THREE.Group(); g.add(obj); g.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(g);
+  obj.position.x -= (box.min.x + box.max.x)/2; obj.position.z -= (box.min.z + box.max.z)/2;
+  g.updateMatrixWorld(true); box.setFromObject(g);
+  return { g, entry: e, box };
+}
+Object.assign(M, { CATALOG: C, IN_PLACE, seeded, rootOf, make, FOOT_CELL, FOOT_PAD, footprint, footSD });
 })();

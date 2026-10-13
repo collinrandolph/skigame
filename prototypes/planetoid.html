@@ -679,7 +679,7 @@ const BLD_MATS = [new THREE.MeshLambertMaterial({ color: 0xffffff }), new THREE.
 const flatGeo = g => { const f = g.toNonIndexed(); f.computeVertexNormals(); g.dispose(); return f; };   // faceted look
 function buildStructures(rnd){
   const R = P.R, area = 4*Math.PI*R*R;
-  clearBuckets('structs'); for (const g of structGeos) g.dispose(); structGeos = []; solids = [];
+  clearBuckets('structs'); for (const g of structGeos) g.dispose(); structGeos = []; solids = modelSolids.slice();
   const up = new THREE.Vector3(0, 1, 0), X = new THREE.Vector3(1, 0, 0), d = new THREE.Vector3(), c = new THREE.Vector3(), p = new THREE.Vector3(), t1 = new THREE.Vector3(), t2 = new THREE.Vector3();
   const q = new THREE.Quaternion(), q2 = new THREE.Quaternion(), sc = new THREE.Vector3(), m4 = new THREE.Matrix4();
   const randDir = out => { const z = 2*rnd() - 1, a = rnd()*Math.PI*2, r = Math.sqrt(1 - z*z); return out.set(r*Math.cos(a), z, r*Math.sin(a)); };
@@ -784,7 +784,7 @@ function buildTrees(rnd){
     if (d.angleTo(START_N)*R < 14) continue;
     if (nearestTrailAt(d).d < TRAIL_W/2 + 3 + rnd()*3 || !bridgeClear(d, 1.5)) continue;
     if (beaconDirs.some(b => d.angleTo(b)*R < 5)) continue;
-    if (solids.some(o => d.dot(o.d) > Math.cos((o.r + 1.5)/R))) continue;
+    if (solids.some(o => nearSolid(o, d, 1.5))) continue;
     // not on steep ground
     t1.copy(Math.abs(d.y) < 0.9 ? up : new V(1, 0, 0)).cross(d).normalize(); t2.crossVectors(d, t1);
     const hAt = (u, v) => { q.copy(d).multiplyScalar(R).addScaledVector(t1, u).addScaledVector(t2, v).normalize(); return groundR(q); };
@@ -842,10 +842,37 @@ function buildLandmarks(){
     beacons.add(g); beaconList.push({ d: L0.d, name: L0.name, r });
   }
 }
+// ---------- a layout's models: the game's own (models.js), where the editor put them ----------
+// each sits on the lowest ground under it (as in the editor) and is solid where the game's own buildings are: its footprint
+// (models.js) is read off its triangles between the snow and head height, so you ski under arches and booms and bump
+// into walls, legs and posts. a layout can make one not solid. trees, rocks and the random buildings keep clear of
+// every one, solid or not
+const modelsG = new THREE.Group(); scene.add(modelsG);
+let modelSolids = [];
+function buildModels(){
+  modelsG.clear(); modelSolids = [];
+  if (!LAYOUT || !LAYOUT.models || !LAYOUT.models.length || !window.SkiModels) return;
+  const R = P.R, V = THREE.Vector3, m4 = new THREE.Matrix4();
+  for (const m of LAYOUT.models){
+    const r = SkiModels.make(m.id, m.v, m.seed); if (!r) continue;
+    const s = m.scale || 1, size = r.box.getSize(new V()), rf = Math.hypot(size.x, size.z)/2*s, d = new V(...m.d).normalize();
+    const seat = PTR.modelSeat(m.d, rf, heightAt, R), [bx, by, bz] = PTR.modelBasis(m.d, m.rot);
+    r.g.traverse(o => { if (o.material) for (const mt of [].concat(o.material)) flatPatch(mt); });   // drawn with the flatten view, like the ground
+    // the footprint, in the model's own frame (x, z along the ground, metres): the snow under it from the planet
+    const X = new V(...bx), Z = new V(...bz), q = new V();
+    r.g.scale.setScalar(s); r.g.updateMatrixWorld(true);
+    const foot = SkiModels.footprint([r.g], (x, z) => { q.copy(d).multiplyScalar(R).addScaledVector(X, x).addScaledVector(Z, z).normalize(); return heightAt(q.x, q.y, q.z) - seat.base; });
+    r.g.position.copy(d).multiplyScalar(R + seat.base);
+    r.g.quaternion.setFromRotationMatrix(m4.makeBasis(new V(...bx), new V(...by), new V(...bz)));
+    modelsG.add(r.g);
+    modelSolids.push({ d, r: rf, lim: Math.cos((rf + 10)/R), foot, X, Z, ghost: m.solid === false });
+  }
+}
 function buildScatter(){
   const R = P.R;
   buildLandmarks();
   buildBridges();
+  buildModels();
   clearBuckets('rocks'); rocks = [];
   { let s2 = 777; buildStructures(() => (s2 = (s2 * 16807) % 2147483647) / 2147483647); }
   { let s4 = 2468; buildTrees(() => (s4 = (s4 * 16807) % 2147483647) / 2147483647); }
@@ -858,7 +885,7 @@ function buildScatter(){
     const z = 2*rnd() - 1, a = rnd()*Math.PI*2, rr = Math.sqrt(1 - z*z);
     d.set(rr*Math.cos(a), z, rr*Math.sin(a));
     if (d.angleTo(START_N)*R < 14) continue;                       // keep the start clear
-    if (solids.some(o => d.angleTo(o.d)*R < o.r + 1)) continue;     // and out of the mountains and buildings
+    if (solids.some(o => nearSolid(o, d, 1))) continue;     // and out of the mountains, buildings and models
     const size = 0.35 + 1.3*Math.pow(rnd(), 2.2);
     if (nearestTrailAt(d).d < TRAIL_W/2 + size + 0.5 || !bridgeClear(d, size)) continue;    // and off the trails and the bridges' ramps
     { const tl = treeGrid.get(cellOf(d.x, d.y, d.z)); if (tl && tl.some(t => t.d.angleTo(d)*R < size + 1)) continue; }   // and clear of the trees
@@ -1234,6 +1261,11 @@ function step(dt){
   if (mode || speed() < 0.05) for (const k of ['L', 'R']){ if (lastSki[k] && lastSki[k].live) continue; lastSki[k] = setParallel(k === 'L' ? -1 : 1); }
   legFlash.L = Math.max(0, legFlash.L - dt*5); legFlash.R = Math.max(0, legFlash.R - dt*5);
 }
+// a placed model's footprint distance (metres, negative inside) at direction p, or null if it has none
+const _fr = new THREE.Vector3();
+function footAt(o, p){ _fr.copy(p).sub(o.d).multiplyScalar(P.R); return SkiModels.footSD(o.foot, _fr.dot(o.X), _fr.dot(o.Z)); }
+// is direction p within pad metres of solid o (its footprint if it has one, else its circle)?
+const nearSolid = (o, p, pad) => o.foot ? p.dot(o.d) > o.lim && footAt(o, p) < pad : p.dot(o.d) > Math.cos((o.r + pad)/P.R);
 // rocks, beacon bases, mountains and buildings are solid: you're pushed out and lose the speed you had into them
 function collide(){
   if (TEST.ghost) return;
@@ -1251,7 +1283,18 @@ function collide(){
   for (const p of pylons) if (p.d.dot(n) > lim) hit(p.d.x, p.d.y, p.d.z, p.r);
   { const tl = treeGrid.get(cellOf(n.x, n.y, n.z)); if (tl) for (const t of tl) hit(t.d.x, t.d.y, t.d.z, 0.18*t.s + 0.05); }   // tree trunks
   for (const o of solids){
-    if (o.d.dot(n) < o.lim) continue;
+    if (o.ghost || o.d.dot(n) < o.lim) continue;
+    if (o.foot){
+      // as the game: out along the footprint's slope, losing the speed into it
+      const BODY = 0.35, sd = footAt(o, n) - BODY; if (sd >= 0) continue;
+      const lx = _fr.dot(o.X), lz = _fr.dot(o.Z), e = 0.05, F = (x, z) => SkiModels.footSD(o.foot, x, z);
+      const gx = F(lx + e, lz) - F(lx - e, lz), gz = F(lx, lz + e) - F(lx, lz - e);
+      const wx = o.X.x*gx + o.Z.x*gz, wy = o.X.y*gx + o.Z.y*gz, wz = o.X.z*gx + o.Z.z*gz;
+      let ux = wx*ex.x + wy*ex.y + wz*ex.z, uy = wx*ey.x + wy*ey.y + wz*ey.z; const L = Math.hypot(ux, uy) || 1; ux /= L; uy /= L;
+      S.x -= ux*sd; S.y -= uy*sd; moveLocal(-ux*sd, -uy*sd);
+      const vn = S.vx*ux + S.vy*uy; if (vn < 0){ S.vx -= ux*vn; S.vy -= uy*vn; S.vx *= 0.92; S.vy *= 0.92; }
+      continue;
+    }
     if (!o.box){ hit(o.d.x, o.d.y, o.d.z, o.r); continue; }
     // a building: a box turned to its own axis. find where you are in its frame and push out through the nearest wall
     const ox = (o.d.x - n.x)*R, oy = (o.d.y - n.y)*R, oz = (o.d.z - n.z)*R;
@@ -1621,7 +1664,7 @@ function applyLayout(Lz){
 }
 function layoutUI(){
   $('procBtn').hidden = !LAYOUT;
-  $('layoutNote').textContent = LAYOUT ? 'Skiing “' + LAYOUT.name + '” from the planet editor (' + LAYOUT.stamps.length + ' stamps, ' + LAYOUT.trails.length + ' trails, ' + LAYOUT.landmarks.length + ' landmarks).' + (TIDY ? ' Tidied: ' + TIDY + '.' : '') : 'Drop a planet.json from the planet editor here to ski it.';
+  $('layoutNote').textContent = LAYOUT ? 'Skiing “' + LAYOUT.name + '” from the planet editor (' + LAYOUT.stamps.length + ' stamps, ' + LAYOUT.trails.length + ' trails, ' + LAYOUT.landmarks.length + ' landmarks' + (LAYOUT.models && LAYOUT.models.length ? ', ' + LAYOUT.models.length + ' models' : '') + ').' + (TIDY ? ' Tidied: ' + TIDY + '.' : '') : 'Drop a planet.json from the planet editor here to ski it.';
   sizeLabel(); rNote();
 }
 function bootLayout(){
@@ -1654,7 +1697,7 @@ bootLayout().then(() => {
   placeAtStart();
   buildPlanet(); faceTrail();
   $('loading').style.display = 'none';
-  window.__planetoid = { S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList,
+  window.__planetoid = { models: () => modelsG.children, trees: () => trees, rocks: () => rocks, S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList,
     weather: WX, sun: { setTime: h => setLocalTime(h, n), get time(){ return localTime(n, sunD); }, get dir(){ return sunD; }, get axis(){ return AXIS; }, get phase(){ return dayPhase; }, set phase(v){ dayPhase = v; } } };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 });

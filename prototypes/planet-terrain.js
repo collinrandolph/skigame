@@ -12,6 +12,9 @@
 //                 can carve its own bed into the ground: level across, its height smoothed along the line (with a
 //                 steepest grade), cutting into rises and building up over dips, with shoulders back to the land
 //   landmarks     named places with a height and a colour
+//   models        the game's own models (models.js), each by its catalogue id, version `v` and `seed` (for the ones
+//                 that vary), turned `rot` degrees clockwise from facing north and scaled by `scale`; `solid` unless
+//                 set false
 //   bridges       light bridges: a line of points from the start ramp's foot to the end ramp's foot. the deck rises at
 //                 the ramps to `clearance` metres above the ground (over `ramp` metres), keeps at least that over the
 //                 ground in between (smoothed, its descents no steeper than `maxGrade`), and is `width` metres either side
@@ -541,7 +544,7 @@ function easeAt(T, dl, cen, core, margin, stop, R){
 const norm = p => { const L = Math.hypot(p[0], p[1], p[2]) || 1; return [p[0]/L, p[1]/L, p[2]/L]; };
 PT.START = norm([0.15, 1, 0.25]);
 PT.cliffDefaults = () => ({ from: 0.6, band: 12, sharp: 8, stop: 1.0 });
-PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), detail: PT.newDetail(1024), trails: [], landmarks: [], bridges: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults(), network: PT.networkDefaults() });
+PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), detail: PT.newDetail(1024), trails: [], landmarks: [], models: [], bridges: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults(), network: PT.networkDefaults() });
 // a small example so every tool has something to show: a peak, a ridge, a crater, a basin and a trail past them
 PT.exampleLayout = function(R){
   R = R || 800;
@@ -558,6 +561,28 @@ PT.exampleLayout = function(R){
   L.landmarks.push({ name: 'Camp', type: 'camp', d: at(60, 13), height: 8, color: '#d2462e' });
   return L;
 };
+// a placed model's frame at unit direction d: x, y (up) and z, as arrays. at rot 0 the model's front (-z) faces north;
+// rot turns it clockwise seen from above, in degrees
+PT.modelBasis = function(d, rot){
+  const u = norm(d), a = Math.abs(u[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  let e = [a[1]*u[2] - a[2]*u[1], a[2]*u[0] - a[0]*u[2], a[0]*u[1] - a[1]*u[0]]; e = norm(e);          // east
+  const n = [u[1]*e[2] - u[2]*e[1], u[2]*e[0] - u[0]*e[2], u[0]*e[1] - u[1]*e[0]];                     // north
+  const r = (rot || 0)*Math.PI/180, c = Math.cos(r), s = Math.sin(r);
+  const x = [0, 1, 2].map(i => c*e[i] - s*n[i]), f = [0, 1, 2].map(i => c*n[i] + s*e[i]);
+  return [x, u, f.map(v => -v)];
+};
+// where a model of footprint radius r (metres) sits: the lowest ground under it (its middle and a ring at 85% of r),
+// a little lower so nothing floats. returns metres above the base radius, and how much the ground varies under it
+PT.modelSeat = function(d, r, height, R){
+  const [x, , z] = PT.modelBasis(d, 0), u = norm(d);
+  let lo = height(u[0], u[1], u[2]), hi = lo;
+  for (let k = 0; k < 12; k++){
+    const a = k/12*Math.PI*2, ox = Math.cos(a)*r*0.85, oz = Math.sin(a)*r*0.85;
+    const p = norm([u[0]*R + x[0]*ox + z[0]*oz, u[1]*R + x[1]*ox + z[1]*oz, u[2]*R + x[2]*ox + z[2]*oz]);
+    const h = height(p[0], p[1], p[2]); lo = Math.min(lo, h); hi = Math.max(hi, h);
+  }
+  return { base: lo - 0.15, spread: hi - lo };
+};
 PT.LANDMARK_TYPES = { beacon: 'Beacon', spire: 'Spire', tower: 'Tower', camp: 'Camp', terminal: 'Terminal', altar: 'Altar', marker: 'Marker' };
 // to and from JSON (the sculpt layer goes as base64 centimetres)
 PT.serialize = function(L){
@@ -568,6 +593,7 @@ PT.serialize = function(L){
     sculpt: PT.encodeSculpt(L.sculpt), detail: PT.encodeDetail(L.detail),
     trails: L.trails.map(t => ({ name: t.name, closed: !!t.closed, pts: t.pts.map(r5), carve: !!t.carve, bed: t.bed, shoulder: t.shoulder, smooth: t.smooth, maxGrade: t.maxGrade })),
     landmarks: L.landmarks.map(m => ({ name: m.name, type: m.type, d: r5(m.d), height: m.height, color: m.color })),
+    models: (L.models || []).map(m => ({ name: m.name, id: m.id, v: m.v, seed: m.seed, d: r5(m.d), rot: m.rot, scale: m.scale, solid: m.solid !== false })),
     bridges: (L.bridges || []).map(b => ({ name: b.name, pts: b.pts.map(r5), clearance: b.clearance, ramp: b.ramp, width: b.width, maxGrade: b.maxGrade })),
     start: { d: r5(L.start.d) }, scatter: Object.assign({}, L.scatter), cliffs: Object.assign({}, L.cliffs), network: Object.assign(PT.networkDefaults(), L.network || {}),
   });
@@ -580,6 +606,7 @@ PT.parse = function(json){
     sculpt: PT.decodeSculpt(o.sculpt), detail: PT.decodeDetail(o.detail),
     trails: (o.trails || []).map(t => Object.assign({ name: t.name || 'Trail', closed: !!t.closed, pts: t.pts.map(norm) }, PT.carveDefaults(), { carve: !!t.carve }, pick(t, ['bed', 'shoulder', 'smooth', 'maxGrade']))),
     landmarks: (o.landmarks || []).map(m => ({ name: m.name || 'Landmark', type: m.type || 'marker', d: norm(m.d), height: +m.height || 10, color: m.color || '#d2462e' })),
+    models: (o.models || []).filter(m => m && m.id && m.d).map(m => ({ name: m.name || m.id, id: String(m.id), v: Math.max(0, m.v | 0), seed: Math.max(1, m.seed | 0), d: norm(m.d), rot: +m.rot || 0, scale: +m.scale > 0 ? +m.scale : 1, solid: m.solid !== false })),
     bridges: (o.bridges || []).filter(b => b.pts && b.pts.length >= 2).map(b => Object.assign({ name: b.name || 'Light bridge', pts: b.pts.map(norm) }, PT.bridgeDefaults(), pick(b, ['clearance', 'ramp', 'width', 'maxGrade']))),
     start: { d: norm(o.start && o.start.d || B.start.d) }, scatter: Object.assign({}, B.scatter, o.scatter || {}),
     cliffs: Object.assign(PT.cliffDefaults(), pick(o.cliffs || {}, ['from', 'band', 'sharp', 'stop'])),

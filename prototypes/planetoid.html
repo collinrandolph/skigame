@@ -1263,9 +1263,9 @@ function step(dt){
 }
 // a placed model's footprint distance (metres, negative inside) at direction p, or null if it has none
 const _fr = new THREE.Vector3();
-function footAt(o, p){ _fr.copy(p).sub(o.d).multiplyScalar(P.R); return SkiModels.footSD(o.foot, _fr.dot(o.X), _fr.dot(o.Z)); }
+function modelFootSD(o, p){ _fr.copy(p).sub(o.d).multiplyScalar(P.R); return SkiModels.footSD(o.foot, _fr.dot(o.X), _fr.dot(o.Z)); }
 // is direction p within pad metres of solid o (its footprint if it has one, else its circle)?
-const nearSolid = (o, p, pad) => o.foot ? p.dot(o.d) > o.lim && footAt(o, p) < pad : p.dot(o.d) > Math.cos((o.r + pad)/P.R);
+const nearSolid = (o, p, pad) => o.foot ? p.dot(o.d) > o.lim && modelFootSD(o, p) < pad : p.dot(o.d) > Math.cos((o.r + pad)/P.R);
 // rocks, beacon bases, mountains and buildings are solid: you're pushed out and lose the speed you had into them
 function collide(){
   if (TEST.ghost) return;
@@ -1286,7 +1286,7 @@ function collide(){
     if (o.ghost || o.d.dot(n) < o.lim) continue;
     if (o.foot){
       // as the game: out along the footprint's slope, losing the speed into it
-      const BODY = 0.35, sd = footAt(o, n) - BODY; if (sd >= 0) continue;
+      const BODY = 0.35, sd = modelFootSD(o, n) - BODY; if (sd >= 0) continue;
       const lx = _fr.dot(o.X), lz = _fr.dot(o.Z), e = 0.05, F = (x, z) => SkiModels.footSD(o.foot, x, z);
       const gx = F(lx + e, lz) - F(lx - e, lz), gz = F(lx, lz + e) - F(lx, lz - e);
       const wx = o.X.x*gx + o.Z.x*gz, wy = o.X.y*gx + o.Z.y*gz, wz = o.X.z*gx + o.Z.z*gz;

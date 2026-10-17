@@ -36,6 +36,10 @@ label.f input[type=range]{grid-column:1 / -1;width:100%;accent-color:var(--accen
 label.f output{color:var(--ink);font-variant-numeric:tabular-nums}
 label.c{display:flex;gap:8px;align-items:center;margin-top:8px;color:var(--muted);font-size:11px}
 label.c input{accent-color:var(--accent)}
+.tcLeg{display:grid;grid-template-columns:12px 1fr;gap:3px 7px;align-items:center;font-size:11px;color:var(--muted);margin-top:8px}
+.tcLeg i{width:12px;height:12px;border-radius:2px;border:1px solid rgba(0,0,0,.25)}
+.tcList{display:flex;flex-direction:column;gap:3px;margin-top:6px}
+.tcList button{text-align:left;font-size:11px;padding:4px 7px}
 input[type=text],select{font:12px var(--mono);color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:4px;padding:4px 6px;width:100%;margin-top:3px}
 select option{color:#1d2a36}
 .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
@@ -115,6 +119,12 @@ button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
   <label class="f" for="nPatch">Ease steep bits under<output id="oPatch"></output><input id="nPatch" type="range" min="0" max="40" step="1"></label>
   <div class="row"><button id="bClean" type="button">Clean up</button></div>
   <p class="hint" id="cleanNote">Trails running side by side within the join distance always ski and carve as one. Clean up also thins crowded points, joins points of different trails that nearly meet, snaps loose ends onto the trail they stop short of, and eases small patches too steep to ski (not painted cliffs). The game does the same as it loads, without changing the layout; here it changes the layout (Ctrl+Z undoes it).</p>
+  <h3>Terrain cleanup</h3>
+  <p class="hint">Reads the land (as sculpted, before the trails carve it) over the whole planet: cliffs and mountains to keep, steep mistakes to smooth away, pockets out of reach, narrow ridges, valleys and benches, cliff feet and tops, and where the trails cross steep ground. Nothing is changed yet.</p>
+  <div class="row"><button id="tcAnalyse" type="button">Analyse</button><label class="c" style="margin:0"><input id="tcShow" type="checkbox" disabled> Show the reading</label></div>
+  <p class="hint" id="tcStatus"></p>
+  <div id="tcLegend" class="tcLeg" hidden></div>
+  <div id="tcList" class="tcList"></div>
   <h3>View</h3>
   <label class="f" for="vContour">Contours every<output id="oContour"></output><input id="vContour" type="range" min="0" max="5" step="1" value="2"></label>
   <label class="f" for="vTilt">Tilt<output id="oTilt"></output><input id="vTilt" type="range" min="0" max="70" step="1" value="0"></label>
@@ -131,6 +141,7 @@ button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="planet-terrain.js"></script>
+<script src="planet-cleanup.js"></script>   <!-- the terrain cleanup (Planet panel, Terrain cleanup) -->
 <script src="../models.js"></script>   <!-- the game's models, for the Model tool -->
 <script>
 'use strict';
@@ -178,10 +189,10 @@ const groundAt = d => T.height(d.x, d.y, d.z);
 const CH = 8;
 const terrainMat = new THREE.ShaderMaterial({
   extensions: { derivatives: true },
-  uniforms: { uR: { value: R }, uLo: { value: -10 }, uHi: { value: 60 }, uCi: { value: 5 }, uLight: { value: new V3(0, 1, 0) }, uSlope: { value: 0 }, uFrom: { value: 0.6 }, uStop: { value: 1.0 } },
+  uniforms: { uOver: { value: null }, uOverN: { value: 1 }, uOverOn: { value: 0 }, uR: { value: R }, uLo: { value: -10 }, uHi: { value: 60 }, uCi: { value: 5 }, uLight: { value: new V3(0, 1, 0) }, uSlope: { value: 0 }, uFrom: { value: 0.6 }, uStop: { value: 1.0 } },
   vertexShader: `attribute float aH; varying vec3 vP; varying vec3 vN; varying float vH;
     void main(){ vP = position; vN = normal; vH = aH; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }`,
-  fragmentShader: `uniform float uR, uLo, uHi, uCi, uSlope, uFrom, uStop; uniform vec3 uLight; varying vec3 vP; varying vec3 vN; varying float vH;
+  fragmentShader: `uniform sampler2D uOver; uniform float uOverN, uOverOn; uniform float uR, uLo, uHi, uCi, uSlope, uFrom, uStop; uniform vec3 uLight; varying vec3 vP; varying vec3 vN; varying float vH;
     void main(){
       float h = vH;
       float k = clamp((h - uLo)/max(1.0, uHi - uLo), 0.0, 1.0);
@@ -191,6 +202,16 @@ const terrainMat = new THREE.ShaderMaterial({
       if (uSlope > 0.5){ float c = clamp(dot(n, up), 0.0, 1.0); float grade = sqrt(max(0.0, 1.0 - c*c))/max(c, 0.05);
         col = mix(col, vec3(0.95, 0.6, 0.2), smoothstep(uFrom*0.97, uFrom*1.03, grade)*0.6);
         col = mix(col, vec3(0.88, 0.22, 0.2), smoothstep(uStop*0.97, uStop*1.03, grade)*0.85); }
+      if (uOverOn > 0.5){
+        // the cleanup's reading: which cube face and grid cell this point is in, and that cell's colour
+        vec3 d = normalize(vP), a = abs(d); float f; vec2 uv;
+        if (a.x >= a.y && a.x >= a.z){ f = d.x > 0.0 ? 0.0 : 1.0; uv = d.yz/a.x; }
+        else if (a.y >= a.z){ f = d.y > 0.0 ? 2.0 : 3.0; uv = d.xz/a.y; }
+        else { f = d.z > 0.0 ? 4.0 : 5.0; uv = d.xy/a.z; }
+        vec2 cell = clamp(floor((uv + 1.0)*0.5*uOverN), 0.0, uOverN - 1.0), tile = vec2(mod(f, 3.0), floor(f/3.0) );
+        vec4 o = texture2D(uOver, (tile*uOverN + cell + 0.5)/vec2(3.0*uOverN, 2.0*uOverN));
+        col = mix(col, o.rgb, o.a);
+      }
       float diff = max(dot(n, normalize(uLight)), 0.0);
       col *= 0.5 + 0.6*diff;
       if (uCi > 0.0){
@@ -477,7 +498,7 @@ function handlePick(px, py, maxPx = 14){
 const undoStack = [], redoStack = [];
 function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, models: L.models, bridges: L.bridges, start: L.start, scatter: L.scatter, cliffs: L.cliffs, network: L.network }), sculpt: L.sculpt.data.slice(), detail: PT.cloneDetail(L.detail) }; }
 let lastSnap = snapshot();
-function commit(){ undoStack.push(lastSnap); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; lastSnap = snapshot(); autosave(); }
+function commit(){ tcStale(); undoStack.push(lastSnap); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; lastSnap = snapshot(); autosave(); }
 function restore(s){
   const o = JSON.parse(s.json); const oldR = L.radius;
   Object.assign(L, o); L.sculpt.data.set(s.sculpt); L.detail = PT.cloneDetail(s.detail); lastSnap = s; sel = null;
@@ -967,6 +988,34 @@ mini.addEventListener('click', e => {
 // ============================================================================================================
 // planet settings, file actions, Ski here
 // ============================================================================================================
+// ---- terrain cleanup: the reading (planet-cleanup.js), shown over the globe
+let tcA = null, tcTex = null, tcBusy = false;
+function tcStale(){ if (tcA && !tcA.stale){ tcA.stale = true; $('tcStatus').textContent += ' The layout has changed since: Analyse again to update it.'; } }
+function tcShowOverlay(on){ terrainMat.uniforms.uOverOn.value = on && tcTex ? 1 : 0; $('tcShow').checked = !!(on && tcTex); $('tcLegend').hidden = !(on && tcTex); }
+$('tcShow').addEventListener('change', e => { tcShowOverlay(e.target.checked); e.target.blur(); });
+$('tcLegend').innerHTML = PlanetCleanup.CLASSES.map(([, name, c]) => `<i style="background:rgb(${c})"></i><span>${name}</span>`).join('');
+$('tcAnalyse').addEventListener('click', async () => {
+  if (tcBusy) return; tcBusy = true; $('tcAnalyse').disabled = true; $('tcAnalyse').blur();
+  const t0 = performance.now();
+  try {
+    const A = await PlanetCleanup.analyse(L, T, {}, (text, f) => { $('tcStatus').textContent = text + ' ' + Math.round(f*100) + '%'; });
+    const at = PlanetCleanup.overlayAtlas(A);
+    if (tcTex) tcTex.dispose();
+    tcTex = new THREE.DataTexture(at.data, at.width, at.height, THREE.RGBAFormat); tcTex.magFilter = tcTex.minFilter = THREE.NearestFilter; tcTex.generateMipmaps = false; tcTex.needsUpdate = true;
+    terrainMat.uniforms.uOver.value = tcTex; terrainMat.uniforms.uOverN.value = A.N;
+    tcA = A; $('tcShow').disabled = false; tcShowOverlay(true);
+    const s = A.summary, m2 = v => v >= 1e6 ? (v/1e6).toFixed(2) + ' km²' : Math.round(v).toLocaleString() + ' m²';
+    $('tcStatus').textContent = `Read in ${((performance.now() - t0)/1000).toFixed(1)} s (a point every ${s.grid.spacing} m). ${s.cliffs.count} cliffs and mountains to keep (${m2(s.cliffs.area)}); ${s.mistakes.count} steep mistakes to smooth away (${m2(s.mistakes.area)}); ${s.pockets.count} pockets out of reach (${m2(s.pockets.area)}); the trails run through ${s.trailRegions.length} separate skiable region${s.trailRegions.length === 1 ? '' : 's'}; ${s.crossings.length} places where a trail crosses steep ground.`;
+    // the places to look at: trail crossings, then the biggest pockets and mistakes
+    const items = s.crossings.map(c => [`${c.trail}: ${c.length} m ${c.text}${c.depth ? ', ' + Math.round(c.depth) + ' m deep' : ''}`, c.at])
+      .concat(s.pockets.at.slice(0, 5).map(p => [`Pocket out of reach, ${m2(p.area)}`, p.at]))
+      .concat(s.mistakes.at.slice(0, 5).map(p => [`Steep mistake, ${m2(p.area)}, ${p.height} m high`, p.at]));
+    $('tcList').innerHTML = items.map(([t], i) => `<button type="button" data-i="${i}">${t}</button>`).join('');
+    $('tcList').onclick = e => { const b = e.target.closest('button'); if (!b) return; const d = items[+b.dataset.i][1]; cam.dir.set(d[0], d[1], d[2]).normalize(); cam.dist = Math.min(cam.dist, R + 260); fixUp(); b.blur(); };
+  } catch (err){ console.error(err); $('tcStatus').textContent = 'The reading failed: ' + err.message; }
+  tcBusy = false; $('tcAnalyse').disabled = false;
+});
+
 const CONTOURS = [0, 1, 2, 5, 10, 25];
 function syncPlanetUI(){
   $('pName').value = L.name;

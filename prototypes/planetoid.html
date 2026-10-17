@@ -1441,6 +1441,10 @@ function buildCaveMesh(CF){
   const R = P.R, base = -CF.depth, Rk = CF.Rk, NG = Math.ceil(Math.PI/2*Rk/1.1), CS = 24, marks = new Set();
   const mark = p => { const [f, u, v] = PTR.faceUV(p[0], p[1], p[2]), ci = Math.min(Math.floor(NG/CS), Math.floor((u + 1)/2*NG/CS)), cj = Math.min(Math.floor(NG/CS), Math.floor((v + 1)/2*NG/CS)); marks.add(f + ',' + ci + ',' + cj); };
   for (const it of CF.items){ if (it.kind === 'tunnel') for (let i = 0; i < it.line.length; i += 2) for (const q of ugDisc(it.line[i], it.w + 4, Rk)) mark(q); else if (it.kind !== 'pillar') for (const q of ugDisc(it.d, it.r + 4, Rk)) mark(q); }
+  // (and every brushed tile that's been dug)
+  if (CF.brush){ const B = CF.brush.room, nT = B.n/32, step = Math.PI/2*Rk/(B.n - 1), q0 = [0, 0, 0];
+    for (const [key, t] of B.tiles){ if (!t.some(v => v > 0.3)) continue; const f = Math.floor(key/(nT*nT)), r = key - f*nT*nT, tj = Math.floor(r/nT), ti = r - tj*nT;
+      PTR.dirFromFace(f, -1 + 2*(ti*32 + 16)/(B.n - 1), -1 + 2*(tj*32 + 16)/(B.n - 1), q0); for (const qq of ugDisc(q0.slice(), 32*step*0.75 + 4, Rk)) mark(qq); } }
   const pos = [], col = [], idx = [], q = [0, 0, 0];
   for (const key of marks){
     const [f, ci, cj] = key.split(',').map(Number), V = CS + 1, v0 = pos.length/3, inf = [];

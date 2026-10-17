@@ -548,12 +548,13 @@ function handlePick(px, py, maxPx = 14){
 // ============================================================================================================
 const undoStack = [], redoStack = [];
 function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, models: L.models, bridges: L.bridges, start: L.start, scatter: L.scatter, cliffs: L.cliffs, network: L.network, layers: L.layers, tunnels: L.tunnels, caveStamps: L.caveStamps, ramps: L.ramps }), sculpt: L.sculpt.data.slice(), detail: PT.cloneDetail(L.detail),
-  clean: L.clean ? Object.assign(PT.cloneDetail(L.clean), { sig: L.clean.sig, stale: L.clean.stale }) : null }; }
+  clean: L.clean ? Object.assign(PT.cloneDetail(L.clean), { sig: L.clean.sig, stale: L.clean.stale }) : null,
+  caveBrush: (L.caveBrush || []).map(b => b ? { room: PT.cloneDetail(b.room), floor: PT.cloneDetail(b.floor) } : null) }; }
 let lastSnap = snapshot();
 function commit(keepReading, keepMoves){ if (!keepReading) tcStale(); if (!keepMoves) tcClearMoves(); cleanStaleCheck(); undoStack.push(lastSnap); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; lastSnap = snapshot(); autosave(); }
 function restore(s){
   const o = JSON.parse(s.json); const oldR = L.radius;
-  Object.assign(L, o); L.sculpt.data.set(s.sculpt); L.detail = PT.cloneDetail(s.detail); L.clean = s.clean ? Object.assign(PT.cloneDetail(s.clean), { sig: s.clean.sig, stale: s.clean.stale }) : null; lastSnap = s; sel = null; tcSync(); tcMoves = []; tcMoveList();
+  Object.assign(L, o); L.sculpt.data.set(s.sculpt); L.detail = PT.cloneDetail(s.detail); L.clean = s.clean ? Object.assign(PT.cloneDetail(s.clean), { sig: s.clean.sig, stale: s.clean.stale }) : null; L.caveBrush = (s.caveBrush || []).map(b => b ? { room: PT.cloneDetail(b.room), floor: PT.cloneDetail(b.floor) } : null); lastSnap = s; sel = null; tcSync(); tcMoves = []; tcMoveList();
   if (L.radius !== oldR) cam.dist *= L.radius/oldR;
   if (VL >= (L.layers || []).length) VL = -1;
   buildGlobe(); buildCave(); rebuildOverlays(); syncPlanetUI(); syncSlopeUniforms(); showSel(); ugSync(); autosave(); if (tool === 'cliffs') setTool('cliffs');
@@ -573,7 +574,7 @@ function autosave(){
 // tools
 // ============================================================================================================
 let tool = 'orbit', drawing = null;      // drawing: a ridge, valley or trail being clicked out point by point
-const opts = { bridge: PT.bridgeDefaults(), cliff: { radius: 30, strength: 3 }, sculpt: { mode: 'raise', radius: 60, strength: 6 }, stamp: { type: 'peak', radius: 80, height: 60, sharp: 0.3 }, trail: { closed: true, carve: true }, tunnel: PT.tunnelDefaults(), cave: { type: 'chamber', radius: 18, height: 14 }, landmark: { type: 'spire', height: 40, color: '#8a5cd6' }, model: { id: 'dome', v: 0, rot: 0, scale: 1 } };
+const opts = { bridge: PT.bridgeDefaults(), cliff: { radius: 30, strength: 3 }, sculpt: { mode: 'raise', radius: 60, strength: 6 }, stamp: { type: 'peak', radius: 80, height: 60, sharp: 0.3 }, trail: { closed: true, carve: true }, tunnel: PT.tunnelDefaults(), cave: { mode: 'dig', radius: 8, height: 7, strength: 5, floor: 0 }, landmark: { type: 'spire', height: 40, color: '#8a5cd6' }, model: { id: 'dome', v: 0, rot: 0, scale: 1 } };
 const TOOL_HELP = {
   orbit: 'Drag to turn the planet. Wheel to zoom.',
   select: 'Click a handle to select it, drag to move it. Delete removes it (for a trail or ridge, the point; Shift+Delete the whole thing).',
@@ -583,7 +584,7 @@ const TOOL_HELP = {
   landmark: 'Click to place a landmark.',
   ramp: 'Click on a pit\'s wall where the ramp should start: it winds down from there, round the pit\'s middle, following the wall.',
   tunnel: 'Click points along the tunnel; Enter (or double-click) finishes. Start it at an entrance\'s tunnel (the short one into the wall) and it carries on from there at its height.',
-  cave: 'Click to place a chamber (a domed room) or a pillar (rock left standing, floor to ceiling).',
+  cave: 'Drag to dig caves out of the rock (a domed space, up to the height in the brush\'s middle), Fill to close them (or leave pillars), Smooth to even them, Floor to raise or lower their floor. A stroke started inside a cave digs on at that cave\'s floor, so passages join level; started in rock, at the floor set below. Shift swaps Dig and Fill. [ and ] change the brush size.',
   model: 'Click to place the model: one of the game\'s own, as the gallery shows it. Ones that vary (crew, camps, crystals) come out different each time; Re-roll in the selection makes another.',
   start: 'Click where the skier should start.',
   bridge: 'Click the start ramp’s foot, any bends, then the end ramp’s foot; Enter (or double-click) finishes. The deck rises at each ramp and clears the ground between. You get on and off only at the feet (through a portal), heading in.',
@@ -644,9 +645,11 @@ function setTool(t){
   }
   if (t === 'cave'){
     const o = opts.cave;
-    parts.push(seg('cvType', Object.entries(PT.CAVE_STAMPS), () => o.type, k => { o.type = k; setTool('cave'); }));
-    parts.push(slider('cvR', 'Radius', 2, 80, 1, () => o.radius, v => o.radius = v, v => v + ' m'));
-    if (o.type === 'chamber') parts.push(slider('cvH', 'Height', 3, 60, 1, () => o.height, v => o.height = v, v => v + ' m'));
+    parts.push(seg('cvMode', [['dig', 'Dig'], ['fill', 'Fill'], ['smooth', 'Smooth'], ['floor', 'Floor']], () => o.mode, k => { o.mode = k; setTool('cave'); }));
+    parts.push(slider('cvR', 'Brush radius', 2, 40, 0.5, () => o.radius, v => o.radius = v, v => v + ' m'));
+    if (o.mode === 'dig') parts.push(slider('cvH', 'Height (in the middle of the brush)', 2, 40, 0.5, () => o.height, v => o.height = v, v => v + ' m'));
+    parts.push(slider('cvS', 'Strength', 1, 20, 0.5, () => o.strength, v => o.strength = v, v => '×' + v));
+    parts.push(slider('cvF', o.mode === 'floor' ? 'Floor height to brush toward (m above the layer\'s base)' : 'Floor where you start digging in rock (m above the layer\'s base)', -40, 40, 0.5, () => o.floor, v => o.floor = v, v => (v > 0 ? '+' : '') + v + ' m'));
   }
   if (t === 'ramp') parts.push({ html: `<p class="hint">${(L.layers || []).length ? 'It gets a slope down to each layer and a plateau there (linked, with an entrance), then a slope to the bottom.' : 'Add layers (Underground) first to get a plateau and entrance at each one.'}</p>`, bind(){} });
   if (t === 'cliffs'){
@@ -824,7 +827,7 @@ cv.addEventListener('pointerdown', e => {
   }
   if (tool === 'trail' || tool === 'tunnel'){ if (!drawing) drawing = { kind: tool, pts: [] }; drawing.pts.push(arr); rebuildOverlays(); return; }
   if (tool === 'ramp'){ createRamp(arr); return; }
-  if (tool === 'cave'){ const o = opts.cave, st = { type: o.type, layer: VL, d: arr, radius: o.radius, height: o.type === 'chamber' ? o.height : 0 }; L.caveStamps.push(st); sel = { kind: 'cavest', ref: st, i: 0 }; rebuildCaveCaps([caveStampCap(st)]); rebuildOverlays(); showSel(); commit(); return; }
+  if (tool === 'cave'){ const a0 = CF ? CF.at(d.x, d.y, d.z) : null; ptr = { mode: 'cavebrush', x: px, y: py, floor0: a0 && a0.open ? a0.floor : opts.cave.floor }; return; }
   if (tool === 'bridge'){ if (!drawing) drawing = { kind: 'bridge', pts: [] }; drawing.pts.push(arr); rebuildOverlays(); return; }
   if (tool === 'landmark'){
     const m = { name: PT.LANDMARK_TYPES[opts.landmark.type] + ' ' + (L.landmarks.length + 1), type: opts.landmark.type, d: arr, height: opts.landmark.height, color: opts.landmark.color };
@@ -861,12 +864,12 @@ cv.addEventListener('pointermove', e => {
     rebuildOverlays();
     return;
   }
-  if (ptr.mode === 'sculpt' || ptr.mode === 'cliff'){ ptr.x = px; ptr.y = py; }
+  if (ptr.mode === 'sculpt' || ptr.mode === 'cliff' || ptr.mode === 'cavebrush'){ ptr.x = px; ptr.y = py; }
 });
 const endPtr = () => {
   if (!ptr) return;
   if (ptr.mode === 'move'){ if (ptr.moved){ if (ptr.h.kind === 'trail' && ptr.h.ref.carve){ rebuildCaps([ptr.cap0, pointCap(ptr.h.ref, ptr.h.i)]); rebuildOverlays(); } if (ptr.h.kind === 'ramp') rampRebuild(ptr.h.ref, ptr.cap0); commit(); showSel(); } }
-  if (ptr.mode === 'sculpt' || ptr.mode === 'cliff') commit();
+  if (ptr.mode === 'sculpt' || ptr.mode === 'cliff' || ptr.mode === 'cavebrush') commit();
   ptr = null; if (tool === 'orbit') cv.style.cursor = 'grab';
 };
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
@@ -988,6 +991,7 @@ addEventListener('keydown', e => {
   if (k === 'Delete' || k === 'Backspace'){ e.preventDefault(); deleteSel(e.shiftKey); return; }
   if (k === '[' || k === ']'){
     if (tool === 'cliffs'){ opts.cliff.radius = Math.max(5, Math.min(120, opts.cliff.radius + (k === ']' ? 3 : -3))); setTool('cliffs'); return; }
+    if (tool === 'cave'){ opts.cave.radius = Math.max(2, Math.min(40, opts.cave.radius + (k === ']' ? 1 : -1))); setTool('cave'); return; }
     opts.sculpt.radius = Math.max(5, Math.min(300, opts.sculpt.radius + (k === ']' ? 5 : -5))); if (tool === 'sculpt') setTool('sculpt'); return; }
   if (k === 'k' || k === 'K') skiHere();
   if (k === 'f' || k === 'F'){ const d = selDir(); if (d){ cam.dir.copy(d); fixUp(); } }
@@ -1130,7 +1134,7 @@ function setLayer(k){
 }
 const escH = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 function ugSync(){
-  if (!L.layers) L.layers = []; if (!L.tunnels) L.tunnels = []; if (!L.caveStamps) L.caveStamps = []; if (!L.ramps) L.ramps = [];
+  if (!L.layers) L.layers = []; if (!L.tunnels) L.tunnels = []; if (!L.caveStamps) L.caveStamps = []; if (!L.ramps) L.ramps = []; if (!L.caveBrush) L.caveBrush = [];
   $('ugView').innerHTML = '<option value="-1">The surface</option>' + L.layers.map((l, i) => `<option value="${i}">${escH(l.name)} (${l.depth} m down)</option>`).join('');
   $('ugView').value = VL;
   $('ugLayers').innerHTML = L.layers.map((l, i) => `<div class="ugRow"><input type="text" data-i="${i}" data-k="name" value="${escH(l.name)}" aria-label="Layer name"><input type="number" data-i="${i}" data-k="depth" value="${l.depth}" step="0.5" min="5" max="${R - 30}" aria-label="Depth"><span>m</span><button type="button" data-del="${i}" aria-label="Remove layer">✕</button></div>`).join('');
@@ -1143,6 +1147,7 @@ $('ugLayers').addEventListener('click', e => { const b = e.target.closest('butto
   L.layers.splice(i, 1);
   L.tunnels = L.tunnels.filter(t => t.layer !== i); for (const t of L.tunnels) if (t.layer > i) t.layer--;
   L.caveStamps = L.caveStamps.filter(c => c.layer !== i); for (const c of L.caveStamps) if (c.layer > i) c.layer--;
+  if (L.caveBrush) L.caveBrush.splice(i, 1);
   for (const rp of L.ramps) for (const sg of rp.segs) if (sg.link === i) sg.link = -1; else if (sg.link > i) sg.link--;
   if (VL >= L.layers.length || VL === i) VL = -1; document.body.classList.toggle('lm', VL >= 0);
   ugSync(); layersChanged(); commit(); });
@@ -1209,6 +1214,32 @@ function drawCaveOverlays(isSel){
 function caveLabels(){
   return L.tunnels.filter(t => t.layer === VL && t.pts.length).map(t => ({ text: t.name, d: t.pts[Math.floor(t.pts.length/2)], lift: 4, cls: 'trail' }))
     .concat((T.ramps || []).flatMap(B => B.doors.filter(d => d.link === VL).map(d => ({ text: 'Entrance', d: d.mouth, lift: 6, cls: '' }))));
+}
+// ---- the cave brush: each frame the mouse is down, the layer's points under the brush (about 1.5 m apart) are dug
+// toward a dome (Dig), closed (Fill), evened (Smooth) or their floor moved (Floor)
+function caveBrushStep(dt){
+  if (!ptr || ptr.mode !== 'cavebrush' || VL < 0 || !CF) return;
+  const d = groundPick(ptr.x, ptr.y); if (!d) return;
+  if (!L.caveBrush) L.caveBrush = []; let B = L.caveBrush[VL]; if (!B) B = L.caveBrush[VL] = { room: PT.newDetail(512), floor: PT.newDetail(512) };
+  const o = opts.cave, Rk = CF.Rk, rad = o.radius, ang = rad/Rk, cosA = Math.cos(ang), n = B.room.n, q = [0, 0, 0], c = [d.x, d.y, d.z];
+  let mode = o.mode; if (keys.shift && (mode === 'dig' || mode === 'fill')) mode = mode === 'dig' ? 'fill' : 'dig';
+  const rate = Math.min(1, o.strength*dt*0.6), AX = [[0, 1, 2, 1], [0, 1, 2, -1], [1, 0, 2, 1], [1, 0, 2, -1], [2, 0, 1, 1], [2, 0, 1, -1]];
+  for (let f = 0; f < 6; f++){
+    const [na, ua, va, sg] = AX[f], comp = c[na]*sg; if (comp < 0.3) continue;
+    const u = c[ua]/comp, v = c[va]/comp, half = ang*3*(n - 1)/2 + 2, ci = (u + 1)/2*(n - 1), cj = (v + 1)/2*(n - 1);
+    const i0 = Math.max(0, Math.floor(ci - half)), i1 = Math.min(n - 1, Math.ceil(ci + half)), j0 = Math.max(0, Math.floor(cj - half)), j1 = Math.min(n - 1, Math.ceil(cj + half));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){
+      PT.dirFromFace(f, -1 + 2*i/(n - 1), -1 + 2*j/(n - 1), q);
+      const dot = q[0]*c[0] + q[1]*c[1] + q[2]*c[2]; if (dot < cosA) continue;
+      const t = Math.acos(Math.min(1, dot))/ang, w = PT.profile(t, 0), cur = PT.detailGet(B.room, f, i, j);
+      if (mode === 'dig'){ const tgt = o.height*Math.sqrt(Math.max(0, 1 - t*t)); if (tgt > cur){ if (cur <= 0.3) PT.detailAdd(B.floor, f, i, j, ptr.floor0 - PT.detailGet(B.floor, f, i, j)); PT.detailAdd(B.room, f, i, j, (tgt - cur)*rate); } }
+      else if (mode === 'fill'){ if (cur > 0) PT.detailAdd(B.room, f, i, j, -Math.min(cur, o.strength*dt*2*w)); }
+      else if (mode === 'smooth'){ if (cur <= 0 && w < 0.3) continue; let sm = 0, k = 0; for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ const ii = i + a, jj = j + b; if (ii < 0 || jj < 0 || ii >= n || jj >= n) continue; sm += PT.detailGet(B.room, f, ii, jj); k++; } if (k) PT.detailAdd(B.room, f, i, j, (sm/k - cur)*rate*w); }
+      else if (mode === 'floor' && cur > 0.3){ PT.detailAdd(B.floor, f, i, j, (o.floor - PT.detailGet(B.floor, f, i, j))*rate*w); }
+    }
+  }
+  PT.weldDetail(B.room); PT.weldDetail(B.floor);
+  rebuildCaveCaps([[d, ang + 4/Rk]]);
 }
 // ---- the selection panel's underground parts
 function ugSelParts(parts){
@@ -1477,7 +1508,7 @@ addEventListener('message', e => { if (e.data === 'planetoid:need-layout' && e.s
 let last = performance.now();
 function frame(now){
   const dt = Math.min(0.1, (now - last)/1000); last = now;
-  sculptStep(dt); cliffStep(dt);
+  sculptStep(dt); cliffStep(dt); caveBrushStep(dt);
   placeCamera();
   // light from over the viewer's shoulder, so relief always reads
   const fwd = new V3(); camera.getWorldDirection(fwd);

@@ -694,7 +694,7 @@ function easeAt(T, dl, cen, core, margin, stop, R){
 const norm = p => { const L = Math.hypot(p[0], p[1], p[2]) || 1; return [p[0]/L, p[1]/L, p[2]/L]; };
 PT.START = norm([0.15, 1, 0.25]);
 PT.cliffDefaults = () => ({ from: 0.6, band: 12, sharp: 8, stop: 1.0 });
-PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), detail: PT.newDetail(1024), trails: [], landmarks: [], models: [], bridges: [], layers: [], tunnels: [], caveStamps: [], ramps: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults(), network: PT.networkDefaults() });
+PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), detail: PT.newDetail(1024), trails: [], landmarks: [], models: [], bridges: [], layers: [], tunnels: [], caveStamps: [], caveBrush: [], ramps: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults(), network: PT.networkDefaults() });
 // a small example so every tool has something to show: a peak, a ridge, a crater, a basin and a trail past them
 PT.exampleLayout = function(R){
   R = R || 800;
@@ -749,6 +749,7 @@ PT.serialize = function(L){
     layers: (L.layers || []).map(l => ({ name: l.name, depth: l.depth })),
     tunnels: (L.tunnels || []).map(t => ({ name: t.name, layer: t.layer, pts: t.pts.map(r5), width: t.width, height: t.height, h0: t.h0, h1: t.h1 })),
     caveStamps: (L.caveStamps || []).map(c => ({ type: c.type, layer: c.layer, d: r5(c.d), radius: c.radius, height: c.height })),
+    caveBrush: (L.caveBrush || []).map(b => b && b.room.tiles.size ? { room: PT.encodeDetail(b.room), floor: PT.encodeDetail(b.floor) } : null),
     ramps: (L.ramps || []).map(rp => ({ name: rp.name, c: r5(rp.c), turn: rp.turn, start: rp.start, top: rp.top, width: rp.width, maxGrade: rp.maxGrade, rMax: rp.rMax, segs: rp.segs.map(sg => Object.assign({}, sg)) })),
     clean: L.clean && L.clean.tiles.size ? Object.assign(PT.encodeDetail(L.clean), { sig: L.clean.sig || '', stale: !!L.clean.stale }) : undefined,
   });
@@ -768,6 +769,7 @@ PT.parse = function(json){
     network: Object.assign(PT.networkDefaults(), pick(o.network || {}, ['join', 'patch', 'corridor', 'side'])),
     layers: (o.layers || []).map(l => ({ name: l.name || 'Layer', depth: +l.depth || 70 })),
     tunnels: (o.tunnels || []).filter(t => t.pts && t.pts.length >= 2).map(t => Object.assign(PT.tunnelDefaults(), { name: t.name || 'Tunnel', layer: t.layer | 0, pts: t.pts.map(norm) }, pick(t, ['width', 'height', 'h0', 'h1']))),
+    caveBrush: (o.caveBrush || []).map(b => b && b.room ? { room: PT.decodeDetail(b.room), floor: PT.decodeDetail(b.floor) } : null),
     caveStamps: (o.caveStamps || []).filter(c => c.d && PT.CAVE_STAMPS[c.type]).map(c => ({ type: c.type, layer: c.layer | 0, d: norm(c.d), radius: +c.radius || 20, height: +c.height || 0 })),
     ramps: (o.ramps || []).filter(rp => rp.c && rp.segs).map(rp => ({ name: rp.name || 'Ramp', c: norm(rp.c), turn: rp.turn === -1 ? -1 : 1, start: +rp.start || 0, top: +rp.top || 0, width: +rp.width || 6, maxGrade: +rp.maxGrade || 0.25, rMax: rp.rMax ? +rp.rMax : undefined,
       segs: rp.segs.map(sg => ({ k: sg.k === 'plateau' ? 'plateau' : 'slope', len: +sg.len || 0, grade: +sg.grade || 0, wide: sg.wide ? +sg.wide : undefined, link: sg.link ?? -1, lead: sg.lead === 'plateau' ? 'plateau' : 'layer', door: sg.door ? { at: +sg.door.at || 0 } : undefined })) })),
@@ -1070,7 +1072,9 @@ PT.caveField = function(L, k, R, under, builds){
     tunnel([d.d, d.mouth, end], { width: 7, height: 6, h0: h, h1: h, adit: true }); d.aditEnd = end; d.aditH = h; }
   for (const st of (L.caveStamps || [])) if (st.layer === k) addItem({ kind: st.type, d: norm(st.d), r: Math.max(1, st.radius), height: Math.max(1, st.height || 0), ref: st }, ringAround(norm(st.d), st.radius + 3, Rk));
   const above = k > 0 && layers[k - 1] ? Ly.depth - layers[k - 1].depth : null;
-  return { k, Rk, depth: Ly.depth, above, items,
+  // the cave brush: headroom dug out (room) and the floor's height there, each a layer in the detail layer's format
+  const BR = (L.caveBrush || [])[k], brushed = !!(BR && BR.room.tiles.size);
+  return { k, Rk, depth: Ly.depth, above, items, brush: brushed ? BR : null,
     // { open, floor, ceil, sky (the top layer's ceiling reaches the surface), voidPit (the land is below this layer here) }
     at(x, y, z){
       const p = [x, y, z], l = hash.get(key(x, y, z)); let open = false, fl = Infinity, ce = -Infinity, closed = false, gap = Infinity, gfl = 0;
@@ -1084,6 +1088,9 @@ PT.caveField = function(L, k, R, under, builds){
           if (it.kind === 'pillar'){ closed = true; continue; }
           open = true; fl = Math.min(fl, 0.6*q*q); ce = Math.max(ce, it.height*Math.pow(Math.max(0, 1 - q*q), 0.5)); }
       }
+      if (brushed){ const hr = PT.sampleDetail(BR.room, x, y, z);
+        if (hr > 0.3){ const fo = PT.sampleDetail(BR.floor, x, y, z); open = true; if (fo < fl) fl = fo; if (fo + hr > ce) ce = fo + hr; }
+        else if (hr > 0.01 && gap > 0.5){ gap = 0.5; gfl = PT.sampleDetail(BR.floor, x, y, z); } }
       // (a pillar standing in a cave: rock right beside the cave's floor)
       if (closed && open && isFinite(fl)){ gap = 0; gfl = fl; }
       const g = under(x, y, z) + Ly.depth;    // the land, above this layer's base

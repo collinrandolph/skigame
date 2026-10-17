@@ -155,7 +155,8 @@ PC.analyse = async function(L, T, opt, progress){
   // ---- where trails cross steep ground, by the land 9 m either side of the line against the bed
   await say('Checking the trails…', 0.86);
   const issues = [], nrm = p => { const l = Math.hypot(p[0], p[1], p[2]); return [p[0]/l, p[1]/l, p[2]/l]; };
-  lines.forEach((l, ti) => { const t = L.trails[ti], bed = t.bed ?? 4; let run = null;
+  const TRL = T.trails || L.trails;
+  lines.forEach((l, ti) => { const t = TRL[ti], bed = t.bed ?? 4; let run = null;
     l.forEach((p, i) => { const id = cellOf(p[0], p[1], p[2]); let what = null, depth = 0;
       if (kept[id] || S[id] > STOP){
         const q2 = l[Math.min(l.length - 1, i + 1)], q1 = l[Math.max(0, i - 1)], tg = nrm([q2[0] - q1[0], q2[1] - q1[1], q2[2] - q1[2]]), sd = nrm([p[1]*tg[2] - p[2]*tg[1], p[2]*tg[0] - p[0]*tg[2], p[0]*tg[1] - p[1]*tg[0]]);
@@ -262,7 +263,8 @@ PC.plan = async function(A, L, T, opt, progress){
   const notes = [], bedAt = bedHeights(T);
   const tmpD = new Float32Array(NC);
   for (let ti = 0; ti < lines.length; ti++){
-    const l = lines[ti], t = L.trails[ti], M = l.length; if (M < 2) continue;
+    const l = lines[ti], t = (T.trails || L.trails)[ti], M = l.length; if (M < 2) continue;
+    const halves = ((T.beds || []).find(b => b.ti === ti) || {}).halves;
     const bed = t.bed ?? 4, kind = new Uint8Array(M), depth = new Float32Array(M), hbA = new Float32Array(M);
     for (let i = 0; i < M; i++){
       const p = l[i], q2 = l[Math.min(M - 1, i + 1)], q1 = l[Math.max(0, i - 1)], tg = nrm([q2[0] - q1[0], q2[1] - q1[1], q2[2] - q1[2]]), sd = nrm([p[1]*tg[2] - p[2]*tg[1], p[2]*tg[0] - p[0]*tg[2], p[0]*tg[1] - p[1]*tg[0]]);
@@ -281,13 +283,14 @@ PC.plan = async function(A, L, T, opt, progress){
     for (let i = 0; i < M; i++){
       const p = l[i], x = p[0]*R, y = p[1]*R, z = p[2]*R;
       const n1 = PT_.noise3(p[0]*R/35 + 3.1, p[1]*R/35 - 7.7, p[2]*R/35 + 1.9), e1 = Math.max(0, Math.min(1, (n1 + 0.35)/0.7));
-      const aw = kind[i] === 3 || kind[i] === 1 ? opt.apronMin : opt.apronMin + (opt.apronMax - opt.apronMin)*e1*e1*(3 - 2*e1);
-      const reach = kind[i] === 2 ? bed + Math.min(25, depth[i]) : bed + aw;
+      // (a ramp is a bench cut into a pit's wall: the narrowest apron)
+      const aw = kind[i] === 3 || kind[i] === 1 || t.build ? opt.apronMin : opt.apronMin + (opt.apronMax - opt.apronMin)*e1*e1*(3 - 2*e1);
+      const bedI = halves ? halves[i] : bed, reach = kind[i] === 2 ? bedI + Math.min(25, depth[i]) : bedI + aw;
       // a small flood from the point's cell (cells within reach, by straight distance to the point)
       const c0 = cellOf(p[0], p[1], p[2]), stack = [c0], seen = new Set([c0]);
       while (stack.length){ const a = stack.pop(); const d = Math.hypot(dir[a*3]*R - x, dir[a*3 + 1]*R - y, dir[a*3 + 2]*R - z);
         if (d > reach + CS) continue;
-        if (d <= reach){ const f = d <= bed ? 1 : kind[i] === 2 ? 3 : 2; if (!F[a] || f < F[a]) F[a] = f; U[a] = 0; if (kind[i] === 1 && d <= bed + 1) slotBed[a] = 1; }
+        if (d <= reach){ const f = d <= bedI ? 1 : kind[i] === 2 ? 3 : 2; if (!F[a] || f < F[a]) F[a] = f; U[a] = 0; if (kind[i] === 1 && d <= bedI + 1) slotBed[a] = 1; }
         for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (!seen.has(b)){ seen.add(b); stack.push(b); } } }
     }
     if (due()) await say('Planning: the trails…', 0.1 + 0.2*ti/lines.length);
@@ -399,9 +402,9 @@ PC.apply = async function(A, P, L, T, opt, progress){
   await say('Shaping: trail beds…', 0.02);
   const sw = new Float32Array(NC), swh = new Float32Array(NC);
   for (const b of T.beds || []){
-    const l = lines[b.ti], bed = b.bed; if (!l || l.length < 2) continue;
+    const l = lines[b.ti]; if (!l || l.length < 2) continue;
     for (let i = 0; i < l.length; i++){
-      const p = l[i], x = p[0]*R, y = p[1]*R, z = p[2]*R, c0 = cellOf(p[0], p[1], p[2]), stack = [c0], seen = new Set([c0]);
+      const bed = b.halves ? b.halves[i] : b.bed, p = l[i], x = p[0]*R, y = p[1]*R, z = p[2]*R, c0 = cellOf(p[0], p[1], p[2]), stack = [c0], seen = new Set([c0]);
       while (stack.length){ const a = stack.pop(), d = Math.hypot(dir[a*3]*R - x, dir[a*3 + 1]*R - y, dir[a*3 + 2]*R - z); if (d > bed + CS) continue;
         if (d <= bed){ const w = 1/((d + 1)*(d + 1)); sw[a] += w; swh[a] += w*b.prof[i]; }
         for (let k = 0; k < 8; k++){ const n = nbr(a, k); if (!seen.has(n)){ seen.add(n); stack.push(n); } } }
@@ -660,7 +663,7 @@ PC.suggest = async function(A, P, L, T, opt, progress){
   const ang = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0]*b[0] + a[1]*b[1] + a[2]*b[2])));
   for (const J of (T.links ? T.links.junctions : [])) lines.forEach((l, ti) => l.forEach((p, i) => { if (ang(p, J.c)*R < opt.keep) fixed[ti][i] = 1; }));
   lines.forEach((l, b) => { const sh = net.shared[b]; l.forEach((p, i) => { if (sh[i]){ fixed[b][i] = 1; const a = sh[i] - 1; lines[a].forEach((q, j) => { if (ang(p, q)*R < 2.5) fixed[a][j] = 1; }); } });
-    if (!L.trails[b].closed && l.length){ for (let i = 0; i < Math.min(3, l.length); i++){ fixed[b][i] = 1; fixed[b][l.length - 1 - i] = 1; } } });
+    if (!(T.trails || L.trails)[b].closed && l.length){ for (let i = 0; i < Math.min(3, l.length); i++){ fixed[b][i] = 1; fixed[b][l.length - 1 - i] = 1; } } });
   // every trail's points, for keeping clear of the others (a hash, 8 m cells)
   const CELL = 8, key = p => Math.floor(p[0]*R/CELL) + ',' + Math.floor(p[1]*R/CELL) + ',' + Math.floor(p[2]*R/CELL), hash = new Map();
   lines.forEach((l, ti) => l.forEach((p, i) => { const k = key(p); let h = hash.get(k); if (!h) hash.set(k, h = []); h.push(ti, i); }));
@@ -672,7 +675,7 @@ PC.suggest = async function(A, P, L, T, opt, progress){
   const moves = [];
   const K = Math.round(opt.reach/opt.step), NS = 2*K + 1;
   for (let ti = 0; ti < lines.length; ti++){
-    const l = lines[ti], M = l.length, t = L.trails[ti], closed = !!t.closed; if (M < 8) continue;
+    const l = lines[ti], M = l.length, t = (T.trails || L.trails)[ti], closed = !!t.closed; if (M < 8 || t.build) continue;   // (a ramp is shaped by its own settings)
     const bed = t.bed ?? 4, maxG = t.maxGrade ?? 0.2, clear = bed + 3, apart = 2*bed + 4;
     // each point's sideways direction, and the offset points
     const sd = l.map((p, i) => { const a = l[closed ? (i + 1) % M : Math.min(M - 1, i + 1)], b = l[closed ? (i - 1 + M) % M : Math.max(0, i - 1)], tg = nrm([a[0] - b[0], a[1] - b[1], a[2] - b[2]]); return nrm([p[1]*tg[2] - p[2]*tg[1], p[2]*tg[0] - p[0]*tg[2], p[0]*tg[1] - p[1]*tg[0]]); });
@@ -751,7 +754,7 @@ function fitPoints(t, l, ghost, o, R, tol = 0.5){
 // of date
 PC.signature = function(L){
   let h = 2166136261 >>> 0; const mix = v => { h ^= v; h = Math.imul(h, 16777619) >>> 0; };
-  const str = JSON.stringify([L.radius, L.noise, L.stamps, L.trails.map(t => [t.pts, t.closed, t.carve, t.bed, t.smooth, t.maxGrade]), L.network && L.network.join, L.cliffs && L.cliffs.stop]);
+  const str = JSON.stringify([L.radius, L.noise, L.stamps, L.trails.map(t => [t.pts, t.closed, t.carve, t.bed, t.smooth, t.maxGrade]), L.network && L.network.join, L.cliffs && L.cliffs.stop, L.ramps || [], (L.layers || []).map(l => l.depth)]);
   for (let i = 0; i < str.length; i++) mix(str.charCodeAt(i));
   const f32 = a => { const u = new Uint32Array(a.buffer, a.byteOffset, a.length); for (let i = 0; i < u.length; i++) if (u[i]) mix(u[i] ^ i); };
   f32(L.sculpt.data); for (const [k, t] of [...L.detail.tiles].sort((a, b) => a[0] - b[0])){ mix(k); f32(t); }

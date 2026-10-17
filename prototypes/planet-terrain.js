@@ -694,7 +694,7 @@ function easeAt(T, dl, cen, core, margin, stop, R){
 const norm = p => { const L = Math.hypot(p[0], p[1], p[2]) || 1; return [p[0]/L, p[1]/L, p[2]/L]; };
 PT.START = norm([0.15, 1, 0.25]);
 PT.cliffDefaults = () => ({ from: 0.6, band: 12, sharp: 8, stop: 1.0 });
-PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), detail: PT.newDetail(1024), trails: [], landmarks: [], models: [], bridges: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults(), network: PT.networkDefaults() });
+PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), detail: PT.newDetail(1024), trails: [], landmarks: [], models: [], bridges: [], layers: [], tunnels: [], caveStamps: [], ramps: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults(), network: PT.networkDefaults() });
 // a small example so every tool has something to show: a peak, a ridge, a crater, a basin and a trail past them
 PT.exampleLayout = function(R){
   R = R || 800;
@@ -746,6 +746,10 @@ PT.serialize = function(L){
     models: (L.models || []).map(m => ({ name: m.name, id: m.id, v: m.v, seed: m.seed, d: r5(m.d), rot: m.rot, scale: m.scale, solid: m.solid !== false })),
     bridges: (L.bridges || []).map(b => ({ name: b.name, pts: b.pts.map(r5), clearance: b.clearance, ramp: b.ramp, width: b.width, maxGrade: b.maxGrade })),
     start: { d: r5(L.start.d) }, scatter: Object.assign({}, L.scatter), cliffs: Object.assign({}, L.cliffs), network: Object.assign(PT.networkDefaults(), L.network || {}),
+    layers: (L.layers || []).map(l => ({ name: l.name, depth: l.depth })),
+    tunnels: (L.tunnels || []).map(t => ({ name: t.name, layer: t.layer, pts: t.pts.map(r5), width: t.width, height: t.height, h0: t.h0, h1: t.h1 })),
+    caveStamps: (L.caveStamps || []).map(c => ({ type: c.type, layer: c.layer, d: r5(c.d), radius: c.radius, height: c.height })),
+    ramps: (L.ramps || []).map(rp => ({ name: rp.name, c: r5(rp.c), turn: rp.turn, start: rp.start, top: rp.top, width: rp.width, maxGrade: rp.maxGrade, rMax: rp.rMax, segs: rp.segs.map(sg => Object.assign({}, sg)) })),
     clean: L.clean && L.clean.tiles.size ? Object.assign(PT.encodeDetail(L.clean), { sig: L.clean.sig || '', stale: !!L.clean.stale }) : undefined,
   });
 };
@@ -762,6 +766,11 @@ PT.parse = function(json){
     start: { d: norm(o.start && o.start.d || B.start.d) }, scatter: Object.assign({}, B.scatter, o.scatter || {}),
     cliffs: Object.assign(PT.cliffDefaults(), pick(o.cliffs || {}, ['from', 'band', 'sharp', 'stop'])),
     network: Object.assign(PT.networkDefaults(), pick(o.network || {}, ['join', 'patch', 'corridor', 'side'])),
+    layers: (o.layers || []).map(l => ({ name: l.name || 'Layer', depth: +l.depth || 70 })),
+    tunnels: (o.tunnels || []).filter(t => t.pts && t.pts.length >= 2).map(t => Object.assign(PT.tunnelDefaults(), { name: t.name || 'Tunnel', layer: t.layer | 0, pts: t.pts.map(norm) }, pick(t, ['width', 'height', 'h0', 'h1']))),
+    caveStamps: (o.caveStamps || []).filter(c => c.d && PT.CAVE_STAMPS[c.type]).map(c => ({ type: c.type, layer: c.layer | 0, d: norm(c.d), radius: +c.radius || 20, height: +c.height || 0 })),
+    ramps: (o.ramps || []).filter(rp => rp.c && rp.segs).map(rp => ({ name: rp.name || 'Ramp', c: norm(rp.c), turn: rp.turn === -1 ? -1 : 1, start: +rp.start || 0, top: +rp.top || 0, width: +rp.width || 6, maxGrade: +rp.maxGrade || 0.25, rMax: rp.rMax ? +rp.rMax : undefined,
+      segs: rp.segs.map(sg => ({ k: sg.k === 'plateau' ? 'plateau' : 'slope', len: +sg.len || 0, grade: +sg.grade || 0, wide: sg.wide ? +sg.wide : undefined, link: sg.link ?? -1, lead: sg.lead === 'plateau' ? 'plateau' : 'layer', door: sg.door ? { at: +sg.door.at || 0 } : undefined })) })),
     clean: o.clean && o.clean.tiles && o.clean.tiles.length ? Object.assign(PT.decodeDetail(o.clean), { sig: o.clean.sig || '', stale: !!o.clean.stale }) : null,
   };
   // older layouts may have steps where the cube faces meet: weld them, easing the change back into each face
@@ -954,6 +963,137 @@ function corridorAt(C, x, y, z, h){
   return any ? Fb + (h - Hb)*(1 - Wb) : h;
 }
 
+// ============================================================================================================
+// underground: layers (nested planetoids), spiral ramps down into a pit, tunnels and caves
+// ============================================================================================================
+// a layer is a shell `depth` m below the base radius (its own planetoid, radius R - depth): solid rock except where
+// tunnels and cave stamps open it. its open space has a floor and a ceiling (metres above the layer's base); a ceiling
+// may rise right up to the layer above (no rock left: an opening between them), and on the top layer up to the
+// surface (a skylight: light and view, not a way through)
+PT.layerDefaults = () => ({ name: 'Layer', depth: 70 });
+PT.tunnelDefaults = () => ({ width: 6, height: 6, h0: 0, h1: 0 });
+PT.CAVE_STAMPS = { chamber: 'Chamber', pillar: 'Pillar' };
+PT.rampDefaults = () => ({ width: 6, grade: 0.12, plateauLen: 30, plateauWide: 12, maxGrade: 0.25 });
+const cross3 = (a, b) => [a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]];
+// a spiral ramp: a carved trail winding down a pit's wall from `top` (its height where it starts, `start` degrees round
+// the centre c, turning `turn` = 1 clockwise or -1), made of segments: slopes (a grade over a length) and plateaus
+// (level, `len` long and `wide` across, a landing). a plateau linked to a layer, led by the layer, sits at that layer's
+// floor (its base): the slopes between it and the anchor before (the top, or the plateau linked before it) share the
+// drop, their grades scaled together; led by the plateau, it sits where the slopes bring it (the layer's tunnels start
+// from there). the line follows the wall: at each height, where the wall going out from the centre reaches that height.
+// `under`: the land (before carving). returns the line (2 m apart), its heights and half-widths, each segment's span
+// and grade (warn: steeper than maxGrade, or climbing), and each plateau's entrance
+PT.rampBuild = function(rp, under, R, layers){
+  const D = Object.assign(PT.rampDefaults(), rp), c = norm(rp.c), a0 = Math.abs(c[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], e = norm(cross3(a0, c)), n = cross3(c, e);
+  const radial = th => [e[0]*Math.cos(th) + n[0]*Math.sin(th), e[1]*Math.cos(th) + n[1]*Math.sin(th), e[2]*Math.cos(th) + n[2]*Math.sin(th)];
+  const at = (th, r) => { const u = radial(th); return norm([c[0] + u[0]*r/R, c[1] + u[1]*r/R, c[2] + u[2]*r/R]); };
+  const rMax = rp.rMax || Math.min(600, R*0.9);
+  const radiusAt = (th, h, guess) => {
+    const g = r => under(...at(th, r)) - h; let lo = 0.5, hi = rMax;
+    if (g(hi) < 0) return { r: hi, ok: false }; if (g(lo) > 0) return { r: lo, ok: false };
+    // (start near the last radius: a pit's wall can have more than one crossing far out)
+    if (guess){ const a = Math.max(lo, guess - 30), b = Math.min(hi, guess + 30); if (g(a) <= 0 && g(b) >= 0){ lo = a; hi = b; } }
+    for (let k = 0; k < 30; k++){ const m = (lo + hi)/2; if (g(m) < 0) lo = m; else hi = m; }
+    return { r: (lo + hi)/2, ok: true };
+  };
+  const segs = (rp.segs || []).map(s => Object.assign({}, s)), top = rp.top ?? 0;
+  // the heights: anchors at the top and at each plateau a layer leads
+  const anchorH = s => s.k === 'plateau' && s.link >= 0 && layers[s.link] && (s.lead || 'layer') === 'layer' ? -layers[s.link].depth : null;
+  const anchors = [{ i: -1, h: top }]; segs.forEach((s, i) => { const h = anchorH(s); if (h !== null) anchors.push({ i, h }); });
+  for (const s of segs){ s.eff = s.k === 'slope' ? s.grade : 0; s.warn = ''; }
+  for (let k = 0; k < anchors.length - 1; k++){
+    const A = anchors[k], B = anchors[k + 1]; let nat = 0; for (let i = A.i + 1; i < B.i; i++) if (segs[i].k === 'slope') nat += segs[i].grade*segs[i].len;
+    const need = A.h - B.h;
+    if (nat <= 1e-6){ if (Math.abs(need) > 0.05) segs[B.i].warn = `needs ${need.toFixed(1)} m of slope before it`; continue; }
+    const kf = need/nat;
+    for (let i = A.i + 1; i < B.i; i++) if (segs[i].k === 'slope'){ segs[i].eff = segs[i].grade*kf;
+      if (kf < 0) segs[i].warn = 'would have to climb'; else if (segs[i].eff > D.maxGrade) segs[i].warn = `${Math.round(segs[i].eff*100)}%: steeper than ${Math.round(D.maxGrade*100)}%`; }
+  }
+  // walk it, 2 m at a time
+  const STEP = 2, pts = [], hs = [], half = [], ss = [], doors = [], ths = [], rs = [], turn = rp.turn === -1 ? -1 : 1;
+  let th = (rp.start || 0)*Math.PI/180, h = top, s = 0, r = radiusAt(th, h).r, off = 0;
+  const push = (seg) => { const p = at(th, r); pts.push(p); hs.push(h); ths.push(th); rs.push(r); half.push(seg && seg.k === 'plateau' ? (seg.wide ?? D.plateauWide)/2 : D.width/2); ss.push(s); };
+  push(segs[0]);
+  segs.forEach((sg, i) => {
+    sg.s0 = s; sg.h0 = h; const len = Math.max(0, sg.len || 0), n = Math.max(1, Math.round(len/STEP)), ds = len/n;
+    for (let k = 0; k < n; k++){
+      h -= sg.k === 'slope' ? sg.eff*ds : 0; s += ds; th += turn*ds/Math.max(5, r);
+      const q = radiusAt(th, h, r); r = q.r; if (!q.ok) off++;
+      push(sg);
+    }
+    sg.s1 = s; sg.h1 = h;
+    if (sg.k === 'plateau' && sg.door){ const sd = sg.s0 + Math.max(0, Math.min(len, sg.door.at ?? len/2)), j = Math.min(ss.length - 1, Math.round(sd/STEP));
+      // the entrance: the wall's side of the landing, its tunnel heading straight out from the centre into the wall
+      const p = pts[j], u = norm(sub3(p, c)), outv = norm(sub3(u, p.map(v => v*dot3(u, p))));
+      const w = (sg.wide ?? D.plateauWide)/2, mouth = norm([p[0] + outv[0]*w/R, p[1] + outv[1]*w/R, p[2] + outv[2]*w/R]);
+      doors.push({ seg: i, d: p, mouth, out: outv, h: hs[j], link: sg.link ?? -1, at: sd }); }
+  });
+  // (half-widths eased over 6 m where a plateau starts and ends)
+  const hw = half.slice(); for (let i = 0; i < half.length; i++){ let m = 0, n2 = 0; for (let k = -3; k <= 3; k++){ const j = i + k; if (j < 0 || j >= half.length) continue; m += half[j]; n2++; } hw[i] = Math.max(half[i], m/n2); }
+  // turns that crowd each other: at each point, how much wall is left between its bench and the turn above's (one turn
+  // back, at the same angle round): under 2 m and the two benches run together
+  for (const sg of segs) sg.gap = Infinity;
+  for (let i = 0, j = 0; i < pts.length; i++){
+    const want = ths[i] - turn*2*Math.PI; if (turn*(want - ths[0]) < 0) continue;
+    while (j < i - 1 && turn*(ths[j + 1] - want) < 0) j++;
+    const u = (want - ths[j])/((ths[j + 1] - ths[j]) || 1e-9), rA = rs[j] + (rs[j + 1] - rs[j])*u, hA = hw[j] + (hw[j + 1] - hw[j])*u, gap = Math.abs(rA - rs[i]) - hA - hw[i];
+    const si = segs.findIndex(sg => ss[i] >= sg.s0 - 1e-6 && ss[i] <= sg.s1 + 1e-6); if (si >= 0 && gap < segs[si].gap){ segs[si].gap = gap; segs[si].gapAt = ss[i]; }
+  }
+  for (const sg of segs) if (sg.gap < 2) sg.warn = (sg.warn ? sg.warn + '; ' : '') + `crowds the turn above: ${sg.gap < 0 ? 'their benches overlap' : 'only ' + sg.gap.toFixed(1) + ' m of wall between them'} (about ${Math.round(sg.gapAt)} m along)`;
+  return { pts, h: hs, half: hw, s: ss, L: s, segs, doors, off, c };
+};
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot3 = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+// the ramps as carved trails (their profiles fixed: the ramp's heights, not the land's)
+PT.rampTrails = function(L, R, under){
+  return (L.ramps || []).map(rp => { const B = PT.rampBuild(rp, under, R, L.layers || []);
+    return { name: rp.name || 'Ramp', closed: false, pts: B.pts.filter((p, i) => i % 2 === 0 || i === B.pts.length - 1), carve: true, bed: (rp.width ?? 6)/2, shoulder: 6, smooth: 0, maxGrade: 0.5, ramp: rp, build: B }; })
+    .filter(t => t.pts.length >= 2);
+};
+// a layer's caves: floor and ceiling (metres above the layer's base) wherever it's open. `under`: the land; builds:
+// the ramps' builds (their entrances into this layer start a short tunnel, the adit, into the wall)
+PT.caveField = function(L, k, R, under, builds){
+  const layers = L.layers || [], Ly = layers[k]; if (!Ly) return null;
+  const Rk = R - Ly.depth, CELL = 8, hash = new Map(), items = [];
+  const key = (x, y, z) => Math.floor(x*Rk/CELL) + ',' + Math.floor(y*Rk/CELL) + ',' + Math.floor(z*Rk/CELL);
+  const addItem = (it, pts) => { const id = items.push(it) - 1, seen = new Set(); for (const p of pts){ const kk = key(...p); if (seen.has(kk)) continue; seen.add(kk); let l = hash.get(kk); if (!l) hash.set(kk, l = []); l.push(id); } };
+  // tunnels: a line 2 m apart, the floor going from h0 to h1 along it
+  const tunnel = (pts, t) => { const line = PT.evenCurve(pts, false, 2, Rk); if (line.length < 2) return; const n = line.length, hf = line.map((_, i) => t.h0 + (t.h1 - t.h0)*i/(n - 1));
+    const w = Math.max(1, t.width)/2;
+    addItem({ kind: 'tunnel', line, hf, w, height: Math.max(1.5, t.height), ref: t }, line.flatMap(p => ringAround(p, w + 3, Rk))); };
+  for (const t of (L.tunnels || [])) if (t.layer === k && t.pts.length >= 2) tunnel(t.pts, t);
+  for (const B of builds || []) for (const d of B.doors) if (d.link === k){
+    const base = -Ly.depth, h = d.h - base, end = norm([d.mouth[0] + d.out[0]*14/R, d.mouth[1] + d.out[1]*14/R, d.mouth[2] + d.out[2]*14/R]);
+    tunnel([d.d, d.mouth, end], { width: 7, height: 6, h0: h, h1: h, adit: true }); d.aditEnd = end; d.aditH = h; }
+  for (const st of (L.caveStamps || [])) if (st.layer === k) addItem({ kind: st.type, d: norm(st.d), r: Math.max(1, st.radius), height: Math.max(1, st.height || 0), ref: st }, ringAround(norm(st.d), st.radius + 3, Rk));
+  const above = k > 0 && layers[k - 1] ? Ly.depth - layers[k - 1].depth : null;
+  return { k, Rk, depth: Ly.depth, above, items,
+    // { open, floor, ceil, sky (the top layer's ceiling reaches the surface), voidPit (the land is below this layer here) }
+    at(x, y, z){
+      const p = [x, y, z], l = hash.get(key(x, y, z)); let open = false, fl = Infinity, ce = -Infinity, closed = false, gap = Infinity, gfl = 0;
+      if (l) for (const id of l){ const it = items[id];
+        if (it.kind === 'tunnel'){ const P = it.line; let bd = Infinity, bi = 0, bu = 0;
+          for (let i = 0; i < P.length - 1; i++){ const a = P[i], b = P[i + 1], ex = b[0] - a[0], ey = b[1] - a[1], ez = b[2] - a[2], L2 = ex*ex + ey*ey + ez*ez || 1e-18;
+            const u = Math.max(0, Math.min(1, ((x - a[0])*ex + (y - a[1])*ey + (z - a[2])*ez)/L2)), dx = x - a[0] - ex*u, dy = y - a[1] - ey*u, dz = z - a[2] - ez*u, d = dx*dx + dy*dy + dz*dz; if (d < bd){ bd = d; bi = i; bu = u; } }
+          const d = Math.sqrt(bd)*Rk, hf = it.hf[bi] + (it.hf[bi + 1] - it.hf[bi])*bu; if (d >= it.w){ if (d - it.w < gap){ gap = d - it.w; gfl = hf + 0.4; } continue; } const q = d/it.w;
+          open = true; fl = Math.min(fl, hf + 0.4*q*q); ce = Math.max(ce, hf + it.height*Math.pow(Math.max(0, 1 - q*q), 0.35)); }
+        else { const d = ang3(p, it.d)*Rk; if (d >= it.r){ if (it.kind !== 'pillar' && d - it.r < gap){ gap = d - it.r; gfl = 0.6; } continue; } const q = d/it.r;
+          if (it.kind === 'pillar'){ closed = true; continue; }
+          open = true; fl = Math.min(fl, 0.6*q*q); ce = Math.max(ce, it.height*Math.pow(Math.max(0, 1 - q*q), 0.5)); }
+      }
+      const g = under(x, y, z) + Ly.depth;    // the land, above this layer's base
+      // (closed: how far it is to the nearest opening, and that opening's floor there: for drawing the walls)
+      const out = { open: open && !closed && ce > fl + 0.3, floor: fl, ceil: ce, sky: false, voidPit: g < -0.5, gap, gapFloor: gfl };
+      if (out.open){ if (above !== null && out.ceil > above) out.ceil = above;
+        if (k === 0 && out.ceil >= g - 0.2){ out.sky = true; out.ceil = Math.max(out.floor + 0.3, g); } }
+      return out;
+    } };
+};
+// directions covering a disc of radius r round p, 3 m apart (for putting an item in every hash cell it reaches)
+function ringAround(p, r, Rk){ const a = Math.abs(p[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], e = norm(cross3(a, p)), n = cross3(p, e), out = [], st = 3, k = Math.ceil(r/st);
+  for (let i = -k; i <= k; i++) for (let j = -k; j <= k; j++){ const x = i*st, y = j*st; if (x*x + y*y > (r + st)*(r + st)) continue;
+    out.push(norm([p[0] + (e[0]*x + n[0]*y)/Rk, p[1] + (e[1]*x + n[1]*y)/Rk, p[2] + (e[2]*x + n[2]*y)/Rk])); }
+  return out; }
+
 PT.terrain = function(L, R, prev, caps){
   const amp = L ? L.noise.amp : 1, stamps = L ? L.stamps.filter(s => s.pts && s.pts.length).map(s => compileStamp(s, R)) : [], sc = L ? L.sculpt : null;
   // everything but the trails' carving
@@ -970,12 +1110,25 @@ PT.terrain = function(L, R, prev, caps){
   const NW = Object.assign(PT.networkDefaults(), L && L.network || {});
   const stopG = L && L.cliffs ? L.cliffs.stop : 1.0, side = Math.max(0.02, Math.min(NW.side, stopG*0.9)), corridor = Math.max(0, NW.corridor);
   // the trails as one network (runs alongside each other made one), so carved beds that share ground agree
-  const join = L && L.network ? L.network.join : 0, net = L && L.trails.length ? PT.trailNetwork(L.trails, R, join, STEP) : null;
-  if (L) L.trails.forEach((t, ti) => {
+  // (the ramps join them as carved trails whose bed heights are the ramp's own)
+  const TR = L ? L.trails.concat(PT.rampTrails(L, R, under)) : [];
+  const join = L && L.network ? L.network.join : 0, net = TR.length ? PT.trailNetwork(TR, R, join, STEP) : null;
+  TR.forEach((t, ti) => {
     if (!t.carve || !t.pts || t.pts.length < 2) return;
     const pts = net.lines[ti], M = pts.length; if (M < 2) return;
-    const c = { ti, pts, closed: !!t.closed, M, bed: Math.max(0.5, t.bed ?? 4), sh: Math.max(0.5, t.shoulder ?? 10), smooth: t.smooth ?? 40, P: new Float64Array(M*3),
-      prof: carveProfile(pts, !!t.closed, under, t.smooth ?? 40, t.maxGrade ?? 0.2, STEP), gA: (t.maxGrade ?? 0.2) + 0.03 };
+    let prof, halves = null;
+    if (t.build){ const B = t.build, BP = B.pts, NB = BP.length; prof = new Float64Array(M); halves = new Float64Array(M);
+      // (each point takes the ramp's height where it's nearest the ramp's own line, searching on from the last)
+      let j = 0;
+      for (let i = 0; i < M; i++){ const p = pts[i]; let best = j, bd = Infinity;
+        for (let k = Math.max(0, j - 3); k < Math.min(NB - 1, j + 12); k++){ const a = BP[k], b2 = BP[k + 1], ex = b2[0] - a[0], ey = b2[1] - a[1], ez = b2[2] - a[2], L2 = ex*ex + ey*ey + ez*ez || 1e-18;
+          const u = Math.max(0, Math.min(1, ((p[0] - a[0])*ex + (p[1] - a[1])*ey + (p[2] - a[2])*ez)/L2)), dx = p[0] - a[0] - ex*u, dy = p[1] - a[1] - ey*u, dz = p[2] - a[2] - ez*u, d = dx*dx + dy*dy + dz*dz;
+          if (d < bd){ bd = d; best = k + u; } }
+        j = Math.floor(best); const k = Math.min(NB - 2, j), u = Math.max(0, Math.min(1, best - k));
+        prof[i] = B.h[k] + (B.h[k + 1] - B.h[k])*u; halves[i] = B.half[k] + (B.half[k + 1] - B.half[k])*u; } }
+    else prof = carveProfile(pts, !!t.closed, under, t.smooth ?? 40, t.maxGrade ?? 0.2, STEP);
+    const c = { ti, pts, closed: !!t.closed, M, bed: Math.max(0.5, halves ? Math.max(...halves) : t.bed ?? 4), sh: Math.max(0.5, t.shoulder ?? 10), smooth: t.smooth ?? 40, P: new Float64Array(M*3),
+      prof, halves, fixed: !!t.build, gA: (t.maxGrade ?? 0.2) + 0.03 };
     pts.forEach((p, i) => { c.P[i*3] = p[0]; c.P[i*3 + 1] = p[1]; c.P[i*3 + 2] = p[2]; });
     carves.push(c);
   });
@@ -993,7 +1146,7 @@ PT.terrain = function(L, R, prev, caps){
   // (each trail's bounding sphere, to skip pairs too far apart to matter)
   for (const c of carves){ const m = [0, 0, 0]; for (const p of c.pts){ m[0] += p[0]; m[1] += p[1]; m[2] += p[2]; } const l = Math.hypot(...m) || 1; c.mid = m.map(v => v/l); c.rad = Math.max(...c.pts.map(p => ang3(p, c.mid))); }
   for (let b = 1; b < carves.length; b++){
-    const B = carves[b], cor = new Float64Array(B.M), has = new Uint8Array(B.M);
+    const B = carves[b], cor = new Float64Array(B.M), has = new Uint8Array(B.M); if (B.fixed) continue;
     for (let a = 0; a < b; a++){
       const A = carves[a], far = A.bed + B.bed + corridor; if (ang3(A.mid, B.mid) > A.rad + B.rad + far/R) continue;
       const H = A.hash || (A.hash = lineHash(A.pts, R, Math.max(4, far/1.5)));
@@ -1026,7 +1179,7 @@ PT.terrain = function(L, R, prev, caps){
   // the junctions, rounded (bed heights: a carved trail's profile, otherwise the land)
   let links = null;
   if (net){ const prof = new Map(carves.map(c => [c.ti, c.prof]));
-    links = PT.trailLinks(L.trails, net, R, (ti, fi) => { const pr = prof.get(ti), l = net.lines[ti], M = l.length, k = Math.floor(fi), u = fi - k, cl2 = !!L.trails[ti].closed;
+    links = PT.trailLinks(TR, net, R, (ti, fi) => { const pr = prof.get(ti), l = net.lines[ti], M = l.length, k = Math.floor(fi), u = fi - k, cl2 = !!TR[ti].closed;
       const ix = i => cl2 ? ((i % M) + M) % M : Math.max(0, Math.min(M - 1, i));
       if (pr) return pr[ix(k)]*(1 - u) + pr[ix(k + 1)]*u;
       const a = l[ix(k)], b = l[ix(k + 1)], q = norm([a[0] + (b[0] - a[0])*u, a[1] + (b[1] - a[1])*u, a[2] + (b[2] - a[2])*u]); return under(q[0], q[1], q[2]); }); }
@@ -1034,7 +1187,9 @@ PT.terrain = function(L, R, prev, caps){
   return {
     R, stamps, carves: carves.length, net, links, corr, clean: !!cl, stop: L && L.cliffs ? L.cliffs.stop : 1.0,
     // each carved trail's bed profile along its line in net.lines (for the cleanup)
-    beds: carves.map(c => ({ ti: c.ti, prof: c.prof, bed: c.bed })),
+    beds: carves.map(c => ({ ti: c.ti, prof: c.prof, bed: c.bed, halves: c.halves })),
+    // every trail, the ramps' after the layout's own (net.lines and links index these), and the ramps' builds
+    trails: TR, ramps: TR.filter(t => t.build).map(t => t.build),
     height(x, y, z){
       const h = under(x, y, z);
       return cl ? h + PT.sampleDetail(cl, x, y, z) : corr ? corridorAt(corr, x, y, z, h) : h;

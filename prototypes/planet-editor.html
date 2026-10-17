@@ -57,7 +57,21 @@ select option{color:#1d2a36}
 #labels div{position:absolute;transform:translate(-50%,-130%);font:700 12px var(--display);letter-spacing:.04em;color:#fff;text-shadow:0 1px 2px #000,0 0 4px #000;white-space:nowrap}
 #labels div.trail{color:#e6f0ff;font-weight:500;transform:translate(-50%,-50%)}
 #busy{position:fixed;left:50%;top:14px;transform:translateX(-50%);padding:6px 12px;display:none}
-@media (max-width:900px){ #side{width:240px} #status{right:264px} #mini canvas{width:200px;height:100px} }
+/* underground: surface tools hide while a layer is being edited, cave tools show */
+body.lm #tools .surfT{display:none} body:not(.lm) #tools .caveT{display:none}
+.ugRow{display:grid;grid-template-columns:1fr 64px auto auto;gap:4px;align-items:center;margin-top:5px;font-size:11px;color:var(--muted)}
+.ugRow input{margin-top:0}
+input[type=number]{font:12px var(--mono);color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:4px;padding:3px 4px;width:100%}
+.rs{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.rsRow{border:1px solid var(--line);border-radius:5px;padding:5px 6px;display:grid;grid-template-columns:auto 1fr auto 1fr;gap:3px 5px;align-items:center;font-size:11px;color:var(--muted)}
+.rsRow.on{border-color:var(--sel)} .rsRow.warn{border-color:var(--accent)}
+.rsRow select,.rsRow input{margin-top:0} .rsRow .full{grid-column:1/-1} .rsRow b{color:var(--ink);font-weight:500}
+.rsRow .wn{grid-column:1/-1;color:var(--accent)}
+#strip{position:fixed;left:316px;right:306px;bottom:40px;height:178px;padding:6px 8px;display:none}
+#strip.on{display:block}
+#strip .sh{display:flex;gap:12px;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden} #strip .sh b{color:var(--ink);font-weight:500}
+#strip canvas{display:block;width:100%;height:146px;margin-top:4px;cursor:crosshair}
+@media (max-width:900px){ #side{width:240px} #status{right:264px} #mini canvas{width:200px;height:100px} #strip{left:228px;right:264px} }
 button.icon{width:44px;height:44px;padding:0;display:grid;place-items:center;background:var(--panel)}
 button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .mob{display:none !important}
@@ -73,6 +87,8 @@ button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
   #side{display:none;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 60px);bottom:calc(env(safe-area-inset-bottom,0px) + 8px);width:auto;z-index:4;overscroll-behavior:contain}
   body.ms #side{display:block}
   #busy{top:calc(env(safe-area-inset-top,0px) + 14px)}
+  #strip{left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px)}
+  body.ms #strip{display:none}
 }
 </style>
 </head>
@@ -88,14 +104,17 @@ button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
 <div id="tools" class="panel" role="toolbar" aria-label="Tools">
   <button data-tool="orbit" type="button">Orbit <kbd>1</kbd></button>
   <button data-tool="select" type="button">Select <kbd>2</kbd></button>
-  <button data-tool="sculpt" type="button">Sculpt <kbd>3</kbd></button>
-  <button data-tool="stamp" type="button">Stamp <kbd>4</kbd></button>
-  <button data-tool="trail" type="button">Trail <kbd>5</kbd></button>
-  <button data-tool="landmark" type="button">Landmark <kbd>6</kbd></button>
-  <button data-tool="start" type="button">Start <kbd>7</kbd></button>
-  <button data-tool="cliffs" type="button">Cliffs <kbd>8</kbd></button>
-  <button data-tool="bridge" type="button">Bridge <kbd>9</kbd></button>
-  <button data-tool="model" type="button">Model <kbd>0</kbd></button>
+  <button data-tool="sculpt" class="surfT" type="button">Sculpt <kbd>3</kbd></button>
+  <button data-tool="stamp" class="surfT" type="button">Stamp <kbd>4</kbd></button>
+  <button data-tool="trail" class="surfT" type="button">Trail <kbd>5</kbd></button>
+  <button data-tool="landmark" class="surfT" type="button">Landmark <kbd>6</kbd></button>
+  <button data-tool="start" class="surfT" type="button">Start <kbd>7</kbd></button>
+  <button data-tool="cliffs" class="surfT" type="button">Cliffs <kbd>8</kbd></button>
+  <button data-tool="bridge" class="surfT" type="button">Bridge <kbd>9</kbd></button>
+  <button data-tool="model" class="surfT" type="button">Model <kbd>0</kbd></button>
+  <button data-tool="ramp" class="surfT" type="button">Ramp <kbd>R</kbd></button>
+  <button data-tool="tunnel" class="caveT" type="button">Tunnel <kbd>3</kbd></button>
+  <button data-tool="cave" class="caveT" type="button">Cave <kbd>4</kbd></button>
 </div>
 
 <div id="side" class="panel">
@@ -103,6 +122,11 @@ button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
   <div id="toolOpts"></div>
   <h3>Selected</h3>
   <div id="selPanel"><p class="empty">Nothing selected. Use Select (2) and click a handle.</p></div>
+  <h3>Underground</h3>
+  <label class="f" for="ugView">Editing<select id="ugView" style="grid-column:1/-1"></select></label>
+  <div id="ugLayers"></div>
+  <div class="row"><button id="ugAdd" type="button">Add layer</button></div>
+  <p class="hint">Layers are nested planetoids under the surface, each a set depth down: solid rock except where you dig tunnels and caves into it. Pick one under Editing to work on it (its rock is drawn cut level, tunnels and caves below; the pit shows as a dark hole). A cave's ceiling can rise right up to the layer above (an opening), and on the top layer up to the surface (a skylight: light, not a way through). On the surface, <b>Ramp</b> winds a carved trail down a pit's wall in slopes and plateaus; a plateau linked to a layer can have the entrance to it.</p>
   <h3>Planet</h3>
   <label class="f" for="pName">Name<input id="pName" type="text" style="grid-column:1/-1"></label>
   <label class="f" for="pR">Radius<output id="oR"></output><input id="pR" type="range" min="150" max="1200" step="50"></label>
@@ -144,6 +168,7 @@ button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
 </div>
 
 <div id="mini" class="panel" title="Click to go there"><canvas id="miniC" width="360" height="180"></canvas></div>
+<div id="strip" class="panel"><div class="sh"><b id="stripT"></b><span id="stripI"></span></div><canvas id="stripC"></canvas></div>
 <div id="status" class="panel"><span id="sPos" class="muted">Move over the planet</span><span id="sH"></span><span id="sSlope"></span><span id="sHint" class="muted"></span><span id="saved"></span></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -182,13 +207,15 @@ function fixUp(){ cam.up.addScaledVector(cam.dir, -cam.up.dot(cam.dir)); if (cam
 fixUp();
 function placeCamera(){
   fixUp();
-  const h = cam.dist - R, t = cam.tilt*D2R, target = cam.dir.clone().multiplyScalar(R + (h < R*0.5 ? groundAt(cam.dir) : 0));
+  const Rv = viewR(), h = cam.dist - Rv, t = cam.tilt*D2R, target = cam.dir.clone().multiplyScalar(R + (h < Rv*0.5 ? groundAt(cam.dir) : Rv - R));
   camera.position.copy(target).addScaledVector(cam.dir, h*Math.cos(t)).addScaledVector(cam.up, -h*Math.sin(t));
   camera.up.copy(cam.dir).multiplyScalar(Math.sin(t)).addScaledVector(cam.up, Math.cos(t));
   camera.lookAt(target);
   camera.near = Math.max(0.5, h*0.02); camera.far = cam.dist + R*2; camera.updateProjectionMatrix();
 }
-const groundAt = d => T.height(d.x, d.y, d.z);
+const groundAt = d => viewH(d.x, d.y, d.z);
+// the radius of what's being edited: the surface's, or a layer's (zooming and turning go by it)
+const viewR = () => VL >= 0 && CF ? R - CF.depth : R;
 
 // ============================================================================================================
 // the globe: a cube-sphere in chunks, shaded by height with contour lines, rebuilt a chunk at a time while you edit
@@ -397,6 +424,8 @@ function rebuildOverlays(){
   for (const o of [...over.children]){ over.remove(o); if (o.geometry && o.geometry !== handleGeo) o.geometry.dispose(); }
   handles = [];
   const isSel = (kind, ref) => sel && sel.kind === kind && sel.ref === ref;
+  drawRamps(isSel);
+  if (VL >= 0){ drawCaveOverlays(isSel); miniDirty(true); return; }
   for (const s of L.stamps){
     const col = isSel('stamp', s) ? 0x5b9cf0 : TYPE_COL[s.type] || 0xffffff, line = PT.STAMP_TYPES[s.type].line;
     if (line){ over.add(lineOn(PT.curve(s.pts, false, 6, R), col, 2, false)); for (let i = 0; i < s.pts.length; i++) addHandle('stamp', s, i, s.pts[i], col); }
@@ -432,7 +461,7 @@ function rebuildOverlays(){
     b.pts.forEach((p, i) => addHandle('bridge', b, i, p, col, i === 0 || i === b.pts.length - 1 ? 1.3 : 0.8));
   }
   addHandle('start', L.start, 0, L.start.d, isSel('start', L.start) ? 0x5b9cf0 : 0x2fd06a, 1.4);
-  drawing && drawing.pts.length && over.add(lineOn(drawing.kind === 'trail' ? PT.curve(drawing.pts, false, 6, R) : PT.curve(drawing.pts, false, 6, R), 0x5b9cf0, 2.5, false));
+  drawing && drawing.pts.length && over.add(lineOn(PT.curve(drawing.pts, false, 6, R), 0x5b9cf0, 2.5, false));
   miniDirty(true);
 }
 
@@ -476,7 +505,7 @@ function groundPick(px, py){
   let t = Math.max(0, -b - Math.sqrt(disc)), prev = t; const tFar = -b + Math.sqrt(disc), p = new V3();
   // step along the ray by a share of the height still above the ground (so it can't skip over a peak), then pin down
   // the crossing by halving
-  const gap = tt => { p.copy(o).addScaledVector(d, tt); const r = p.length(); p.divideScalar(r); return r - (R + T.height(p.x, p.y, p.z)); };
+  const gap = tt => { p.copy(o).addScaledVector(d, tt); const r = p.length(); p.divideScalar(r); return r - (R + viewH(p.x, p.y, p.z)); };
   for (let k = 0; k < 600 && t <= tFar; k++){
     const g = gap(t);
     if (g < 0.02){
@@ -500,7 +529,7 @@ function seen(p){
   const n = Math.min(160, Math.max(8, Math.ceil((t1 - t0)/3)));
   for (let k = 0; k <= n; k++){
     _sq.copy(p).addScaledVector(_sv, t0 + (t1 - t0)*k/n); const r = _sq.length();
-    if (r < R + T.height(_sq.x/r, _sq.y/r, _sq.z/r)) return false;
+    if (r < R + viewH(_sq.x/r, _sq.y/r, _sq.z/r)) return false;
   }
   return true;
 }
@@ -518,7 +547,7 @@ function handlePick(px, py, maxPx = 14){
 // undo, autosave
 // ============================================================================================================
 const undoStack = [], redoStack = [];
-function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, models: L.models, bridges: L.bridges, start: L.start, scatter: L.scatter, cliffs: L.cliffs, network: L.network }), sculpt: L.sculpt.data.slice(), detail: PT.cloneDetail(L.detail),
+function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, models: L.models, bridges: L.bridges, start: L.start, scatter: L.scatter, cliffs: L.cliffs, network: L.network, layers: L.layers, tunnels: L.tunnels, caveStamps: L.caveStamps, ramps: L.ramps }), sculpt: L.sculpt.data.slice(), detail: PT.cloneDetail(L.detail),
   clean: L.clean ? Object.assign(PT.cloneDetail(L.clean), { sig: L.clean.sig, stale: L.clean.stale }) : null }; }
 let lastSnap = snapshot();
 function commit(keepReading, keepMoves){ if (!keepReading) tcStale(); if (!keepMoves) tcClearMoves(); cleanStaleCheck(); undoStack.push(lastSnap); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; lastSnap = snapshot(); autosave(); }
@@ -526,7 +555,8 @@ function restore(s){
   const o = JSON.parse(s.json); const oldR = L.radius;
   Object.assign(L, o); L.sculpt.data.set(s.sculpt); L.detail = PT.cloneDetail(s.detail); L.clean = s.clean ? Object.assign(PT.cloneDetail(s.clean), { sig: s.clean.sig, stale: s.clean.stale }) : null; lastSnap = s; sel = null; tcSync(); tcMoves = []; tcMoveList();
   if (L.radius !== oldR) cam.dist *= L.radius/oldR;
-  buildGlobe(); rebuildOverlays(); syncPlanetUI(); syncSlopeUniforms(); showSel(); autosave(); if (tool === 'cliffs') setTool('cliffs');
+  if (VL >= (L.layers || []).length) VL = -1;
+  buildGlobe(); buildCave(); rebuildOverlays(); syncPlanetUI(); syncSlopeUniforms(); showSel(); ugSync(); autosave(); if (tool === 'cliffs') setTool('cliffs');
 }
 function undo(){ if (!undoStack.length) return; redoStack.push(snapshot()); restore(undoStack.pop()); }
 function redo(){ if (!redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); }
@@ -543,7 +573,7 @@ function autosave(){
 // tools
 // ============================================================================================================
 let tool = 'orbit', drawing = null;      // drawing: a ridge, valley or trail being clicked out point by point
-const opts = { bridge: PT.bridgeDefaults(), cliff: { radius: 30, strength: 3 }, sculpt: { mode: 'raise', radius: 60, strength: 6 }, stamp: { type: 'peak', radius: 80, height: 60, sharp: 0.3 }, trail: { closed: true, carve: true }, landmark: { type: 'spire', height: 40, color: '#8a5cd6' }, model: { id: 'dome', v: 0, rot: 0, scale: 1 } };
+const opts = { bridge: PT.bridgeDefaults(), cliff: { radius: 30, strength: 3 }, sculpt: { mode: 'raise', radius: 60, strength: 6 }, stamp: { type: 'peak', radius: 80, height: 60, sharp: 0.3 }, trail: { closed: true, carve: true }, tunnel: PT.tunnelDefaults(), cave: { type: 'chamber', radius: 18, height: 14 }, landmark: { type: 'spire', height: 40, color: '#8a5cd6' }, model: { id: 'dome', v: 0, rot: 0, scale: 1 } };
 const TOOL_HELP = {
   orbit: 'Drag to turn the planet. Wheel to zoom.',
   select: 'Click a handle to select it, drag to move it. Delete removes it (for a trail or ridge, the point; Shift+Delete the whole thing).',
@@ -551,6 +581,9 @@ const TOOL_HELP = {
   stamp: 'Click to place. Ridges and valleys: click each point, then Enter (or double-click) to finish.',
   trail: 'Click points along the route; Enter (or double-click) finishes. Esc drops the last point. A carved trail cuts a level bed into the ground, its grade smoothed along the line.',
   landmark: 'Click to place a landmark.',
+  ramp: 'Click on a pit\'s wall where the ramp should start: it winds down from there, round the pit\'s middle, following the wall.',
+  tunnel: 'Click points along the tunnel; Enter (or double-click) finishes. Start it at an entrance\'s tunnel (the short one into the wall) and it carries on from there at its height.',
+  cave: 'Click to place a chamber (a domed room) or a pillar (rock left standing, floor to ceiling).',
   model: 'Click to place the model: one of the game\'s own, as the gallery shows it. Ones that vary (crew, camps, crystals) come out different each time; Re-roll in the selection makes another.',
   start: 'Click where the skier should start.',
   bridge: 'Click the start ramp’s foot, any bends, then the end ramp’s foot; Enter (or double-click) finishes. The deck rises at each ramp and clears the ground between. You get on and off only at the feet (through a portal), heading in.',
@@ -569,7 +602,7 @@ function setTool(t){
   if (drawing) finishDrawing();
   tool = t;
   for (const b of document.querySelectorAll('#tools button')) b.classList.toggle('on', b.dataset.tool === t);
-  $('toolTitle').textContent = { orbit: 'Orbit', select: 'Select', sculpt: 'Sculpt', stamp: 'Stamp', trail: 'Trail', landmark: 'Landmark', model: 'Model', start: 'Start', cliffs: 'Cliffs', bridge: 'Light bridge' }[t];
+  $('toolTitle').textContent = { orbit: 'Orbit', select: 'Select', sculpt: 'Sculpt', stamp: 'Stamp', trail: 'Trail', landmark: 'Landmark', model: 'Model', start: 'Start', cliffs: 'Cliffs', bridge: 'Light bridge', ramp: 'Spiral ramp', tunnel: 'Tunnel', cave: 'Cave' }[t];
   const parts = [];
   if (t === 'sculpt'){
     parts.push(seg('sMode', [['raise', 'Raise'], ['lower', 'Lower'], ['smooth', 'Smooth'], ['flatten', 'Flatten']], () => opts.sculpt.mode, k => opts.sculpt.mode = k));
@@ -604,6 +637,18 @@ function setTool(t){
     parts.push(slider('brR', 'Ramp length', 10, 200, 5, () => B.ramp, v => B.ramp = v, v => v + ' m'));
     parts.push(slider('brW', 'Deck half-width', 1, 6, 0.5, () => B.width, v => B.width = v, v => v + ' m'));
   }
+  if (t === 'tunnel'){
+    const o = opts.tunnel;
+    parts.push(slider('tuW', 'Width', 2, 20, 0.5, () => o.width, v => o.width = v, v => v + ' m'));
+    parts.push(slider('tuH', 'Height', 2, 30, 0.5, () => o.height, v => o.height = v, v => v + ' m'));
+  }
+  if (t === 'cave'){
+    const o = opts.cave;
+    parts.push(seg('cvType', Object.entries(PT.CAVE_STAMPS), () => o.type, k => { o.type = k; setTool('cave'); }));
+    parts.push(slider('cvR', 'Radius', 2, 80, 1, () => o.radius, v => o.radius = v, v => v + ' m'));
+    if (o.type === 'chamber') parts.push(slider('cvH', 'Height', 3, 60, 1, () => o.height, v => o.height = v, v => v + ' m'));
+  }
+  if (t === 'ramp') parts.push({ html: `<p class="hint">${(L.layers || []).length ? 'It gets a slope down to each layer and a plateau there (linked, with an entrance), then a slope to the bottom.' : 'Add layers (Underground) first to get a plateau and entrance at each one.'}</p>`, bind(){} });
   if (t === 'cliffs'){
     const C = L.cliffs, pct = v => Math.round(v*100) + '% (' + Math.round(Math.atan(v)/D2R) + '°)';
     parts.push(slider('clRad', 'Brush radius', 5, 120, 1, () => opts.cliff.radius, v => opts.cliff.radius = v, v => v + ' m'));
@@ -626,7 +671,7 @@ for (const b of document.querySelectorAll('#tools button')) b.addEventListener('
 // ---- selection panel ----
 function showSel(){
   const P = $('selPanel');
-  if (!sel){ P.innerHTML = '<p class="empty">Nothing selected. Use Select (2) and click a handle.</p>'; return; }
+  if (!sel){ P.innerHTML = '<p class="empty">Nothing selected. Use Select (2) and click a handle.</p>'; drawStrip(); return; }
   const parts = [];
   if (sel.kind === 'stamp'){
     const s = sel.ref, before = () => stampCap(s);
@@ -693,12 +738,14 @@ function showSel(){
     const warn = D.desc > Math.max(b.maxGrade, D.rampGrade) + 0.05 ? ` <b style="color:var(--accent)">Steeper than set: the ground near a ramp rises faster than the ramp can climb. Move that foot to flatter ground or lengthen the ramp.</b>` : '';
     parts.push({ html: `<p class="hint">${fmtM(D.L)} long, up to ${D.highest.toFixed(0)} m over the ground. Ramps ${pc(D.rampGrade)}; steepest climb ${pc(D.climb)}, steepest descent ${pc(D.desc)}.${warn} The big handles are the ramps’ feet.</p>`, bind(){} });
   }
+  ugSelParts(parts);
   if (sel.kind === 'start') parts.push({ html: `<p class="hint">The skier starts here${nearTrailName(sel.ref.d) ? ', on ' + nearTrailName(sel.ref.d) : ''}.</p>`, bind(){} });
-  const ll = latLon(sel.ref.d || sel.ref.pts[sel.i]);
-  parts.push({ html: `<p class="hint">${ll}</p><div class="row">${sel.kind !== 'start' ? '<button id="slDel" type="button">Delete</button>' : ''}${(sel.kind === 'trail' || sel.kind === 'bridge' || (sel.kind === 'stamp' && PT.STAMP_TYPES[sel.ref.type].line)) ? '<button id="slDelPt" type="button">Delete point</button>' : ''}<button id="slGo" type="button">Ski here</button></div>`,
+  const ll = latLon(sel.ref.d || (sel.ref.pts ? sel.ref.pts[sel.i] : sel.ref.c));
+  parts.push({ html: `<p class="hint">${ll}</p><div class="row">${sel.kind !== 'start' ? '<button id="slDel" type="button">Delete</button>' : ''}${(sel.kind === 'trail' || sel.kind === 'bridge' || sel.kind === 'tunnel' || (sel.kind === 'stamp' && PT.STAMP_TYPES[sel.ref.type].line)) ? '<button id="slDelPt" type="button">Delete point</button>' : ''}<button id="slGo" type="button">Ski here</button></div>`,
     bind(){ $('slDel') && $('slDel').addEventListener('click', () => deleteSel(true)); $('slDelPt') && $('slDelPt').addEventListener('click', () => deleteSel(false)); $('slGo').addEventListener('click', skiHere); } });
   P.innerHTML = parts.map(p => p.html).join('');
   for (const p of parts) p.bind();
+  drawStrip();
   // commit slider edits when let go
   for (const el of P.querySelectorAll('input[type=range]')) el.addEventListener('change', () => commit());
 }
@@ -718,6 +765,9 @@ function deleteSel(all){
     rebuildCaps([cap]);
   }
   if (sel.kind === 'trail'){ const cap = trailCap(r); if (!all && r.pts.length > 2) r.pts.splice(sel.i, 1); else L.trails.splice(L.trails.indexOf(r), 1); if (r.carve) rebuildCaps([cap]); }
+  if (sel.kind === 'tunnel'){ const cap = tunnelCap(r); if (!all && r.pts.length > 2) r.pts.splice(sel.i, 1); else L.tunnels.splice(L.tunnels.indexOf(r), 1); rebuildCaveCaps([cap]); }
+  if (sel.kind === 'cavest'){ const cap = caveStampCap(r); L.caveStamps.splice(L.caveStamps.indexOf(r), 1); rebuildCaveCaps([cap]); }
+  if (sel.kind === 'ramp'){ const cap = rampCap(r); L.ramps.splice(L.ramps.indexOf(r), 1); rebuildCaps([cap]); buildCave(); }
   if (sel.kind === 'landmark') L.landmarks.splice(L.landmarks.indexOf(r), 1);
   if (sel.kind === 'model') L.models.splice(L.models.indexOf(r), 1);
   if (sel.kind === 'bridge'){ if (!all && r.pts.length > 2) r.pts.splice(sel.i, 1); else L.bridges.splice(L.bridges.indexOf(r), 1); }
@@ -730,6 +780,10 @@ function finishDrawing(){
     const t = Object.assign({ name: 'Trail ' + (L.trails.length + 1), closed: opts.trail.closed && d.pts.length >= 3, pts: d.pts }, PT.carveDefaults(), { carve: opts.trail.carve });
     L.trails.push(t); sel = { kind: 'trail', ref: t, i: 0 };
     if (t.carve) rebuildCaps([trailCap(t)]);
+  }
+  if (d.kind === 'tunnel' && d.pts.length >= 2){
+    const t = Object.assign({ name: 'Tunnel ' + (L.tunnels.length + 1), layer: VL, pts: d.pts }, opts.tunnel); tunnelSnap(t);
+    L.tunnels.push(t); sel = { kind: 'tunnel', ref: t, i: 0 }; rebuildCaveCaps([tunnelCap(t)]);
   }
   if (d.kind === 'bridge' && d.pts.length >= 2){
     const b = Object.assign({ name: 'Light bridge ' + (L.bridges.length + 1), pts: d.pts }, opts.bridge);
@@ -753,7 +807,8 @@ cv.addEventListener('pointerdown', e => {
   if (tool === 'select'){
     const h = handlePick(px, py);
     sel = h ? { kind: h.kind, ref: h.ref, i: h.i } : null; rebuildOverlays(); showSel();
-    if (h) ptr = { mode: 'move', h, moved: false, cap0: h.kind === 'stamp' ? stampCap(h.ref) : h.kind === 'trail' && h.ref.carve ? pointCap(h.ref, h.i) : null };
+    if (h && h.kind === 'door'){ sel = { kind: 'ramp', ref: h.ref, i: 0 }; rampSel = h.i; rebuildOverlays(); showSel(); return; }
+    if (h) ptr = { mode: 'move', h, moved: false, cap0: h.kind === 'stamp' ? stampCap(h.ref) : h.kind === 'trail' && h.ref.carve ? pointCap(h.ref, h.i) : h.kind === 'tunnel' ? tunnelCap(h.ref) : h.kind === 'cavest' ? caveStampCap(h.ref) : h.kind === 'ramp' ? rampCap(h.ref) : null };
     else if (!groundPick(px, py)) ptr = { mode: 'orbit', x: px, y: py };      // off the planet: turn it
     return;
   }
@@ -767,7 +822,9 @@ cv.addEventListener('pointerdown', e => {
     else { const s = { type: opts.stamp.type, pts: [arr], radius: opts.stamp.radius, height: opts.stamp.height, sharp: opts.stamp.sharp }; L.stamps.push(s); rebuildCaps([stampCap(s)]); sel = { kind: 'stamp', ref: s, i: 0 }; rebuildOverlays(); showSel(); commit(); }
     return;
   }
-  if (tool === 'trail'){ if (!drawing) drawing = { kind: 'trail', pts: [] }; drawing.pts.push(arr); rebuildOverlays(); return; }
+  if (tool === 'trail' || tool === 'tunnel'){ if (!drawing) drawing = { kind: tool, pts: [] }; drawing.pts.push(arr); rebuildOverlays(); return; }
+  if (tool === 'ramp'){ createRamp(arr); return; }
+  if (tool === 'cave'){ const o = opts.cave, st = { type: o.type, layer: VL, d: arr, radius: o.radius, height: o.type === 'chamber' ? o.height : 0 }; L.caveStamps.push(st); sel = { kind: 'cavest', ref: st, i: 0 }; rebuildCaveCaps([caveStampCap(st)]); rebuildOverlays(); showSel(); commit(); return; }
   if (tool === 'bridge'){ if (!drawing) drawing = { kind: 'bridge', pts: [] }; drawing.pts.push(arr); rebuildOverlays(); return; }
   if (tool === 'landmark'){
     const m = { name: PT.LANDMARK_TYPES[opts.landmark.type] + ' ' + (L.landmarks.length + 1), type: opts.landmark.type, d: arr, height: opts.landmark.height, color: opts.landmark.color };
@@ -788,7 +845,7 @@ cv.addEventListener('pointermove', e => {
   if (ptr.mode === 'orbit' || ptr.mode === 'tilt'){
     const dx = px - ptr.x, dy = py - ptr.y; ptr.x = px; ptr.y = py;
     if (ptr.mode === 'tilt'){ cam.tilt = Math.max(0, Math.min(70, cam.tilt + dy*0.25)); $('vTilt').value = cam.tilt; $('oTilt').textContent = Math.round(cam.tilt) + '°'; return; }
-    const k = Math.max(0.0004, (cam.dist - R)/R*0.0016);
+    const k = Math.max(0.0004, (cam.dist - viewR())/R*0.0016);
     const right = new V3().crossVectors(cam.up, cam.dir).normalize();
     const q1 = new THREE.Quaternion().setFromAxisAngle(cam.up, -dx*k), q2 = new THREE.Quaternion().setFromAxisAngle(right, -dy*k);
     cam.dir.applyQuaternion(q1).applyQuaternion(q2).normalize(); cam.up.applyQuaternion(q2); fixUp();
@@ -797,8 +854,9 @@ cv.addEventListener('pointermove', e => {
   if (ptr.mode === 'move'){
     const d = groundPick(px, py); if (!d) return;
     const h = ptr.h, a = d.toArray();
-    if (h.kind === 'stamp' || h.kind === 'trail' || h.kind === 'bridge') h.ref.pts[h.i] = a; else h.ref.d = a;
+    if (h.kind === 'stamp' || h.kind === 'trail' || h.kind === 'bridge' || h.kind === 'tunnel') h.ref.pts[h.i] = a; else if (h.kind === 'ramp') rampHandleMove(h.ref, h.i, a); else h.ref.d = a;
     ptr.moved = true;
+    if (h.kind === 'tunnel' || h.kind === 'cavest'){ const c = h.kind === 'tunnel' ? tunnelCap(h.ref) : caveStampCap(h.ref); rebuildCaveCaps([ptr.cap0, c]); ptr.cap0 = c; }
     if (h.kind === 'stamp'){ const c = stampCap(h.ref); rebuildCaps([ptr.cap0, c]); ptr.cap0 = c; }
     rebuildOverlays();
     return;
@@ -807,12 +865,12 @@ cv.addEventListener('pointermove', e => {
 });
 const endPtr = () => {
   if (!ptr) return;
-  if (ptr.mode === 'move'){ if (ptr.moved){ if (ptr.h.kind === 'trail' && ptr.h.ref.carve){ rebuildCaps([ptr.cap0, pointCap(ptr.h.ref, ptr.h.i)]); rebuildOverlays(); } commit(); showSel(); } }
+  if (ptr.mode === 'move'){ if (ptr.moved){ if (ptr.h.kind === 'trail' && ptr.h.ref.carve){ rebuildCaps([ptr.cap0, pointCap(ptr.h.ref, ptr.h.i)]); rebuildOverlays(); } if (ptr.h.kind === 'ramp') rampRebuild(ptr.h.ref, ptr.cap0); commit(); showSel(); } }
   if (ptr.mode === 'sculpt' || ptr.mode === 'cliff') commit();
   ptr = null; if (tool === 'orbit') cv.style.cursor = 'grab';
 };
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
-cv.addEventListener('wheel', e => { e.preventDefault(); cam.dist = R + Math.max(R*0.03, Math.min(R*6, (cam.dist - R)*Math.exp(e.deltaY*0.0012))); }, { passive: false });
+cv.addEventListener('wheel', e => { e.preventDefault(); const Rv = viewR(); cam.dist = Rv + Math.max(Rv*0.03, Math.min(R*6, (cam.dist - Rv)*Math.exp(e.deltaY*0.0012))); }, { passive: false });
 
 // ---- sculpting: each frame the mouse is down, the brush works the sculpt layer's points inside it ----
 function sculptStep(dt){
@@ -904,8 +962,8 @@ cv.addEventListener('pointermove', e => {
   if (!touches.has(e.pointerId)) return; touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (!pinch || touches.size < 2) return; e.stopImmediatePropagation();
   const p = pinchInfo(), dx = p.x - pinch.x, dy = p.y - pinch.y; pinch.x = p.x; pinch.y = p.y;
-  cam.dist = R + Math.max(R*0.03, Math.min(R*6, (pinch.dist - R)*pinch.d/Math.max(10, p.d)));
-  const k = Math.max(0.0004, (cam.dist - R)/R*0.0016), right = new V3().crossVectors(cam.up, cam.dir).normalize();
+  const Rv = viewR(); cam.dist = Rv + Math.max(Rv*0.03, Math.min(R*6, (pinch.dist - Rv)*pinch.d/Math.max(10, p.d)));
+  const k = Math.max(0.0004, (cam.dist - Rv)/R*0.0016), right = new V3().crossVectors(cam.up, cam.dir).normalize();
   const q1 = new THREE.Quaternion().setFromAxisAngle(cam.up, -dx*k), q2 = new THREE.Quaternion().setFromAxisAngle(right, -dy*k);
   cam.dir.applyQuaternion(q1).applyQuaternion(q2).normalize(); cam.up.applyQuaternion(q2); fixUp();
 }, true);
@@ -921,9 +979,10 @@ addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'z'){ e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'y'){ e.preventDefault(); redo(); return; }
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
-  const tools = ['orbit', 'select', 'sculpt', 'stamp', 'trail', 'landmark', 'start', 'cliffs', 'bridge'];
-  if (k >= '1' && k <= '9'){ setTool(tools[+k - 1]); return; }
-  if (k === '0'){ setTool('model'); return; }
+  const tools = VL >= 0 ? ['orbit', 'select', 'tunnel', 'cave'] : ['orbit', 'select', 'sculpt', 'stamp', 'trail', 'landmark', 'start', 'cliffs', 'bridge'];
+  if (k >= '1' && k <= '9'){ if (tools[+k - 1]) setTool(tools[+k - 1]); return; }
+  if (k === '0'){ if (VL < 0) setTool('model'); return; }
+  if ((k === 'r' || k === 'R') && VL < 0){ setTool('ramp'); return; }
   if (k === 'Enter'){ if (drawing) finishDrawing(); return; }
   if (k === 'Escape'){ if (drawing){ drawing.pts.pop(); if (!drawing.pts.length) drawing = null; rebuildOverlays(); } else { sel = null; rebuildOverlays(); showSel(); } return; }
   if (k === 'Delete' || k === 'Backspace'){ e.preventDefault(); deleteSel(e.shiftKey); return; }
@@ -942,7 +1001,7 @@ const fmtM = m => m >= 1000 ? (m/1000).toFixed(2) + ' km' : Math.round(m) + ' m'
 function latLon(d){ const v = new V3(...d).normalize(), lat = Math.asin(v.y)/D2R, lon = Math.atan2(v.x, v.z)/D2R; return `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? 'N' : 'S'} ${Math.abs(lon).toFixed(1)}°${lon >= 0 ? 'E' : 'W'}`; }
 function trailLength(t){ const p = PT.curve(t.pts, t.closed, 3, R); let s = 0; for (let i = 1; i < p.length; i++) s += Math.acos(Math.min(1, p[i-1][0]*p[i][0] + p[i-1][1]*p[i][1] + p[i-1][2]*p[i][2]))*R; return s; }
 function nearTrailName(d){ const v = new V3(...d); for (const t of L.trails) for (const p of PT.curve(t.pts, t.closed, 4, R)) if (v.angleTo(new V3(...p))*R < 4) return t.name; return null; }
-function selDir(){ if (!sel) return null; const p = sel.ref.d || sel.ref.pts[sel.i]; return new V3(...p).normalize(); }
+function selDir(){ if (!sel) return null; const p = sel.ref.d || (sel.ref.pts ? sel.ref.pts[sel.i] : sel.ref.c); return new V3(...p).normalize(); }
 function readout(px, py){
   const d = groundPick(px, py);
   if (!d){ $('sPos').textContent = 'Move over the planet'; $('sH').textContent = $('sSlope').textContent = ''; cursorDir = null; return; }
@@ -957,7 +1016,7 @@ function readout(px, py){
 let cursorDir = null;
 const labelsEl = $('labels');
 function drawLabels(){
-  const items = L.landmarks.map(m => ({ text: m.name, d: m.d, lift: m.height + 4, cls: '' }))
+  const items = VL >= 0 ? caveLabels() : L.landmarks.map(m => ({ text: m.name, d: m.d, lift: m.height + 4, cls: '' }))
     .concat(L.trails.filter(t => t.pts.length).map(t => ({ text: t.name, d: t.pts[Math.floor(t.pts.length/2)], lift: 6, cls: 'trail' })))
     .concat(L.bridges.map(b => { const D = deckOf(b), i = Math.floor(D.pts.length/2); return { text: b.name, d: D.pts[i], lift: D.h[i] - D.g[i] + 5, cls: 'trail' }; }));
   while (labelsEl.children.length < items.length) labelsEl.appendChild(document.createElement('div'));
@@ -1007,6 +1066,237 @@ mini.addEventListener('click', e => {
   const lon = (x*2 - 1)*Math.PI, lat = (0.5 - y)*Math.PI;
   cam.dir.set(Math.cos(lat)*Math.sin(lon), Math.sin(lat), Math.cos(lat)*Math.cos(lon)); cam.up.set(0, 1, 0); fixUp(); miniOver = true;
 });
+
+// ============================================================================================================
+// underground: layers (nested planetoids), their caves, spiral ramps (planet-terrain.js: PT.rampBuild, PT.caveField)
+// ============================================================================================================
+let VL = -1, CF = null, caveChunks = [], NFC = 0, rampSel = -1;
+const caveG = new THREE.Group(); scene.add(caveG);
+const caveMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+const CUT = 10;      // a layer's solid rock is drawn cut level this far above its base, its tunnels and caves below
+// what the view shows at a direction, as a height above the base radius (and its colour): the surface, or the layer
+// being edited: its open floor (sand; orange where there's under 2.5 m of headroom, yellow under a skylight), its rock
+// cut level, and the pit (the land below this layer) as a dark hole
+function caveDisp(x, y, z, col){
+  const a = CF.at(x, y, z), base = -CF.depth; let h, c;
+  if (a.voidPit){ h = base - 25; c = [0.07, 0.09, 0.13]; }
+  else if (a.open){ h = base + a.floor; c = a.sky ? [0.97, 0.88, 0.5] : a.ceil - a.floor < 2.5 ? [0.93, 0.56, 0.3] : [0.84, 0.8, 0.71]; }
+  else { const t = Math.min(1, a.gap/4); h = base + a.gapFloor + (CUT - a.gapFloor)*(t*t*(3 - 2*t)); c = [0.37, 0.35, 0.34]; }   // (walls: up from the opening's floor to the cut over 4 m)
+  if (col){ col[0] = c[0]; col[1] = c[1]; col[2] = c[2]; }
+  return h;
+}
+const viewH = (x, y, z) => VL < 0 || !CF ? T.height(x, y, z) : caveDisp(x, y, z);
+function caveIndex(m){ const V = m + 1, idx = new Uint32Array(m*m*6); let q = 0; for (let j = 0; j < m; j++) for (let i = 0; i < m; i++){ const a = j*V + i, b = a + 1, c = a + V, d = c + 1; idx[q++] = a; idx[q++] = b; idx[q++] = c; idx[q++] = b; idx[q++] = d; idx[q++] = c; } return idx; }
+function buildCaveChunk(c){
+  const m = NFC/CH, M = m + 3, V = m + 1, P = new Float32Array(M*M*3), C = new Float32Array(M*M*3), col = [0, 0, 0];
+  for (let j = 0; j < M; j++) for (let i = 0; i < M; i++){
+    const gi = c.ci*m + i - 1, gj = c.cj*m + j - 1; faceDir(c.f, gi, gj, _d, NFC); _d.normalize();
+    const h = caveDisp(_d.x, _d.y, _d.z, col), r = R + h, o = (j*M + i)*3; P[o] = _d.x*r; P[o + 1] = _d.y*r; P[o + 2] = _d.z*r; C[o] = col[0]; C[o + 1] = col[1]; C[o + 2] = col[2];
+  }
+  const pos = new Float32Array(V*V*3), nor = new Float32Array(V*V*3), cols = new Float32Array(V*V*3);
+  for (let j = 0; j <= m; j++) for (let i = 0; i <= m; i++){
+    const o = ((j + 1)*M + i + 1)*3, k = (j*V + i)*3, a = o + 3, b = o - 3, cc = o + M*3, d = o - M*3;
+    pos[k] = P[o]; pos[k + 1] = P[o + 1]; pos[k + 2] = P[o + 2]; cols[k] = C[o]; cols[k + 1] = C[o + 1]; cols[k + 2] = C[o + 2];
+    const ux = P[a] - P[b], uy = P[a + 1] - P[b + 1], uz = P[a + 2] - P[b + 2], wx = P[cc] - P[d], wy = P[cc + 1] - P[d + 1], wz = P[cc + 2] - P[d + 2];
+    let nx = uy*wz - uz*wy, ny = uz*wx - ux*wz, nz = ux*wy - uy*wx; const Ln = Math.hypot(nx, ny, nz) || 1; nor[k] = nx/Ln; nor[k + 1] = ny/Ln; nor[k + 2] = nz/Ln;
+  }
+  if (!c.mesh){ const g = new THREE.BufferGeometry(); g.setIndex(new THREE.BufferAttribute(caveIndex(m), 1));
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    c.mesh = new THREE.Mesh(g, caveMat); caveG.add(c.mesh); }
+  else { const g = c.mesh.geometry; g.attributes.position.array.set(pos); g.attributes.normal.array.set(nor); g.attributes.color.array.set(cols); g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = g.attributes.color.needsUpdate = true; }
+  c.mesh.geometry.computeBoundingSphere();
+}
+function freshCF(){ CF = VL >= 0 ? PT.caveField(L, VL, R, T.under, T.ramps || []) : null; }
+function buildCave(){
+  for (const c of caveChunks){ caveG.remove(c.mesh); c.mesh.geometry.dispose(); } caveChunks = [];
+  globe.visible = VL < 0; modelG.visible = VL < 0; freshCF(); if (VL < 0) return;
+  const Rk = R - CF.depth; NFC = Math.min(320, Math.max(64, Math.ceil(Math.PI/2*Rk/2.2/CH)*CH)); const m = NFC/CH;
+  for (let f = 0; f < 6; f++) for (let cj = 0; cj < CH; cj++) for (let ci = 0; ci < CH; ci++){
+    const c = { f, ci, cj, c: new V3(), ang: 0 }; faceDir(f, ci*m + m/2, cj*m + m/2, c.c, NFC); c.c.normalize();
+    for (const [a, b] of [[0, 0], [m, 0], [0, m], [m, m]]){ faceDir(f, ci*m + a, cj*m + b, _d, NFC); c.ang = Math.max(c.ang, c.c.angleTo(_d.normalize())); }
+    buildCaveChunk(c); caveChunks.push(c);
+  }
+}
+function rebuildCaveCaps(caps){ if (VL < 0) return; freshCF(); for (const c of caveChunks) if (caps.some(([d, a]) => c.c.angleTo(d) < a + c.ang + 0.002)) buildCaveChunk(c); }
+const capOf = (pts, pad) => { const v = pts.map(p => new V3(...p).normalize()), c = v.reduce((a, p) => a.add(p), new V3()).normalize(); let ang = 0; for (const p of v) ang = Math.max(ang, c.angleTo(p)); return [c, ang + pad/R]; };
+const tunnelCap = t => capOf(t.pts, (t.width || 6) + 30);
+const caveStampCap = st => capOf([st.d], st.radius + 10);
+function setLayer(k){
+  if (drawing) finishDrawing();
+  VL = k; document.body.classList.toggle('lm', k >= 0); sel = null;
+  if (k >= 0 && !['orbit', 'select', 'tunnel', 'cave'].includes(tool)) setTool('select');
+  if (k < 0 && ['tunnel', 'cave'].includes(tool)) setTool('select');
+  busy(() => { buildCave(); rebuildOverlays(); showSel(); }); ugSync();
+}
+const escH = v => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function ugSync(){
+  if (!L.layers) L.layers = []; if (!L.tunnels) L.tunnels = []; if (!L.caveStamps) L.caveStamps = []; if (!L.ramps) L.ramps = [];
+  $('ugView').innerHTML = '<option value="-1">The surface</option>' + L.layers.map((l, i) => `<option value="${i}">${escH(l.name)} (${l.depth} m down)</option>`).join('');
+  $('ugView').value = VL;
+  $('ugLayers').innerHTML = L.layers.map((l, i) => `<div class="ugRow"><input type="text" data-i="${i}" data-k="name" value="${escH(l.name)}" aria-label="Layer name"><input type="number" data-i="${i}" data-k="depth" value="${l.depth}" step="0.5" min="5" max="${R - 30}" aria-label="Depth"><span>m</span><button type="button" data-del="${i}" aria-label="Remove layer">✕</button></div>`).join('');
+}
+$('ugView').addEventListener('change', e => { setLayer(+e.target.value); e.target.blur(); });
+$('ugLayers').addEventListener('change', e => { const el = e.target, i = +el.dataset.i, l = L.layers[i]; if (!l) return;
+  if (el.dataset.k === 'name'){ l.name = el.value || 'Layer'; ugSync(); commit(); return; }
+  l.depth = Math.max(5, Math.min(R - 30, +el.value || l.depth)); ugSync(); layersChanged(); commit(); });
+$('ugLayers').addEventListener('click', e => { const b = e.target.closest('button[data-del]'); if (!b) return; const i = +b.dataset.del;
+  L.layers.splice(i, 1);
+  L.tunnels = L.tunnels.filter(t => t.layer !== i); for (const t of L.tunnels) if (t.layer > i) t.layer--;
+  L.caveStamps = L.caveStamps.filter(c => c.layer !== i); for (const c of L.caveStamps) if (c.layer > i) c.layer--;
+  for (const rp of L.ramps) for (const sg of rp.segs) if (sg.link === i) sg.link = -1; else if (sg.link > i) sg.link--;
+  if (VL >= L.layers.length || VL === i) VL = -1; document.body.classList.toggle('lm', VL >= 0);
+  ugSync(); layersChanged(); commit(); });
+$('ugAdd').addEventListener('click', () => { const last = L.layers.reduce((m, l) => Math.max(m, l.depth), 0);
+  L.layers.push({ name: 'Layer ' + (L.layers.length + 1), depth: Math.min(R - 30, last + 70) }); ugSync(); layersChanged(); commit(); $('ugAdd').blur(); });
+// a layer's depth moves the plateaus it leads, and so the ramps
+function layersChanged(){ busy(() => { if (L.ramps.length) rebuildCaps(L.ramps.map(rampCap)); buildCave(); rebuildOverlays(); showSel(); }); }
+
+// ---- ramps: worked out from the land (cheap), drawn at their beds' heights; the ground is rebuilt when one changes
+const rampCache = new Map();
+function rampB(rp){ const key = JSON.stringify([rp.c, rp.turn, rp.start, rp.top, rp.width, rp.maxGrade, rp.rMax, rp.segs, L.layers.map(l => l.depth), R]), c = rampCache.get(rp);
+  if (c && c.key === key && c.T === T) return c.B; const B = PT.rampBuild(rp, T.under, R, L.layers); rampCache.set(rp, { key, T, B }); return B; }
+function rampCap(rp){ const B = rampB(rp); let r = 0; for (const p of B.pts) r = Math.max(r, Math.acos(Math.min(1, p[0]*B.c[0] + p[1]*B.c[1] + p[2]*B.c[2]))); return [new V3(...B.c), r + 20/R]; }
+function rampRebuild(rp, oldCap){ busy(() => { rebuildCaps(oldCap ? [oldCap, rampCap(rp)] : [rampCap(rp)]); buildCave(); rebuildOverlays(); showSel(); }); }
+function rampFrame(c){ const C = new V3(...c).normalize(), a0 = Math.abs(C.y) < 0.9 ? new V3(0, 1, 0) : new V3(1, 0, 0), e = new V3().crossVectors(a0, C).normalize(), n = new V3().crossVectors(C, e); return { C, e, n }; }
+function rampHandleMove(rp, i, a){
+  if (i === 0){ rp.c = a; return; }
+  const { C, e, n } = rampFrame(rp.c), v = new V3(...a).sub(C); rp.start = Math.round(Math.atan2(v.dot(n), v.dot(e))/D2R*10)/10;
+}
+function createRamp(p){
+  let pit = null, best = Infinity; const P = new V3(...p);
+  for (const s of L.stamps) if (['pit', 'crater', 'basin'].includes(s.type) && s.pts.length === 1){ const dd = P.angleTo(new V3(...s.pts[0]))*R; if (dd < s.radius && dd < best){ best = dd; pit = s; } }
+  const c = pit ? pit.pts[0].slice() : p, { C, e, n } = rampFrame(c), v = P.clone().sub(C);
+  const start = Math.atan2(v.dot(n), v.dot(e))/D2R, top = T.under(...p), bottom = T.under(...c) + 3, G = PT.rampDefaults(), segs = [];
+  let h = top;
+  for (const [k, l] of L.layers.map((l, k) => [k, l]).sort((x, y) => x[1].depth - y[1].depth)){ const t = -l.depth; if (t >= h - 1 || t <= bottom) continue;
+    segs.push({ k: 'slope', grade: G.grade, len: Math.round((h - t)/G.grade) }); segs.push({ k: 'plateau', len: G.plateauLen, wide: G.plateauWide, link: k, lead: 'layer', door: { at: G.plateauLen/2 } }); h = t; }
+  if (h > bottom + 1) segs.push({ k: 'slope', grade: G.grade, len: Math.round((h - bottom)/G.grade) });
+  if (!segs.length) segs.push({ k: 'slope', grade: G.grade, len: 100 });
+  const rp = { name: 'Ramp ' + (L.ramps.length + 1), c, turn: 1, start: Math.round(start*10)/10, top: Math.round(top*10)/10, width: G.width, maxGrade: G.maxGrade, segs };
+  L.ramps.push(rp); sel = { kind: 'ramp', ref: rp, i: 0 }; rampSel = -1; rampRebuild(rp); commit();
+}
+// each ramp: its line at its bed's heights (slopes blue, plateaus green, too steep red), its middle and start as handles,
+// and each entrance (the door: click it to pick its plateau)
+function drawRamps(isSel){
+  for (const rp of L.ramps || []){
+    const B = rampB(rp), on = isSel('ramp', rp), at = (i, lift = 0.6) => new V3(...B.pts[i]).multiplyScalar(R + B.h[i] + lift);
+    B.segs.forEach((sg, si) => { const i0 = Math.round(sg.s0/2), i1 = Math.min(B.pts.length - 1, Math.round(sg.s1/2)); if (i1 <= i0) return;
+      const pts = []; for (let i = i0; i <= i1; i++) pts.push(at(i));
+      const col = sg.warn ? 0xff4d4d : sg.k === 'plateau' ? (on && si === rampSel ? 0x9dffb0 : 0x36d46a) : (on ? 0x5b9cf0 : 0x7fd1ff);
+      over.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: col, depthTest: VL < 0 }))); });
+    for (const d of B.doors){ const m = new THREE.Mesh(handleGeo, handleMat(0xffb020)); m.renderOrder = 10; m.position.copy(new V3(...d.mouth).multiplyScalar(R + d.h + 2)); m.userData.big = 1.2; over.add(m); handles.push({ obj: m, kind: 'door', ref: rp, i: d.seg, d: d.mouth }); }
+    if (VL < 0){ addHandle('ramp', rp, 0, rp.c, on ? 0x5b9cf0 : 0x7fd1ff, 1.3); const h0 = new THREE.Mesh(handleGeo, handleMat(on ? 0x5b9cf0 : 0x7fd1ff)); h0.renderOrder = 10; h0.position.copy(at(0, 1.2)); h0.userData.big = 1.1; over.add(h0); handles.push({ obj: h0, kind: 'ramp', ref: rp, i: 1, d: B.pts[0] }); }
+  }
+}
+// a tunnel that starts (or ends) at an entrance's tunnel carries on from it, at its height
+function tunnelSnap(t){
+  const snapped = [false, false];
+  for (const B of T.ramps || []) for (const d of B.doors){ if (d.link !== t.layer || !d.aditEnd) continue;
+    for (const end of [0, t.pts.length - 1]){ if (new V3(...t.pts[end]).angleTo(new V3(...d.aditEnd))*R < 12){ t.pts[end] = d.aditEnd.slice(); t[end === 0 ? 'h0' : 'h1'] = +d.aditH.toFixed(1); snapped[end ? 1 : 0] = true; } } }
+  // (joined at one end only: it stays at that entrance's height, level, until you set the other end)
+  if (snapped[0] && !snapped[1]) t.h1 = t.h0; else if (snapped[1] && !snapped[0]) t.h0 = t.h1;
+}
+function drawCaveOverlays(isSel){
+  const other = (L.tunnels || []).filter(t => t.layer !== VL && Math.abs(t.layer - VL) === 1);
+  for (const t of other) over.add(lineOn(PT.curve(t.pts, false, 4, R), 0x9aa8b8, 1, false, 0.45));       // the layers either side, faint
+  if (VL === 0) for (const t of L.trails) if (t.pts.length > 1) over.add(lineOn(PT.curve(t.pts, !!t.closed, 6, R), 0xcfd8e2, 1, !!t.closed, 0.3));   // the surface's trails, faint
+  for (const t of L.tunnels.filter(t => t.layer === VL)){ const col = isSel('tunnel', t) ? 0x5b9cf0 : 0xffffff;
+    over.add(lineOn(PT.curve(t.pts, false, 3, R), col, 1.2, false)); t.pts.forEach((p, i) => addHandle('tunnel', t, i, p, col, 0.8)); }
+  for (const st of L.caveStamps.filter(c => c.layer === VL)){ const col = isSel('cavest', st) ? 0x5b9cf0 : st.type === 'pillar' ? 0xb8a890 : 0xffe08a;
+    over.add(lineOn(circlePts(st.d, st.radius), col, 1.5, true, 0.8)); addHandle('cavest', st, 0, st.d, col, 1.1); }
+  drawing && drawing.pts.length && over.add(lineOn(PT.curve(drawing.pts, false, 4, R), 0x5b9cf0, 2, false));
+}
+function caveLabels(){
+  return L.tunnels.filter(t => t.layer === VL && t.pts.length).map(t => ({ text: t.name, d: t.pts[Math.floor(t.pts.length/2)], lift: 4, cls: 'trail' }))
+    .concat((T.ramps || []).flatMap(B => B.doors.filter(d => d.link === VL).map(d => ({ text: 'Entrance', d: d.mouth, lift: 6, cls: '' }))));
+}
+// ---- the selection panel's underground parts
+function ugSelParts(parts){
+  if (sel.kind === 'tunnel'){
+    const t = sel.ref, cap0 = tunnelCap(t), len = PT.evenCurve(t.pts, false, 2, R).length*2, gr = Math.abs(t.h1 - t.h0)/Math.max(1, len), Ly = L.layers[t.layer], up = Ly && t.layer > 0 ? Ly.depth - L.layers[t.layer - 1].depth : null;
+    const re = () => { rebuildCaveCaps([cap0, tunnelCap(t)]); rebuildOverlays(); };
+    parts.push({ html: `<label class="f" for="slName">Name<input id="slName" type="text" style="grid-column:1/-1"></label>`, bind(){ const n = $('slName'); n.value = t.name; n.addEventListener('input', () => { t.name = n.value; drawLabels(); }); n.addEventListener('change', () => { commit(); n.blur(); }); } });
+    parts.push(slider('slTW', 'Width', 2, 20, 0.5, () => t.width, v => { t.width = v; re(); }, v => v + ' m'));
+    parts.push(slider('slTH', 'Height', 2, 30, 0.5, () => t.height, v => { t.height = v; re(); }, v => v + ' m'));
+    parts.push({ html: `<label class="f" for="slT0">Floor at the start (m above the layer's base)<input id="slT0" type="number" step="0.1" style="grid-column:1/-1"></label><label class="f" for="slT1">Floor at the end<input id="slT1" type="number" step="0.1" style="grid-column:1/-1"></label><p class="hint">${fmtM(len)} long, its floor ${gr > 0.005 ? (t.h1 > t.h0 ? 'rising' : 'falling') + ' at ' + Math.round(gr*100) + '%' : 'level'}${gr > 0.25 ? ' <b style="color:var(--accent)">(steep)</b>' : ''}. ${up !== null ? `Its ceiling can rise ${(up - Math.max(t.h0, t.h1)).toFixed(0)} m before it opens into the layer above.` : 'Where its ceiling reaches the surface it opens as a skylight.'} Ends within 12 m of an entrance's tunnel join it when drawn.</p>`,
+      bind(){ for (const [id, k] of [['slT0', 'h0'], ['slT1', 'h1']]){ const el = $(id); el.value = t[k]; el.addEventListener('change', () => { t[k] = +el.value || 0; re(); commit(); setTimeout(showSel, 0); }); } } });
+  }
+  if (sel.kind === 'cavest'){
+    const st = sel.ref, cap0 = caveStampCap(st), re = () => { rebuildCaveCaps([cap0, caveStampCap(st)]); rebuildOverlays(); };
+    parts.push({ html: `<p class="hint">${PT.CAVE_STAMPS[st.type]} in ${escH((L.layers[st.layer] || {}).name || 'a layer')}.</p>`, bind(){} });
+    parts.push(slider('slCR', 'Radius', 2, 80, 1, () => st.radius, v => { st.radius = v; re(); }, v => v + ' m'));
+    if (st.type === 'chamber') parts.push(slider('slCH', 'Height', 3, 60, 1, () => st.height, v => { st.height = v; re(); }, v => v + ' m'));
+  }
+  if (sel.kind === 'ramp') rampPanel(parts, sel.ref);
+}
+function rampPanel(parts, rp){
+  const B = rampB(rp), cap0 = rampCap(rp), changed = () => { rampRebuild(rp, cap0); commit(); };
+  const layerOpts = cur => '<option value="-1">no layer</option>' + L.layers.map((l, i) => `<option value="${i}"${i === cur ? ' selected' : ''}>${escH(l.name)}</option>`).join('');
+  parts.push({ html: `<label class="f" for="slName">Name<input id="slName" type="text" style="grid-column:1/-1"></label>`, bind(){ const n = $('slName'); n.value = rp.name; n.addEventListener('input', () => { rp.name = n.value; }); n.addEventListener('change', () => { commit(); n.blur(); }); } });
+  parts.push(seg('slRT', [['1', 'Clockwise'], ['-1', 'Anticlockwise']], () => String(rp.turn), k => { rp.turn = +k; changed(); }));
+  parts.push({ html: `<label class="f" for="slRS">Starts at (degrees round)<input id="slRS" type="number" step="0.5" style="grid-column:1/-1"></label><label class="f" for="slRTop">Starts at height (m)<input id="slRTop" type="number" step="0.1" style="grid-column:1/-1"></label><label class="f" for="slRW">Width (slopes, m)<input id="slRW" type="number" step="0.5" min="2" style="grid-column:1/-1"></label><label class="f" for="slRG">Steepest a slope may get (%)<input id="slRG" type="number" step="0.5" min="2" style="grid-column:1/-1"></label>`,
+    bind(){ for (const [id, k, f, g] of [['slRS', 'start', v => v, v => v], ['slRTop', 'top', v => v, v => v], ['slRW', 'width', v => Math.max(2, v), v => v], ['slRG', 'maxGrade', v => Math.max(0.02, v/100), v => +(v*100).toFixed(1)]]){
+      const el = $(id); el.value = g(rp[k] ?? PT.rampDefaults()[k]); el.addEventListener('change', () => { rp[k] = f(+el.value); changed(); }); } } });
+  const rows = rp.segs.map((sg, i) => { const b = B.segs[i] || {}, on = i === rampSel ? ' on' : '', wn = b.warn ? ' warn' : '';
+    const hh = `<span class="full">${fmtM(b.s0 || 0)}–${fmtM(b.s1 || 0)} along, height ${(b.h0 ?? 0).toFixed(1)} → ${(b.h1 ?? 0).toFixed(1)} m</span>`;
+    const head = `<select data-i="${i}" data-f="k"><option value="slope"${sg.k === 'slope' ? ' selected' : ''}>Slope</option><option value="plateau"${sg.k === 'plateau' ? ' selected' : ''}>Plateau</option></select><span></span><span>long</span><input type="number" step="0.5" min="0" data-i="${i}" data-f="len" value="${sg.len}">`;
+    const body = sg.k === 'slope'
+      ? `<span>grade %</span><input type="number" step="0.1" data-i="${i}" data-f="grade" value="${+(sg.grade*100).toFixed(2)}"><span class="full">${Math.abs(b.eff - sg.grade) > 0.0005 ? `scaled to <b>${(b.eff*100).toFixed(1)}%</b> to meet the plateau after it` : ''}</span>`
+      : `<span>wide</span><input type="number" step="0.5" min="2" data-i="${i}" data-f="wide" value="${sg.wide ?? 12}"><span>layer</span><select data-i="${i}" data-f="link">${layerOpts(sg.link ?? -1)}</select>` +
+        ((sg.link ?? -1) >= 0 ? `<span class="full"><select data-i="${i}" data-f="lead"><option value="layer"${(sg.lead || 'layer') === 'layer' ? ' selected' : ''}>the layer sets its height</option><option value="plateau"${sg.lead === 'plateau' ? ' selected' : ''}>its height sets the layer's tunnel</option></select></span>` +
+          `<label class="c full" style="margin-top:0"><input type="checkbox" data-i="${i}" data-f="door"${sg.door ? ' checked' : ''}> Entrance</label>` + (sg.door ? `<span>at (m)</span><input type="number" step="0.5" min="0" data-i="${i}" data-f="at" value="${sg.door.at ?? 15}"><span class="full">${(() => { const Ly = L.layers[sg.link]; return Ly ? `${(b.h0 + Ly.depth) >= 0 ? '+' : ''}${(b.h0 + Ly.depth).toFixed(1)} m from the layer's base` : ''; })()}</span>` : '') : '');
+    return `<div class="rsRow${on}${wn}" data-row="${i}">${head}${body}${hh}${b.warn ? `<span class="wn">${b.warn}</span>` : ''}<span class="full row" style="margin-top:0"><button type="button" data-i="${i}" data-act="up">↑</button><button type="button" data-i="${i}" data-act="down">↓</button><button type="button" data-i="${i}" data-act="dup">Copy</button><button type="button" data-i="${i}" data-act="del">✕</button></span></div>`; }).join('');
+  parts.push({ html: `<h3>Segments, from the top</h3><div class="rs" id="rsList">${rows}</div><div class="row"><button id="rsAddS" type="button">Add a slope</button><button id="rsAddP" type="button">Add a plateau</button></div><p class="hint">${fmtM(B.L)} long, ${B.h[0].toFixed(0)} m to ${B.h[B.h.length - 1].toFixed(0)} m${B.off ? ` <b style="color:var(--accent)">(${B.off*2} m of it off the wall: the land there isn't as high or low as the ramp)</b>` : ''}. Number boxes take arrow keys for fine steps; the strip below drags the joins.</p>`,
+    bind(){ const list = $('rsList'), G = PT.rampDefaults();
+      list.addEventListener('change', e => { const el = e.target, i = +el.dataset.i, sg = rp.segs[i], f = el.dataset.f; if (!sg || !f) return;
+        if (f === 'k'){ sg.k = el.value; if (sg.k === 'plateau'){ sg.wide = sg.wide ?? G.plateauWide; sg.link = sg.link ?? -1; } else sg.grade = sg.grade || G.grade; }
+        else if (f === 'len') sg.len = Math.max(0, +el.value || 0); else if (f === 'grade') sg.grade = (+el.value || 0)/100; else if (f === 'wide') sg.wide = Math.max(2, +el.value || 12);
+        else if (f === 'link') sg.link = +el.value; else if (f === 'lead') sg.lead = el.value; else if (f === 'door') sg.door = el.checked ? { at: sg.len/2 } : undefined; else if (f === 'at') sg.door = { at: Math.max(0, +el.value || 0) };
+        rampSel = i; changed(); });
+      list.addEventListener('click', e => { const b = e.target.closest('button[data-act]'); const row = e.target.closest('[data-row]'); if (row && !b && rampSel !== +row.dataset.row){ rampSel = +row.dataset.row; for (const r of list.children) r.classList.toggle('on', r === row); rebuildOverlays(); drawStrip(); }
+        if (!b) return; const i = +b.dataset.i, a = b.dataset.act, S = rp.segs;
+        if (a === 'del'){ if (S.length > 1) S.splice(i, 1); } else if (a === 'dup') S.splice(i + 1, 0, JSON.parse(JSON.stringify(S[i])));
+        else if (a === 'up' && i > 0) [S[i - 1], S[i]] = [S[i], S[i - 1]]; else if (a === 'down' && i < S.length - 1) [S[i + 1], S[i]] = [S[i], S[i + 1]];
+        changed(); });
+      $('rsAddS').addEventListener('click', () => { rp.segs.push({ k: 'slope', grade: G.grade, len: 100 }); changed(); });
+      $('rsAddP').addEventListener('click', () => { rp.segs.push({ k: 'plateau', len: G.plateauLen, wide: G.plateauWide, link: -1, lead: 'layer' }); changed(); }); } });
+}
+// ---- the profile strip: the selected ramp unrolled (along it, across; height, up), its segments, the layers' depths;
+// drag a join between two segments to lengthen or shorten the one before it
+const strip = $('strip'), stripC = $('stripC'), sg2 = stripC.getContext('2d');
+let stripDrag = null, stripView = null;
+function drawStrip(){
+  const on = !!(sel && sel.kind === 'ramp'); strip.classList.toggle('on', on); if (!on) return;
+  const rp = sel.ref, B = stripDrag ? PT.rampBuild(rp, T.under, R, L.layers) : rampB(rp), dpr = Math.min(2, devicePixelRatio || 1), w = stripC.clientWidth, h = stripC.clientHeight;
+  if (!w || !h) return; if (stripC.width !== Math.round(w*dpr) || stripC.height !== Math.round(h*dpr)){ stripC.width = Math.round(w*dpr); stripC.height = Math.round(h*dpr); }
+  const g = sg2; g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+  const css = getComputedStyle(document.documentElement), ink = css.getPropertyValue('--ink').trim() || '#1d2a36', muted = css.getPropertyValue('--muted').trim() || '#5d7083', acc = css.getPropertyValue('--accent').trim() || '#d2462e';
+  let lo = Math.min(...B.h), hi = Math.max(...B.h); for (const l of L.layers){ lo = Math.min(lo, -l.depth); hi = Math.max(hi, -l.depth); } lo -= 6; hi += 6;
+  const padL = 44, padB = 14, X = s => padL + s/Math.max(1, B.L)*(w - padL - 6), Y = v => 4 + (hi - v)/(hi - lo)*(h - padB - 8);
+  stripView = { X, B, rp };
+  g.font = '10px ' + (css.getPropertyValue('--mono') || 'monospace'); g.fillStyle = muted; g.strokeStyle = muted; g.lineWidth = 1;
+  // the layers' depths
+  L.layers.forEach(l => { const y = Y(-l.depth); g.setLineDash([4, 4]); g.globalAlpha = 0.7; g.beginPath(); g.moveTo(padL, y); g.lineTo(w - 4, y); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; g.fillText(l.name, padL + 4, y - 3); g.fillText(-l.depth + ' m', 2, y + 3); });
+  g.fillText(hi.toFixed(0) + ' m', 2, 10);
+  // the ramp, segment by segment
+  B.segs.forEach((sg, i) => { const i0 = Math.round(sg.s0/2), i1 = Math.min(B.pts.length - 1, Math.round(sg.s1/2));
+    g.strokeStyle = sg.warn ? acc : sg.k === 'plateau' ? '#2fb85c' : '#3b82d6'; g.lineWidth = i === rampSel ? 4 : 2.2; g.beginPath();
+    for (let k = i0; k <= i1; k++){ const x = X(B.s[k]), y = Y(B.h[k]); k === i0 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
+    if (sg.k === 'slope' && X(sg.s1) - X(sg.s0) > 40){ g.fillStyle = sg.warn ? acc : ink; g.fillText((sg.eff*100).toFixed(1) + '%', (X(sg.s0) + X(sg.s1))/2 - 12, Y((sg.h0 + sg.h1)/2) - 6); }
+    // the join after it
+    if (i < B.segs.length - 1){ const x = X(sg.s1); g.strokeStyle = ink; g.lineWidth = 1; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(x, Y(sg.h1) - 9); g.lineTo(x, Y(sg.h1) + 9); g.stroke(); g.globalAlpha = 1; } });
+  for (const d of B.doors){ const x = X(d.at), y = Y(d.h); g.fillStyle = '#ffb020'; g.beginPath(); g.moveTo(x, y - 3); g.lineTo(x - 5, y - 12); g.lineTo(x + 5, y - 12); g.closePath(); g.fill(); }
+  g.fillStyle = muted; g.fillText('0', padL, h - 2); g.fillText(fmtM(B.L), w - 50, h - 2);
+  $('stripT').textContent = rp.name; $('stripI').textContent = `${fmtM(B.L)} · ${B.h[0].toFixed(0)} → ${B.h[B.h.length - 1].toFixed(0)} m · ${B.doors.length} entrance${B.doors.length === 1 ? '' : 's'}`;
+}
+stripC.addEventListener('pointerdown', e => { if (!stripView) return; const r = stripC.getBoundingClientRect(), x = e.clientX - r.left, { X, B, rp } = stripView;
+  let best = -1, bd = 8; B.segs.forEach((sg, i) => { if (i < B.segs.length - 1){ const d = Math.abs(X(sg.s1) - x); if (d < bd){ bd = d; best = i; } } });
+  if (best >= 0){ stripDrag = { i: best, cap0: rampCap(rp), s0: B.segs[best].s0 }; stripC.setPointerCapture(e.pointerId); return; }
+  const i = B.segs.findIndex(sg => x >= X(sg.s0) && x <= X(sg.s1)); if (i >= 0){ rampSel = i; showSel(); rebuildOverlays(); } });
+stripC.addEventListener('pointermove', e => { if (!stripDrag || !stripView) return; const r = stripC.getBoundingClientRect(), x = e.clientX - r.left, { X, B, rp } = stripView;
+  const s = (x - 44)/(r.width - 44 - 6)*B.L, sg = rp.segs[stripDrag.i]; sg.len = Math.max(0, Math.round((s - stripDrag.s0)*2)/2); drawStrip(); });
+stripC.addEventListener('pointerup', () => { if (!stripDrag) return; const d = stripDrag; stripDrag = null; rampSel = d.i; rampRebuild(sel.ref, d.cap0); commit(); });
+addEventListener('resize', () => drawStrip());
 
 // ============================================================================================================
 // planet settings, file actions, Ski here
@@ -1069,6 +1359,7 @@ async function tcPlan(){
   $('tcStatus').textContent = `Planned in ${((performance.now() - t0)/1000).toFixed(1)} s. ${m2(s.toSkiable)} becomes skiable (steep mistakes and thin strips smoothed away, trails' benches and slots cut back), ${m2(s.toUnskiable)} becomes unskiable (narrow gaps closed). ${s.walls} thin tall wall${s.walls === 1 ? '' : 's'} kept; ${s.slots} slot${s.slots === 1 ? '' : 's'} and ${s.saddles} saddle${s.saddles === 1 ? '' : 's'} through ridges. Check: ${s.check.bedsBlocked ? s.check.bedsBlocked + ' trail bed points blocked, ' : 'every trail bed skiable, '}${s.check.thinLeft ? m2(s.check.thinLeft) + ' of thin strip left' : 'no thin strips left'} besides the kept walls.`;
   tcList(P.notes.map(n => [n.text, n.at]));
 }
+ugSync();
 if (L.clean && L.clean.tiles.size){ $('tcStatus').textContent = 'A terrain cleanup is applied.'; cleanStaleCheck(); } tcSync();
 $('tcPlan').addEventListener('click', () => { $('tcPlan').blur(); tcRun(tcPlan); });
 $('tcApply').addEventListener('click', () => { $('tcApply').blur(); tcRun(async () => {
@@ -1157,7 +1448,7 @@ $('vTilt').addEventListener('input', () => { cam.tilt = +$('vTilt').value; $('oT
 $('vTilt').addEventListener('change', () => $('vTilt').blur());
 $('vSlope').addEventListener('change', () => { terrainMat.uniforms.uSlope.value = $('vSlope').checked ? 1 : 0; $('vSlope').blur(); });
 function busy(fn){ $('busy').style.display = 'block'; requestAnimationFrame(() => setTimeout(() => { fn(); $('busy').style.display = 'none'; }, 0)); }
-function replaceLayout(NL){ undoStack.push(snapshot()); redoStack.length = 0; const old = L.radius; L = NL; syncSlopeUniforms(); cam.dist *= L.radius/old; sel = null; drawing = null; lastSnap = snapshot(); busy(() => { buildGlobe(); rebuildOverlays(); miniDirty(); }); syncPlanetUI(); showSel(); tcSync(); autosave(); }
+function replaceLayout(NL){ undoStack.push(snapshot()); redoStack.length = 0; const old = L.radius; L = NL; VL = -1; CF = null; document.body.classList.remove('lm'); globe.visible = modelG.visible = true; for (const c of caveChunks){ caveG.remove(c.mesh); c.mesh.geometry.dispose(); } caveChunks = []; ugSync(); syncSlopeUniforms(); cam.dist *= L.radius/old; sel = null; drawing = null; lastSnap = snapshot(); busy(() => { buildGlobe(); rebuildOverlays(); miniDirty(); }); syncPlanetUI(); showSel(); tcSync(); autosave(); }
 $('bNew').addEventListener('click', () => { if (confirmReplace()) replaceLayout(Object.assign(PT.blankLayout(L.radius), { sculpt: PT.newSculpt(128) })); });
 $('bExample').addEventListener('click', () => { if (confirmReplace()) replaceLayout(PT.exampleLayout(L.radius)); });
 function confirmReplace(){ return true; }   // (undo brings the old one back)
@@ -1215,7 +1506,7 @@ resize(); syncPlanetUI(); syncSlopeUniforms(); setTool('orbit');
 $('oContour').textContent = CONTOURS[2] + ' m'; terrainMat.uniforms.uCi.value = CONTOURS[2]; $('oTilt').textContent = '0°';
 busy(() => {
   buildGlobe(); rebuildOverlays(); renderMiniTerrain(); showSel();
-  window.__editor = { get L(){ return L; }, get T(){ return T; }, setTool, undo, redo, commit, opts,
+  window.__editor = { get L(){ return L; }, get T(){ return T; }, get VL(){ return VL; }, get CF(){ return CF; }, setLayer, createRamp, rampB, screenOf: d => { const p = surf(d, 0).project(camera); return [(p.x + 1)/2*W, (1 - p.y)/2*H]; }, setTool, undo, redo, commit, opts,
     stroke(mode, dir, frames, dt = 1/30){ ptr = { mode, dir: new V3(dir.x, dir.y, dir.z).normalize(), goals: new Map(), target: 0 }; for (let i = 0; i < frames; i++) mode === 'cliff' ? cliffStep(dt) : sculptStep(dt); ptr = null; }, groundPick, handlePick, cam, get sel(){ return sel; }, finishDrawing, get chunks(){ return chunks; }, get handles(){ return handles; }, camera, modelObjs };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 });

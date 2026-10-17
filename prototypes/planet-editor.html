@@ -120,10 +120,12 @@ button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
   <div class="row"><button id="bClean" type="button">Clean up</button></div>
   <p class="hint" id="cleanNote">Trails running side by side within the join distance always ski and carve as one. Clean up also thins crowded points, joins points of different trails that nearly meet, snaps loose ends onto the trail they stop short of, and eases small patches too steep to ski (not painted cliffs). The game does the same as it loads, without changing the layout; here it changes the layout (Ctrl+Z undoes it).</p>
   <h3>Terrain cleanup</h3>
-  <p class="hint"><b>Analyse</b> reads the land (as sculpted, before the trails carve it) over the whole planet: cliffs and mountains to keep, steep mistakes to smooth away, pockets out of reach, narrow ridges, valleys and benches, cliff feet and tops, and where the trails cross steep ground. <b>Plan</b> turns that into the target map: which ground should end up skiable (trail beds and aprons, benches cut back, slots through ridges, mistakes and thin strips smoothed away) and which unskiable (solid masses, narrow gaps closed, tall walls kept). Neither changes anything. <b>Apply</b> shapes the ground to the plan (planning first if needed): trail beds held level with gentle shoulders, skiable ground smoothed as little as it can be to under the limit, mountains' feet eased back beside a cut, gaps raised into the walls. <b>Suggest moves</b> (before Apply) looks up to 10 m either side of each trail for a better line to ski: off unskiable ground, clear of cliff edges and of trails beside it, on gentler ground, a lower way through a ridge (junctions, shared stretches and ends stay put). The moves show as orange lines; nothing changes until you accept one (it moves and adds the trail's points, all still editable), then Apply shapes the ground for the new lines. After Apply, it keeps to ground that's skiable now. The change is kept as a layer over your sculpting (which stays as it was): <b>Remove</b> takes it off, Ctrl+Z undoes it, and Apply again redoes it from scratch after you edit.</p>
+  <p class="hint"><b>Analyse</b> reads the land (as sculpted, before the trails carve it) over the whole planet: cliffs and mountains to keep, steep mistakes to smooth away, pockets out of reach, narrow ridges, valleys and benches, cliff feet and tops, and where the trails cross steep ground. <b>Plan</b> turns that into the target map: which ground should end up skiable (trail beds and aprons, benches cut back, slots through ridges, mistakes and thin strips smoothed away) and which unskiable (solid masses, narrow gaps closed, tall walls kept). Neither changes anything. <b>Apply</b> shapes the ground to the plan (planning first if needed): trail beds held level with gentle shoulders, skiable ground smoothed as little as it can be to under the limit, mountains' feet eased back beside a cut, gaps raised into the walls. <b>Suggest moves</b> (before Apply) looks up to 10 m either side of each trail for a better line to ski: off unskiable ground, clear of cliff edges and of trails beside it, on gentler ground, a lower way through a ridge (junctions, shared stretches and ends stay put). The moves show as orange lines; nothing changes until you accept one (it moves and adds the trail's points, all still editable), then Apply shapes the ground for the new lines. After Apply, it keeps to ground that's skiable now. <b>Mountain character</b> (Apply's last step) gives the unskiable masses gullies and ribs down their faces and a little rise along their crests, and lets the skiable ground at their feet rise gently toward them (their roots, with spurs), keeping it skiable; plateaus and raised trails keep their heights, and trail beds, aprons and islands aren't touched. Off at 0; <b>Vary the mountains</b> applies again with a different variation. The change is kept as a layer over your sculpting (which stays as it was): <b>Remove</b> takes it off, Ctrl+Z undoes it, and Apply again redoes it from scratch after you edit.</p>
   <label class="f" for="tcMinU">Thinnest unskiable strip (unless a tall wall)<output id="oMinU"></output><input id="tcMinU" type="range" min="2" max="15" step="1" value="6"></label>
   <label class="f" for="tcMinS">Narrowest skiable gap (unless a trail runs through)<output id="oMinS"></output><input id="tcMinS" type="range" min="2" max="15" step="1" value="6"></label>
   <div class="row"><button id="tcAnalyse" type="button">Analyse</button><button id="tcPlan" type="button">Plan</button><button id="tcSuggest" type="button">Suggest moves</button><button id="tcApply" type="button">Apply</button><button id="tcRemove" type="button" disabled>Remove</button></div>
+  <label class="f" for="tcChar">Mountain character (with Apply)<output id="oChar"></output><input id="tcChar" type="range" min="0" max="1" step="0.05" value="0.5"></label>
+  <div class="row"><button id="tcVary" type="button">Vary the mountains</button></div>
   <label class="c"><input id="tcBefore" type="checkbox" disabled> Show the land before the cleanup</label>
   <label class="f" for="tcView">Show<select id="tcView" style="grid-column:1/-1" disabled><option value="off">Nothing</option><option value="read">The reading</option><option value="plan">The plan</option><option value="result">The result</option></select></label>
   <p class="hint" id="tcStatus"></p>
@@ -1010,7 +1012,7 @@ mini.addEventListener('click', e => {
 // planet settings, file actions, Ski here
 // ============================================================================================================
 // ---- terrain cleanup (planet-cleanup.js): the reading and the plan, shown over the globe
-let tcMoves = [], tcA = null, tcP = null, tcTex = { read: null, plan: null }, tcBusy = false;
+let tcSeed = 0, tcMoves = [], tcA = null, tcP = null, tcTex = { read: null, plan: null }, tcBusy = false;
 // an applied cleanup is out of date once the land or the trails change (Apply again redoes it)
 function cleanStaleCheck(){ if (L.clean && !L.clean.stale && PlanetCleanup.signature(L) !== L.clean.sig){ L.clean.stale = true; tcSync(); } }
 function tcSync(){
@@ -1041,10 +1043,10 @@ function tcList(items){
   $('tcList').onclick = e => { const b = e.target.closest('button'); if (!b) return; const d = items[+b.dataset.i][1]; cam.dir.set(d[0], d[1], d[2]).normalize(); cam.dist = Math.min(cam.dist, R + 260); fixUp(); b.blur(); };
 }
 async function tcRun(fn){
-  if (tcBusy) return; tcBusy = true; for (const b of ['tcAnalyse', 'tcPlan', 'tcSuggest', 'tcApply', 'tcRemove', 'tcBefore']) $(b).disabled = true;
+  if (tcBusy) return; tcBusy = true; for (const b of ['tcAnalyse', 'tcPlan', 'tcSuggest', 'tcApply', 'tcVary', 'tcRemove', 'tcBefore']) $(b).disabled = true;
   freshLinks();
   try { await fn(); } catch (err){ console.error(err); $('tcStatus').textContent = 'That failed: ' + err.message; }
-  tcBusy = false; $('tcAnalyse').disabled = $('tcPlan').disabled = $('tcSuggest').disabled = $('tcApply').disabled = false; tcSync();
+  tcBusy = false; $('tcAnalyse').disabled = $('tcPlan').disabled = $('tcSuggest').disabled = $('tcApply').disabled = $('tcVary').disabled = false; tcSync();
 }
 async function tcAnalyse(){
   const t0 = performance.now();
@@ -1072,14 +1074,14 @@ $('tcPlan').addEventListener('click', () => { $('tcPlan').blur(); tcRun(tcPlan);
 $('tcApply').addEventListener('click', () => { $('tcApply').blur(); tcRun(async () => {
   if (!tcP || tcP.stale || tcA.stale) await tcPlan();
   const t0 = performance.now(), plan = tcP.summary;
-  const X = await PlanetCleanup.apply(tcA, tcP, L, T, {}, (text, f) => { $('tcStatus').textContent = text + ' ' + Math.round(f*100) + '%'; });
+  const X = await PlanetCleanup.apply(tcA, tcP, L, T, { character: +$('tcChar').value, seed: tcSeed }, (text, f) => { $('tcStatus').textContent = text + ' ' + Math.round(f*100) + '%'; });
   $('tcStatus').textContent = 'Rebuilding the globe…'; await new Promise(r => setTimeout(r, 0));
   L.clean = X.layer; L.clean.sig = PlanetCleanup.signature(L); L.clean.stale = false; L.cleanOff = false; $('tcBefore').checked = false;
   T = PT.terrain(L, R); T.fresh = true; buildGlobe(); rebuildOverlays(); miniDirty();
   commit(true);
   tcTexture('result', PlanetCleanup.overlayAtlas(tcA, 215, X.rcls, PlanetCleanup.RESULT_CLASSES)); tcShow('result');
   const s = X.summary;
-  $('tcStatus').textContent = `Applied in ${((performance.now() - t0)/1000).toFixed(1)} s. Reshaped ${m2(s.changed)} (cut up to ${s.maxCut} m, filled up to ${s.maxFill} m). ` +
+  $('tcStatus').textContent = `Applied in ${((performance.now() - t0)/1000).toFixed(1)} s. Reshaped ${m2(s.changed)} (cut up to ${s.maxCut} m, filled up to ${s.maxFill} m)` + (s.character ? `, with mountain character on ${m2(s.character.faces)} of faces and ${m2(s.character.roots)} of roots. ` : '. ') +
     (s.failArea || s.leakArea ? `Left over: ${s.failArea ? m2(s.failArea) + ' should ski but is still too steep' : ''}${s.failArea && s.leakArea ? ', ' : ''}${s.leakArea ? m2(s.leakArea) + ' at unskiable edges that ski' : ''} (listed below; the rest matches the plan).` : 'Everything matches the plan.') +
     (s.bedFail ? ` ${s.bedFail} trail bed points too steep.` : '') + ' Ctrl+Z undoes it; Remove takes it off.';
   tcList(X.notes.map(n => [n.text, n.at]));
@@ -1102,6 +1104,8 @@ function tcAccept(list){
   commit(false, true);
   $('tcStatus').textContent = `Accepted ${list.length} move${list.length === 1 ? '' : 's'}. ` + (L.clean ? 'Apply again to shape the ground for the new lines.' : 'Apply to shape the ground for the new lines.');
 }
+{ const el = $('tcChar'), o = $('oChar'), fmt = () => { o.textContent = +el.value ? Math.round(el.value*100) + '%' : 'off'; }; fmt(); el.addEventListener('input', fmt); el.addEventListener('change', () => el.blur()); }
+$('tcVary').addEventListener('click', () => { $('tcVary').blur(); tcSeed++; $('tcApply').click(); });
 $('tcSuggest').addEventListener('click', () => { $('tcSuggest').blur(); tcRun(async () => {
   if (!tcP || tcP.stale || tcA.stale) await tcPlan();
   const t0 = performance.now(), X = await PlanetCleanup.suggest(tcA, tcP, L, T, {}, (text, f) => { $('tcStatus').textContent = text + ' ' + Math.round(f*100) + '%'; });

@@ -246,12 +246,14 @@ PT.encodeDetail = function(dl){
     const q = new Int16Array(t.length); let any = false;
     for (let i = 0; i < q.length; i++){ q[i] = Math.max(-32767, Math.min(32767, Math.round(t[i]*100))); if (q[i]) any = true; }
     if (!any) continue;
-    // mostly empty: a bit per point saying which hold a value, then just those values
+    // packed: a bit per point saying which hold a value (unless all do), then each value as the change from the last
+    // one, in as few bytes as it needs (the layers change smoothly, so mostly one)
     let nz = 0; for (let i = 0; i < q.length; i++) if (q[i]) nz++;
-    if (nz < q.length*0.6){ const m = new Uint8Array(q.length/8), v = new Int16Array(nz); let j = 0;
-      for (let i = 0; i < q.length; i++) if (q[i]){ m[i >> 3] |= 1 << (i & 7); v[j++] = q[i]; }
-      const out = new Uint8Array(m.length + v.length*2); out.set(m); out.set(new Uint8Array(v.buffer), m.length); tiles.push([k, b64FromBytes(out), 1]); }
-    else tiles.push([k, b64FromBytes(new Uint8Array(q.buffer))]);
+    const sparse = nz < q.length*0.9, out = new Uint8Array((sparse ? q.length/8 : 0) + 3*q.length); let o = 0, prev = 0;
+    if (sparse){ for (let i = 0; i < q.length; i++) if (q[i]) out[i >> 3] |= 1 << (i & 7); o = q.length/8; }
+    for (let i = 0; i < q.length; i++){ if (sparse && !q[i]) continue; const d = q[i] - prev; prev = q[i]; let z = d >= 0 ? 2*d : -2*d - 1;
+      while (z >= 128){ out[o++] = (z & 127) | 128; z >>>= 7; } out[o++] = z; }
+    tiles.push([k, b64FromBytes(out.subarray(0, o)), sparse ? 3 : 2]);
   }
   return { n: dl.n, tiles };
 };
@@ -259,7 +261,10 @@ PT.decodeDetail = function(o){
   const dl = PT.newDetail(o && o.n || 1024);
   if (o && o.tiles) for (const [k, b, sparse] of o.tiles){
     const bytes = bytesFromB64(b), t = new Float32Array(DT*DT);
-    if (sparse){ const m = bytes.subarray(0, t.length/8), v = new Int16Array(bytes.buffer.slice(t.length/8)); let j = 0; for (let i = 0; i < t.length; i++) if (m[i >> 3] & (1 << (i & 7))) t[i] = v[j++]/100; }
+    if (sparse >= 2){ let o = sparse === 3 ? t.length/8 : 0, prev = 0;
+      for (let i = 0; i < t.length; i++){ if (sparse === 3 && !(bytes[i >> 3] & (1 << (i & 7)))) continue; let z = 0, sh = 0, c; do { c = bytes[o++]; z |= (c & 127) << sh; sh += 7; } while (c & 128);
+        prev += z & 1 ? -(z + 1)/2 : z/2; t[i] = prev/100; } }
+    else if (sparse){ const m = bytes.subarray(0, t.length/8), v = new Int16Array(bytes.buffer.slice(t.length/8)); let j = 0; for (let i = 0; i < t.length; i++) if (m[i >> 3] & (1 << (i & 7))) t[i] = v[j++]/100; }
     else { const q = new Int16Array(bytes.buffer); for (let i = 0; i < t.length; i++) t[i] = q[i]/100; }
     dl.tiles.set(k, t); }
   return dl;

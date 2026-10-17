@@ -376,7 +376,7 @@ PC.plan = async function(A, L, T, opt, progress){
 //   checked: skiable ground still too steep is relaxed again, unskiable edges that came out gentle are raised, and
 //     what's left either way is counted (and shown)
 // ============================================================================================================
-PC.applyDefaults = () => ({ skiMax: 0.75, apronGrade: 0.5, margin: 30, soften: 1.5, edge: 1.25 });
+PC.applyDefaults = () => ({ skiMax: 0.75, apronGrade: 0.5, margin: 30, soften: 1.5, edge: 1.25, character: 0.5, seed: 0 });
 PC.RESULT_CLASSES = [
   ['ski', 'Skiable', [232, 237, 241]],
   ['unski', 'Unskiable', [112, 104, 118]],
@@ -510,6 +510,66 @@ PC.apply = async function(A, P, L, T, opt, progress){
     for (const id of regList) if (reg[id] < 3 && skiSlope(Z, id) > STOP) fail.push(id);
     for (let id = 0; id < NC; id++) if (U[id] && (!kept[id] || dR[id] <= opt.margin) && edgeU(id) && slope(Z, id) <= STOP && stepOn(id)) leak.push(id);
     return { fail, leak }; };
+  // ---- mountain character (step 5): the unskiable masses' faces get gullies and ribs down the fall line and their
+  // crests a little rise, and at a mass's foot the skiable ground rises gently toward it (its roots, with spurs where
+  // they run further out). heights change only a little; the edge between skiable and unskiable stays where it is;
+  // skiable ground on top of a mass (a plateau, a raised trail) keeps its height; trail beds, aprons and junction
+  // islands (and 4 m round them, easing out over 6 m more) aren't touched; slot walls and kept walls stay; raised
+  // skiable ground stays well under the limit
+  let character = null;
+  if (opt.character > 0){
+    await say('Mountain character…', 0.6);
+    const k = Math.min(1, opt.character), sd = opt.seed*17.31, flood = async (dd, src, pass, limit) => {
+      await run(a => { for (let j = 0; j < 8; j++){ const b = nbr(a, j); if (!pass(b)) continue; const d = dd[a] + dist(a, b); if (d < dd[b] - 1e-3 && d <= limit){ dd[b] = d; if (src) src[b] = src[a]; push(b); } } }, 'Mountain character…', 0.6); };
+    const mass = id => U[id] && !keepWall[id] && nearSlot[id] > 5;
+    // how far into a mass from skiable ground (dE), how far skiable ground is from a mass and which mass point (dM,
+    // srcM), and how far anything is from a trail's bed, apron or island (dT)
+    const dE = new Float32Array(NC).fill(1e9), dM = new Float32Array(NC).fill(1e9), srcM = new Int32Array(NC).fill(-1), dT = new Float32Array(NC).fill(1e9);
+    for (let id = 0; id < NC; id++){ if (!U[id]) continue; for (let j = 0; j < 8; j++) if (!U[nbr(id, j)]){ dE[id] = 0.5*CS; push(id); break; } }
+    await flood(dE, null, b => U[b], 30);
+    for (let id = 0; id < NC; id++) if (mass(id)){ let edge = false; for (let j = 0; j < 8; j++) if (!U[nbr(id, j)]){ edge = true; break; } if (edge){ dM[id] = 0; srcM[id] = id; push(id); } }
+    await flood(dM, srcM, b => !U[b], 18);
+    for (let id = 0; id < NC; id++) if (F[id] || isPin[id]){ dT[id] = 0; push(id); }
+    await flood(dT, null, () => true, 12);
+    const sm = x => x <= 0 ? 0 : x >= 1 ? 1 : x*x*(3 - 2*x), nz = (x, y, z, f, o) => PT.noise3(x*R/f + o + sd, y*R/f - o*0.7 + sd*0.3, z*R/f + o*1.3 - sd);
+    const dZ = new Float32Array(NC); let faces = 0, roots = 0;
+    // faces: noise averaged along the fall line (streaks down it: ribs up, gullies down), fading in from 1 to 5 m in
+    // from the edge; the crest a little higher the further in, up to 1.5 m
+    for (let id = 0; id < NC; id++){
+      if (!mass(id) || dE[id] > 30) continue; if ((id & 0xFFFF) === 0 && due()) await say('Mountain character: faces…', 0.6);
+      const w = sm((dE[id] - 1)/4); if (!w) continue;
+      const e = nbr(id, 0), wv = nbr(id, 1), n = nbr(id, 2), so = nbr(id, 3), gx = (Z[e] - Z[wv])/(dist(e, wv) || 1), gy = (Z[n] - Z[so])/(dist(n, so) || 1);
+      let fx = 0, fy = 0, fz = 0; for (const [a, b, gg] of [[e, wv, gx], [n, so, gy]]){ const vx = dir[a*3] - dir[b*3], vy = dir[a*3 + 1] - dir[b*3 + 1], vz = dir[a*3 + 2] - dir[b*3 + 2], vl = Math.hypot(vx, vy, vz) || 1; fx -= gg*vx/vl; fy -= gg*vy/vl; fz -= gg*vz/vl; }
+      const fl = Math.hypot(fx, fy, fz), p = id*3; let v = 0;
+      if (fl > 1e-6){ fx /= fl; fy /= fl; fz /= fl; for (let t = -3; t <= 3; t++){ const o = t*4/R; v += nz(dir[p] + fx*o, dir[p + 1] + fy*o, dir[p + 2] + fz*o, 7, 3.3); } v /= 7; }
+      const crest = Math.min(1.5, 0.05*Math.max(0, dE[id] - 4))*(0.5 + 0.5*nz(dir[p], dir[p + 1], dir[p + 2], 30, 9.1));
+      dZ[id] = k*(6*v + crest)*w; if (dZ[id]) faces++;
+    }
+    // roots: skiable ground at a mass's foot (the mass at least 2 m above it there; not on top of one) rises toward it,
+    // most right at the foot, out to 6-16 m (further where a spur runs out), the rise a quarter of the face's height
+    // there, at most 3 m; then eased back wherever the ground would get steeper than 60% of the limit
+    // (each mass edge point's face height: the highest of the mass within 6 m of it)
+    const faceTop = new Map(), topOf = m => { let v = faceTop.get(m); if (v !== undefined) return v; v = Z[m]; const st = [m], seen = new Set([m]);
+      while (st.length){ const a = st.pop(); if (Z[a] > v) v = Z[a]; for (let j = 0; j < 8; j++){ const b = nbr(a, j); if (!seen.has(b) && U[b] && dist(m, b) <= 6){ seen.add(b); st.push(b); } } }
+      faceTop.set(m, v); return v; };
+    const raise = new Float32Array(NC), rootCells = [];
+    for (let id = 0; id < NC; id++){
+      if (U[id] || dM[id] > 16 || srcM[id] < 0 || dT[id] <= 4) continue; const m = srcM[id], above = topOf(m) - Z[id]; if (above < 2) continue;
+      const p = id*3, spur = 0.5 + 0.5*nz(dir[p], dir[p + 1], dir[p + 2], 25, 5.7), W = 6 + 10*spur; if (dM[id] > W) continue;
+      const t = 1 - dM[id]/W; raise[id] = k*Math.min(3, 0.25*above)*(0.4 + 0.6*spur)*t*t*sm((dT[id] - 4)/6); if (raise[id] > 0.02) rootCells.push(id);
+    }
+    const Zr = Z.slice(); for (const id of rootCells) Zr[id] += raise[id];
+    for (let it = 0; it < 12; it++){ let bad = 0;
+      for (const id of rootCells){ if (raise[id] <= 0) continue; if (skiSlope(Zr, id) > 0.6*STOP){ bad++; const cut = raise[id]*0.4; raise[id] -= cut; Zr[id] -= cut;
+        for (let j = 0; j < 8; j++){ const b = nbr(id, j); if (raise[b] > 0){ const c2 = raise[b]*0.2; raise[b] -= c2; Zr[b] -= c2; } } } }
+      if (!bad) break; }
+    // (never steeper than it was where it was already over 60%)
+    for (const id of rootCells) if (raise[id] > 0.02 && skiSlope(Zr, id) > Math.max(0.6*STOP, skiSlope(Z, id) + 0.01)){ Zr[id] -= raise[id]; raise[id] = 0; }
+    for (const id of rootCells){ if (raise[id] > 0.02) roots++; Z[id] = Zr[id]; }
+    for (let id = 0; id < NC; id++) if (dZ[id]) Z[id] += dZ[id];
+    let fArea = 0, rArea = 0; for (let id = 0; id < NC; id++){ if (Math.abs(dZ[id]) > 0.1) fArea += AREA[id]; if (raise[id] > 0.1) rArea += AREA[id]; }
+    character = { faces: Math.round(fArea), roots: Math.round(rArea) };
+  }
   await say('Checking…', 0.65);
   let c = check(); const first = { fail: c.fail.length, leak: c.leak.length };
   for (let round = 0; round < 3 && (c.fail.length || c.leak.length); round++){
@@ -558,7 +618,7 @@ PC.apply = async function(A, P, L, T, opt, progress){
   for (const x of group(c.fail, 'fail').slice(0, 8)) notes.push(Object.assign(x, { text: `Still too steep to ski: ${Math.round(x.area)} m²` }));
   for (const x of group(c.leak, 'leak').slice(0, 8)) notes.push(Object.assign(x, { text: `Should be unskiable but skis: ${Math.round(x.area)} m²` }));
   const summary = { seconds: +((now() - t0)/1000).toFixed(1), changed: Math.round(changed), cut: Math.round(cut), fill: Math.round(fill), maxCut: +maxCut.toFixed(1), maxFill: +maxFill.toFixed(1),
-    found: first, conflicts: conflictCells, failArea: Math.round(failArea), leakArea: Math.round(leakArea), bedFail, tiles: layer.tiles.size };
+    found: first, conflicts: conflictCells, character, failArea: Math.round(failArea), leakArea: Math.round(leakArea), bedFail, tiles: layer.tiles.size };
   await say('Applied', 1);
   return { layer, rcls, summary, notes, Z };
 };

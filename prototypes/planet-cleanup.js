@@ -38,6 +38,19 @@ PC.CLASSES = [
 
 // a trail's bed height at point i of its line: a carved trail's profile, otherwise the land under it
 const bedHeights = T => { const prof = new Map(); for (const b of T.beds || []) prof.set(b.ti, b.prof); return (ti, i, p) => { const pr = prof.get(ti); return pr && pr[i] !== undefined ? pr[i] : T.under(p[0], p[1], p[2]); }; };
+// the junction curves' cells (T.links): each curve's bed (fn(id, d, h, f): d metres from its line, h its bed height
+// there) and each wedge inside one (d = 0, h the junction's height)
+const linkCells = (A, T, fn) => {
+  const { R, CS, nbr, cellOf } = A, dir = A.grid.dir;
+  for (const f of (T.links ? T.links.fillets : [])){
+    f.pts.forEach((p, i) => { const x = p[0]*R, y = p[1]*R, z = p[2]*R, c0 = cellOf(p[0], p[1], p[2]), stack = [c0], seen = new Set([c0]);
+      while (stack.length){ const a = stack.pop(), d = Math.hypot(dir[a*3]*R - x, dir[a*3 + 1]*R - y, dir[a*3 + 2]*R - z); if (d > f.bed + CS) continue;
+        if (d <= f.bed) fn(a, d, f.h[i], f); for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (!seen.has(b)){ seen.add(b); stack.push(b); } } } });
+    const c = f.wedge[0], c0 = cellOf(c[0], c[1], c[2]), stack = [c0], seen = new Set([c0]); PT.inWedge(f, c, R);
+    while (stack.length){ const a = stack.pop(), q = [dir[a*3], dir[a*3 + 1], dir[a*3 + 2]]; if (Math.acos(Math.min(1, q[0]*c[0] + q[1]*c[1] + q[2]*c[2]))*R > f._r + CS) continue;
+      if (PT.inWedge(f, q, R)) fn(a, 0, f.hc, f); for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (!seen.has(b)){ seen.add(b); stack.push(b); } } }
+  }
+};
 const tick = () => new Promise(r => setTimeout(r, 0));
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
@@ -279,6 +292,8 @@ PC.plan = async function(A, L, T, opt, progress){
     }
     if (due()) await say('Planning: the trails…', 0.1 + 0.2*ti/lines.length);
   }
+  // the junction curves and the groomed wedges inside them: bed
+  linkCells(A, T, a => { F[a] = 1; U[a] = 0; });
   // ---- clean the map
   // unskiable strips thinner than minUnski: what an opening (narrow, then widen again by half the minimum) removes,
   // unless it's a tall wall
@@ -393,6 +408,7 @@ PC.apply = async function(A, P, L, T, opt, progress){
     }
     if (due()) await say('Shaping: trail beds…', 0.05);
   }
+  linkCells(A, T, (a, d, h, f) => { if (!f.carved) return; const w = 1/((d + 1)*(d + 1)); sw[a] += w; swh[a] += w*h; });
   // pins: bed cells (their height), level where trails meet (a few rounds of averaging with neighbouring bed cells)
   const PV = new Float32Array(NC), isPin = new Uint8Array(NC);
   for (let id = 0; id < NC; id++) if (sw[id] > 0 && !U[id]){ isPin[id] = 1; PV[id] = swh[id]/sw[id]; }

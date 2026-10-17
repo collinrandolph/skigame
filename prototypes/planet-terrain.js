@@ -426,6 +426,128 @@ PT.trailNetwork = function(trails, R, join, spacing){
   netCache.set(key, out); return out;
 };
 
+// ---------- junctions: where trails really meet, each corner between two neighbouring arms rounded ----------
+// a junction is where two trails cross (or a trail crosses itself), where a trail leaves or joins another it runs
+// along (a fork), or where a trail's end sits on another trail. it's real only if the trails meet at the same height
+// there (their beds within `dh` m: not one passing over the other). round it, each pair of neighbouring arms gets a
+// curve meeting both smoothly: its radius from rMin (arms close together) to rMax (nearly straight on), starting no
+// further than tMax m out along the arms, so a shallow fork's curve is small and a crossing's about 5 m. the corner
+// inside each curve (the wedge between it and the two arms) is groomed with it: at a crossing the four wedges make a
+// small groomed island. heightOf(ti, fi): a trail's bed height at (fractional) point fi of its line in net.lines
+PT.junctionDefaults = () => ({ rMin: 3, rMax: 8, tMax: 8, dh: 1.5 });
+PT.trailLinks = function(trails, net, R, heightOf, opt){
+  opt = Object.assign(PT.junctionDefaults(), opt || {});
+  const lines = net.lines, junctions = [], fillets = [];
+  // (a trail that only touches another for a point or two is crossing it, not running along it)
+  const spc = (() => { const l = lines.find(l => l.length > 1); return l ? Math.max(0.3, ang3(l[0], l[1])*R) : 2; })(), minRun = Math.max(3, Math.ceil(5/spc));
+  const shared = net.shared.map((sh, ti) => { const o = Uint8Array.from(sh), M = o.length, closed = !!trails[ti].closed;
+    for (let i = 0; i < M; ){ if (!o[i]){ i++; continue; } let j = i; while (j < M && o[j]) j++;
+      const wraps = closed && (i === 0 || j === M) && o[0] && o[M - 1];
+      if (j - i < minRun && !wraps) for (let k = i; k < j; k++) o[k] = 0; i = j; }
+    return o; });
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+  const lerpP = (l, closed, fi) => { const M = l.length, k = Math.floor(fi), u = fi - k, a = l[closed ? ((k % M) + M) % M : Math.max(0, Math.min(M - 1, k))], b = l[closed ? (((k + 1) % M) + M) % M : Math.max(0, Math.min(M - 1, k + 1))];
+    return norm([a[0] + (b[0] - a[0])*u, a[1] + (b[1] - a[1])*u, a[2] + (b[2] - a[2])*u]); };
+  // walk s metres along a trail's line from fi, one way (dir ±1): the point, where (fi), and whether it got that far
+  const walk = (ti, fi, dir, s) => {
+    const l = lines[ti], M = l.length, closed = !!trails[ti].closed; let pos = fi, left = s, p = lerpP(l, closed, pos);
+    for (let n = 0; n < 4*M && left > 1e-6; n++){
+      let nxt = dir > 0 ? Math.floor(pos + 1e-9) + 1 : Math.ceil(pos - 1e-9) - 1;
+      if (!closed && (nxt < 0 || nxt > M - 1)) return { p, fi: pos, ok: false, s: s - left };
+      const q = lerpP(l, closed, nxt), d = ang3(p, q)*R;
+      if (d >= left){ const t = left/d; pos = pos + (nxt - pos)*t; return { p: lerpP(l, closed, pos), fi: pos, ok: true, s }; }
+      left -= d; pos = nxt; p = q;
+    }
+    return { p, fi: pos, ok: true, s: s - left };
+  };
+  const frame = c => { const a = Math.abs(c[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], e = norm([a[1]*c[2] - a[2]*c[1], a[2]*c[0] - a[0]*c[2], a[0]*c[1] - a[1]*c[0]]); return [e, [c[1]*e[2] - c[2]*e[1], c[2]*e[0] - c[0]*e[2], c[0]*e[1] - c[1]*e[0]]]; };
+  const to2 = (c, F, p) => { const d = sub(p, c); return [dot(d, F[0])*R, dot(d, F[1])*R]; };
+  const from2 = (c, F, x, y) => norm([c[0] + (F[0][0]*x + F[1][0]*y)/R, c[1] + (F[0][1]*x + F[1][1]*y)/R, c[2] + (F[0][2]*x + F[1][2]*y)/R]);
+  const near = (p, list, r) => list.some(j => ang3(j.c, p)*R < r);
+  const add = (c, kind, arms) => { if (near(c, junctions, 4)) return; junctions.push({ c, kind, arms }); };
+  // ---- crossings: segments of different trails (or far-apart stretches of one) that cross, off any shared stretch
+  const CELL = 4, key = p => Math.floor(p[0]*R/CELL) + ',' + Math.floor(p[1]*R/CELL) + ',' + Math.floor(p[2]*R/CELL), hash = new Map();
+  lines.forEach((l, ti) => { const segN = trails[ti].closed ? l.length : l.length - 1; for (let k = 0; k < segN; k++){ const m = norm(l[k].map((v, q) => v + l[(k + 1) % l.length][q])), kk = key(m); let h = hash.get(kk); if (!h) hash.set(kk, h = []); h.push(ti, k); } });
+  const gapN = Math.max(6, Math.ceil(12/spc));
+  lines.forEach((B, b) => { const segN = trails[b].closed ? B.length : B.length - 1, MB = B.length;
+    for (let k = 0; k < segN; k++){
+      const k1 = (k + 1) % MB; if (shared[b][k] || shared[b][k1]) continue;
+      const m = norm(B[k].map((v, q) => v + B[k1][q])), F = frame(m), p0 = to2(m, F, B[k]), p1 = to2(m, F, B[k1]);
+      const cx = Math.floor(m[0]*R/CELL), cy = Math.floor(m[1]*R/CELL), cz = Math.floor(m[2]*R/CELL);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++){
+        const h = hash.get((cx + dx) + ',' + (cy + dy) + ',' + (cz + dz)); if (!h) continue;
+        for (let n = 0; n < h.length; n += 2){
+          const a = h[n], j = h[n + 1]; if (a > b) continue; const A = lines[a], MA = A.length, j1 = (j + 1) % MA;
+          if (a === b){ if (j >= k) continue; const dd = Math.min(k - j, trails[b].closed ? MA - (k - j) : Infinity); if (dd < gapN) continue; }
+          if (shared[a][j] || shared[a][j1]) continue;
+          const q0 = to2(m, F, A[j]), q1 = to2(m, F, A[j1]), rx = p1[0] - p0[0], ry = p1[1] - p0[1], sx = q1[0] - q0[0], sy = q1[1] - q0[1], den = rx*sy - ry*sx;
+          if (Math.abs(den) < 1e-9) continue;
+          const u = ((q0[0] - p0[0])*sy - (q0[1] - p0[1])*sx)/den, v = ((q0[0] - p0[0])*ry - (q0[1] - p0[1])*rx)/den;
+          if (u < 0 || u >= 1 || v < 0 || v >= 1) continue;
+          const c = lerpP(B, !!trails[b].closed, k + u);
+          add(c, 'crossing', [{ ti: b, fi: k + u, dir: 1 }, { ti: b, fi: k + u, dir: -1 }, { ti: a, fi: j + v, dir: 1 }, { ti: a, fi: j + v, dir: -1 }]);
+        }
+      }
+    } });
+  // ---- forks: where a trail leaves or joins one it runs along (its shared stretch starts or ends), and a trail's end
+  // sitting on another trail
+  const hashes = new Map(), lh = a => { if (!hashes.has(a)) hashes.set(a, lineHash(lines[a], R, 6)); return hashes.get(a); };
+  const hostArms = (a, p, skip) => { const nq = nearestOn(lh(a), p, !!trails[a].closed, skip); if (!nq || nq.d > 1.5) return null; const fi = nq.k + nq.u; return [{ ti: a, fi, dir: 1 }, { ti: a, fi, dir: -1 }]; };
+  lines.forEach((B, b) => { const sh = shared[b], M = B.length, closed = !!trails[b].closed; if (M < 3) return;
+    for (let i = 0; i < M; i++){
+      const n = i + 1; if (!closed && n >= M) break; const nn = n % M;
+      if (!!sh[i] === !!sh[nn]) continue;
+      const leaving = !!sh[i], at = leaving ? i : nn, a = sh[at] - 1;
+      const host = hostArms(a, B[at], a === b ? k => Math.abs(k - at) < gapN || (closed && M - Math.abs(k - at) < gapN) : null); if (!host) continue;
+      add(B[at], 'fork', host.concat([{ ti: b, fi: at, dir: leaving ? 1 : -1 }]));
+    }
+    if (!closed) for (const end of [0, M - 1]){ if (sh[end]) continue;
+      for (let a = 0; a < lines.length; a++){ if (lines[a].length < 2 || a === b) continue; const host = hostArms(a, B[end]); if (host){ add(B[end], 'end', host.concat([{ ti: b, fi: end, dir: end ? -1 : 1 }])); break; } } }
+  });
+  // ---- round each real junction
+  for (const J of junctions){
+    const hs = J.arms.map(A => heightOf(A.ti, A.fi)); J.real = Math.max(...hs) - Math.min(...hs) <= opt.dh; if (!J.real) continue;
+    J.h = hs.reduce((s, v) => s + v, 0)/hs.length;
+    const F = frame(J.c);
+    // each arm: how far it goes (up to 12 m) and its direction, from the point 3 m out
+    const arms = J.arms.map(A => { const w = walk(A.ti, A.fi, A.dir, 12), d3 = walk(A.ti, A.fi, A.dir, Math.min(3, w.s)), v = to2(J.c, F, d3.p); return Object.assign({}, A, { len: w.s, ang: Math.atan2(v[1], v[0]) }); })
+      .filter(A => A.len > 1);
+    // (the same arm twice, e.g. a fork's shared stretch: keep one)
+    const uniq = []; for (const A of arms) if (!uniq.some(B => Math.abs(Math.atan2(Math.sin(A.ang - B.ang), Math.cos(A.ang - B.ang))) < 0.09)) uniq.push(A);
+    uniq.sort((x, y) => x.ang - y.ang); J.armCount = uniq.length; if (uniq.length < 2) continue;
+    for (let i = 0; i < uniq.length; i++){
+      const A = uniq[i], B = uniq[(i + 1) % uniq.length]; let phi = B.ang - A.ang; if (i === uniq.length - 1) phi += 2*Math.PI;
+      if (phi >= Math.PI - 0.02 || phi <= 0.01) continue;
+      let r = opt.rMin + (opt.rMax - opt.rMin)*phi/Math.PI, t = r/Math.tan(phi/2);
+      t = Math.min(t, opt.tMax, 0.7*A.len, 0.7*B.len); r = t*Math.tan(phi/2); if (t < 0.3) continue;
+      const wa = walk(A.ti, A.fi, A.dir, t), wb = walk(B.ti, B.fi, B.dir, t);
+      const pa = to2(J.c, F, wa.p), pb = to2(J.c, F, wb.p), ia = to2(J.c, F, walk(A.ti, A.fi, A.dir, Math.max(0, t - 0.5)).p), ib = to2(J.c, F, walk(B.ti, B.fi, B.dir, Math.max(0, t - 0.5)).p);
+      const ua = norm([ia[0] - pa[0], ia[1] - pa[1], 0]), ub = norm([ib[0] - pb[0], ib[1] - pb[1], 0]);
+      const hl = 4/3*Math.tan((Math.PI - phi)/4)*r, c1 = [pa[0] + ua[0]*hl, pa[1] + ua[1]*hl], c2 = [pb[0] + ub[0]*hl, pb[1] + ub[1]*hl];
+      const n = Math.max(4, Math.ceil(((Math.PI - phi)*r + 0.5))), pts = [], h = [], ha = heightOf(A.ti, wa.fi), hb = heightOf(B.ti, wb.fi);
+      for (let s = 0; s <= n; s++){ const u = s/n, v = 1 - u, x = v*v*v*pa[0] + 3*v*v*u*c1[0] + 3*v*u*u*c2[0] + u*u*u*pb[0], y = v*v*v*pa[1] + 3*v*v*u*c1[1] + 3*v*u*u*c2[1] + u*u*u*pb[1];
+        pts.push(from2(J.c, F, x, y)); h.push(ha + (hb - ha)*u); }
+      // the wedge: the junction, out along one arm to the curve, round it, back along the other
+      const wedge = [J.c]; for (let s = 1; s < t; s += 1) wedge.push(walk(A.ti, A.fi, A.dir, s).p);
+      wedge.push(...pts); for (let s = Math.floor(t - 1e-6); s >= 1; s -= 1) wedge.push(walk(B.ti, B.fi, B.dir, s).p);
+      const tA = trails[A.ti], tB = trails[B.ti];
+      fillets.push({ pts, h, wedge, hc: J.h, r: +r.toFixed(2), t: +t.toFixed(2), turn: +((Math.PI - phi)*180/Math.PI).toFixed(1), kind: J.kind,
+        tis: [A.ti, B.ti], names: [...new Set([tA.name, tB.name])], bed: Math.min(tA.bed ?? 4, tB.bed ?? 4), carved: !!(tA.carve && tB.carve) });
+    }
+  }
+  return { junctions, fillets };
+};
+// is unit direction p inside a fillet's wedge (on the plane at its junction)?
+PT.inWedge = function(f, p, R){
+  if (!f._2){ const c = f.wedge[0], a = Math.abs(c[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], e = norm([a[1]*c[2] - a[2]*c[1], a[2]*c[0] - a[0]*c[2], a[0]*c[1] - a[1]*c[0]]), n = [c[1]*e[2] - c[2]*e[1], c[2]*e[0] - c[0]*e[2], c[0]*e[1] - c[1]*e[0]];
+    f._F = [c, e, n]; f._2 = f.wedge.map(q => { const d = [q[0] - c[0], q[1] - c[1], q[2] - c[2]]; return [(d[0]*e[0] + d[1]*e[1] + d[2]*e[2])*R, (d[0]*n[0] + d[1]*n[1] + d[2]*n[2])*R]; });
+    f._r = Math.max(...f._2.map(v => Math.hypot(v[0], v[1]))); }
+  const [c, e, n] = f._F, d = [p[0] - c[0], p[1] - c[1], p[2] - c[2]], x = (d[0]*e[0] + d[1]*e[1] + d[2]*e[2])*R, y = (d[0]*n[0] + d[1]*n[1] + d[2]*n[2])*R;
+  if (Math.hypot(x, y) > f._r || p[0]*c[0] + p[1]*c[1] + p[2]*c[2] < 0) return false;
+  let ins = false; const P = f._2; for (let i = 0, j = P.length - 1; i < P.length; j = i++){ const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi)*(y - yi)/(yj - yi) + xi) ins = !ins; }
+  return ins;
+};
+
 // ---------- cleanup: what a layout's trails and steep bits need before skiing ----------
 // thin crowded points, join a trail's ends into a loop when they meet, bring control points of different trails that
 // nearly meet together (a junction), snap loose ends onto the trail they stop short of, and ease the small patches of
@@ -891,9 +1013,16 @@ PT.terrain = function(L, R, prev, caps){
   // an applied terrain cleanup (planet-cleanup.js) takes over from the corridors: its layer of changes is added to the
   // land as sculpted (L.cleanOff: show the land without it, in the editor)
   const cl = L && L.clean && L.clean.tiles.size && !L.cleanOff ? L.clean : null;
+  // the junctions, rounded (bed heights: a carved trail's profile, otherwise the land)
+  let links = null;
+  if (net){ const prof = new Map(carves.map(c => [c.ti, c.prof]));
+    links = PT.trailLinks(L.trails, net, R, (ti, fi) => { const pr = prof.get(ti), l = net.lines[ti], M = l.length, k = Math.floor(fi), u = fi - k, cl2 = !!L.trails[ti].closed;
+      const ix = i => cl2 ? ((i % M) + M) % M : Math.max(0, Math.min(M - 1, i));
+      if (pr) return pr[ix(k)]*(1 - u) + pr[ix(k + 1)]*u;
+      const a = l[ix(k)], b = l[ix(k + 1)], q = norm([a[0] + (b[0] - a[0])*u, a[1] + (b[1] - a[1])*u, a[2] + (b[2] - a[2])*u]); return under(q[0], q[1], q[2]); }); }
   const corr = carves.length && !cl ? bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev && prev.corr, caps) : null;
   return {
-    R, stamps, carves: carves.length, net, corr, clean: !!cl, stop: L && L.cliffs ? L.cliffs.stop : 1.0,
+    R, stamps, carves: carves.length, net, links, corr, clean: !!cl, stop: L && L.cliffs ? L.cliffs.stop : 1.0,
     // each carved trail's bed profile along its line in net.lines (for the cleanup)
     beds: carves.map(c => ({ ti: c.ti, prof: c.prof, bed: c.bed })),
     height(x, y, z){

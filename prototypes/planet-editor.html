@@ -378,6 +378,17 @@ function addHandle(kind, ref, i, d, color, big = 1){
   m.renderOrder = 10; m.position.copy(surf(d, 1)); m.userData.big = big; over.add(m);
   handles.push({ obj: m, kind, ref, i, d });
 }
+// the junctions' curves for the trails as they are now (the ground's T.links is worked out when the ground is; an
+// edit to a trail that doesn't carve doesn't rebuild the ground, so they're worked out again here when the trails differ)
+function freshLinks(){
+  const join = L.network ? L.network.join : 0, key = JSON.stringify([R, join, L.trails.map(t => [t.pts, !!t.closed, !!t.carve])]);
+  if (T._lk === key) return T.links;
+  const net = PT.trailNetwork(L.trails, R, join, 2), prof = new Map((T.beds || []).map(b => [b.ti, b.prof]));
+  T.links = PT.trailLinks(L.trails, net, R, (ti, fi) => { const l = net.lines[ti], M = l.length, cl = !!L.trails[ti].closed, k = Math.floor(fi), u = fi - k, ix = i => cl ? ((i % M) + M) % M : Math.max(0, Math.min(M - 1, i));
+    const pr = prof.get(ti); if (pr && pr.length === M) return pr[ix(k)]*(1 - u) + pr[ix(k + 1)]*u;
+    const a = l[ix(k)], b = l[ix(k + 1)], x = a[0] + (b[0] - a[0])*u, y = a[1] + (b[1] - a[1])*u, z = a[2] + (b[2] - a[2])*u, n = Math.hypot(x, y, z); return T.under(x/n, y/n, z/n); });
+  T._lk = key; return T.links;
+}
 function rebuildOverlays(){
   if (!L.models) L.models = [];
   for (const o of [...over.children]){ over.remove(o); if (o.geometry && o.geometry !== handleGeo) o.geometry.dispose(); }
@@ -394,6 +405,8 @@ function rebuildOverlays(){
     if (t.pts.length > 1) over.add(lineOn(PT.trailNetwork(L.trails, R, L.network ? L.network.join : 0, 4).lines[L.trails.indexOf(t)], col, 1.5, false));
     for (let i = 0; i < t.pts.length; i++) addHandle('trail', t, i, t.pts[i], col, 0.8);
   }
+  // the junctions' curves (not while dragging a point: worked out again when you let go)
+  if (!(ptr && ptr.mode === 'move')){ freshLinks(); for (const f of T.links ? T.links.fillets : []) over.add(lineOn(f.pts, 0xffffff, 1.5, false, 0.85)); }
   for (const m of L.landmarks){
     const base = surf(m.d, 0), dir = new V3(...m.d).normalize(), col = new THREE.Color(m.color);
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 6), new THREE.MeshBasicMaterial({ color: col }));
@@ -1026,6 +1039,7 @@ function tcList(items){
 }
 async function tcRun(fn){
   if (tcBusy) return; tcBusy = true; for (const b of ['tcAnalyse', 'tcPlan', 'tcApply', 'tcRemove', 'tcBefore']) $(b).disabled = true;
+  freshLinks();
   try { await fn(); } catch (err){ console.error(err); $('tcStatus').textContent = 'That failed: ' + err.message; }
   tcBusy = false; $('tcAnalyse').disabled = $('tcPlan').disabled = $('tcApply').disabled = false; tcSync();
 }

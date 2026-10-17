@@ -106,8 +106,12 @@ button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
   <label class="f" for="pMtn">Random mountains (game)<output id="oMtn"></output><input id="pMtn" type="range" min="0" max="3" step="0.25"></label>
   <label class="f" for="pBld">Buildings (game)<output id="oBld"></output><input id="pBld" type="range" min="0" max="3" step="0.25"></label>
   <label class="f" for="pTrees">Trees (game)<output id="oTrees"></output><input id="pTrees" type="range" min="0" max="3" step="0.25"></label>
-  <h3>Clean up</h3>
+  <h3>Trails</h3>
   <label class="f" for="nJoin">Join trails within<output id="oJoin"></output><input id="nJoin" type="range" min="0" max="20" step="1"></label>
+  <label class="f" for="nCorr">Corridor beside carved trails<output id="oCorr"></output><input id="nCorr" type="range" min="0" max="60" step="5"></label>
+  <label class="f" for="nSide">Steepest ground in a corridor<output id="oSide"></output><input id="nSide" type="range" min="0.05" max="0.6" step="0.01"></label>
+  <p class="hint">A carved trail takes over the ground beside it out to the corridor's width past its bed: nothing there is steeper than the setting (it cuts and fills as little as it can), so the ground beside every trail skis, and trails side by side, at junctions and at forks share one smooth surface. Past the corridor it eases back into the land over 10 m. Joined trails (alongside within the join distance, or a trail going back over its own path) ski and carve as one.</p>
+  <h3>Clean up</h3>
   <label class="f" for="nPatch">Ease steep bits under<output id="oPatch"></output><input id="nPatch" type="range" min="0" max="40" step="1"></label>
   <div class="row"><button id="bClean" type="button">Clean up</button></div>
   <p class="hint" id="cleanNote">Trails running side by side within the join distance always ski and carve as one. Clean up also thins crowded points, joins points of different trails that nearly meet, snaps loose ends onto the trail they stop short of, and eases small patches too steep to ski (not painted cliffs). The game does the same as it loads, without changing the layout; here it changes the layout (Ctrl+Z undoes it).</p>
@@ -139,7 +143,7 @@ const V3 = THREE.Vector3;
 let L = null;
 try { const s = localStorage.getItem(PT.STORE); if (s) L = PT.parse(s); } catch (e) {}
 if (!L) L = PT.exampleLayout(800);
-let T = PT.terrain(L, L.radius);
+let T = PT.terrain(L, L.radius); T.fresh = true;     // (the first globe uses this one rather than working it out again)
 let R = L.radius;
 
 // ============================================================================================================
@@ -268,7 +272,7 @@ function buildChunk(c){
 }
 function buildGlobe(){
   for (const c of chunks){ globe.remove(c.mesh); c.mesh.geometry.dispose(); }
-  chunks = []; R = L.radius; T = PT.terrain(L, R); terrainMat.uniforms.uR.value = R;
+  chunks = []; R = L.radius; if (!(T.fresh && T.R === R)) T = PT.terrain(L, R); T.fresh = false; terrainMat.uniforms.uR.value = R;
   NF = Math.min(256, Math.max(64, Math.ceil(Math.PI/2*R/6/CH)*CH));
   const m = NF/CH;
   for (let f = 0; f < 6; f++) for (let cj = 0; cj < CH; cj++) for (let ci = 0; ci < CH; ci++){
@@ -281,9 +285,11 @@ function buildGlobe(){
 }
 // rebuild only the chunks touching a cap (centre direction, angular radius)
 function rebuildCaps(caps){
-  T = PT.terrain(L, R);
-  // a carved trail's bed follows the ground under it, averaged along the line: an edit near one moves its bed a little way off
-  { const cs = carved(); if (cs.length){ const extra = Math.max(...cs.map(t => (t.bed || 4) + (t.shoulder || 10) + (t.smooth || 40)))/R; caps = caps.map(([d, a]) => [d, a + extra]); } }
+  // a carved trail's bed follows the ground under it, averaged along the line, and its corridor reaches out beside it: an
+  // edit near one moves its bed a little way off, and the ground out to the corridor's edge. the ground is worked out
+  // again only round the edit (the trails' corridors with it)
+  { const cs = carved(); if (cs.length){ const extra = (Math.max(...cs.map(t => (t.bed || 4) + (t.shoulder || 10) + (t.smooth || 40))) + corridorReach())/R; caps = caps.map(([d, a]) => [d, a + extra]); } }
+  T = PT.terrain(L, R, T, caps);
   for (const c of chunks) if (caps.some(([d, a]) => c.c.angleTo(d) < a + c.ang + 0.002)) buildChunk(c);
   updateRange(); miniDirty();
 }
@@ -291,13 +297,22 @@ function updateRange(){
   let lo = Infinity, hi = -Infinity; for (const c of chunks){ lo = Math.min(lo, c.lo); hi = Math.max(hi, c.hi); }
   terrainMat.uniforms.uLo.value = lo; terrainMat.uniforms.uHi.value = Math.max(hi, lo + 10);
 }
-// the cap a carved trail reaches (its line, plus its bed, shoulders and smoothing)
+// the cap moving one point of a carved trail changes: the curve as far as the points either side of its neighbours
+// (rebuildCaps adds the bed, shoulders, smoothing and corridor round it)
+function pointCap(t, i){
+  const M = t.pts.length, at = k => new V3(...t.pts[t.closed ? (k + M) % M : Math.max(0, Math.min(M - 1, k))]), c = at(i).normalize();
+  let ang = 0; for (let k = i - 2; k <= i + 2; k++) ang = Math.max(ang, c.angleTo(at(k).normalize()));
+  return [c, ang + 6/R];
+}
+// the cap a carved trail's line covers
 function trailCap(t){
   const pts = t.pts.map(p => new V3(...p)), c = pts.reduce((a, p) => a.add(p), new V3()).normalize();
   let ang = 0; for (const p of PT.curve(t.pts, t.closed, 20, R)) ang = Math.max(ang, c.angleTo(new V3(...p)));
-  return [c, ang + ((t.bed || 4) + (t.shoulder || 10) + (t.smooth || 40) + 6)/R];
+  return [c, ang + 6/R];     // (rebuildCaps adds the bed, shoulders, smoothing and corridor round it)
 }
 const carved = () => L.trails.filter(t => t.carve && t.pts.length >= 2);
+// how far a carved trail's corridor reaches past its bed (with the 10 m where it eases back into the land)
+const corridorReach = () => ((L.network && L.network.corridor) ?? PT.networkDefaults().corridor) + 10;
 // the cap a stamp covers (to rebuild what it touches)
 function stampCap(s){
   const pts = s.pts.map(p => new V3(...p)), c = pts.reduce((a, p) => a.add(p), new V3()).normalize();
@@ -592,7 +607,7 @@ function showSel(){
       // the bed rebuilds when a slider is let go (each one changes the ground along the whole trail)
       const carveSlider = (id, label, min, max, step, key, fmt) => { const sl = slider(id, label, min, max, step, () => t[key], v => { t[key] = v; }, fmt); const b0 = sl.bind; sl.bind = () => { b0(); $(id).addEventListener('change', () => { rebuildCaps([trailCap(t)]); rebuildOverlays(); setTimeout(showSel, 0); }); }; return sl; };
       parts.push(carveSlider('slBed', 'Bed half-width (level)', 1, 15, 0.5, 'bed', v => v + ' m'));
-      parts.push(carveSlider('slSh', 'Shoulders (blend to the land)', 1, 40, 1, 'shoulder', v => v + ' m'));
+      parts.push(carveSlider('slSh', 'Shoulders (round the bed into the corridor)', 1, 40, 1, 'shoulder', v => v + ' m'));
       parts.push(carveSlider('slSm', 'Smooth the grade over', 0, 150, 5, 'smooth', v => v ? v + ' m' : 'off'));
       parts.push(carveSlider('slGr', 'Steepest grade', 0.03, 0.4, 0.01, 'maxGrade', v => Math.round(v*100) + '%'));
       parts.push({ html: `<p class="hint">${carveReport(t)}</p>`, bind(){} });
@@ -694,7 +709,7 @@ cv.addEventListener('pointerdown', e => {
   if (tool === 'select'){
     const h = handlePick(px, py);
     sel = h ? { kind: h.kind, ref: h.ref, i: h.i } : null; rebuildOverlays(); showSel();
-    if (h) ptr = { mode: 'move', h, moved: false, cap0: h.kind === 'stamp' ? stampCap(h.ref) : h.kind === 'trail' && h.ref.carve ? trailCap(h.ref) : null };
+    if (h) ptr = { mode: 'move', h, moved: false, cap0: h.kind === 'stamp' ? stampCap(h.ref) : h.kind === 'trail' && h.ref.carve ? pointCap(h.ref, h.i) : null };
     else if (!groundPick(px, py)) ptr = { mode: 'orbit', x: px, y: py };      // off the planet: turn it
     return;
   }
@@ -748,7 +763,7 @@ cv.addEventListener('pointermove', e => {
 });
 const endPtr = () => {
   if (!ptr) return;
-  if (ptr.mode === 'move'){ if (ptr.moved){ if (ptr.h.kind === 'trail' && ptr.h.ref.carve){ rebuildCaps([ptr.cap0, trailCap(ptr.h.ref)]); rebuildOverlays(); } commit(); showSel(); } }
+  if (ptr.mode === 'move'){ if (ptr.moved){ if (ptr.h.kind === 'trail' && ptr.h.ref.carve){ rebuildCaps([ptr.cap0, pointCap(ptr.h.ref, ptr.h.i)]); rebuildOverlays(); } commit(); showSel(); } }
   if (ptr.mode === 'sculpt' || ptr.mode === 'cliff') commit();
   ptr = null; if (tool === 'orbit') cv.style.cursor = 'grab';
 };
@@ -959,10 +974,16 @@ function syncPlanetUI(){
   set('pR', 'oR', L.radius, v => v + ' m'); set('pAmp', 'oAmp', L.noise.amp, v => '×' + (+v).toFixed(2));
   if (!L.network) L.network = PT.networkDefaults();
   set('nJoin', 'oJoin', L.network.join, v => +v ? v + ' m' : 'off'); set('nPatch', 'oPatch', L.network.patch, v => +v ? v + ' m' : 'off');
+  const ND = PT.networkDefaults(); set('nCorr', 'oCorr', L.network.corridor ?? ND.corridor, fmtCorr); set('nSide', 'oSide', L.network.side ?? ND.side, fmtSide);
   set('pMtn', 'oMtn', L.scatter.mountains, v => +v ? '×' + v : 'none'); set('pBld', 'oBld', L.scatter.buildings, v => +v ? '×' + v : 'none'); set('pTrees', 'oTrees', L.scatter.trees, v => +v ? '×' + v : 'none');
 }
 $('nJoin').addEventListener('input', () => { $('oJoin').textContent = +$('nJoin').value ? $('nJoin').value + ' m' : 'off'; });
 $('nJoin').addEventListener('change', () => { L.network.join = +$('nJoin').value; busy(() => { rebuildCaps(L.trails.filter(t => t.carve && t.pts.length > 1).map(trailCap)); rebuildOverlays(); }); commit(); $('nJoin').blur(); });
+const fmtCorr = v => +v ? v + ' m' : 'off', fmtSide = v => Math.round(v*100) + '% (' + Math.round(Math.atan(v)*180/Math.PI) + '°)';
+for (const [id, o, key, fmt] of [['nCorr', 'oCorr', 'corridor', fmtCorr], ['nSide', 'oSide', 'side', fmtSide]]){
+  $(id).addEventListener('input', () => { $(o).textContent = fmt(+$(id).value); });
+  $(id).addEventListener('change', () => { L.network[key] = +$(id).value; busy(() => { buildGlobe(); rebuildOverlays(); miniDirty(); }); commit(); $(id).blur(); });
+}
 $('nPatch').addEventListener('input', () => { $('oPatch').textContent = +$('nPatch').value ? $('nPatch').value + ' m' : 'off'; });
 $('nPatch').addEventListener('change', () => { L.network.patch = +$('nPatch').value; commit(); $('nPatch').blur(); });
 $('bClean').addEventListener('click', () => {

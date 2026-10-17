@@ -288,12 +288,6 @@ function carveProfile(pts, closed, under, smooth, maxGrade, step){
   }
   return prof;
 }
-// a cube-sphere grid for finding the carved segments near a point (cells about 12 m across)
-function carveGrid(R){
-  const G = Math.max(16, Math.min(256, Math.round(Math.PI/2*R/12)));
-  return { G, map: new Map(), key(x, y, z){ const [f, u, v] = PT.faceUV(x, y, z); return (f*G + Math.min(G - 1, Math.floor((u + 1)/2*G)))*G + Math.min(G - 1, Math.floor((v + 1)/2*G)); } };
-}
-
 // ---------- light bridges ----------
 PT.bridgeDefaults = () => ({ clearance: 10, ramp: 50, width: 2.5, maxGrade: 0.25 });
 // the deck along a bridge: points 2 m apart (unit directions), the deck's and the ground's height at each (metres above
@@ -324,7 +318,9 @@ PT.bridgeDeck = function(b, height, R){
 
 // ---------- the trail network ----------
 // join: trails closer than this (m) are made one. patch: the steep bits smaller than this across (m) are eased
-PT.networkDefaults = () => ({ join: 8, patch: 15 });
+// join: trails closer than this run as one; patch: ease steep patches smaller than this (cleanup). corridor: how far
+// past a carved trail's bed the trail takes over the ground, and side: the steepest the ground beside it may be there
+PT.networkDefaults = () => ({ join: 8, patch: 15, corridor: 30, side: 0.25 });
 const ang3 = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0]*b[0] + a[1]*b[1] + a[2]*b[2])));
 // a spatial hash of a line's points (cells `cell` metres), for finding the nearest point of the line quickly
 function lineHash(pts, R, cell){
@@ -337,10 +333,12 @@ function lineHash(pts, R, cell){
   } };
 }
 // the nearest point of a line (within about a cell): distance (m), the point, its direction along the line, where (k, u)
-function nearestOn(H, p, closed){
+// (skip(k): leave out segment k, for a line measured against another part of itself)
+function nearestOn(H, p, closed, skip){
   const P = H.pts, M = P.length, R = H.R; let best = null;
   for (const i of H.near(p)) for (const k of [i - 1, i]){
     if (k < 0 && !closed) continue; const k0 = (k + M) % M, k1 = (k0 + 1) % M; if (!closed && k0 === M - 1) continue;
+    if (skip && skip(k0)) continue;
     const a = P[k0], b = P[k1], ex = b[0] - a[0], ey = b[1] - a[1], ez = b[2] - a[2], L2 = ex*ex + ey*ey + ez*ez || 1e-18;
     const u = Math.max(0, Math.min(1, ((p[0] - a[0])*ex + (p[1] - a[1])*ey + (p[2] - a[2])*ez)/L2));
     const q = [a[0] + ex*u, a[1] + ey*u, a[2] + ez*u], d = Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2])*R;
@@ -354,26 +352,35 @@ const tangentAt = (P, i, closed) => {
   const t = [a[0] - b[0], a[1] - b[1], a[2] - b[2]], l = Math.hypot(...t) || 1; return [t[0]/l, t[1]/l, t[2]/l];
 };
 // every trail as an even line of points `spacing` m apart, with the runs where a trail goes alongside an earlier one
-// (within `join` m, for at least twice that, roughly the same way) pulled onto it, eased in and out over 2 x join.
-// shared[t][i] is 1 + the earlier trail point i of trail t now lies on (0 if none): draw it once, name both
+// (within `join` m, roughly the same line) pulled onto it, eased in and out over 2 x join. a trail that goes back over
+// its own earlier path (a retrace) is pulled onto that the same way: the same way round within join, the other way
+// round (out and back) within join/2, so a switchback's legs stay apart. crossings stay crossings (the lines must run
+// within about 37° of each other), but a shallow approach to a junction is zipped onto the trail it joins, however
+// short. shared[t][i] is 1 + the trail point i of trail t now lies on (0 if none; t + 1 for its own earlier path):
+// draw it once, name both
 const netCache = new Map();
 PT.trailNetwork = function(trails, R, join, spacing){
   const key = JSON.stringify([R, join, spacing, trails.map(t => [t.pts, !!t.closed])]);
   if (netCache.has(key)) return netCache.get(key);
   const lines = trails.map(t => t.pts && t.pts.length >= 2 ? PT.evenCurve(t.pts, !!t.closed, spacing, R) : []);
   const shared = lines.map(l => new Uint8Array(l.length)), merged = [];
-  if (join > 0) for (let b = 1; b < lines.length; b++){
+  const gapN = Math.max(4, Math.ceil(3*join/spacing));            // a trail's own path counts as "earlier" this far back
+  // (each line's bounding cap, to skip pairs of trails too far apart to meet)
+  const caps = lines.map(l => { if (!l.length) return null; const m = [0, 0, 0]; for (const p of l){ m[0] += p[0]; m[1] += p[1]; m[2] += p[2]; } const n = Math.hypot(...m) || 1, c = m.map(v => v/n); let r = 0; for (const p of l) r = Math.max(r, ang3(p, c)); return [c, r]; });
+  const apart = (a, b) => !caps[a] || !caps[b] || ang3(caps[a][0], caps[b][0]) > caps[a][1] + caps[b][1] + 3*join/R;
+  const earlierOnly = (i, M, closed) => k => !(k < i - gapN && !(closed && i - k > M - gapN));
+  if (join > 0) for (let b = 0; b < lines.length; b++){
     const closed = !!trails[b].closed;
-    for (let a = 0; a < b; a++){
-      const A = lines[a], B = lines[b], M = B.length; if (A.length < 2 || M < 3) continue;
+    for (let a = 0; a <= b; a++){
+      const self = a === b, A = lines[a], B = lines[b], M = B.length; if (A.length < 2 || M < 3 || (!self && apart(a, b))) continue;
       const H = lineHash(A, R, Math.max(4, join*1.5)), raw = new Uint8Array(M), Q = new Array(M);
       for (let i = 0; i < M; i++){
-        const nq = nearestOn(H, B[i], !!trails[a].closed); if (!nq || nq.d > join*3) continue;
-        Q[i] = nq.q; const tb = tangentAt(B, i, closed);
-        if (nq.d < join && Math.abs(tb[0]*nq.t[0] + tb[1]*nq.t[1] + tb[2]*nq.t[2]) > 0.8) raw[i] = 1;
+        const nq = nearestOn(H, B[i], !!trails[a].closed, self ? earlierOnly(i, M, closed) : null); if (!nq || nq.d > join*3) continue;
+        Q[i] = nq.q; const tb = tangentAt(B, i, closed), c = tb[0]*nq.t[0] + tb[1]*nq.t[1] + tb[2]*nq.t[2];
+        if (Math.abs(c) > 0.8 && nq.d < (self && c < 0 ? join/2 : join)) raw[i] = 1;
       }
-      // keep only the runs at least 2 x join long (so a crossing stays a crossing)
-      const need = Math.max(2, Math.round(2*join/spacing)); let any = false, start = 0;
+      // drop only stray points (a run shorter than about join/2): a shallow approach is zipped however short
+      const need = Math.max(3, Math.round(join/2/spacing)); let any = false, start = 0;
       if (closed){ start = raw.indexOf(0); if (start < 0) start = 0; }
       for (let s0 = 0; s0 < M; ){
         const i0 = (start + s0) % M; if (!raw[i0]){ s0++; continue; }
@@ -389,18 +396,19 @@ PT.trailNetwork = function(trails, R, join, spacing){
         for (let k = -E; k <= E; k++){ let j = i + k; if (closed) j = (j % M + M) % M; else if (j < 0 || j >= M) continue; sum += raw[j]; n++; }
         const t = Math.min(1, 2*sum/n); w[i] = t*t*(3 - 2*t);
       }
+      const B2 = B.slice();
       for (let i = 0; i < M; i++) if (w[i] > 0 && Q[i]){
         const p = B[i], q = Q[i], x = p[0] + (q[0] - p[0])*w[i], y = p[1] + (q[1] - p[1])*w[i], z = p[2] + (q[2] - p[2])*w[i], l = Math.hypot(x, y, z);
-        B[i] = [x/l, y/l, z/l];
+        B2[i] = [x/l, y/l, z/l];
       }
-      lines[b] = PT.resampleLine(B, closed, spacing, R);
+      lines[b] = PT.resampleLine(B2, closed, spacing, R);
       merged.push([a, b]);
     }
-    // which of its points now lie on an earlier trail
+    // which of its points now lie on an earlier trail, or on its own earlier path
     const B = lines[b], sh = shared[b] = new Uint8Array(B.length);
-    for (let a = 0; a < b; a++){
-      if (lines[a].length < 2) continue; const H = lineHash(lines[a], R, 4);
-      for (let i = 0; i < B.length; i++){ if (sh[i]) continue; const nq = nearestOn(H, B[i], !!trails[a].closed); if (nq && nq.d < 0.3) sh[i] = a + 1; }
+    for (let a = 0; a <= b; a++){
+      if (lines[a].length < 2 || (a !== b && apart(a, b))) continue; const H = lineHash(lines[a], R, 4);
+      for (let i = 0; i < B.length; i++){ if (sh[i]) continue; const nq = nearestOn(H, B[i], !!trails[a].closed, a === b ? earlierOnly(i, B.length, closed) : null); if (nq && nq.d < 0.3) sh[i] = a + 1; }
     }
   }
   const out = { lines, shared, merged };
@@ -610,7 +618,7 @@ PT.parse = function(json){
     bridges: (o.bridges || []).filter(b => b.pts && b.pts.length >= 2).map(b => Object.assign({ name: b.name || 'Light bridge', pts: b.pts.map(norm) }, PT.bridgeDefaults(), pick(b, ['clearance', 'ramp', 'width', 'maxGrade']))),
     start: { d: norm(o.start && o.start.d || B.start.d) }, scatter: Object.assign({}, B.scatter, o.scatter || {}),
     cliffs: Object.assign(PT.cliffDefaults(), pick(o.cliffs || {}, ['from', 'band', 'sharp', 'stop'])),
-    network: Object.assign(PT.networkDefaults(), pick(o.network || {}, ['join', 'patch'])),
+    network: Object.assign(PT.networkDefaults(), pick(o.network || {}, ['join', 'patch', 'corridor', 'side'])),
   };
   // older layouts may have steps where the cube faces meet: weld them, easing the change back into each face
   PT.weldSculpt(L.sculpt, 3); PT.weldDetail(L.detail, 8);
@@ -619,77 +627,261 @@ PT.parse = function(json){
 
 // ---------- the ground: height (metres above the base radius) at a unit direction ----------
 // with no layout it's the procedural planet. R may differ from the layout's radius (stamps stay in metres)
-PT.terrain = function(L, R){
+// ---------- trail corridors (see PT.terrain): baked on a grid per cube face ----------
+const CT = 16;     // corridor grid tiles, CT x CT points
+// prev, caps: an earlier bake with the same settings, and the caps ([direction, angle]) where anything has changed since:
+// only the corridors within reach of those are worked out again (with room round them), the rest kept as they were
+function bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev, caps){
+  const CS = 2, NG = Math.max(65, Math.round(2*R/CS) + 1), TN = Math.ceil(NG/CT), key = JSON.stringify([NG, side, corridor, FADE, R]);
+  const inc = !!(prev && caps && prev.key === key), tiles = inc ? new Map(prev.tiles) : new Map(), owned = new Set();
+  const tileFor = k => { let t = tiles.get(k); if (t && inc && !owned.has(k)){ t = t.slice(); tiles.set(k, t); } if (!t){ t = new Float32Array(CT*CT*3).fill(NaN); tiles.set(k, t); } owned.add(k); return t; };
+  const capList = inc ? caps.map(([d, a]) => { const v = d.isVector3 ? [d.x, d.y, d.z] : d, l = Math.hypot(v[0], v[1], v[2]) || 1; return [[v[0]/l, v[1]/l, v[2]/l], a]; }) : null;
+  const bedMax = Math.max(...carves.map(c => c.bed)), reach = bedMax + corridor + FADE + 2, lim = corridor + FADE;
+  const LMAX = 3;                                    // the steepest the corridor's edge may get as it meets the land
+  // the margin, in grid steps (the grid is finest, about half as far apart, toward a face's edges)
+  const M = Math.ceil(reach/(CS*0.45)) + 2, W = NG + 2*M, du = 2/(NG - 1), N = W*W;
+  const dir = new Float32Array(N*3), cd = new Float32Array(N), lo = new Float32Array(N), hi = new Float32Array(N);
+  const h0 = new Float32Array(N), hl = new Float32Array(N), hu = new Float32Array(N), Lc = new Float32Array(N), inR = new Uint8Array(N), dI = new Float32Array(N), dJ = new Float32Array(N), dok = new Uint8Array(N), sw = new Float32Array(N), swh = new Float32Array(N);
+  const q = [0, 0, 0];
+  for (let f = 0; f < 6; f++){
+    const [na, ua, va, sg] = FAX[f];
+    // which segments reach this face (its plane, extended past its edges by the margin)
+    const segs = [];
+    carves.forEach((c, ci) => { const segN = c.closed ? c.M : c.M - 1, P = c.P;
+      for (let k = 0; k < segN; k++){ const den = sg*P[k*3 + na]; if (den < 0.35) continue; const u = P[k*3 + ua]/den, v = P[k*3 + va]/den;
+        if (Math.abs(u) < 1 + (M + 4)*du*2 && Math.abs(v) < 1 + (M + 4)*du*2) segs.push(ci, k); } });
+    if (!segs.length) continue;
+    // the part of the face the corridors can reach (its grid points as directions)
+    let bi0 = W, bi1 = -1, bj0 = W, bj1 = -1;
+    for (let s = 0; s < segs.length; s += 2){ const P = carves[segs[s]].P, k = segs[s + 1], den = sg*P[k*3 + na], cu = P[k*3 + ua]/den, cv = P[k*3 + va]/den;
+      const r = Math.ceil(reach/R*(1 + cu*cu + cv*cv)/du) + 3, gi = (cu + 1)/du + M, gj = (cv + 1)/du + M;
+      bi0 = Math.min(bi0, gi - r); bi1 = Math.max(bi1, gi + r); bj0 = Math.min(bj0, gj - r); bj1 = Math.max(bj1, gj + r); }
+    // (redoing only round the changes: keep the corridors within their reach of a change, working them out with 20 m more)
+    let wb = null;
+    if (inc){
+      let a0 = W, a1 = -1, b0 = W, b1 = -1, c0 = W, c1 = -1, e0 = W, e1 = -1;
+      for (let [d, ang] of capList){
+        // (a cap centred off this face reaches it only if it comes within its reach of the face's edge: measure from the
+        // nearest point of the face's square instead)
+        const den = sg*d[na]; if (den < 0.05) continue; let cu = d[ua]/den, cv = d[va]/den;
+        if (Math.abs(cu) > 1 || Math.abs(cv) > 1){ const e = [0, 0, 0]; e[na] = sg; e[ua] = Math.max(-1, Math.min(1, cu)); e[va] = Math.max(-1, Math.min(1, cv));
+          const el = Math.hypot(e[0], e[1], e[2]), gap = Math.acos(Math.max(-1, Math.min(1, (e[0]*d[0] + e[1]*d[1] + e[2]*d[2])/el)));
+          if (gap*R > ang*R + reach + 20) continue; cu = e[ua]; cv = e[va]; ang = Math.max(0, ang - gap); }
+        const sc = (1 + cu*cu + cv*cv)/(R*du);
+        const gi = (cu + 1)/du + M, gj = (cv + 1)/du + M, rw = (ang*R + reach + 20)*sc + 3, rk = (ang*R + reach)*sc + 2;
+        a0 = Math.min(a0, gi - rw); a1 = Math.max(a1, gi + rw); b0 = Math.min(b0, gj - rw); b1 = Math.max(b1, gj + rw);
+        c0 = Math.min(c0, gi - rk); c1 = Math.max(c1, gi + rk); e0 = Math.min(e0, gj - rk); e1 = Math.max(e1, gj + rk); }
+      if (a1 < a0) continue;
+      bi0 = Math.max(bi0, a0); bi1 = Math.min(bi1, a1); bj0 = Math.max(bj0, b0); bj1 = Math.min(bj1, b1);
+      wb = [Math.max(M, Math.floor(c0)), Math.min(M + NG - 1, Math.ceil(c1)), Math.max(M, Math.floor(e0)), Math.min(M + NG - 1, Math.ceil(e1))];
+    }
+    bi0 = Math.max(1, Math.floor(bi0)); bi1 = Math.min(W - 2, Math.ceil(bi1)); bj0 = Math.max(1, Math.floor(bj0)); bj1 = Math.min(W - 2, Math.ceil(bj1));
+    if (bi0 > bi1 || bj0 > bj1) continue;
+    cd.fill(1e9); lo.fill(-1e9); hi.fill(1e9); inR.fill(0); dok.fill(0); sw.fill(0); swh.fill(0);
+    // a grid point as a direction, worked out the first time it's wanted
+    const need = id => { if (dok[id]) return; dok[id] = 1; const i = id % W, j = (id/W) | 0, o = id*3; PT.dirFromFace(f, -1 + (i - M)*du, -1 + (j - M)*du, q); dir[o] = q[0]; dir[o + 1] = q[1]; dir[o + 2] = q[2]; };
+    // each segment marks the points within its reach: how far past the bed (cd), and the beds' limits (lo, hi)
+    for (let s = 0; s < segs.length; s += 2){
+      const c = carves[segs[s]], k = segs[s + 1], k2 = (k + 1) % c.M, P = c.P;
+      if (inc){ const d0 = sg*P[k*3 + na], u0 = P[k*3 + ua]/d0, v0 = P[k*3 + va]/d0, r0 = reach*(1 + u0*u0 + v0*v0)/(R*du) + 4, g0 = (u0 + 1)/du + M, h0_ = (v0 + 1)/du + M;
+        if (g0 + r0 < bi0 || g0 - r0 > bi1 || h0_ + r0 < bj0 || h0_ - r0 > bj1) continue; }
+      const ax = P[k*3], ay = P[k*3 + 1], az = P[k*3 + 2], ex = P[k2*3] - ax, ey = P[k2*3 + 1] - ay, ez = P[k2*3 + 2] - az, L2 = ex*ex + ey*ey + ez*ez || 1e-12;
+      const p0 = c.prof[k], p1 = c.prof[k2], bed = c.bed, Ls = Math.sqrt(L2)*R;
+      // the strip square to this piece (a quarter of its length past each end, out to its reach either side). on a cube
+      // face a great circle is a straight line, so the strip is a four-sided shape on the grid: fill it row by row
+      const mx = ax + ex/2, my = ay + ey/2, mz = az + ez/2;
+      let nx = my*ez - mz*ey, ny = mz*ex - mx*ez, nz = mx*ey - my*ex; const nl = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1; nx /= nl; ny /= nl; nz /= nl;
+      // (past each end, as far as the bend there needs, so the strips leave no gaps on the outside of a bend)
+      const bend = kk => { const k0 = c.closed ? (kk + c.M) % c.M : Math.max(0, Math.min(c.M - 2, kk)), k1 = (k0 + 1) % c.M;
+        const fx = P[k1*3] - P[k0*3], fy = P[k1*3 + 1] - P[k0*3 + 1], fz = P[k1*3 + 2] - P[k0*3 + 2], fl = Math.sqrt(fx*fx + fy*fy + fz*fz) || 1e-12;
+        return Math.acos(Math.max(-1, Math.min(1, (fx*ex + fy*ey + fz*ez)/(fl*Math.sqrt(L2))))); };
+      const tw = (bed + lim + 1)/R, ext0 = 0.3 + (0.8 + (bed + lim)*Math.min(1, 1.3*bend(k - 1)))/Ls, ext1 = 0.3 + (0.8 + (bed + lim)*Math.min(1, 1.3*bend(k + 1)))/Ls, cg = [];
+      let ok = true;
+      for (const [sa, tb] of [[-ext0, -tw], [1 + ext1, -tw], [1 + ext1, tw], [-ext0, tw]]){
+        const px = ax + ex*sa + nx*tb, py = ay + ey*sa + ny*tb, pz = az + ez*sa + nz*tb, dn = sg*(na === 0 ? px : na === 1 ? py : pz); if (dn <= 0.05){ ok = false; break; }
+        cg.push(((ua === 0 ? px : ua === 1 ? py : pz)/dn + 1)/du + M, ((va === 0 ? px : va === 1 ? py : pz)/dn + 1)/du + M);
+      }
+      if (!ok) continue;
+      if (Math.max(cg[0], cg[2], cg[4], cg[6]) < bi0 - 1 || Math.min(cg[0], cg[2], cg[4], cg[6]) > bi1 + 1 || Math.max(cg[1], cg[3], cg[5], cg[7]) < bj0 - 1 || Math.min(cg[1], cg[3], cg[5], cg[7]) > bj1 + 1) continue;
+      const rj0 = Math.max(bj0, Math.floor(Math.min(cg[1], cg[3], cg[5], cg[7])) - 1), rj1 = Math.min(bj1, Math.ceil(Math.max(cg[1], cg[3], cg[5], cg[7])) + 1);
+      for (let j = rj0; j <= rj1; j++){
+        // where this row crosses the shape's sides (with a point's slack either way)
+        let x0 = Infinity, x1 = -Infinity;
+        for (let e = 0; e < 4; e++){
+          const xa = cg[e*2], ya = cg[e*2 + 1], xb = cg[((e + 1) % 4)*2], yb = cg[((e + 1) % 4)*2 + 1];
+          const y0 = Math.min(ya, yb) - 1, y1 = Math.max(ya, yb) + 1; if (j < y0 || j > y1) continue;
+          const t = yb === ya ? 0.5 : Math.max(0, Math.min(1, (j - ya)/(yb - ya))), xx = xa + (xb - xa)*t;
+          if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (xa < x0 && Math.abs(j - ya) <= 1) x0 = xa; if (xa > x1 && Math.abs(j - ya) <= 1) x1 = xa;
+        }
+        if (x0 > x1) continue;
+        const ri0 = Math.max(bi0, Math.floor(x0) - 1), ri1 = Math.min(bi1, Math.ceil(x1) + 1);
+        for (let i = ri0; i <= ri1; i++){
+        const id = j*W + i; need(id);
+        const o = id*3, x = dir[o], y = dir[o + 1], z = dir[o + 2];
+        // past a piece's ends the trail climbs or falls on (at most its steepest grade), so the limit loosens by that much:
+        // a stretch further along the same trail never pins the ground beside this one
+        const u0 = ((x - ax)*ex + (y - ay)*ey + (z - az)*ez)/L2;
+        const u = u0 < 0 ? 0 : u0 > 1 ? 1 : u0, qx = x - ax - u*ex, qy = y - ay - u*ey, qz = z - az - u*ez, dd = Math.sqrt(qx*qx + qy*qy + qz*qz)*R - bed; if (dd > lim) continue;
+        if (dd < cd[id]) cd[id] = dd;
+        const hb = p0 + (p1 - p0)*u, a = allow(c, dd) + c.gA*(u0 < 0 ? -u0 : u0 > 1 ? u0 - 1 : 0)*Ls;
+        if (hb - a > lo[id]) lo[id] = hb - a; if (hb + a < hi[id]) hi[id] = hb + a;
+        // (the beds near, by nearness; along a trail each piece's share fades out past its ends, so the pieces blend evenly)
+        const wu = 1 - Math.abs(u0 - 0.5); if (wu > 0){ const wd = wu/Math.max(1, (dd + bed)*(dd + bed)); sw[id] += wd; swh[id] += wd*hb; }
+        }
+      }
+    }
+    // the land under the corridors, clamped into the beds' limits (where trails disagree, halfway between them)
+    const reg = [];
+    for (let j = bj0; j <= bj1; j++) for (let i = bi0; i <= bi1; i++){ const id = j*W + i; if (cd[id] <= lim) reg.push(id); }
+    // where trails disagree (beds too far apart in height for the side grade between them, like a switchback's legs),
+    // the ground ramps evenly from one bed to the other (each bed counting by how near it is), eased in from where
+    // they start to disagree; those points are held there
+    for (const id of reg){
+      inR[id] = 1; const o = id*3, h = under(dir[o], dir[o + 1], dir[o + 2]); h0[id] = h;
+      const l = lo[id], u = hi[id]; let hc;
+      if (l > u){ const m = (l + u)/2, t = Math.min(1, (l - u)/2), r = sw[id] > 0 ? swh[id]/sw[id] : m; hc = m + (r - m)*t*t*(3 - 2*t); inR[id] = 3; }
+      else hc = h < l ? l : h > u ? u : h;
+      hl[id] = hu[id] = hc;
+      Lc[id] = cd[id] <= corridor ? side : side + (LMAX - side)*Math.min(1, (cd[id] - corridor)/FADE);
+    }
+    // no steeper than the side grade: the least fill (hu, raised to it) and the least cut (hl, lowered to it), by
+    // sweeping the grid both ways (twice), each point taking what its neighbours allow
+    // (a bed's points don't move, and nothing goes outside the beds' limits: those are no steeper than the side grade)
+    // (the distances to the neighbours, worked out once: across (dI), down (dJ), and the diagonals from those)
+    for (const id of reg){ const o = id*3; need(id + 1); need(id + W);
+      let x = dir[o + 3] - dir[o], y = dir[o + 4] - dir[o + 1], z = dir[o + 5] - dir[o + 2]; dI[id] = Math.sqrt(x*x + y*y + z*z)*R;
+      const w = o + W*3; x = dir[w] - dir[o]; y = dir[w + 1] - dir[o + 1]; z = dir[w + 2] - dir[o + 2]; dJ[id] = Math.sqrt(x*x + y*y + z*z)*R; }
+    const relax = (id, nb, dist) => { if (!inR[nb]) return;
+      const cst = 0.5*(Lc[id] + Lc[nb])*dist;
+      const a = hl[nb] + cst; if (a < hl[id]) hl[id] = a > lo[id] ? a : lo[id]; const b = hu[nb] - cst; if (b > hu[id]) hu[id] = b < hi[id] ? b : hi[id]; };
+    for (const id of reg) if (inR[id] === 1 && lo[id] >= hi[id] - 0.01) inR[id] = 2;      // the beds: fixed
+    // smooth the ramps where trails disagree (on the inside of a tight bend which points disagree can flicker)
+    { const ramp = Int32Array.from(reg.filter(id => inR[id] === 3));
+      for (let it = 0; it < 6; it++){
+        for (const id of ramp) hu[id] = hl[id];
+        for (const id of ramp){ let sm = hu[id], n = 1;
+          for (const nb of [id - 1, id + 1, id - W, id + W, id - W - 1, id - W + 1, id + W - 1, id + W + 1]) if (inR[nb] === 3){ sm += hu[nb]; n++; }
+          hl[id] = sm/n; }
+      }
+      for (const id of ramp) hu[id] = hl[id]; }
+    const free = Int32Array.from(reg.filter(id => inR[id] === 1)), nf = free.length;
+    for (let it = 0; it < 3; it++){
+      for (let r = 0; r < nf; r++){ const id = free[r], di = dI[id], dj = dJ[id], dg = Math.sqrt(di*di + dj*dj); relax(id, id - 1, di); relax(id, id - W - 1, dg); relax(id, id - W, dj); relax(id, id - W + 1, dg); }
+      for (let r = nf - 1; r >= 0; r--){ const id = free[r], di = dI[id], dj = dJ[id], dg = Math.sqrt(di*di + dj*dj); relax(id, id + 1, di); relax(id, id + W + 1, dg); relax(id, id + W, dj); relax(id, id + W - 1, dg); }
+    }
+    // average the two, keep within the beds' limits, round the corners (twice), keeping within the limits
+    const F = hl;
+    for (const id of reg){ if (inR[id] === 3) continue; const v = (hl[id] + hu[id])/2, l = lo[id], u = hi[id]; F[id] = l > u ? (l + u)/2 : v < l ? l : v > u ? u : v; }
+    for (let it = 0; it < 2; it++){
+      for (const id of reg) hu[id] = F[id];
+      for (let r = 0; r < nf; r++){
+        const id = free[r];       // (a bed stays as it is)
+        let sm = 0, n = 0; if (inR[id - 1]){ sm += hu[id - 1]; n++; } if (inR[id + 1]){ sm += hu[id + 1]; n++; } if (inR[id - W]){ sm += hu[id - W]; n++; } if (inR[id + W]){ sm += hu[id + W]; n++; }
+        const v = n ? 0.5*hu[id] + 0.5*sm/n : hu[id], l = lo[id], u = hi[id]; F[id] = v < l ? l : v > u ? u : v;
+      }
+    }
+    // keep this face's own points: the corridor's height, the land's, and how much the corridor counts there (redoing
+    // round a change: clear what was kept there first)
+    if (wb) for (let j = wb[2]; j <= wb[3]; j++) for (let i = wb[0]; i <= wb[1]; i++){
+      const gi = i - M, gj = j - M, k = (f*TN + (gj/CT | 0))*TN + (gi/CT | 0); if (!tiles.has(k)) continue;
+      const t = tileFor(k), t0 = ((gj % CT)*CT + (gi % CT))*3; t[t0] = t[t0 + 1] = t[t0 + 2] = NaN; }
+    for (const id of reg){
+      const i = id % W, j = (id/W) | 0; if (i < M || i >= M + NG || j < M || j >= M + NG) continue;
+      if (wb && (i < wb[0] || i > wb[1] || j < wb[2] || j > wb[3])) continue;
+      const gi = i - M, gj = j - M, t = tileFor((f*TN + (gj/CT | 0))*TN + (gi/CT | 0));
+      const t0 = ((gj % CT)*CT + (gi % CT))*3, e = cd[id] <= corridor ? 1 : Math.max(0, 1 - (cd[id] - corridor)/FADE), w = e*e*(3 - 2*e);
+      t[t0] = F[id]; t[t0 + 1] = h0[id]; t[t0 + 2] = w;
+    }
+  }
+  return { NG, TN, tiles, key };
+}
+// the ground at a point near a corridor: the corridor's height where it counts in full, the land's own (h) where it
+// doesn't, eased between; the land's detail finer than the grid shows only as it fades out
+function corridorAt(C, x, y, z, h){
+  const fuv = PT.faceUV(x, y, z), f = fuv[0], NG = C.NG, TN = C.TN, gx = (fuv[1] + 1)/2*(NG - 1), gy = (fuv[2] + 1)/2*(NG - 1);
+  const i = Math.max(0, Math.min(NG - 2, Math.floor(gx))), j = Math.max(0, Math.min(NG - 2, Math.floor(gy))), fx = gx - i, fy = gy - j;
+  let Fb = 0, Hb = 0, Wb = 0, any = false;
+  for (let c = 0; c < 4; c++){
+    const ii = i + (c & 1), jj = j + (c >> 1), wt = ((c & 1) ? fx : 1 - fx)*((c >> 1) ? fy : 1 - fy);
+    const t = C.tiles.get((f*TN + (jj/CT | 0))*TN + (ii/CT | 0)), o = ((jj % CT)*CT + (ii % CT))*3;
+    if (t && t[o] === t[o]){ Fb += t[o]*wt; Hb += t[o + 1]*wt; Wb += t[o + 2]*wt; any = true; }
+    else { Fb += h*wt; Hb += h*wt; }
+  }
+  return any ? Fb + (h - Hb)*(1 - Wb) : h;
+}
+
+PT.terrain = function(L, R, prev, caps){
   const amp = L ? L.noise.amp : 1, stamps = L ? L.stamps.filter(s => s.pts && s.pts.length).map(s => compileStamp(s, R)) : [], sc = L ? L.sculpt : null;
   // everything but the trails' carving
   const shaped = (x, y, z) => { let h = amp ? amp*PT.baseNoise(x, y, z, R) : 0; for (let i = 0; i < stamps.length; i++) h += stampAt(stamps[i], x, y, z, R); return h; };
   const dl = L && L.detail && L.detail.tiles.size ? L.detail : null;
   const under = (x, y, z) => shaped(x, y, z) + (sc ? PT.sampleSculpt(sc, x, y, z) : 0) + (dl ? PT.sampleDetail(dl, x, y, z) : 0);
-  // carved trails: each one's line (2 m apart) and bed profile, and a grid of its segments
-  const carves = [], grid = carveGrid(R), STEP = 2;
+  // carved trails: each one's line (2 m apart) and bed profile
+  // a carved trail takes over the ground beside it, out to `corridor` m past its bed: the ground there may rise or fall
+  // from the bed no faster than `side` (rounding off from the level bed over the trail's shoulder width), so nothing
+  // beside a trail is steeper than that, however the trail cuts across the land. where the ground is gentler it's left
+  // as it is. every carved trail near a point has its say (the ground keeps within all their limits), so parallel
+  // trails, junctions and forks share one smooth surface. past the corridor it eases back into the land over FADE m
+  const carves = [], STEP = 2, FADE = 10;
+  const NW = Object.assign(PT.networkDefaults(), L && L.network || {});
+  const stopG = L && L.cliffs ? L.cliffs.stop : 1.0, side = Math.max(0.02, Math.min(NW.side, stopG*0.9)), corridor = Math.max(0, NW.corridor);
   // the trails as one network (runs alongside each other made one), so carved beds that share ground agree
   const join = L && L.network ? L.network.join : 0, net = L && L.trails.length ? PT.trailNetwork(L.trails, R, join, STEP) : null;
   if (L) L.trails.forEach((t, ti) => {
     if (!t.carve || !t.pts || t.pts.length < 2) return;
     const pts = net.lines[ti], M = pts.length; if (M < 2) return;
     const c = { ti, pts, closed: !!t.closed, M, bed: Math.max(0.5, t.bed ?? 4), sh: Math.max(0.5, t.shoulder ?? 10), smooth: t.smooth ?? 40, P: new Float64Array(M*3),
-      prof: carveProfile(pts, !!t.closed, under, t.smooth ?? 40, t.maxGrade ?? 0.2, STEP) };
+      prof: carveProfile(pts, !!t.closed, under, t.smooth ?? 40, t.maxGrade ?? 0.2, STEP), gA: (t.maxGrade ?? 0.2) + 0.03 };
     pts.forEach((p, i) => { c.P[i*3] = p[0]; c.P[i*3 + 1] = p[1]; c.P[i*3 + 2] = p[2]; });
-    const ci = carves.length; carves.push(c);
-    const reach = c.bed + c.sh + 1, segN = c.closed ? M : M - 1, q = [0, 0, 0];
-    for (let k = 0; k < segN; k++){
-      const a = pts[k], b = pts[(k + 1) % M], m = [a[0] + b[0], a[1] + b[1], a[2] + b[2]], Lm = Math.hypot(m[0], m[1], m[2]); m[0] /= Lm; m[1] /= Lm; m[2] /= Lm;
-      const ax = Math.abs(m[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
-      const t1 = [ax[1]*m[2] - ax[2]*m[1], ax[2]*m[0] - ax[0]*m[2], ax[0]*m[1] - ax[1]*m[0]], L1 = Math.hypot(t1[0], t1[1], t1[2]); t1[0] /= L1; t1[1] /= L1; t1[2] /= L1;
-      const t2 = [m[1]*t1[2] - m[2]*t1[1], m[2]*t1[0] - m[0]*t1[2], m[0]*t1[1] - m[1]*t1[0]];
-      const keys = new Set([grid.key(m[0], m[1], m[2])]);
-      for (const rr of [reach/2, reach]) for (let i = 0; i < 12; i++){
-        const an = i/12*Math.PI*2, ox = Math.cos(an)*rr/R, oy = Math.sin(an)*rr/R;
-        q[0] = m[0] + t1[0]*ox + t2[0]*oy; q[1] = m[1] + t1[1]*ox + t2[1]*oy; q[2] = m[2] + t1[2]*ox + t2[2]*oy; keys.add(grid.key(q[0], q[1], q[2]));
-      }
-      for (const key of keys){ let l = grid.map.get(key); if (!l) grid.map.set(key, l = []); l.push(ci, k); }
-    }
+    carves.push(c);
   });
-  // junctions: where a carved trail meets or runs along an earlier one, its bed takes the earlier one's height there,
-  // eased back to its own over its smoothing length either side
+  // how far the ground may differ from a bed at dd m past its edge: level at the edge, rounding into the side grade over
+  // the shoulder, then that grade out to the corridor, then easing off quickly (by FADE m past it, 100 m)
+  const allow = (c, dd) => {
+    if (dd <= 0) return 0;
+    let a = dd < c.sh ? side*dd*dd/(2*c.sh) : side*(dd - c.sh/2);
+    const f = dd - corridor; if (f > 0) a += 0.1*f*f*f;
+    return a;
+  };
+  // junctions and neighbours: where a carved trail meets, runs along or passes near an earlier one, its bed moves toward
+  // the earlier one's height as far as it must for the ground between them to keep within the side grade (on a shared
+  // stretch, all the way), eased back to its own over its smoothing length either side
+  // (each trail's bounding sphere, to skip pairs too far apart to matter)
+  for (const c of carves){ const m = [0, 0, 0]; for (const p of c.pts){ m[0] += p[0]; m[1] += p[1]; m[2] += p[2]; } const l = Math.hypot(...m) || 1; c.mid = m.map(v => v/l); c.rad = Math.max(...c.pts.map(p => ang3(p, c.mid))); }
   for (let b = 1; b < carves.length; b++){
     const B = carves[b], cor = new Float64Array(B.M), has = new Uint8Array(B.M);
     for (let a = 0; a < b; a++){
-      const A = carves[a], H = lineHash(A.pts, R, Math.max(4, A.bed + B.bed));
+      const A = carves[a], far = A.bed + B.bed + corridor; if (ang3(A.mid, B.mid) > A.rad + B.rad + far/R) continue;
+      const H = A.hash || (A.hash = lineHash(A.pts, R, Math.max(4, far/1.5)));
       for (let i = 0; i < B.M; i++){
-        const nq = nearestOn(H, B.pts[i], A.closed); if (!nq || nq.d > Math.min(A.bed, B.bed)) continue;
-        const k2 = (nq.k + 1) % A.M; cor[i] = A.prof[nq.k] + (A.prof[k2] - A.prof[nq.k])*nq.u - B.prof[i]; has[i] = 1;
+        const nq = nearestOn(H, B.pts[i], A.closed); if (!nq || nq.d > far) continue;
+        const k2 = (nq.k + 1) % A.M, dh = A.prof[nq.k] + (A.prof[k2] - A.prof[nq.k])*nq.u - B.prof[i];
+        const ok = nq.d < Math.min(A.bed, B.bed) ? 0 : allow(A, nq.d - A.bed - B.bed), need = Math.sign(dh)*Math.max(0, Math.abs(dh) - ok);
+        if (need && (!has[i] || Math.abs(need) > Math.abs(cor[i]))){ cor[i] = need; has[i] = 1; }
       }
     }
     if (!has.some(x => x)) continue;
-    // spread: each point takes the correction of the nearest junction point along the line, faded by distance
-    const span = Math.max(20, B.smooth)/STEP, M = B.M, out = new Float64Array(M), dist = new Float64Array(M).fill(Infinity), val = new Float64Array(M);
+    // spread: each point takes the correction of the nearest point along the line that has one, faded by distance
+    const span = Math.max(20, B.smooth)/STEP, M = B.M, dist = new Float64Array(M).fill(Infinity), val = new Float64Array(M);
     const sweep = (dirn) => {
       let d = Infinity, v = 0; const n = B.closed ? 2*M : M;
-      for (let s = 0; s < n; s++){ const i = dirn > 0 ? s % M : (M - 1 - (s % M)); if (has[i]){ d = 0; v = cor[i]; } else d++; if (d < dist[i]){ dist[i] = d; val[i] = v; } }
+      for (let s = 0; s < n; s++){ const i = dirn > 0 ? s % M : (M - 1 - (s % M)); if (has[i]){ d = 0; v = cor[i]; } else d++; if (d < dist[i] || (d === dist[i] && Math.abs(v) > Math.abs(val[i]))){ dist[i] = d; val[i] = v; } }
     };
     sweep(1); sweep(-1);
     for (let i = 0; i < M; i++){ const t = Math.min(1, dist[i]/span), w = 1 - t*t*(3 - 2*t); B.prof[i] += val[i]*w; }
   }
-  // the bed under a point: the carved trail it's most inside (distance across, the bed's height there)
-  const carveAt = (x, y, z) => {
-    const list = grid.map.get(grid.key(x, y, z)); if (!list) return null;
-    let best = null, bs = Infinity;
-    for (let i = 0; i < list.length; i += 2){
-      const c = carves[list[i]], k = list[i + 1], k2 = (k + 1) % c.M, P = c.P;
-      const ax = P[k*3], ay = P[k*3 + 1], az = P[k*3 + 2], ex = P[k2*3] - ax, ey = P[k2*3 + 1] - ay, ez = P[k2*3 + 2] - az, L2 = ex*ex + ey*ey + ez*ez || 1e-12;
-      const u = Math.max(0, Math.min(1, ((x - ax)*ex + (y - ay)*ey + (z - az)*ez)/L2));
-      const d = Math.hypot(x - ax - u*ex, y - ay - u*ey, z - az - u*ez)*R, score = d - c.bed;
-      if (score < bs && d < c.bed + c.sh){ bs = score; best = { d, hb: c.prof[k] + (c.prof[k2] - c.prof[k])*u, bed: c.bed, sh: c.sh }; }
-    }
-    return best;
-  };
+  // the corridors, worked out once on a grid (about 1.5 m apart, per cube face, each face with a margin past its edges so
+  // faces agree where they meet). on the grid: the beds are held level, and the ground in each corridor is cut and
+  // filled as little as it can be so that nowhere is it steeper than the side grade (the steepest the land beside a
+  // trail may be): the least fill that does it and the least cut that does it, averaged. then the corners are rounded,
+  // everything is kept within the beds' limits, and past the corridor it eases back into the land over FADE m. the
+  // ground then reads the grid: the corridor's height, with the land's own finer detail where it fades out
+  const corr = carves.length ? bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev && prev.corr, caps) : null;
   return {
-    R, stamps, carves: carves.length, net, stop: L && L.cliffs ? L.cliffs.stop : 1.0,
+    R, stamps, carves: carves.length, net, corr, stop: L && L.cliffs ? L.cliffs.stop : 1.0,
     height(x, y, z){
-      let h = under(x, y, z);
-      if (carves.length){ const q = carveAt(x, y, z); if (q){ const t = q.d <= q.bed ? 0 : (q.d - q.bed)/q.sh, w = t*t*(3 - 2*t); h = q.hb + (h - q.hb)*w; } }
-      return h;
+      const h = under(x, y, z);
+      return corr ? corridorAt(corr, x, y, z, h) : h;
     },
     // everything but the sculpt and detail layers and the carving
     shaped,

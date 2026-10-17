@@ -464,7 +464,12 @@ PT.trailLinks = function(trails, net, R, heightOf, opt){
   const to2 = (c, F, p) => { const d = sub(p, c); return [dot(d, F[0])*R, dot(d, F[1])*R]; };
   const from2 = (c, F, x, y) => norm([c[0] + (F[0][0]*x + F[1][0]*y)/R, c[1] + (F[0][1]*x + F[1][1]*y)/R, c[2] + (F[0][2]*x + F[1][2]*y)/R]);
   const near = (p, list, r) => list.some(j => ang3(j.c, p)*R < r);
-  const add = (c, kind, arms) => { if (near(c, junctions, 4)) return; junctions.push({ c, kind, arms }); };
+  // (junctions within 8 m of each other are one: a trail ending just across another from where a third starts is a
+  // crossing drawn in two pieces. their arms are pooled, the same arm twice kept once)
+  const RANK = { crossing: 3, end: 1, fork: 2 };
+  const add = (c, kind, arms) => { const J = junctions.find(j => ang3(j.c, c)*R < 8);
+    if (!J){ junctions.push({ c, kind, arms }); return; }
+    J.arms.push(...arms); if (RANK[kind] > RANK[J.kind]) J.kind = kind; };
   // ---- crossings: segments of different trails (or far-apart stretches of one) that cross, off any shared stretch
   const CELL = 4, key = p => Math.floor(p[0]*R/CELL) + ',' + Math.floor(p[1]*R/CELL) + ',' + Math.floor(p[2]*R/CELL), hash = new Map();
   lines.forEach((l, ti) => { const segN = trails[ti].closed ? l.length : l.length - 1; for (let k = 0; k < segN; k++){ const m = norm(l[k].map((v, q) => v + l[(k + 1) % l.length][q])), kk = key(m); let h = hash.get(kk); if (!h) hash.set(kk, h = []); h.push(ti, k); } });
@@ -492,7 +497,7 @@ PT.trailLinks = function(trails, net, R, heightOf, opt){
   // ---- forks: where a trail leaves or joins one it runs along (its shared stretch starts or ends), and a trail's end
   // sitting on another trail
   const hashes = new Map(), lh = a => { if (!hashes.has(a)) hashes.set(a, lineHash(lines[a], R, 6)); return hashes.get(a); };
-  const hostArms = (a, p, skip) => { const nq = nearestOn(lh(a), p, !!trails[a].closed, skip); if (!nq || nq.d > 1.5) return null; const fi = nq.k + nq.u; return [{ ti: a, fi, dir: 1 }, { ti: a, fi, dir: -1 }]; };
+  const hostArms = (a, p, skip) => { const nq = nearestOn(lh(a), p, !!trails[a].closed, skip); if (!nq || nq.d > 3) return null; const fi = nq.k + nq.u; return [{ ti: a, fi, dir: 1 }, { ti: a, fi, dir: -1 }]; };
   lines.forEach((B, b) => { const sh = shared[b], M = B.length, closed = !!trails[b].closed; if (M < 3) return;
     for (let i = 0; i < M; i++){
       const n = i + 1; if (!closed && n >= M) break; const nn = n % M;
@@ -514,7 +519,7 @@ PT.trailLinks = function(trails, net, R, heightOf, opt){
       .filter(A => A.len > 1);
     // (the same arm twice, e.g. a fork's shared stretch: keep one)
     const uniq = []; for (const A of arms) if (!uniq.some(B => Math.abs(Math.atan2(Math.sin(A.ang - B.ang), Math.cos(A.ang - B.ang))) < 0.09)) uniq.push(A);
-    uniq.sort((x, y) => x.ang - y.ang); J.armCount = uniq.length; if (uniq.length < 2) continue;
+    uniq.sort((x, y) => x.ang - y.ang); J.armCount = uniq.length; if (uniq.length >= 4) J.kind = 'crossing'; if (uniq.length < 2) continue;
     for (let i = 0; i < uniq.length; i++){
       const A = uniq[i], B = uniq[(i + 1) % uniq.length]; let phi = B.ang - A.ang; if (i === uniq.length - 1) phi += 2*Math.PI;
       if (phi >= Math.PI - 0.02 || phi <= 0.01) continue;

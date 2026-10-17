@@ -563,6 +563,130 @@ PC.apply = async function(A, P, L, T, opt, progress){
   return { layer, rcls, summary, notes, Z };
 };
 
+// ============================================================================================================
+// step 4, moving trails: for each trail, the best line within 10 m either side of where it runs, for skiing:
+// off the unskiable ground, clear of cliff edges and of other trails running beside it, on gentler ground, holding
+// its grade (a lower way through a ridge), close to where it was drawn and smooth. found by trying every offset
+// (1 m apart, up to 10 m) at every point 2 m along the trail and keeping the cheapest path through them that moves at
+// most 1 m sideways per 2 m. junctions (12 m round), stretches shared with another trail and open ends stay put.
+// a move is suggested only where it's worth it (it saves at least a fifth of the cost there). then it's turned back
+// into the trail's own points: the points in a moved stretch move with it, and points are added where the curve
+// through them would stray more than half a metre from the new line.
+// before the cleanup is applied (or once it's out of date) the ground is the land as sculpted, read through the
+// plan: unskiable ground the trail would have to cut through costs, but it may go there (the cleanup will shape it).
+// with a cleanup applied, the ground is the cleaned ground and the trail stays on skiable ground
+// ============================================================================================================
+PC.suggestDefaults = () => ({ reach: 10, step: 1, keep: 12, worth: 0.2, least: 1.5 });
+PC.suggest = async function(A, P, L, T, opt, progress){
+  opt = Object.assign(PC.suggestDefaults(), opt || {}); progress = progress || (() => {});
+  const { N, NN, NC, R, CS, STOP, nbr, dist, cellOf } = A, g = A.grid, dir = g.dir;
+  let last = now(); const due = () => now() - last > 50, say = async (t, f) => { progress(t, f); await tick(); last = now(); };
+  const applied = !!(L.clean && L.clean.tiles.size && !L.clean.stale && !L.cleanOff);
+  await say('Suggesting moves: reading the ground…', 0);
+  // the ground: heights and slopes (the cleaned ground when a cleanup is applied)
+  let H = g.H, S = g.S;
+  if (applied){ H = new Float32Array(NC); for (let id = 0; id < NC; id++){ H[id] = T.height(dir[id*3], dir[id*3 + 1], dir[id*3 + 2]); if ((id & 0xFFFF) === 0 && due()) await say('Suggesting moves: reading the ground…', 0.3*id/NC); }
+    S = new Float32Array(NC); for (let id = 0; id < NC; id++){ const e = nbr(id, 0), w = nbr(id, 1), n = nbr(id, 2), s = nbr(id, 3), gx = (H[e] - H[w])/(dist(e, w) || 1), gy = (H[n] - H[s])/(dist(n, s) || 1); S[id] = Math.sqrt(gx*gx + gy*gy); } }
+  // unskiable ground as the land would have it without the trails (what the plan keeps, plus what it cuts back only
+  // for a trail); with a cleanup applied, whatever is too steep now
+  const Un = new Uint8Array(NC); for (let id = 0; id < NC; id++) Un[id] = applied ? (S[id] > STOP ? 1 : 0) : (g.kept[id] && (P.U[id] || P.F[id]) ? 1 : 0);
+  // how far each point is from that ground (up to 16 m)
+  const D = new Float32Array(NC).fill(1e9), queue = new Int32Array(NC), inQ = new Uint8Array(NC); let qh = 0, qt = 0;
+  for (let id = 0; id < NC; id++) if (Un[id]){ D[id] = 0; queue[qt++] = id; inQ[id] = 1; }
+  { let steps = 0; while (qh !== qt){ if ((++steps & 0xFFFF) === 0 && due()) await say('Suggesting moves: reading the ground…', 0.4); const a = queue[qh]; qh = (qh + 1) % NC; inQ[a] = 0;
+    for (let k = 0; k < 8; k++){ const b = nbr(a, k), d = D[a] + dist(a, b); if (d < D[b] - 1e-3 && d <= 16){ D[b] = d; if (!inQ[b]){ inQ[b] = 1; queue[qt] = b; qt = (qt + 1) % NC; } } } } }
+  // ---- the trails as skied, and what stays put
+  const net = T.net, lines = net ? net.lines : [], fixed = lines.map(l => new Uint8Array(l.length)), nrm = p => { const l = Math.hypot(p[0], p[1], p[2]); return [p[0]/l, p[1]/l, p[2]/l]; };
+  const ang = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0]*b[0] + a[1]*b[1] + a[2]*b[2])));
+  for (const J of (T.links ? T.links.junctions : [])) lines.forEach((l, ti) => l.forEach((p, i) => { if (ang(p, J.c)*R < opt.keep) fixed[ti][i] = 1; }));
+  lines.forEach((l, b) => { const sh = net.shared[b]; l.forEach((p, i) => { if (sh[i]){ fixed[b][i] = 1; const a = sh[i] - 1; lines[a].forEach((q, j) => { if (ang(p, q)*R < 2.5) fixed[a][j] = 1; }); } });
+    if (!L.trails[b].closed && l.length){ for (let i = 0; i < Math.min(3, l.length); i++){ fixed[b][i] = 1; fixed[b][l.length - 1 - i] = 1; } } });
+  // every trail's points, for keeping clear of the others (a hash, 8 m cells)
+  const CELL = 8, key = p => Math.floor(p[0]*R/CELL) + ',' + Math.floor(p[1]*R/CELL) + ',' + Math.floor(p[2]*R/CELL), hash = new Map();
+  lines.forEach((l, ti) => l.forEach((p, i) => { const k = key(p); let h = hash.get(k); if (!h) hash.set(k, h = []); h.push(ti, i); }));
+  const nearOther = (ti, i, p, M, closed) => { let best = 1e9; const cx = Math.floor(p[0]*R/CELL), cy = Math.floor(p[1]*R/CELL), cz = Math.floor(p[2]*R/CELL);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++){ const h = hash.get((cx + a) + ',' + (cy + b) + ',' + (cz + c)); if (!h) continue;
+      for (let n = 0; n < h.length; n += 2){ const tj = h[n], j = h[n + 1]; if (tj === ti){ const dd = Math.abs(j - i), ring = closed ? Math.min(dd, M - dd) : dd; if (ring*2 < 40) continue; }
+        if (net.shared[tj][j]) continue; const q = lines[tj][j], d = ang(p, q)*R; if (d < best) best = d; } }
+    return best; };
+  const moves = [];
+  const K = Math.round(opt.reach/opt.step), NS = 2*K + 1;
+  for (let ti = 0; ti < lines.length; ti++){
+    const l = lines[ti], M = l.length, t = L.trails[ti], closed = !!t.closed; if (M < 8) continue;
+    const bed = t.bed ?? 4, maxG = t.maxGrade ?? 0.2, clear = bed + 3, apart = 2*bed + 4;
+    // each point's sideways direction, and the offset points
+    const sd = l.map((p, i) => { const a = l[closed ? (i + 1) % M : Math.min(M - 1, i + 1)], b = l[closed ? (i - 1 + M) % M : Math.max(0, i - 1)], tg = nrm([a[0] - b[0], a[1] - b[1], a[2] - b[2]]); return nrm([p[1]*tg[2] - p[2]*tg[1], p[2]*tg[0] - p[0]*tg[2], p[0]*tg[1] - p[1]*tg[0]]); });
+    const at = (i, s) => { const p = l[i], o = (s - K)*opt.step/R; return nrm([p[0] + sd[i][0]*o, p[1] + sd[i][1]*o, p[2] + sd[i][2]*o]); };
+    // the cost of being at offset s at point i (and its parts, for saying why a move was made)
+    const cell = new Int32Array(M*NS), cost = new Float32Array(M*NS), part = new Float32Array(M*NS*4);
+    for (let i = 0; i < M; i++) for (let s = 0; s < NS; s++){
+      if (fixed[ti][i] && s !== K){ cost[i*NS + s] = 1e9; continue; }
+      const p = at(i, s), id = cellOf(p[0], p[1], p[2]), o = (s - K)*opt.step; cell[i*NS + s] = id;
+      const cU = Un[id] ? (applied ? 1e6 : 8) : 0;
+      const cD = D[id] < clear ? 10*((clear - D[id])/clear)**2 : 0;
+      const cS = 6*Math.max(0, S[id]/STOP - 0.3)**2;
+      const dn = nearOther(ti, i, p, M, closed), cP = dn < apart ? 6*((apart - dn)/apart)**2 : 0;
+      const cO = 1.0*(o/opt.reach)**2;
+      cost[i*NS + s] = cU + cD + cS + cP + cO; const q = (i*NS + s)*4; part[q] = cU; part[q + 1] = cD; part[q + 2] = cS; part[q + 3] = cP;
+    }
+    if (due()) await say('Suggesting moves: ' + t.name + '…', 0.5 + 0.4*ti/lines.length);
+    // the cheapest path (each step 2 m along, at most 1 m sideways; climbing faster than the trail's grade costs)
+    const step = (i, s, j, s2) => { const dH = Math.abs(H[cell[j*NS + s2]] - H[cell[i*NS + s]])/2, e = Math.max(0, dH - maxG); return 0.5*(s2 - s)*(s2 - s)*opt.step*opt.step + 5*(e/maxG)**2; };
+    // (a closed trail starts where it's fixed, or where it's cheapest to stay put)
+    let i0 = 0; if (closed){ i0 = fixed[ti].indexOf(1); if (i0 < 0){ let b = Infinity; for (let i = 0; i < M; i++) if (cost[i*NS + K] < b){ b = cost[i*NS + K]; i0 = i; } } }
+    const order = Array.from({ length: closed ? M + 1 : M }, (_, k) => (i0 + k) % M);
+    const acc = new Float64Array(order.length*NS).fill(Infinity), from = new Int8Array(order.length*NS);
+    acc[K] = cost[order[0]*NS + K];
+    for (let k = 1; k < order.length; k++){ const i = order[k], ip = order[k - 1], end = closed && k === order.length - 1;
+      for (let s = 0; s < NS; s++){ if (end && s !== K) continue; const c = cost[i*NS + s]; if (c >= 1e9) continue; let b = Infinity, bs = 0;
+        for (let d = -1; d <= 1; d++){ const s0 = s + d; if (s0 < 0 || s0 >= NS) continue; const v = acc[(k - 1)*NS + s0]; if (v === Infinity) continue; const w = v + step(ip, s0, i, s); if (w < b){ b = w; bs = d; } }
+        acc[k*NS + s] = b + c; from[k*NS + s] = bs; } }
+    let s = K; if (!closed){ let b = Infinity; for (let x = 0; x < NS; x++) if (acc[(order.length - 1)*NS + x] < b){ b = acc[(order.length - 1)*NS + x]; s = x; } }
+    const off = new Float32Array(M);
+    for (let k = order.length - 1; k >= 0; k--){ off[order[k]] = (s - K)*opt.step; s += from[k*NS + s]; }
+    // smoothed (easing out to the fixed points), then kept only where it's worth it
+    const fixedD = new Float32Array(M).fill(1e9); for (let pass = 0; pass < 2; pass++) for (let k = 0; k < M; k++){ const i = pass ? M - 1 - k : k, pi = pass ? i + 1 : i - 1;
+      if (fixed[ti][i]) fixedD[i] = 0; else { const j = closed ? (pi + M) % M : pi; if (j >= 0 && j < M) fixedD[i] = Math.min(fixedD[i], fixedD[j] + 2); } }
+    const smooth = o => { const r = new Float32Array(M); for (let i = 0; i < M; i++){ let sm = 0, n = 0; for (let k = -4; k <= 4; k++){ const j = closed ? (i + k + M) % M : i + k; if (j < 0 || j >= M) continue; sm += o[j]; n++; } const e = Math.min(1, fixedD[i]/10); r[i] = sm/n*e*e*(3 - 2*e); } return r; };
+    let o = smooth(smooth(off));
+    const costAt = (i, x) => { const sF = x/opt.step + K, a = Math.max(0, Math.min(NS - 1, Math.floor(sF))), b = Math.min(NS - 1, a + 1), u = sF - a, ca = Math.min(cost[i*NS + a], 1e6), cb = Math.min(cost[i*NS + b], 1e6); return ca + (cb - ca)*u; };
+    const partAt = (i, x, n) => part[(i*NS + Math.round(x/opt.step + K))*4 + n];
+    const runs = []; const moved = new Uint8Array(M); for (let i = 0; i < M; i++) moved[i] = Math.abs(o[i]) > 0.75 ? 1 : 0;
+    for (let i = 0; i < M; ){ if (!moved[i]){ i++; continue; } let j = i; while (j < M && moved[j]) j++;
+      let before = 0, after = 0, mx = 0, at0 = i; const why = [0, 0, 0, 0];
+      for (let k = Math.max(0, i - 5); k < Math.min(M, j + 5); k++){ before += costAt(k, 0); after += costAt(k, o[k]); for (let n = 0; n < 4; n++) why[n] += partAt(k, 0, n) - partAt(k, o[k], n); if (Math.abs(o[k]) > mx){ mx = Math.abs(o[k]); at0 = k; } }
+      for (let k = i; k < j - 1; k++){ before += 5*(Math.max(0, Math.abs(H[cellOf(...l[k + 1])] - H[cellOf(...l[k])])/2 - maxG)/maxG)**2; const p1 = at(k, o[k]/opt.step + K), p2 = at(k + 1, o[k + 1]/opt.step + K); after += 5*(Math.max(0, Math.abs(H[cellOf(...p2)] - H[cellOf(...p1)])/2 - maxG)/maxG)**2; }
+      const gain = before - after;
+      if (gain < Math.max(4, opt.worth*before) || mx < opt.least){ for (let k = i; k < j; k++) o[k] = 0; }
+      else { const w = why.indexOf(Math.max(...why)), WHY = ['off unskiable ground', 'clear of a cliff edge', 'onto gentler ground', 'apart from a trail beside it'];
+        runs.push({ i0: i, i1: j - 1, max: +mx.toFixed(1), len: (j - i)*2, why: Math.max(...why) > 0.25*gain ? WHY[w] : 'to hold its grade (a lower way through)', at: l[at0] }); }
+      i = j; }
+    if (!runs.length) continue;
+    // keep the kept runs' easing: zero what was dropped, smooth once more within reach of the kept ones
+    const ghost = l.map((p, i) => Math.abs(o[i]) < 1e-3 ? p : nrm([p[0] + sd[i][0]*o[i]/R, p[1] + sd[i][1]*o[i]/R, p[2] + sd[i][2]*o[i]/R]));
+    moves.push({ ti, name: t.name, ghost, off: o, sd, runs, pts: fitPoints(t, l, ghost, o, R), max: Math.max(...runs.map(r => r.max)) });
+  }
+  await say('Suggested', 1);
+  return { moves, applied };
+};
+// the trail's own points for a moved line: points in a moved stretch move with it (by the move where they lie), and
+// points are added where the curve through them strays more than `tol` m from the new line
+function fitPoints(t, l, ghost, o, R, tol = 0.5){
+  const PT_ = PT, M = l.length, closed = !!t.closed, near = p => { let b = 0, bd = Infinity; for (let i = 0; i < M; i++){ const d = (p[0] - l[i][0])**2 + (p[1] - l[i][1])**2 + (p[2] - l[i][2])**2; if (d < bd){ bd = d; b = i; } } return b; };
+  let pts = t.pts.map(p => { const i = near(p); if (Math.abs(o[i]) < 1e-3) return p.slice(); const sh = [ghost[i][0] - l[i][0], ghost[i][1] - l[i][1], ghost[i][2] - l[i][2]], q = [p[0] + sh[0], p[1] + sh[1], p[2] + sh[2]], n = Math.hypot(...q); return q.map(v => v/n); });
+  let idx = pts.map(near);
+  for (let it = 0; it < 60; it++){
+    const curve = PT_.evenCurve(pts, closed, 1, R); let worst = 0, wi = -1;
+    for (let i = 0; i < M; i++){ if (Math.abs(o[i]) < 1e-3) continue; const g = ghost[i]; let bd = Infinity; for (const q of curve){ const d = (g[0] - q[0])**2 + (g[1] - q[1])**2 + (g[2] - q[2])**2; if (d < bd) bd = d; } const d = Math.sqrt(bd)*R; if (d > worst){ worst = d; wi = i; } }
+    if (worst <= tol) break;
+    // insert the new line's point there, between the points either side of it along the trail
+    let k = 0; while (k < idx.length && idx[k] <= wi) k++;
+    if (idx.includes(wi)) break;
+    pts.splice(k, 0, ghost[wi].slice()); idx.splice(k, 0, wi);
+  }
+  return pts;
+}
+
 // a fingerprint of everything the cleanup reads (the land and the trails): when it changes, an applied cleanup is out
 // of date
 PC.signature = function(L){

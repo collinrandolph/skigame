@@ -182,15 +182,163 @@ PC.analyse = async function(L, T, opt, progress){
   };
   await say('Done', 1);
   // (the grids are kept for the later steps)
-  return { N, NN, NC, R, cls, summary, grid: { dir, H, S, kept, steepComp, skiComp, D, srcCell, mid, edge, AREA, comps, skis }, cellOf, nbr };
+  return { N, NN, NC, R, CS, STOP, cls, summary, grid: { dir, H, S, kept, steepComp, skiComp, D, srcCell, mid, edge, AREA, comps, skis }, cellOf, nbr, dist, lines, opt };
 };
 
 // the overlay: one RGBA texture holding all six faces (3 across, 2 down), each N x N, coloured by class
-PC.overlayAtlas = function(A, alpha = 215){
-  const N = A.N, W = 3*N, Hh = 2*N, out = new Uint8Array(W*Hh*4), cls = A.cls;
+PC.overlayAtlas = function(A, alpha = 215, cls = A.cls, table = PC.CLASSES){
+  const N = A.N, W = 3*N, Hh = 2*N, out = new Uint8Array(W*Hh*4);
   for (let f = 0; f < 6; f++){ const tx = (f % 3)*N, ty = ((f/3) | 0)*N;
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++){ const c = PC.CLASSES[cls[f*A.NN + j*N + i]][2], o = ((ty + j)*W + tx + i)*4; out[o] = c[0]; out[o + 1] = c[1]; out[o + 2] = c[2]; out[o + 3] = alpha; } }
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++){ const c = table[cls[f*A.NN + j*N + i]][2], o = ((ty + j)*W + tx + i)*4; out[o] = c[0]; out[o + 1] = c[1]; out[o + 2] = c[2]; out[o + 3] = alpha; } }
   return { data: out, width: W, height: Hh };
+};
+
+
+// ============================================================================================================
+// step 2, the plan: the target map, which ground should end up skiable and which unskiable, built from the reading.
+// nothing is changed. made as an image:
+//   start from the reading (kept cliffs and mountains unskiable, steep mistakes skiable)
+//   the trails: each bed skiable, and an apron beside it (1-6 m, varying slowly along the trail, so where a trail
+//     benches into a mountain the bench is cut back by a varying amount and the mountain's edge stays wherever it
+//     already lies further out). along a crest or a raised strip, 1 m (a bridge, widened to the bed + 1 m). through a
+//     ridge, a slot: the bed + 1 m, its walls kept; a saddle (a wider cut) where that slot would be deeper than 25 m
+//     or longer than 40 m
+//   cleaned: unskiable strips thinner than the minimum become skiable unless they're tall walls (6 m or more of
+//     height, like a switchback's); skiable gaps narrower than the minimum with no trail become unskiable; small
+//     unskiable bits (under 60 m², under 6 m high) become skiable, tiny skiable holes (under 20 m²) unskiable;
+//     pockets out of reach are left as they are
+//   checked: no strip under the minimums but the kept walls, and every trail bed skiable
+// ============================================================================================================
+PC.planDefaults = () => ({ minUnski: 6, minSki: 6, wall: 6, apronMin: 1, apronMax: 6, slotDepth: 25, slotLength: 40 });
+PC.PLAN_CLASSES = [
+  ['ski', 'Skiable', [232, 237, 241]],
+  ['unski', 'Unskiable (cliff or mountain)', [112, 104, 118]],
+  ['bed', 'Trail bed', [255, 250, 225]],
+  ['apron', 'Trail apron', [236, 214, 150]],
+  ['toski', 'Becomes skiable (smoothed away or cut back)', [80, 195, 105]],
+  ['tounski', 'Becomes unskiable (thin gap closed)', [175, 95, 205]],
+  ['wall', 'Thin wall kept (tall)', [60, 40, 85]],
+  ['pocket', 'Pocket, left as it is', [245, 130, 30]],
+  ['unreached', 'Skiable, no trail in this region', [190, 196, 206]],
+  ['slot', 'Slot walls (a trail through a ridge)', [160, 40, 60]],
+  ['saddle', 'Saddle (a ridge cut wider for the trail)', [40, 165, 150]],
+];
+PC.plan = async function(A, L, T, opt, progress){
+  opt = Object.assign(PC.planDefaults(), opt || {}); progress = progress || (() => {});
+  const { NC, R, CS, nbr, dist, cellOf, lines } = A, g = A.grid, H = g.H, dir = g.dir, AREA = g.AREA, PT_ = PT;
+  let last = now(); const due = () => now() - last > 50, say = async (t, f) => { progress(t, f); await tick(); last = now(); };
+  await say('Planning: the trails…', 0);
+  // the target: 1 unskiable. F: what forced it (1 bed, 2 apron, 3 slot or saddle cut: always skiable)
+  const U = new Uint8Array(NC), F = new Uint8Array(NC), slotBed = new Uint8Array(NC), was = g.kept;
+  for (let id = 0; id < NC; id++) U[id] = was[id];
+  // ---- a flood from seed cells out to a limit, by real distance (each cell's nearest seed): used to rasterise and to
+  // widen or narrow the masks
+  const queue = new Int32Array(NC), inQ = new Uint8Array(NC);
+  const flood = async (seeds, limit, pass, out, label) => {   // pass(id): may the flood enter id; out: Float32Array of distances
+    out.fill(1e9); let qh = 0, qt = 0, steps = 0;
+    for (const id of seeds){ out[id] = 0; if (!inQ[id]){ inQ[id] = 1; queue[qt] = id; qt = (qt + 1) % NC; } }
+    while (qh !== qt){ if ((++steps & 0xFFFF) === 0 && due()) await say(label, 0.5); const a = queue[qh]; qh = (qh + 1) % NC; inQ[a] = 0;
+      for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (!pass(b)) continue; const d = out[a] + dist(a, b); if (d < out[b] - 1e-3 && d <= limit){ out[b] = d; if (!inQ[b]){ inQ[b] = 1; queue[qt] = b; qt = (qt + 1) % NC; } } } }
+    return out;
+  };
+  // ---- the trails: per point of each line, its bed, apron and kind (from the land 9 m either side against the bed)
+  const nrm = p => { const l = Math.hypot(p[0], p[1], p[2]); return [p[0]/l, p[1]/l, p[2]/l]; };
+  const notes = [];
+  const tmpD = new Float32Array(NC);
+  for (let ti = 0; ti < lines.length; ti++){
+    const l = lines[ti], t = L.trails[ti], M = l.length; if (M < 2) continue;
+    const bed = t.bed ?? 4, kind = new Uint8Array(M), depth = new Float32Array(M), hbA = new Float32Array(M);
+    for (let i = 0; i < M; i++){
+      const p = l[i], q2 = l[Math.min(M - 1, i + 1)], q1 = l[Math.max(0, i - 1)], tg = nrm([q2[0] - q1[0], q2[1] - q1[1], q2[2] - q1[2]]), sd = nrm([p[1]*tg[2] - p[2]*tg[1], p[2]*tg[0] - p[0]*tg[2], p[0]*tg[1] - p[1]*tg[0]]);
+      const hb = T.height(p[0], p[1], p[2]), side = sg => H[cellOf(...nrm([p[0] + sg*9/R*sd[0], p[1] + sg*9/R*sd[1], p[2] + sg*9/R*sd[2]]))] - hb, a = side(-1), b = side(1);
+      // (only where the trail crosses steep ground: a trail along a gentle gully isn't in a notch)
+      const pc = cellOf(p[0], p[1], p[2]), steep = was[pc] || g.S[pc] > A.STOP;
+      hbA[i] = hb; kind[i] = steep && a > 4 && b > 4 ? 1 : steep && a < -2 && b < -2 ? 3 : 0; depth[i] = kind[i] === 1 ? Math.min(a, b) : 0;
+      if (!kind[i] && g.D[cellOf(p[0], p[1], p[2])] < bed + 1 && !was[cellOf(p[0], p[1], p[2])]) kind[i] = 3;   // a raised strip too narrow for it: a bridge
+    }
+    // notch runs: a slot, or a saddle if the slot would be too deep or too long
+    for (let i = 0; i < M; ){ if (kind[i] !== 1){ i++; continue; } let j = i, dmax = 0; while (j < M && kind[j] === 1){ dmax = Math.max(dmax, depth[j]); j++; }
+      const len = (j - i)*2, saddle = dmax > opt.slotDepth || len > opt.slotLength;
+      for (let k = i; k < j; k++){ kind[k] = saddle ? 2 : 1; depth[k] = dmax; }
+      notes.push({ what: saddle ? 'saddle' : 'slot', text: `${t.name}: a ${saddle ? 'saddle' : 'slot'} through a ridge, ${len} m long, ${Math.round(dmax)} m deep`, at: l[(i + j) >> 1] }); i = j; }
+    // rasterise: each point marks the cells within its reach as bed, apron or cut
+    for (let i = 0; i < M; i++){
+      const p = l[i], x = p[0]*R, y = p[1]*R, z = p[2]*R;
+      const n1 = PT_.noise3(p[0]*R/35 + 3.1, p[1]*R/35 - 7.7, p[2]*R/35 + 1.9), e1 = Math.max(0, Math.min(1, (n1 + 0.35)/0.7));
+      const aw = kind[i] === 3 || kind[i] === 1 ? opt.apronMin : opt.apronMin + (opt.apronMax - opt.apronMin)*e1*e1*(3 - 2*e1);
+      const reach = kind[i] === 2 ? bed + Math.min(25, depth[i]) : bed + aw;
+      // a small flood from the point's cell (cells within reach, by straight distance to the point)
+      const c0 = cellOf(p[0], p[1], p[2]), stack = [c0], seen = new Set([c0]);
+      while (stack.length){ const a = stack.pop(); const d = Math.hypot(dir[a*3]*R - x, dir[a*3 + 1]*R - y, dir[a*3 + 2]*R - z);
+        if (d > reach + CS) continue;
+        if (d <= reach){ const f = d <= bed ? 1 : kind[i] === 2 ? 3 : 2; if (!F[a] || f < F[a]) F[a] = f; U[a] = 0; if (kind[i] === 1 && d <= bed + 1) slotBed[a] = 1; }
+        for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (!seen.has(b)){ seen.add(b); stack.push(b); } } }
+    }
+    if (due()) await say('Planning: the trails…', 0.1 + 0.2*ti/lines.length);
+  }
+  // ---- clean the map
+  // unskiable strips thinner than minUnski: what an opening (narrow, then widen again by half the minimum) removes,
+  // unless it's a tall wall
+  await say('Planning: thin strips…', 0.35);
+  const r1 = opt.minUnski/2, dIn = new Float32Array(NC), dCore = new Float32Array(NC);
+  const notU = []; for (let id = 0; id < NC; id++) if (!U[id]){ for (let k = 0; k < 8; k++) if (U[nbr(id, k)]){ notU.push(id); break; } }
+  await flood(notU, r1 + 2*CS, b => U[b] === 1, dIn, 'Planning: thin strips…');
+  const core = []; for (let id = 0; id < NC; id++) if (U[id] && dIn[id] > r1) core.push(id);
+  await flood(core, r1 + CS, b => U[b] === 1, dCore, 'Planning: thin strips…');
+  const thin = new Uint8Array(NC); for (let id = 0; id < NC; id++) if (U[id] && dCore[id] > r1 + 0.5*CS) thin[id] = 1;
+  // group the thin bits: a tall one (a wall) stays
+  const keepWall = new Uint8Array(NC); let walls = 0, thinRemoved = 0;
+  { const seen = new Uint8Array(NC);
+    for (let s0 = 0; s0 < NC; s0++){ if (!thin[s0] || seen[s0]) continue; const comp = [s0]; seen[s0] = 1; let lo = H[s0], hi = H[s0], area = 0;
+      for (let h = 0; h < comp.length; h++){ const a = comp[h]; area += AREA[a]; if (H[a] < lo) lo = H[a]; if (H[a] > hi) hi = H[a];
+        for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (thin[b] && !seen[b]){ seen[b] = 1; comp.push(b); } } }
+      if (hi - lo >= opt.wall && area >= 30){ for (const a of comp) keepWall[a] = 1; walls++; notes.push({ what: 'wall', text: `Thin wall kept: ${Math.round(hi - lo)} m high, ${Math.round(area)} m²`, at: [dir[comp[0]*3], dir[comp[0]*3 + 1], dir[comp[0]*3 + 2]], area }); }
+      else { for (const a of comp) U[a] = 0; thinRemoved += area; } } }
+  // skiable gaps narrower than minSki with no trail in them: what a closing would fill
+  await say('Planning: narrow gaps…', 0.55);
+  const r2 = opt.minSki/2, onU = []; for (let id = 0; id < NC; id++) if (U[id]){ for (let k = 0; k < 8; k++) if (!U[nbr(id, k)]){ onU.push(id); break; } }
+  await flood(onU, r2 + 2*CS, b => !U[b], dIn, 'Planning: narrow gaps…');
+  const coreS = []; for (let id = 0; id < NC; id++) if (!U[id] && (dIn[id] > r2 || F[id])) coreS.push(id);
+  await flood(coreS, r2 + CS, b => !U[b], dCore, 'Planning: narrow gaps…');
+  let gapsClosed = 0; for (let id = 0; id < NC; id++) if (!U[id] && !F[id] && dCore[id] > r2 + 0.5*CS){ U[id] = 2; gapsClosed += AREA[id]; }
+  for (let id = 0; id < NC; id++) if (U[id] === 2) U[id] = 1;
+  // small unskiable bits and tiny skiable holes
+  await say('Planning: specks…', 0.7);
+  let specks = 0, holes = 0;
+  { const seen = new Uint8Array(NC);
+    for (let s0 = 0; s0 < NC; s0++){ if (seen[s0]) continue; const u = U[s0]; const comp = [s0]; seen[s0] = 1; let lo = H[s0], hi = H[s0], area = 0, trail = false;
+      for (let h = 0; h < comp.length; h++){ const a = comp[h]; area += AREA[a]; if (F[a]) trail = true; if (H[a] < lo) lo = H[a]; if (H[a] > hi) hi = H[a];
+        for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (!seen[b] && U[b] === u){ seen[b] = 1; comp.push(b); } } }
+      if (u && area < 60 && hi - lo < opt.wall && !comp.some(a => keepWall[a])){ for (const a of comp) U[a] = 0; specks++; }
+      else if (!u && !trail && area < 20){ for (const a of comp) U[a] = 1; holes++; }
+      if ((s0 & 0xFFFF) === 0 && due()) await say('Planning: specks…', 0.7 + 0.1*s0/NC); } }
+  // ---- check: thin strips left (besides the kept walls), and trail beds that aren't skiable
+  await say('Planning: checking…', 0.85);
+  const bU = []; for (let id = 0; id < NC; id++) if (!U[id]){ for (let k = 0; k < 8; k++) if (U[nbr(id, k)]){ bU.push(id); break; } }
+  await flood(bU, r1 + 2*CS, b => U[b] === 1, dIn, 'Planning: checking…');
+  const core2 = []; for (let id = 0; id < NC; id++) if (U[id] && dIn[id] > r1) core2.push(id);
+  await flood(core2, r1 + CS, b => U[b] === 1, dCore, 'Planning: checking…');
+  let thinLeft = 0; for (let id = 0; id < NC; id++) if (U[id] && !keepWall[id] && dCore[id] > r1 + 0.5*CS) thinLeft += AREA[id];
+  let bedsBlocked = 0; for (let id = 0; id < NC; id++) if (F[id] === 1 && U[id]) bedsBlocked++;
+  // ---- the map's colours
+  const pcls = new Uint8Array(NC), skis = g.skis, skiComp = g.skiComp;
+  let toSki = 0, toUnski = 0;
+  for (let id = 0; id < NC; id++){
+    const u = U[id], w = was[id];
+    if (u){ pcls[id] = keepWall[id] ? 6 : !w ? 5 : 1; if (!w) toUnski += AREA[id]; continue; }
+    if (F[id] === 1){ pcls[id] = 2; if (w) toSki += AREA[id]; continue; }
+    if (F[id] === 3){ pcls[id] = 10; if (w) toSki += AREA[id]; continue; }
+    if (F[id] === 2){ pcls[id] = w ? 4 : 3; if (w) toSki += AREA[id]; continue; }
+    if (w || A.grid.S[id] > A.STOP){ pcls[id] = 4; toSki += AREA[id]; continue; }
+    const sk = skis[skiComp[id]]; pcls[id] = sk && sk.trail === 0 ? (sk.area < A.opt.trap ? 7 : 8) : 0;
+  }
+  // slot walls: unskiable ground within 4 m of a slot's floor
+  { const seeds = []; for (let id = 0; id < NC; id++) if (slotBed[id]) seeds.push(id);
+    if (seeds.length){ await flood(seeds, 4, () => true, dIn, 'Planning: checking…'); for (let id = 0; id < NC; id++) if (U[id] && dIn[id] <= 4) pcls[id] = 9; } }
+  const summary = { toSkiable: Math.round(toSki), toUnskiable: Math.round(toUnski), thinRemoved: Math.round(thinRemoved), gapsClosed: Math.round(gapsClosed), walls, specks, holes,
+    slots: notes.filter(n => n.what === 'slot').length, saddles: notes.filter(n => n.what === 'saddle').length, check: { thinLeft: Math.round(thinLeft), bedsBlocked } };
+  await say('Planned', 1);
+  return { U, F, keepWall, pcls, summary, notes: notes.sort((a, b) => (a.what === 'wall') - (b.what === 'wall') || (b.area || 0) - (a.area || 0)), opt };
 };
 
 (typeof window !== 'undefined' ? window : globalThis).PlanetCleanup = PC;

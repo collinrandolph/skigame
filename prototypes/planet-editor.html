@@ -114,17 +114,18 @@ button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
   <label class="f" for="nJoin">Join trails within<output id="oJoin"></output><input id="nJoin" type="range" min="0" max="20" step="1"></label>
   <label class="f" for="nCorr">Corridor beside carved trails<output id="oCorr"></output><input id="nCorr" type="range" min="0" max="60" step="5"></label>
   <label class="f" for="nSide">Steepest ground in a corridor<output id="oSide"></output><input id="nSide" type="range" min="0.05" max="0.6" step="0.01"></label>
-  <p class="hint">A carved trail takes over the ground beside it out to the corridor's width past its bed: nothing there is steeper than the setting (it cuts and fills as little as it can), so the ground beside every trail skis, and trails side by side, at junctions and at forks share one smooth surface. Past the corridor it eases back into the land over 10 m. Joined trails (alongside within the join distance, or a trail going back over its own path) ski and carve as one.</p>
+  <p class="hint">A carved trail takes over the ground beside it out to the corridor's width past its bed: nothing there is steeper than the setting (it cuts and fills as little as it can), so the ground beside every trail skis, and trails side by side, at junctions and at forks share one smooth surface. Past the corridor it eases back into the land over 10 m. Joined trails (alongside within the join distance, or a trail going back over its own path) ski and carve as one. Once Terrain cleanup is applied it shapes the ground beside the trails instead, and these two settings do nothing.</p>
   <h3>Clean up</h3>
   <label class="f" for="nPatch">Ease steep bits under<output id="oPatch"></output><input id="nPatch" type="range" min="0" max="40" step="1"></label>
   <div class="row"><button id="bClean" type="button">Clean up</button></div>
   <p class="hint" id="cleanNote">Trails running side by side within the join distance always ski and carve as one. Clean up also thins crowded points, joins points of different trails that nearly meet, snaps loose ends onto the trail they stop short of, and eases small patches too steep to ski (not painted cliffs). The game does the same as it loads, without changing the layout; here it changes the layout (Ctrl+Z undoes it).</p>
   <h3>Terrain cleanup</h3>
-  <p class="hint"><b>Analyse</b> reads the land (as sculpted, before the trails carve it) over the whole planet: cliffs and mountains to keep, steep mistakes to smooth away, pockets out of reach, narrow ridges, valleys and benches, cliff feet and tops, and where the trails cross steep ground. <b>Plan</b> turns that into the target map: which ground should end up skiable (trail beds and aprons, benches cut back, slots through ridges, mistakes and thin strips smoothed away) and which unskiable (solid masses, narrow gaps closed, tall walls kept). Neither changes anything yet.</p>
+  <p class="hint"><b>Analyse</b> reads the land (as sculpted, before the trails carve it) over the whole planet: cliffs and mountains to keep, steep mistakes to smooth away, pockets out of reach, narrow ridges, valleys and benches, cliff feet and tops, and where the trails cross steep ground. <b>Plan</b> turns that into the target map: which ground should end up skiable (trail beds and aprons, benches cut back, slots through ridges, mistakes and thin strips smoothed away) and which unskiable (solid masses, narrow gaps closed, tall walls kept). Neither changes anything. <b>Apply</b> shapes the ground to the plan (planning first if needed): trail beds held level with gentle shoulders, skiable ground smoothed as little as it can be to under the limit, mountains' feet eased back beside a cut, gaps raised into the walls. The change is kept as a layer over your sculpting (which stays as it was): <b>Remove</b> takes it off, Ctrl+Z undoes it, and Apply again redoes it from scratch after you edit.</p>
   <label class="f" for="tcMinU">Thinnest unskiable strip (unless a tall wall)<output id="oMinU"></output><input id="tcMinU" type="range" min="2" max="15" step="1" value="6"></label>
   <label class="f" for="tcMinS">Narrowest skiable gap (unless a trail runs through)<output id="oMinS"></output><input id="tcMinS" type="range" min="2" max="15" step="1" value="6"></label>
-  <div class="row"><button id="tcAnalyse" type="button">Analyse</button><button id="tcPlan" type="button">Plan</button></div>
-  <label class="f" for="tcView">Show<select id="tcView" style="grid-column:1/-1" disabled><option value="off">Nothing</option><option value="read">The reading</option><option value="plan">The plan</option></select></label>
+  <div class="row"><button id="tcAnalyse" type="button">Analyse</button><button id="tcPlan" type="button">Plan</button><button id="tcApply" type="button">Apply</button><button id="tcRemove" type="button" disabled>Remove</button></div>
+  <label class="c"><input id="tcBefore" type="checkbox" disabled> Show the land before the cleanup</label>
+  <label class="f" for="tcView">Show<select id="tcView" style="grid-column:1/-1" disabled><option value="off">Nothing</option><option value="read">The reading</option><option value="plan">The plan</option><option value="result">The result</option></select></label>
   <p class="hint" id="tcStatus"></p>
   <div id="tcLegend" class="tcLeg" hidden></div>
   <div id="tcList" class="tcList"></div>
@@ -499,12 +500,13 @@ function handlePick(px, py, maxPx = 14){
 // undo, autosave
 // ============================================================================================================
 const undoStack = [], redoStack = [];
-function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, models: L.models, bridges: L.bridges, start: L.start, scatter: L.scatter, cliffs: L.cliffs, network: L.network }), sculpt: L.sculpt.data.slice(), detail: PT.cloneDetail(L.detail) }; }
+function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, models: L.models, bridges: L.bridges, start: L.start, scatter: L.scatter, cliffs: L.cliffs, network: L.network }), sculpt: L.sculpt.data.slice(), detail: PT.cloneDetail(L.detail),
+  clean: L.clean ? Object.assign(PT.cloneDetail(L.clean), { sig: L.clean.sig, stale: L.clean.stale }) : null }; }
 let lastSnap = snapshot();
-function commit(){ tcStale(); undoStack.push(lastSnap); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; lastSnap = snapshot(); autosave(); }
+function commit(keepReading){ if (!keepReading) tcStale(); cleanStaleCheck(); undoStack.push(lastSnap); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; lastSnap = snapshot(); autosave(); }
 function restore(s){
   const o = JSON.parse(s.json); const oldR = L.radius;
-  Object.assign(L, o); L.sculpt.data.set(s.sculpt); L.detail = PT.cloneDetail(s.detail); lastSnap = s; sel = null;
+  Object.assign(L, o); L.sculpt.data.set(s.sculpt); L.detail = PT.cloneDetail(s.detail); L.clean = s.clean ? Object.assign(PT.cloneDetail(s.clean), { sig: s.clean.sig, stale: s.clean.stale }) : null; lastSnap = s; sel = null; tcSync();
   if (L.radius !== oldR) cam.dist *= L.radius/oldR;
   buildGlobe(); rebuildOverlays(); syncPlanetUI(); syncSlopeUniforms(); showSel(); autosave(); if (tool === 'cliffs') setTool('cliffs');
 }
@@ -993,6 +995,13 @@ mini.addEventListener('click', e => {
 // ============================================================================================================
 // ---- terrain cleanup (planet-cleanup.js): the reading and the plan, shown over the globe
 let tcA = null, tcP = null, tcTex = { read: null, plan: null }, tcBusy = false;
+// an applied cleanup is out of date once the land or the trails change (Apply again redoes it)
+function cleanStaleCheck(){ if (L.clean && !L.clean.stale && PlanetCleanup.signature(L) !== L.clean.sig){ L.clean.stale = true; tcSync(); } }
+function tcSync(){
+  const on = !!(L.clean && L.clean.tiles.size); $('tcRemove').disabled = tcBusy || !on; $('tcBefore').disabled = tcBusy || !on; if (!on){ $('tcBefore').checked = false; L.cleanOff = false; }
+  $('tcApply').textContent = on ? 'Apply again' : 'Apply';
+  if (on && L.clean.stale && !/Apply again to/.test($('tcStatus').textContent)) $('tcStatus').textContent += ' The land or the trails have changed since the cleanup was applied: Apply again to redo it.';
+}
 const tcPlanOpt = () => ({ minUnski: +$('tcMinU').value, minSki: +$('tcMinS').value });
 for (const [id, o] of [['tcMinU', 'oMinU'], ['tcMinS', 'oMinS']]){ const el = $(id); $(o).textContent = el.value + ' m';
   el.addEventListener('input', () => { $(o).textContent = el.value + ' m'; }); el.addEventListener('change', () => { if (tcP){ tcP.stale = true; $('tcStatus').textContent = 'Settings changed: Plan again to update the plan.'; } el.blur(); }); }
@@ -1002,7 +1011,7 @@ function tcShow(which){
   const tex = which === 'off' ? null : tcTex[which];
   terrainMat.uniforms.uOver.value = tex; terrainMat.uniforms.uOverOn.value = tex ? 1 : 0;
   $('tcView').value = tex ? which : 'off'; $('tcLegend').hidden = !tex;
-  if (tex) tcLegend(which === 'plan' ? PlanetCleanup.PLAN_CLASSES : PlanetCleanup.CLASSES);
+  if (tex) tcLegend(which === 'plan' ? PlanetCleanup.PLAN_CLASSES : which === 'result' ? PlanetCleanup.RESULT_CLASSES : PlanetCleanup.CLASSES);
 }
 $('tcView').addEventListener('change', e => { tcShow(e.target.value); e.target.blur(); });
 function tcTexture(which, at){
@@ -1016,14 +1025,14 @@ function tcList(items){
   $('tcList').onclick = e => { const b = e.target.closest('button'); if (!b) return; const d = items[+b.dataset.i][1]; cam.dir.set(d[0], d[1], d[2]).normalize(); cam.dist = Math.min(cam.dist, R + 260); fixUp(); b.blur(); };
 }
 async function tcRun(fn){
-  if (tcBusy) return; tcBusy = true; $('tcAnalyse').disabled = $('tcPlan').disabled = true;
+  if (tcBusy) return; tcBusy = true; for (const b of ['tcAnalyse', 'tcPlan', 'tcApply', 'tcRemove', 'tcBefore']) $(b).disabled = true;
   try { await fn(); } catch (err){ console.error(err); $('tcStatus').textContent = 'That failed: ' + err.message; }
-  tcBusy = false; $('tcAnalyse').disabled = $('tcPlan').disabled = false;
+  tcBusy = false; $('tcAnalyse').disabled = $('tcPlan').disabled = $('tcApply').disabled = false; tcSync();
 }
 async function tcAnalyse(){
   const t0 = performance.now();
   const A = await PlanetCleanup.analyse(L, T, {}, (text, f) => { $('tcStatus').textContent = text + ' ' + Math.round(f*100) + '%'; });
-  tcA = A; tcP = null; tcTex.plan && tcTex.plan.dispose(); tcTex.plan = null;
+  tcA = A; tcP = null; for (const k of ['plan', 'result']){ tcTex[k] && tcTex[k].dispose(); tcTex[k] = null; }
   tcTexture('read', PlanetCleanup.overlayAtlas(A)); tcShow('read');
   const s = A.summary;
   $('tcStatus').textContent = `Read in ${((performance.now() - t0)/1000).toFixed(1)} s (a point every ${s.grid.spacing} m). ${s.cliffs.count} cliffs and mountains to keep (${m2(s.cliffs.area)}); ${s.mistakes.count} steep mistakes to smooth away (${m2(s.mistakes.area)}); ${s.pockets.count} pockets out of reach (${m2(s.pockets.area)}); the trails run through ${s.trailRegions.length} separate skiable region${s.trailRegions.length === 1 ? '' : 's'}; ${s.crossings.length} places where a trail crosses steep ground.`;
@@ -1032,7 +1041,7 @@ async function tcAnalyse(){
     .concat(s.mistakes.at.slice(0, 5).map(p => [`Steep mistake, ${m2(p.area)}, ${p.height} m high`, p.at])));
 }
 $('tcAnalyse').addEventListener('click', () => { $('tcAnalyse').blur(); tcRun(tcAnalyse); });
-$('tcPlan').addEventListener('click', () => { $('tcPlan').blur(); tcRun(async () => {
+async function tcPlan(){
   if (!tcA || tcA.stale) await tcAnalyse();
   const t0 = performance.now();
   const P = await PlanetCleanup.plan(tcA, L, T, tcPlanOpt(), (text, f) => { $('tcStatus').textContent = text + ' ' + Math.round(f*100) + '%'; });
@@ -1040,7 +1049,29 @@ $('tcPlan').addEventListener('click', () => { $('tcPlan').blur(); tcRun(async ()
   const s = P.summary;
   $('tcStatus').textContent = `Planned in ${((performance.now() - t0)/1000).toFixed(1)} s. ${m2(s.toSkiable)} becomes skiable (steep mistakes and thin strips smoothed away, trails' benches and slots cut back), ${m2(s.toUnskiable)} becomes unskiable (narrow gaps closed). ${s.walls} thin tall wall${s.walls === 1 ? '' : 's'} kept; ${s.slots} slot${s.slots === 1 ? '' : 's'} and ${s.saddles} saddle${s.saddles === 1 ? '' : 's'} through ridges. Check: ${s.check.bedsBlocked ? s.check.bedsBlocked + ' trail bed points blocked, ' : 'every trail bed skiable, '}${s.check.thinLeft ? m2(s.check.thinLeft) + ' of thin strip left' : 'no thin strips left'} besides the kept walls.`;
   tcList(P.notes.map(n => [n.text, n.at]));
+}
+if (L.clean && L.clean.tiles.size){ $('tcStatus').textContent = 'A terrain cleanup is applied.'; cleanStaleCheck(); } tcSync();
+$('tcPlan').addEventListener('click', () => { $('tcPlan').blur(); tcRun(tcPlan); });
+$('tcApply').addEventListener('click', () => { $('tcApply').blur(); tcRun(async () => {
+  if (!tcP || tcP.stale || tcA.stale) await tcPlan();
+  const t0 = performance.now(), plan = tcP.summary;
+  const X = await PlanetCleanup.apply(tcA, tcP, L, T, {}, (text, f) => { $('tcStatus').textContent = text + ' ' + Math.round(f*100) + '%'; });
+  $('tcStatus').textContent = 'Rebuilding the globe…'; await new Promise(r => setTimeout(r, 0));
+  L.clean = X.layer; L.clean.sig = PlanetCleanup.signature(L); L.clean.stale = false; L.cleanOff = false; $('tcBefore').checked = false;
+  T = PT.terrain(L, R); T.fresh = true; buildGlobe(); rebuildOverlays(); miniDirty();
+  commit(true);
+  tcTexture('result', PlanetCleanup.overlayAtlas(tcA, 215, X.rcls, PlanetCleanup.RESULT_CLASSES)); tcShow('result');
+  const s = X.summary;
+  $('tcStatus').textContent = `Applied in ${((performance.now() - t0)/1000).toFixed(1)} s. Reshaped ${m2(s.changed)} (cut up to ${s.maxCut} m, filled up to ${s.maxFill} m). ` +
+    (s.failArea || s.leakArea ? `Left over: ${s.failArea ? m2(s.failArea) + ' should ski but is still too steep' : ''}${s.failArea && s.leakArea ? ', ' : ''}${s.leakArea ? m2(s.leakArea) + ' at unskiable edges that ski' : ''} (listed below; the rest matches the plan).` : 'Everything matches the plan.') +
+    (s.bedFail ? ` ${s.bedFail} trail bed points too steep.` : '') + ' Ctrl+Z undoes it; Remove takes it off.';
+  tcList(X.notes.map(n => [n.text, n.at]));
 }); });
+$('tcRemove').addEventListener('click', () => { $('tcRemove').blur(); if (!L.clean) return;
+  L.clean = null; L.cleanOff = false; busy(() => { T.fresh = false; buildGlobe(); rebuildOverlays(); miniDirty(); });
+  if (tcTex.result){ tcTex.result.dispose(); tcTex.result = null; if ($('tcView').value === 'result') tcShow('off'); }
+  commit(true); tcSync(); $('tcStatus').textContent = 'Cleanup removed: the ground is as you sculpted it (Ctrl+Z puts it back).'; });
+$('tcBefore').addEventListener('change', () => { L.cleanOff = $('tcBefore').checked; busy(() => { T.fresh = false; buildGlobe(); rebuildOverlays(); miniDirty(); }); $('tcBefore').blur(); });
 
 const CONTOURS = [0, 1, 2, 5, 10, 25];
 function syncPlanetUI(){
@@ -1080,7 +1111,7 @@ $('vTilt').addEventListener('input', () => { cam.tilt = +$('vTilt').value; $('oT
 $('vTilt').addEventListener('change', () => $('vTilt').blur());
 $('vSlope').addEventListener('change', () => { terrainMat.uniforms.uSlope.value = $('vSlope').checked ? 1 : 0; $('vSlope').blur(); });
 function busy(fn){ $('busy').style.display = 'block'; requestAnimationFrame(() => setTimeout(() => { fn(); $('busy').style.display = 'none'; }, 0)); }
-function replaceLayout(NL){ undoStack.push(snapshot()); redoStack.length = 0; const old = L.radius; L = NL; syncSlopeUniforms(); cam.dist *= L.radius/old; sel = null; drawing = null; lastSnap = snapshot(); busy(() => { buildGlobe(); rebuildOverlays(); miniDirty(); }); syncPlanetUI(); showSel(); autosave(); }
+function replaceLayout(NL){ undoStack.push(snapshot()); redoStack.length = 0; const old = L.radius; L = NL; syncSlopeUniforms(); cam.dist *= L.radius/old; sel = null; drawing = null; lastSnap = snapshot(); busy(() => { buildGlobe(); rebuildOverlays(); miniDirty(); }); syncPlanetUI(); showSel(); tcSync(); autosave(); }
 $('bNew').addEventListener('click', () => { if (confirmReplace()) replaceLayout(Object.assign(PT.blankLayout(L.radius), { sculpt: PT.newSculpt(128) })); });
 $('bExample').addEventListener('click', () => { if (confirmReplace()) replaceLayout(PT.exampleLayout(L.radius)); });
 function confirmReplace(){ return true; }   // (undo brings the old one back)

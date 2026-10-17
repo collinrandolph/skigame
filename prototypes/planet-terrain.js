@@ -245,13 +245,23 @@ PT.encodeDetail = function(dl){
   for (const [k, t] of dl.tiles){
     const q = new Int16Array(t.length); let any = false;
     for (let i = 0; i < q.length; i++){ q[i] = Math.max(-32767, Math.min(32767, Math.round(t[i]*100))); if (q[i]) any = true; }
-    if (any) tiles.push([k, b64FromBytes(new Uint8Array(q.buffer))]);
+    if (!any) continue;
+    // mostly empty: a bit per point saying which hold a value, then just those values
+    let nz = 0; for (let i = 0; i < q.length; i++) if (q[i]) nz++;
+    if (nz < q.length*0.6){ const m = new Uint8Array(q.length/8), v = new Int16Array(nz); let j = 0;
+      for (let i = 0; i < q.length; i++) if (q[i]){ m[i >> 3] |= 1 << (i & 7); v[j++] = q[i]; }
+      const out = new Uint8Array(m.length + v.length*2); out.set(m); out.set(new Uint8Array(v.buffer), m.length); tiles.push([k, b64FromBytes(out), 1]); }
+    else tiles.push([k, b64FromBytes(new Uint8Array(q.buffer))]);
   }
   return { n: dl.n, tiles };
 };
 PT.decodeDetail = function(o){
   const dl = PT.newDetail(o && o.n || 1024);
-  if (o && o.tiles) for (const [k, b] of o.tiles){ const q = new Int16Array(bytesFromB64(b).buffer), t = new Float32Array(DT*DT); for (let i = 0; i < t.length; i++) t[i] = q[i]/100; dl.tiles.set(k, t); }
+  if (o && o.tiles) for (const [k, b, sparse] of o.tiles){
+    const bytes = bytesFromB64(b), t = new Float32Array(DT*DT);
+    if (sparse){ const m = bytes.subarray(0, t.length/8), v = new Int16Array(bytes.buffer.slice(t.length/8)); let j = 0; for (let i = 0; i < t.length; i++) if (m[i >> 3] & (1 << (i & 7))) t[i] = v[j++]/100; }
+    else { const q = new Int16Array(bytes.buffer); for (let i = 0; i < t.length; i++) t[i] = q[i]/100; }
+    dl.tiles.set(k, t); }
   return dl;
 };
 PT.encodeSculpt = function(sc){
@@ -468,7 +478,7 @@ PT.cleanup = function(L0, opt){
       }
     });
   }
-  if (net.patch > 0){ const r = easePatches(L, R, net.patch); rep.patches = r.eased; rep.patchesLeft = r.left; }
+  if (net.patch > 0 && !(L.clean && L.clean.tiles.size)){ const r = easePatches(L, R, net.patch); rep.patches = r.eased; rep.patchesLeft = r.left; }
   return { L, report: rep };
 };
 PT.cleanupSummary = function(r){
@@ -604,6 +614,7 @@ PT.serialize = function(L){
     models: (L.models || []).map(m => ({ name: m.name, id: m.id, v: m.v, seed: m.seed, d: r5(m.d), rot: m.rot, scale: m.scale, solid: m.solid !== false })),
     bridges: (L.bridges || []).map(b => ({ name: b.name, pts: b.pts.map(r5), clearance: b.clearance, ramp: b.ramp, width: b.width, maxGrade: b.maxGrade })),
     start: { d: r5(L.start.d) }, scatter: Object.assign({}, L.scatter), cliffs: Object.assign({}, L.cliffs), network: Object.assign(PT.networkDefaults(), L.network || {}),
+    clean: L.clean && L.clean.tiles.size ? Object.assign(PT.encodeDetail(L.clean), { sig: L.clean.sig || '', stale: !!L.clean.stale }) : undefined,
   });
 };
 PT.parse = function(json){
@@ -619,6 +630,7 @@ PT.parse = function(json){
     start: { d: norm(o.start && o.start.d || B.start.d) }, scatter: Object.assign({}, B.scatter, o.scatter || {}),
     cliffs: Object.assign(PT.cliffDefaults(), pick(o.cliffs || {}, ['from', 'band', 'sharp', 'stop'])),
     network: Object.assign(PT.networkDefaults(), pick(o.network || {}, ['join', 'patch', 'corridor', 'side'])),
+    clean: o.clean && o.clean.tiles && o.clean.tiles.length ? Object.assign(PT.decodeDetail(o.clean), { sig: o.clean.sig || '', stale: !!o.clean.stale }) : null,
   };
   // older layouts may have steps where the cube faces meet: weld them, easing the change back into each face
   PT.weldSculpt(L.sculpt, 3); PT.weldDetail(L.detail, 8);
@@ -876,12 +888,17 @@ PT.terrain = function(L, R, prev, caps){
   // trail may be): the least fill that does it and the least cut that does it, averaged. then the corners are rounded,
   // everything is kept within the beds' limits, and past the corridor it eases back into the land over FADE m. the
   // ground then reads the grid: the corridor's height, with the land's own finer detail where it fades out
-  const corr = carves.length ? bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev && prev.corr, caps) : null;
+  // an applied terrain cleanup (planet-cleanup.js) takes over from the corridors: its layer of changes is added to the
+  // land as sculpted (L.cleanOff: show the land without it, in the editor)
+  const cl = L && L.clean && L.clean.tiles.size && !L.cleanOff ? L.clean : null;
+  const corr = carves.length && !cl ? bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev && prev.corr, caps) : null;
   return {
-    R, stamps, carves: carves.length, net, corr, stop: L && L.cliffs ? L.cliffs.stop : 1.0,
+    R, stamps, carves: carves.length, net, corr, clean: !!cl, stop: L && L.cliffs ? L.cliffs.stop : 1.0,
+    // each carved trail's bed profile along its line in net.lines (for the cleanup)
+    beds: carves.map(c => ({ ti: c.ti, prof: c.prof, bed: c.bed })),
     height(x, y, z){
       const h = under(x, y, z);
-      return corr ? corridorAt(corr, x, y, z, h) : h;
+      return cl ? h + PT.sampleDetail(cl, x, y, z) : corr ? corridorAt(corr, x, y, z, h) : h;
     },
     // everything but the sculpt and detail layers and the carving
     shaped,

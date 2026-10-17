@@ -36,6 +36,8 @@ PC.CLASSES = [
   ['unreached', 'Skiable, no trail in this region', [190, 196, 206]],
 ];
 
+// a trail's bed height at point i of its line: a carved trail's profile, otherwise the land under it
+const bedHeights = T => { const prof = new Map(); for (const b of T.beds || []) prof.set(b.ti, b.prof); return (ti, i, p) => { const pr = prof.get(ti); return pr && pr[i] !== undefined ? pr[i] : T.under(p[0], p[1], p[2]); }; };
 const tick = () => new Promise(r => setTimeout(r, 0));
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
@@ -98,6 +100,7 @@ PC.analyse = async function(L, T, opt, progress){
     while (qh < qt){ const a = queue[qh++]; c.n++; c.area += AREA[a]; for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (!kept[b] && skiComp[b] < 0){ skiComp[b] = c.id; queue[qt++] = b; } } }
     c.mid = queue[qt >> 1]; skis.push(c); }
   const lines = T.net ? T.net.lines : [];
+  const bedAt = bedHeights(T);
   for (const l of lines) for (const p of l){ const id = cellOf(p[0], p[1], p[2]); if (skiComp[id] >= 0) skis[skiComp[id]].trail++; }
   const onTrail = c => c.trail > 0;
   // ---- how far each skiable point is from a kept cliff, and the nearest cliff point (a flood, adding real distances)
@@ -143,7 +146,7 @@ PC.analyse = async function(L, T, opt, progress){
     l.forEach((p, i) => { const id = cellOf(p[0], p[1], p[2]); let what = null, depth = 0;
       if (kept[id] || S[id] > STOP){
         const q2 = l[Math.min(l.length - 1, i + 1)], q1 = l[Math.max(0, i - 1)], tg = nrm([q2[0] - q1[0], q2[1] - q1[1], q2[2] - q1[2]]), sd = nrm([p[1]*tg[2] - p[2]*tg[1], p[2]*tg[0] - p[0]*tg[2], p[0]*tg[1] - p[1]*tg[0]]);
-        const hb = T.height(p[0], p[1], p[2]), side = sg => H[cellOf(...nrm([p[0] + sg*9/R*sd[0], p[1] + sg*9/R*sd[1], p[2] + sg*9/R*sd[2]]))] - hb, a = side(-1), b = side(1);
+        const hb = bedAt(ti, i, p), side = sg => H[cellOf(...nrm([p[0] + sg*9/R*sd[0], p[1] + sg*9/R*sd[1], p[2] + sg*9/R*sd[2]]))] - hb, a = side(-1), b = side(1);
         what = a > 2 && b > 2 ? 'notch' : a < -2 && b < -2 ? 'causeway' : 'bench'; depth = Math.max(Math.abs(a), Math.abs(b));
       } else if (D[id] < bed + 1 && H[id] > (ringMean(id, D[id] + 5) ?? H[id]) + 1.5) what = 'narrow';
       if (what && run && run.what === what && i === run.i1 + 1){ run.i1 = i; run.depth = Math.max(run.depth, depth); return; }
@@ -243,14 +246,14 @@ PC.plan = async function(A, L, T, opt, progress){
   };
   // ---- the trails: per point of each line, its bed, apron and kind (from the land 9 m either side against the bed)
   const nrm = p => { const l = Math.hypot(p[0], p[1], p[2]); return [p[0]/l, p[1]/l, p[2]/l]; };
-  const notes = [];
+  const notes = [], bedAt = bedHeights(T);
   const tmpD = new Float32Array(NC);
   for (let ti = 0; ti < lines.length; ti++){
     const l = lines[ti], t = L.trails[ti], M = l.length; if (M < 2) continue;
     const bed = t.bed ?? 4, kind = new Uint8Array(M), depth = new Float32Array(M), hbA = new Float32Array(M);
     for (let i = 0; i < M; i++){
       const p = l[i], q2 = l[Math.min(M - 1, i + 1)], q1 = l[Math.max(0, i - 1)], tg = nrm([q2[0] - q1[0], q2[1] - q1[1], q2[2] - q1[2]]), sd = nrm([p[1]*tg[2] - p[2]*tg[1], p[2]*tg[0] - p[0]*tg[2], p[0]*tg[1] - p[1]*tg[0]]);
-      const hb = T.height(p[0], p[1], p[2]), side = sg => H[cellOf(...nrm([p[0] + sg*9/R*sd[0], p[1] + sg*9/R*sd[1], p[2] + sg*9/R*sd[2]]))] - hb, a = side(-1), b = side(1);
+      const hb = bedAt(ti, i, p), side = sg => H[cellOf(...nrm([p[0] + sg*9/R*sd[0], p[1] + sg*9/R*sd[1], p[2] + sg*9/R*sd[2]]))] - hb, a = side(-1), b = side(1);
       // (only where the trail crosses steep ground: a trail along a gentle gully isn't in a notch)
       const pc = cellOf(p[0], p[1], p[2]), steep = was[pc] || g.S[pc] > A.STOP;
       hbA[i] = hb; kind[i] = steep && a > 4 && b > 4 ? 1 : steep && a < -2 && b < -2 ? 3 : 0; depth[i] = kind[i] === 1 ? Math.min(a, b) : 0;
@@ -338,7 +341,221 @@ PC.plan = async function(A, L, T, opt, progress){
   const summary = { toSkiable: Math.round(toSki), toUnskiable: Math.round(toUnski), thinRemoved: Math.round(thinRemoved), gapsClosed: Math.round(gapsClosed), walls, specks, holes,
     slots: notes.filter(n => n.what === 'slot').length, saddles: notes.filter(n => n.what === 'saddle').length, check: { thinLeft: Math.round(thinLeft), bedsBlocked } };
   await say('Planned', 1);
-  return { U, F, keepWall, pcls, summary, notes: notes.sort((a, b) => (a.what === 'wall') - (b.what === 'wall') || (b.area || 0) - (a.area || 0)), opt };
+  return { U, F, keepWall, slotBed, pcls, summary, notes: notes.sort((a, b) => (a.what === 'wall') - (b.what === 'wall') || (b.area || 0) - (a.area || 0)), opt };
+};
+
+// ============================================================================================================
+// step 3, apply: shape the ground to the plan. works on the reading's grid, then hands back the change as a layer
+// (the detail layer's format: tiles of heights to add, only where something changed), which the terrain adds on top
+// of the land as sculpted. the land itself (stamps, sculpt, detail) is never touched, so applying again starts afresh
+//   trail beds: held at the trail's bed height (its line's profile: the land under it averaged along it, held to its
+//     steepest grade, agreeing where trails meet), level across
+//   skiable ground near anything that changes (30 m): cut and filled as little as it can be so that nothing in it is
+//     steeper than 85% of the limit, and nothing in a trail's apron steeper than 35% of it (a gentle shoulder); the
+//     least cut and the least fill, averaged (a saddle: the cut alone), corners rounded. ground beside a cliff isn't
+//     tied to the cliff, so the cliff stays a cliff
+//   where the ground beside a trail is cut down into a mountain (a bench), the mountain's foot is eased back by as
+//     much as the cut, so the bench doesn't leave a sheer cut wall; where it's built up, an embankment below. slots'
+//     walls stay sheer
+//   gaps closed: raised from the skiable ground at their mouth, steeper than the limit, up to the walls' tops
+//   checked: skiable ground still too steep is relaxed again, unskiable edges that came out gentle are raised, and
+//     what's left either way is counted (and shown)
+// ============================================================================================================
+PC.applyDefaults = () => ({ skiMax: 0.75, apronGrade: 0.5, margin: 30, soften: 1.5, edge: 1.25 });
+PC.RESULT_CLASSES = [
+  ['ski', 'Skiable', [232, 237, 241]],
+  ['unski', 'Unskiable', [112, 104, 118]],
+  ['skich', 'Skiable, reshaped', [120, 205, 140]],
+  ['unskich', 'Unskiable, reshaped', [150, 110, 190]],
+  ['bed', 'Trail bed', [255, 250, 225]],
+  ['fail', 'Should ski but still too steep', [230, 40, 40]],
+  ['leak', 'Should be unskiable but skis', [250, 150, 20]],
+];
+PC.apply = async function(A, P, L, T, opt, progress){
+  opt = Object.assign(PC.applyDefaults(), opt || {}); progress = progress || (() => {});
+  const { N, NN, NC, R, CS, STOP, nbr, dist, cellOf, lines } = A, g = A.grid, H = g.H, dir = g.dir, AREA = g.AREA, kept = g.kept;
+  const { U, F, keepWall, slotBed } = P;
+  let last = now(); const due = () => now() - last > 50, say = async (t, f) => { progress(t, f); await tick(); last = now(); };
+  const t0 = now(), SMAX = STOP*opt.skiMax, SAPR = STOP*opt.apronGrade;
+  const queue = new Int32Array(NC), inQ = new Uint8Array(NC);
+  const push = id => { if (!inQ[id]){ inQ[id] = 1; queue[qt] = id; qt = (qt + 1) % NC; } }; let qh = 0, qt = 0;
+  const run = async (visit, label, f) => { let steps = 0; while (qh !== qt){ if ((++steps & 0x3FFF) === 0 && due()) await say(label, f); const a = queue[qh]; qh = (qh + 1) % NC; inQ[a] = 0; visit(a); } };
+  // ---- the trail beds: each carved trail's profile, spread over the cells within its bed (nearer points count more)
+  await say('Shaping: trail beds…', 0.02);
+  const sw = new Float32Array(NC), swh = new Float32Array(NC);
+  for (const b of T.beds || []){
+    const l = lines[b.ti], bed = b.bed; if (!l || l.length < 2) continue;
+    for (let i = 0; i < l.length; i++){
+      const p = l[i], x = p[0]*R, y = p[1]*R, z = p[2]*R, c0 = cellOf(p[0], p[1], p[2]), stack = [c0], seen = new Set([c0]);
+      while (stack.length){ const a = stack.pop(), d = Math.hypot(dir[a*3]*R - x, dir[a*3 + 1]*R - y, dir[a*3 + 2]*R - z); if (d > bed + CS) continue;
+        if (d <= bed){ const w = 1/((d + 1)*(d + 1)); sw[a] += w; swh[a] += w*b.prof[i]; }
+        for (let k = 0; k < 8; k++){ const n = nbr(a, k); if (!seen.has(n)){ seen.add(n); stack.push(n); } } }
+    }
+    if (due()) await say('Shaping: trail beds…', 0.05);
+  }
+  // pins: bed cells (their height), level where trails meet (a few rounds of averaging with neighbouring bed cells)
+  const PV = new Float32Array(NC), isPin = new Uint8Array(NC);
+  for (let id = 0; id < NC; id++) if (sw[id] > 0 && !U[id]){ isPin[id] = 1; PV[id] = swh[id]/sw[id]; }
+  for (let it = 0; it < 3; it++){ const o = PV.slice();
+    for (let id = 0; id < NC; id++){ if (!isPin[id]) continue; let s = o[id]*2, n = 2; for (let k = 0; k < 8; k++){ const b = nbr(id, k); if (isPin[b]){ s += o[b]; n++; } } PV[id] = s/n; } }
+  // ---- what changes: steep ground that should ski, gentle ground that should be unskiable, beds off the land
+  await say('Shaping: finding what changes…', 0.1);
+  const seeds = [];
+  for (let id = 0; id < NC; id++){ const steep = kept[id] || g.S[id] > STOP;
+    if ((!U[id] && (steep || F[id] === 3)) || (U[id] && !kept[id]) || (isPin[id] && Math.abs(PV[id] - H[id]) > 0.25)) seeds.push(id); }
+  // the region: everything within `margin` of a change. skiable cells in it are worked out (pins held); the skiable
+  // ring just outside is held as it is, so the change blends into the land
+  const dR = new Float32Array(NC).fill(1e9), reg = new Uint8Array(NC), Lc = new Float32Array(NC), lo = new Float32Array(NC), hi = new Float32Array(NC);
+  let regList = [];   // reg: 1 free, 2 pinned bed, 3 held ring
+  const lim = (a, b) => 0.5*(Lc[a] + Lc[b])*dist(a, b);
+  const region = async extra => {
+    for (const id of extra){ dR[id] = 0; push(id); }
+    await run(a => { for (let k = 0; k < 8; k++){ const b = nbr(a, k), d = dR[a] + dist(a, b); if (d < dR[b] - 1e-3 && d <= opt.margin + 2*CS){ dR[b] = d; push(b); } } }, 'Shaping: finding what changes…', 0.15);
+    regList = [];
+    for (let id = 0; id < NC; id++){ reg[id] = 0; if (U[id] || dR[id] > opt.margin + 2*CS) continue; reg[id] = dR[id] > opt.margin ? 3 : isPin[id] ? 2 : 1; regList.push(id); if (reg[id] === 3) PV[id] = H[id]; if (!Lc[id]) Lc[id] = F[id] === 2 || F[id] === 3 ? SAPR : SMAX; }
+  };
+  // the bounds the pins set (each pin lets the ground round it rise and fall at the limit, no more)
+  const bounds = async () => {
+    lo.fill(-1e9); hi.fill(1e9);
+    for (const id of regList) if (reg[id] > 1){ lo[id] = hi[id] = PV[id]; push(id); }
+    await run(a => { for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (reg[b] !== 1) continue; const c = lim(a, b), l = lo[a] - c, h = hi[a] + c; let ch = false;
+      if (l > lo[b] + 1e-4){ lo[b] = l; ch = true; } if (h < hi[b] - 1e-4){ hi[b] = h; ch = true; } if (ch) push(b); } }, 'Shaping: skiable ground…', 0.25);
+    return regList.filter(id => reg[id] === 1 && lo[id] > hi[id] + 0.05);
+  };
+  const near = async (cells, r, fn) => { const d = new Float32Array(NC).fill(1e9); for (const id of cells){ d[id] = 0; push(id); }
+    await run(a => { for (let k = 0; k < 8; k++){ const b = nbr(a, k), dd = d[a] + dist(a, b); if (dd < d[b] - 1e-3 && dd <= r){ d[b] = dd; push(b); } } }, 'Shaping: skiable ground…', 0.3);
+    for (let id = 0; id < NC; id++) if (d[id] <= r) fn(id); };
+  await region(seeds); await say('Shaping: skiable ground…', 0.2);
+  // where the pins disagree (trails side by side at different heights, a deep cut against the held ring), let the
+  // ground there take the full ski grade instead of an apron's; then (still disagreeing near the ring) widen the
+  // region round it; what's left ramps evenly between them
+  let conflicts = await bounds(), conflictCells = 0;
+  for (let round = 0; round < 3 && conflicts.length; round++){
+    if (round < 2) await near(conflicts, 10, id => { if (Lc[id]) Lc[id] = round ? STOP*0.95 : Math.max(Lc[id], SMAX); });
+    if (round) await region(conflicts.filter(id => dR[id] > opt.margin - 12));
+    conflicts = await bounds();
+  }
+  conflictCells = conflicts.length;
+  // the least cut (Zc) and the least fill (Zf) within those bounds
+  const Zc = new Float32Array(NC), Zf = new Float32Array(NC);
+  for (const id of regList){ if (reg[id] > 1){ Zc[id] = Zf[id] = PV[id]; } else { const h = H[id]; Zc[id] = Zf[id] = lo[id] > hi[id] ? (lo[id] + hi[id])/2 : h < lo[id] ? lo[id] : h > hi[id] ? hi[id] : h; } push(id); }
+  await run(a => { for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (reg[b] !== 1 || lo[b] > hi[b]) continue; const c = lim(a, b);
+    const zc = Math.max(lo[b], Zc[a] + c), zf = Math.min(hi[b], Zf[a] - c); let ch = false;
+    if (zc < Zc[b] - 1e-4){ Zc[b] = zc; ch = true; } if (zf > Zf[b] + 1e-4){ Zf[b] = zf; ch = true; } if (ch) push(b); } }, 'Shaping: skiable ground…', 0.35);
+  const Z = new Float32Array(H);
+  for (const id of regList) Z[id] = reg[id] > 1 ? PV[id] : F[id] === 3 ? Zc[id] : 0.5*(Zc[id] + Zf[id]);
+  // what still disagrees: an even ramp between them (the cells there relaxed toward their neighbours)
+  if (conflicts.length){ const cells = []; await near(conflicts, 3, id => { if (reg[id] === 1) cells.push(id); });
+    for (let it = 0; it < 40; it++){ const o = cells.map(id => { let s = 0, n = 0; for (let k = 0; k < 8; k++){ const b = nbr(id, k); if (reg[b]){ s += Z[b]; n++; } } return n ? s/n : Z[id]; }); cells.forEach((id, k) => { Z[id] = o[k]; }); } }
+  // round the corners where it changed (twice), within the bounds
+  for (let it = 0; it < 2; it++){ const o = Z.slice();
+    for (const id of regList){ if (reg[id] !== 1) continue; let moved = Math.abs(o[id] - H[id]) > 0.05, s = 0, n = 0;
+      for (let k = 0; k < 8; k++){ const b = nbr(id, k); if (!reg[b]) continue; s += o[b]; n++; if (Math.abs(o[b] - H[b]) > 0.05) moved = true; }
+      if (!moved || !n) continue; const v = 0.5*o[id] + 0.5*s/n; Z[id] = lo[id] > hi[id] ? v : Math.max(lo[id], Math.min(hi[id], v)); } }
+  // ---- the mountains' feet beside a cut (eased back by as much as the cut) or a fill (an embankment below)
+  await say('Shaping: mountain feet…', 0.45);
+  const nearSlot = new Float32Array(NC).fill(1e9); for (let id = 0; id < NC; id++) if (slotBed && slotBed[id]){ nearSlot[id] = 0; push(id); }
+  await run(a => { for (let k = 0; k < 8; k++){ const b = nbr(a, k), d = nearSlot[a] + dist(a, b); if (d < nearSlot[b] - 1e-3 && d <= 5){ nearSlot[b] = d; push(b); } } }, 'Shaping: mountain feet…', 0.47);
+  const softenable = id => U[id] && kept[id] && !keepWall[id] && nearSlot[id] > 5;
+  for (const sign of [-1, 1]){     // -1: beside a cut, 1: beside a fill
+    const dS = new Float32Array(NC).fill(1e9), src = new Int32Array(NC).fill(-1);
+    for (const id of regList){ if (reg[id] === 3) continue; const ch = (Z[id] - H[id])*sign; if (ch > 0.5){ let edge = false; for (let k = 0; k < 8; k++) if (softenable(nbr(id, k))){ edge = true; break; } if (edge){ dS[id] = 0; src[id] = id; push(id); } } }
+    await run(a => { const s = src[a], c = Math.abs(Z[s] - H[s]), reach = 2.5*c/STOP + 2;
+      for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (!softenable(b)) continue; const d = dS[a] + dist(a, b); if (d < dS[b] - 1e-3 && d <= reach){ dS[b] = d; src[b] = s; push(b); } } }, 'Shaping: mountain feet…', 0.5);
+    for (let id = 0; id < NC; id++){ const s = src[id]; if (s < 0 || !softenable(id)) continue;
+      const c = Math.abs(Z[s] - H[s]), reach = 2.5*c/STOP + 2, t = Math.max(0, 1 - dS[id]/reach), cone = Z[s] - sign*opt.soften*STOP*dS[id];
+      const want = sign < 0 ? H[id] - cone : cone - H[id]; if (want <= 0) continue;
+      Z[id] = H[id] + sign*Math.min(want, c*t*t*(3 - 2*t)); }
+  }
+  // ---- gaps closed: raised from their mouth, steeper than the limit, up to the walls' tops
+  await say('Shaping: closing gaps…', 0.55);
+  { const dS = new Float32Array(NC).fill(1e9), srcZ = new Float32Array(NC), gap = id => U[id] && !kept[id];
+    for (let id = 0; id < NC; id++) if (gap(id)) for (let k = 0; k < 8; k++){ const b = nbr(id, k); if (!U[b]){ const d = dist(id, b); if (d < dS[id]){ dS[id] = d; srcZ[id] = Z[b]; } } }
+    for (let id = 0; id < NC; id++) if (dS[id] < 1e9) push(id);
+    await run(a => { for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (!gap(b)) continue; const d = dS[a] + dist(a, b); if (d < dS[b] - 1e-3){ dS[b] = d; srcZ[b] = srcZ[a]; push(b); } } }, 'Shaping: closing gaps…', 0.57);
+    for (let id = 0; id < NC; id++){ if (!gap(id)) continue;
+      // the walls' tops: the highest unskiable ground within 6 m
+      let top = H[id]; const stack = [id], seen = new Set([id]);
+      while (stack.length){ const a = stack.pop(); if (kept[a] && Z[a] > top) top = Z[a]; for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (!seen.has(b) && dist(id, b) <= 6){ seen.add(b); stack.push(b); } } }
+      const p = id*3, n = PT.noise3(dir[p]*R/6 + 11.3, dir[p + 1]*R/6 - 4.1, dir[p + 2]*R/6 + 7.7);
+      const ramp = (dS[id] < 1e9 ? srcZ[id] : H[id]) + opt.edge*1.1*STOP*(dS[id] < 1e9 ? dS[id] : 0) + 0.4;
+      Z[id] = Math.max(Z[id], Math.min(ramp, top) + 0.4*n); } }
+  // ---- check and repair
+  const skiSlope = (Zz, id) => { // (only against skiable neighbours: a cliff beside it isn't its slope)
+    let gx = 0, gy = 0;
+    for (const [ka, kb, axis] of [[0, 1, 0], [2, 3, 1]]){ const a = nbr(id, ka), b = nbr(id, kb), ua = !U[a], ub = !U[b];
+      const v = ua && ub ? (Zz[a] - Zz[b])/(dist(a, b) || 1) : ua ? (Zz[a] - Zz[id])/(dist(a, id) || 1) : ub ? (Zz[id] - Zz[b])/(dist(id, b) || 1) : 0;
+      if (axis) gy = v; else gx = v; }
+    return Math.sqrt(gx*gx + gy*gy); };
+  const slope = (Zz, id) => { const e = nbr(id, 0), w = nbr(id, 1), n = nbr(id, 2), s = nbr(id, 3), gx = (Zz[e] - Zz[w])/(dist(e, w) || 1), gy = (Zz[n] - Zz[s])/(dist(n, s) || 1); return Math.sqrt(gx*gx + gy*gy); };
+  const edgeU = id => { if (!U[id]) return false; for (let k = 0; k < 8; k++) if (!U[nbr(id, k)]) return true; return false; };
+  const stepOn = id => { for (let k = 0; k < 8; k++){ const b = nbr(id, k); if (!U[b] && Math.abs(Z[id] - Z[b]) <= STOP*dist(id, b)) return true; } return false; };
+  const check = () => { const fail = [], leak = [];
+    for (const id of regList) if (reg[id] < 3 && skiSlope(Z, id) > STOP) fail.push(id);
+    for (let id = 0; id < NC; id++) if (U[id] && (!kept[id] || dR[id] <= opt.margin) && edgeU(id) && slope(Z, id) <= STOP && stepOn(id)) leak.push(id);
+    return { fail, leak }; };
+  await say('Checking…', 0.65);
+  let c = check(); const first = { fail: c.fail.length, leak: c.leak.length };
+  for (let round = 0; round < 3 && (c.fail.length || c.leak.length); round++){
+    // too steep to ski: relax it and the ground round it (not the beds) toward its neighbours
+    if (c.fail.length){ const set = new Set();
+      for (const id of c.fail){ set.add(id); for (let k = 0; k < 8; k++){ const b = nbr(id, k); if (reg[b] === 1) set.add(b); } }
+      const cells = [...set].filter(id => reg[id] === 1);
+      for (let it = 0; it < 30; it++){ const o = new Float32Array(cells.length);
+        cells.forEach((id, k) => { let s = 0, n = 0; for (let j = 0; j < 8; j++){ const b = nbr(id, j); if (!U[b]){ s += Z[b]; n++; } } o[k] = n ? s/n : Z[id]; });
+        cells.forEach((id, k) => { Z[id] = 0.4*Z[id] + 0.6*o[k]; }); } }
+    // an unskiable edge that came out gentle: raised from the skiable ground beside it, steeper than the limit
+    // (above the skiable ground beside it: raised; below it: lowered, a drop)
+    for (const id of c.leak){ let up = -Infinity, dn = Infinity, above = 0, below = 0;
+      for (let k = 0; k < 8; k++){ const b = nbr(id, k); if (U[b]) continue; const st = opt.edge*STOP*dist(id, b); if (Z[id] >= Z[b]){ above++; up = Math.max(up, Z[b] + st); } else { below++; dn = Math.min(dn, Z[b] - st); } }
+      Z[id] = above >= below ? Math.max(Z[id], up) : Math.min(Z[id], dn); }
+    c = check(); await say('Checking…', 0.7 + 0.05*round);
+  }
+  let failArea = 0, leakArea = 0, bedFail = 0; for (const id of c.fail){ failArea += AREA[id]; if (reg[id] === 2) bedFail++; } for (const id of c.leak) leakArea += AREA[id];
+  // ---- the change, as a layer of heights to add (the detail layer's format: n x n points per face, in tiles)
+  await say('Writing the cleaned ground…', 0.85);
+  const D = new Float32Array(NC); let changed = 0, cut = 0, fill = 0, maxCut = 0, maxFill = 0;
+  for (let id = 0; id < NC; id++){ const d = Z[id] - H[id]; D[id] = d; if (Math.abs(d) > 0.05){ changed += AREA[id]; if (d < 0){ cut += -d*AREA[id]; maxCut = Math.max(maxCut, -d); } else { fill += d*AREA[id]; maxFill = Math.max(maxFill, d); } } }
+  const n = Math.min(1024, Math.ceil((N + 1)/32)*32), layer = PT.newDetail(n), TPF = n/32, want = new Set();
+  for (let id = 0; id < NC; id++){ if (Math.abs(D[id]) < 0.01) continue; const f = (id/NN) | 0, r = id - f*NN, j = (r/N) | 0, i = r - j*N;
+    // (the layer's points round this cell, and their tiles)
+    const pi = (i + 0.5)/N*(n - 1), pj = (j + 0.5)/N*(n - 1);
+    for (const a of [Math.floor(pi) - 1, Math.ceil(pi) + 1]) for (const b of [Math.floor(pj) - 1, Math.ceil(pj) + 1]){ const ia = Math.max(0, Math.min(n - 1, a)), jb = Math.max(0, Math.min(n - 1, b)); want.add((f*TPF + (jb >> 5))*TPF + (ia >> 5)); } }
+  const cellD = (f, gx, gy) => { const i = Math.max(0, Math.min(N - 2, Math.floor(gx))), j = Math.max(0, Math.min(N - 2, Math.floor(gy))), fx = Math.max(0, Math.min(1, gx - i)), fy = Math.max(0, Math.min(1, gy - j)), o = f*NN + j*N + i;
+    return (D[o]*(1 - fx) + D[o + 1]*fx)*(1 - fy) + (D[o + N]*(1 - fx) + D[o + N + 1]*fx)*fy; };
+  let k = 0;
+  for (const key of want){ const f = (key/(TPF*TPF)) | 0, r = key - f*TPF*TPF, tj = (r/TPF) | 0, ti = r - tj*TPF;
+    for (let jj = 0; jj < 32; jj++) for (let ii = 0; ii < 32; ii++){ const i = ti*32 + ii, j = tj*32 + jj, v = cellD(f, i/(n - 1)*N - 0.5, j/(n - 1)*N - 0.5); if (v) PT.detailAdd(layer, f, i, j, v); }
+    if ((++k & 63) === 0 && due()) await say('Writing the cleaned ground…', 0.85 + 0.1*k/want.size); }
+  PT.weldDetail(layer, 0);
+  // the result, as a map (what's skiable now, what was reshaped, what's left wrong)
+  const rcls = new Uint8Array(NC); const failS = new Uint8Array(NC), leakS = new Uint8Array(NC); for (const id of c.fail) failS[id] = 1; for (const id of c.leak) leakS[id] = 1;
+  for (let id = 0; id < NC; id++){ const ch = Math.abs(D[id]) > 0.3;
+    rcls[id] = failS[id] ? 5 : leakS[id] ? 6 : U[id] ? (ch ? 3 : 1) : isPin[id] || F[id] === 1 ? 4 : ch ? 2 : 0; }
+  // where problems are left, for the list
+  const notes = [];
+  const group = (cells, what) => { const s = new Uint8Array(NC); cells.forEach(id => { s[id] = 1; }); const seen = new Uint8Array(NC), out = [];
+    for (const s0 of cells){ if (seen[s0]) continue; const comp = [s0]; seen[s0] = 1; let area = 0;
+      for (let h = 0; h < comp.length; h++){ const a = comp[h]; area += AREA[a]; for (let k = 0; k < 8; k++){ const b = nbr(a, k); if (s[b] && !seen[b]){ seen[b] = 1; comp.push(b); } } }
+      const m = comp[comp.length >> 1]; out.push({ what, area, at: [dir[m*3], dir[m*3 + 1], dir[m*3 + 2]] }); }
+    return out.sort((a, b) => b.area - a.area); };
+  for (const x of group(c.fail, 'fail').slice(0, 8)) notes.push(Object.assign(x, { text: `Still too steep to ski: ${Math.round(x.area)} m²` }));
+  for (const x of group(c.leak, 'leak').slice(0, 8)) notes.push(Object.assign(x, { text: `Should be unskiable but skis: ${Math.round(x.area)} m²` }));
+  const summary = { seconds: +((now() - t0)/1000).toFixed(1), changed: Math.round(changed), cut: Math.round(cut), fill: Math.round(fill), maxCut: +maxCut.toFixed(1), maxFill: +maxFill.toFixed(1),
+    found: first, conflicts: conflictCells, failArea: Math.round(failArea), leakArea: Math.round(leakArea), bedFail, tiles: layer.tiles.size };
+  await say('Applied', 1);
+  return { layer, rcls, summary, notes, Z };
+};
+
+// a fingerprint of everything the cleanup reads (the land and the trails): when it changes, an applied cleanup is out
+// of date
+PC.signature = function(L){
+  let h = 2166136261 >>> 0; const mix = v => { h ^= v; h = Math.imul(h, 16777619) >>> 0; };
+  const str = JSON.stringify([L.radius, L.noise, L.stamps, L.trails.map(t => [t.pts, t.closed, t.carve, t.bed, t.smooth, t.maxGrade]), L.network && L.network.join, L.cliffs && L.cliffs.stop]);
+  for (let i = 0; i < str.length; i++) mix(str.charCodeAt(i));
+  const f32 = a => { const u = new Uint32Array(a.buffer, a.byteOffset, a.length); for (let i = 0; i < u.length; i++) if (u[i]) mix(u[i] ^ i); };
+  f32(L.sculpt.data); for (const [k, t] of [...L.detail.tiles].sort((a, b) => a[0] - b[0])){ mix(k); f32(t); }
+  return h.toString(36);
 };
 
 (typeof window !== 'undefined' ? window : globalThis).PlanetCleanup = PC;

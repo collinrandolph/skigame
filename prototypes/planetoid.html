@@ -540,13 +540,9 @@ function nearestTrailAt(d){
   const names = bt ? [...per].filter(([, x]) => x < best + 0.6).map(([t]) => t.name) : [];
   return { d: best, t: bt, names };
 }
-// corduroy: ribs along the trail, a slightly darker groomed edge each side
-const cordTex = (() => {
-  const c = document.createElement('canvas'); c.width = 112; c.height = 2; const g = c.getContext('2d');
-  for (let x = 0; x < 112; x++){ g.fillStyle = (x < 6 || x > 105) ? '#c9d6e2' : (Math.floor((x - 6)/5) % 2 ? '#eef3f8' : '#fbfdff'); g.fillRect(x, 0, 1, 2); }
-  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;
-})();
-const trailMat = twilightPatch(flatPatch(new THREE.MeshLambertMaterial({ map: cordTex, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })));
+// the groomed ribbon: one plain colour for now (no corduroy, no edges), so where trails overlap at a junction it
+// doesn't show
+const trailMat = twilightPatch(flatPatch(new THREE.MeshLambertMaterial({ color: 0xf6f9fc, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 })));
 function buildTrails(rnd){
   const R = P.R, V = THREE.Vector3;
   for (const m of trailMeshes){ scene.remove(m); m.geometry.dispose(); }

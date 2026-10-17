@@ -320,7 +320,7 @@ PT.bridgeDeck = function(b, height, R){
 // join: trails closer than this (m) are made one. patch: the steep bits smaller than this across (m) are eased
 // join: trails closer than this run as one; patch: ease steep patches smaller than this (cleanup). corridor: how far
 // past a carved trail's bed the trail takes over the ground, and side: the steepest the ground beside it may be there
-PT.networkDefaults = () => ({ join: 8, patch: 15, corridor: 30, side: 0.25 });
+PT.networkDefaults = () => ({ join: 8, patch: 15, corridor: 30, side: 0.35 });
 const ang3 = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0]*b[0] + a[1]*b[1] + a[2]*b[2])));
 // a spatial hash of a line's points (cells `cell` metres), for finding the nearest point of the line quickly
 function lineHash(pts, R, cell){
@@ -631,7 +631,7 @@ PT.parse = function(json){
 const CT = 16;     // corridor grid tiles, CT x CT points
 // prev, caps: an earlier bake with the same settings, and the caps ([direction, angle]) where anything has changed since:
 // only the corridors within reach of those are worked out again (with room round them), the rest kept as they were
-function bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev, caps){
+function bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev, caps, allowM, stop){
   const CS = 2, NG = Math.max(65, Math.round(2*R/CS) + 1), TN = Math.ceil(NG/CT), key = JSON.stringify([NG, side, corridor, FADE, R]);
   const inc = !!(prev && caps && prev.key === key), tiles = inc ? new Map(prev.tiles) : new Map(), owned = new Set();
   const tileFor = k => { let t = tiles.get(k); if (t && inc && !owned.has(k)){ t = t.slice(); tiles.set(k, t); } if (!t){ t = new Float32Array(CT*CT*3).fill(NaN); tiles.set(k, t); } owned.add(k); return t; };
@@ -641,7 +641,7 @@ function bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev, caps
   // the margin, in grid steps (the grid is finest, about half as far apart, toward a face's edges)
   const M = Math.ceil(reach/(CS*0.45)) + 2, W = NG + 2*M, du = 2/(NG - 1), N = W*W;
   const dir = new Float32Array(N*3), cd = new Float32Array(N), lo = new Float32Array(N), hi = new Float32Array(N);
-  const h0 = new Float32Array(N), hl = new Float32Array(N), hu = new Float32Array(N), Lc = new Float32Array(N), inR = new Uint8Array(N), dI = new Float32Array(N), dJ = new Float32Array(N), dok = new Uint8Array(N), sw = new Float32Array(N), swh = new Float32Array(N);
+  const h0 = new Float32Array(N), hl = new Float32Array(N), hu = new Float32Array(N), Lc = new Float32Array(N), inR = new Uint8Array(N), dI = new Float32Array(N), dJ = new Float32Array(N), dok = new Uint8Array(N), sw = new Float32Array(N), swh = new Float32Array(N), loM = new Float32Array(N), hiM = new Float32Array(N), mnt = new Uint8Array(N);
   const q = [0, 0, 0];
   for (let f = 0; f < 6; f++){
     const [na, ua, va, sg] = FAX[f];
@@ -677,7 +677,7 @@ function bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev, caps
     }
     bi0 = Math.max(1, Math.floor(bi0)); bi1 = Math.min(W - 2, Math.ceil(bi1)); bj0 = Math.max(1, Math.floor(bj0)); bj1 = Math.min(W - 2, Math.ceil(bj1));
     if (bi0 > bi1 || bj0 > bj1) continue;
-    cd.fill(1e9); lo.fill(-1e9); hi.fill(1e9); inR.fill(0); dok.fill(0); sw.fill(0); swh.fill(0);
+    cd.fill(1e9); lo.fill(-1e9); hi.fill(1e9); inR.fill(0); dok.fill(0); sw.fill(0); swh.fill(0); loM.fill(-1e9); hiM.fill(1e9); mnt.fill(0);
     // a grid point as a direction, worked out the first time it's wanted
     const need = id => { if (dok[id]) return; dok[id] = 1; const i = id % W, j = (id/W) | 0, o = id*3; PT.dirFromFace(f, -1 + (i - M)*du, -1 + (j - M)*du, q); dir[o] = q[0]; dir[o + 1] = q[1]; dir[o + 2] = q[2]; };
     // each segment marks the points within its reach: how far past the bed (cd), and the beds' limits (lo, hi)
@@ -725,6 +725,8 @@ function bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev, caps
         if (dd < cd[id]) cd[id] = dd;
         const hb = p0 + (p1 - p0)*u, a = allow(c, dd) + c.gA*(u0 < 0 ? -u0 : u0 > 1 ? u0 - 1 : 0)*Ls;
         if (hb - a > lo[id]) lo[id] = hb - a; if (hb + a < hi[id]) hi[id] = hb + a;
+        const am = allowM(c, u0 < 0.5 ? k : k2, dd) + c.gA*(u0 < 0 ? -u0 : u0 > 1 ? u0 - 1 : 0)*Ls;     // (if it turns out to be mountain)
+        if (hb - am > loM[id]) loM[id] = hb - am; if (hb + am < hiM[id]) hiM[id] = hb + am;
         // (the beds near, by nearness; along a trail each piece's share fades out past its ends, so the pieces blend evenly)
         const wu = 1 - Math.abs(u0 - 0.5); if (wu > 0){ const wd = wu/Math.max(1, (dd + bed)*(dd + bed)); sw[id] += wd; swh[id] += wd*hb; }
         }
@@ -736,9 +738,47 @@ function bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev, caps
     // where trails disagree (beds too far apart in height for the side grade between them, like a switchback's legs),
     // the ground ramps evenly from one bed to the other (each bed counting by how near it is), eased in from where
     // they start to disagree; those points are held there
+    for (const id of reg){ inR[id] = 1; const o = id*3; h0[id] = under(dir[o], dir[o + 1], dir[o + 2]); }
+    // (the distances to the neighbours, worked out once: across (dI), down (dJ), and the diagonals from those)
+    for (const id of reg){ const o = id*3; need(id + 1); need(id + W);
+      let x = dir[o + 3] - dir[o], y = dir[o + 4] - dir[o + 1], z = dir[o + 5] - dir[o + 2]; dI[id] = Math.sqrt(x*x + y*y + z*z)*R;
+      const w = o + W*3; x = dir[w] - dir[o]; y = dir[w + 1] - dir[o + 1]; z = dir[w + 2] - dir[o + 2]; dJ[id] = Math.sqrt(x*x + y*y + z*z)*R; }
+    // which of the land here is mountain: steeper than you can ski, with real height close by (6 m within about 8 m).
+    // a mountain keeps its own shape: the corridor cuts or fills it only where a bed needs room (an apron of 1-6 m beside
+    // the bed, then a face of 60-80% up to where it meets the mountain, which so follows the mountain's own contours;
+    // through a ridge, a slot with steep walls), and the skiable ground's smoothing never reaches into it. small steep
+    // bumps aren't mountain: they're smoothed away with the rest
     for (const id of reg){
-      inR[id] = 1; const o = id*3, h = under(dir[o], dir[o + 1], dir[o + 2]); h0[id] = h;
-      const l = lo[id], u = hi[id]; let hc;
+      const e = inR[id + 1] && inR[id - 1], n = inR[id + W] && inR[id - W]; if (!e || !n) continue;
+      const gx = (h0[id + 1] - h0[id - 1])/(2*(dI[id] || 1)), gy = (h0[id + W] - h0[id - W])/(2*(dJ[id] || 1)); if (gx*gx + gy*gy <= stop*stop) continue;
+      let mn = h0[id], mx = mn;
+      for (let dj = -4; dj <= 4; dj++) for (let di = -4; di <= 4; di++){ const nb = id + dj*W + di; if (inR[nb]){ const v = h0[nb]; if (v < mn) mn = v; if (v > mx) mx = v; } }
+      if (mx - mn >= 6) mnt[id] = 1;
+    }
+    // tidy the mask: specks under about 20 points aren't mountain; then take in a ring two points wide round each
+    // mountain (not a bed), so its foot keeps the land's own shape and the skiable smoothing starts beyond it
+    { const seen = new Uint8Array(0), comp = [];
+      for (const s0 of reg){ if (mnt[s0] !== 1) continue; comp.length = 0; comp.push(s0); mnt[s0] = 3;
+        for (let h = 0; h < comp.length; h++){ const a = comp[h]; for (const b of [a - 1, a + 1, a - W, a + W, a - W - 1, a - W + 1, a + W - 1, a + W + 1]) if (mnt[b] === 1){ mnt[b] = 3; comp.push(b); } }
+        const keep = comp.length >= 20 ? 1 : 0; for (const a of comp) mnt[a] = keep ? 4 : 0; }
+      for (const id of reg) if (mnt[id] === 4) mnt[id] = 1;
+      for (let ring = 0; ring < 2; ring++){
+        const add = [];
+        for (const id of reg) if (!mnt[id] && cd[id] > 0.5){ for (const b of [id - 1, id + 1, id - W, id + W, id - W - 1, id - W + 1, id + W - 1, id + W + 1]) if (mnt[b]){ add.push(id); break; } }
+        for (const id of add) mnt[id] = 2;          // (the ring: the mountain's foot)
+      }
+      // approaching a mountain, the corridor's limits ease into the mountain's (looser) ones over the last 5 points, so
+      // the skiable ground meets the mountain's foot without a step
+      let front = reg.filter(id => mnt[id]); const dm = new Map(); for (const id of front) dm.set(id, 0);
+      for (let d = 1; d <= 5 && front.length; d++){ const next = [];
+        for (const a of front) for (const b of [a - 1, a + 1, a - W, a + W]) if (inR[b] && !mnt[b] && !dm.has(b)){ dm.set(b, d); next.push(b); }
+        front = next; }
+      for (const [id, d] of dm){ if (!d || cd[id] <= 0.5) continue; const t = 1 - d/6, e = t*t*(3 - 2*t);
+        if (loM[id] < lo[id]) lo[id] += (loM[id] - lo[id])*e; if (hiM[id] > hi[id]) hi[id] += (hiM[id] - hi[id])*e; } }
+    for (const id of reg){
+      const h = h0[id]; let hc;
+      if (mnt[id]){ const l = loM[id], u = hiM[id]; hl[id] = hu[id] = l > u ? (l + u)/2 : h < l ? l : h > u ? u : h; inR[id] = 2; continue; }
+      const l = lo[id], u = hi[id];
       if (l > u){ const m = (l + u)/2, t = Math.min(1, (l - u)/2), r = sw[id] > 0 ? swh[id]/sw[id] : m; hc = m + (r - m)*t*t*(3 - 2*t); inR[id] = 3; }
       else hc = h < l ? l : h > u ? u : h;
       hl[id] = hu[id] = hc;
@@ -747,11 +787,7 @@ function bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev, caps
     // no steeper than the side grade: the least fill (hu, raised to it) and the least cut (hl, lowered to it), by
     // sweeping the grid both ways (twice), each point taking what its neighbours allow
     // (a bed's points don't move, and nothing goes outside the beds' limits: those are no steeper than the side grade)
-    // (the distances to the neighbours, worked out once: across (dI), down (dJ), and the diagonals from those)
-    for (const id of reg){ const o = id*3; need(id + 1); need(id + W);
-      let x = dir[o + 3] - dir[o], y = dir[o + 4] - dir[o + 1], z = dir[o + 5] - dir[o + 2]; dI[id] = Math.sqrt(x*x + y*y + z*z)*R;
-      const w = o + W*3; x = dir[w] - dir[o]; y = dir[w + 1] - dir[o + 1]; z = dir[w + 2] - dir[o + 2]; dJ[id] = Math.sqrt(x*x + y*y + z*z)*R; }
-    const relax = (id, nb, dist) => { if (!inR[nb]) return;
+    const relax = (id, nb, dist) => { if (!inR[nb] || mnt[nb] === 1) return;
       const cst = 0.5*(Lc[id] + Lc[nb])*dist;
       const a = hl[nb] + cst; if (a < hl[id]) hl[id] = a > lo[id] ? a : lo[id]; const b = hu[nb] - cst; if (b > hu[id]) hu[id] = b < hi[id] ? b : hi[id]; };
     for (const id of reg) if (inR[id] === 1 && lo[id] >= hi[id] - 0.01) inR[id] = 2;      // the beds: fixed
@@ -771,12 +807,12 @@ function bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev, caps
     }
     // average the two, keep within the beds' limits, round the corners (twice), keeping within the limits
     const F = hl;
-    for (const id of reg){ if (inR[id] === 3) continue; const v = (hl[id] + hu[id])/2, l = lo[id], u = hi[id]; F[id] = l > u ? (l + u)/2 : v < l ? l : v > u ? u : v; }
+    for (const id of reg){ if (inR[id] === 3 || mnt[id]) continue; const v = (hl[id] + hu[id])/2, l = lo[id], u = hi[id]; F[id] = l > u ? (l + u)/2 : v < l ? l : v > u ? u : v; }
     for (let it = 0; it < 2; it++){
       for (const id of reg) hu[id] = F[id];
       for (let r = 0; r < nf; r++){
         const id = free[r];       // (a bed stays as it is)
-        let sm = 0, n = 0; if (inR[id - 1]){ sm += hu[id - 1]; n++; } if (inR[id + 1]){ sm += hu[id + 1]; n++; } if (inR[id - W]){ sm += hu[id - W]; n++; } if (inR[id + W]){ sm += hu[id + W]; n++; }
+        let sm = 0, n = 0; for (const nb of [id - 1, id + 1, id - W, id + W]) if (inR[nb] && mnt[nb] !== 1){ sm += hu[nb]; n++; }
         const v = n ? 0.5*hu[id] + 0.5*sm/n : hu[id], l = lo[id], u = hi[id]; F[id] = v < l ? l : v > u ? u : v;
       }
     }
@@ -870,13 +906,49 @@ PT.terrain = function(L, R, prev, caps){
     sweep(1); sweep(-1);
     for (let i = 0; i < M; i++){ const t = Math.min(1, dist[i]/span), w = 1 - t*t*(3 - 2*t); B.prof[i] += val[i]*w; }
   }
+  // how each carved trail meets the land, point by point (the land 9 m either side against its bed): through a ridge
+  // (a notch: a slot with steep walls where it's short, a saddle graded like the rest where it's long), along a crest
+  // with drops both sides (a causeway: built out level 1 m past the bed), or across a slope (a bench). a bench's apron
+  // (1-6 m) and face (60-80%) vary slowly along the trail, so the cut never reads as one straight wall
+  const SLOT_MAX = 40;
+  for (const c of carves){
+    const M = c.M, P = c.P, kind = new Uint8Array(M), aw = new Float32Array(M), lf = new Float32Array(M), q = [0, 0, 0];
+    for (let i = 0; i < M; i++){
+      const a = c.closed ? (i + 1) % M : Math.min(M - 1, i + 1), b = c.closed ? (i - 1 + M) % M : Math.max(0, i - 1);
+      const tx = P[a*3] - P[b*3], ty = P[a*3 + 1] - P[b*3 + 1], tz = P[a*3 + 2] - P[b*3 + 2], x = P[i*3], y = P[i*3 + 1], z = P[i*3 + 2];
+      let sx = y*tz - z*ty, sy = z*tx - x*tz, sz = x*ty - y*tx; const sl = Math.hypot(sx, sy, sz) || 1; sx /= sl; sy /= sl; sz /= sl;
+      const at = sg => { q[0] = x + sg*9/R*sx; q[1] = y + sg*9/R*sy; q[2] = z + sg*9/R*sz; const l = Math.hypot(q[0], q[1], q[2]); return under(q[0]/l, q[1]/l, q[2]/l); };
+      const hb = c.prof[i], l1 = at(-1), l2 = at(1);
+      kind[i] = l1 > hb + 2 && l2 > hb + 2 ? 1 : l1 < hb - 2 && l2 < hb - 2 ? 3 : 0;
+      const n1 = noise3(x*R/35 + 3.1, y*R/35 - 7.7, z*R/35 + 1.9), n2 = noise3(x*R/28 - 4.4, y*R/28 + 2.6, z*R/28 + 9.3);
+      const e1 = Math.max(0, Math.min(1, (n1 + 0.35)/0.7)), e2 = Math.max(0, Math.min(1, (n2 + 0.35)/0.7));
+      aw[i] = kind[i] === 3 ? 1 : 1 + 5*e1*e1*(3 - 2*e1); lf[i] = 0.6 + 0.2*e2*e2*(3 - 2*e2);
+    }
+    // notches: long ones are saddles; then reach a few points past each end, so a slot's walls start before the ridge
+    for (let i = 0; i < M; ){ if (kind[i] !== 1){ i++; continue; } let j = i; while (j < M && kind[j] === 1) j++; if ((j - i)*STEP > SLOT_MAX) for (let k = i; k < j; k++) kind[k] = 2; i = j; }
+    const k0 = kind.slice();
+    for (let i = 0; i < M; i++) if (k0[i] === 1 || k0[i] === 2) for (let d = -3; d <= 3; d++){ const j = c.closed ? (i + d + M) % M : i + d; if (j >= 0 && j < M && !k0[j]) kind[j] = k0[i]; }
+    c.kind = kind; c.aw = aw; c.lf = lf;
+  }
+  // how far a mountain may differ from a bed at dd m past its edge (see above): level-ish across the apron, then the face,
+  // then (8 m further) steepening fast, so a tall cliff above is left alone
+  const FACE = 8;
+  const allowM = (c, k, dd) => {
+    if (dd <= 0) return 0;
+    const kd = c.kind[k]; if (kd === 2) return allow(c, dd);
+    const aw = kd === 1 ? 1 : c.aw[k], lf = kd === 1 ? 3 : c.lf[k], face = kd === 1 ? 40 : FACE;
+    let a = dd <= aw ? side*dd : side*aw + lf*(dd - aw);
+    const g = dd - aw - face; if (g > 0) a += 0.5*g*g*g;
+    const f = dd - corridor; if (f > 0) a += 0.1*f*f*f;
+    return a;
+  };
   // the corridors, worked out once on a grid (about 1.5 m apart, per cube face, each face with a margin past its edges so
   // faces agree where they meet). on the grid: the beds are held level, and the ground in each corridor is cut and
   // filled as little as it can be so that nowhere is it steeper than the side grade (the steepest the land beside a
   // trail may be): the least fill that does it and the least cut that does it, averaged. then the corners are rounded,
   // everything is kept within the beds' limits, and past the corridor it eases back into the land over FADE m. the
   // ground then reads the grid: the corridor's height, with the land's own finer detail where it fades out
-  const corr = carves.length ? bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev && prev.corr, caps) : null;
+  const corr = carves.length ? bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev && prev.corr, caps, allowM, stopG) : null;
   return {
     R, stamps, carves: carves.length, net, corr, stop: L && L.cliffs ? L.cliffs.stop : 1.0,
     height(x, y, z){

@@ -172,7 +172,9 @@ const save = () => { try { const o = { lift: P.lift, cycle: P.daynight, aurora: 
 // noise, stamps and sculpting when one is loaded
 const PTR = window.PlanetTerrain, noise3 = PTR.noise3;
 let LAYOUT = null, LAYOUT_RAW = null, TIDY = '', TERRAIN = PTR.terrain(null, P.R);
-function heightAt(x, y, z){ return TERRAIN.height(x, y, z); }
+// (underground, the ground is the cave's floor: see ugHeight)
+let UG = null;
+function heightAt(x, y, z){ return UG ? ugHeight(x, y, z) : TERRAIN.height(x, y, z); }
 const groundR = d => P.R + heightAt(d.x, d.y, d.z);
 
 // ---------- renderer, scene, camera ----------
@@ -449,7 +451,7 @@ function buildChunk(c){
     const gi = c.ci*m + i - 1, gj = c.cj*m + j - 1, d = faceDir3(c.f, gi, gj, N, _cd3);
     // the border ring carries on past the face's edge (onto the next face) rather than repeating the edge point
     if (gi < 0 || gj < 0 || gi > N || gj > N){ const l = Math.hypot(d[0], d[1], d[2]); d[0] /= l; d[1] /= l; d[2] /= l; }
-    const r = R + heightAt(d[0], d[1], d[2]), o = (j*M + i)*3;
+    const r = R + TERRAIN.height(d[0], d[1], d[2]), o = (j*M + i)*3;
     D[o] = d[0]; D[o + 1] = d[1]; D[o + 2] = d[2]; Pp[o] = d[0]*r; Pp[o + 1] = d[1]*r; Pp[o + 2] = d[2]*r;
   }
   const NV = V*V + 4*V, vp = new Float32Array(NV*3), vn = new Float32Array(NV*3), vc = new Float32Array(NV*3), col = c.tmpCol || (c.tmpCol = new THREE.Color());
@@ -469,19 +471,24 @@ function buildChunk(c){
   { let lo = Infinity, hi = -Infinity; for (let k = 0; k < V*V*3; k += 3){ const h = Math.hypot(vp[k], vp[k + 1], vp[k + 2]); lo = Math.min(lo, h); hi = Math.max(hi, h); } skirt(vp, vn, vc, m, Math.max(2, (hi - lo)*0.3), R); }
   if (c.mesh && c.builtLod !== lod){ planet.remove(c.mesh); c.mesh.geometry.dispose(); c.mesh = null; }
   c.builtLod = lod;
+  // (where a tunnel's mouth is in the wall here, the wall in front of it is left out: the portal stands there)
+  const slot = ugDoors.length && ugDoors.some(D => c.c.angleTo(D.mouth) < c.ang + 12/R);
+  const idx = slot ? slotIndex(chunkIndex(m), vp, R) : chunkIndex(m);
   if (!c.mesh){
-    const idx = chunkIndex(m), g = new THREE.BufferGeometry();
+    const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(vp, 3)); g.setAttribute('normal', new THREE.BufferAttribute(vn, 3)); g.setAttribute('color', new THREE.BufferAttribute(vc, 3));
     g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeBoundingSphere();
     c.mesh = new THREE.Mesh(g, planetMat); planet.add(c.mesh);
   } else {
     const g = c.mesh.geometry; g.attributes.position.array.set(vp); g.attributes.normal.array.set(vn); g.attributes.color.array.set(vc);
-    g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = g.attributes.color.needsUpdate = true; g.computeBoundingSphere();
+    g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = g.attributes.color.needsUpdate = true;
+    if (slot || c.slotted) g.setIndex(new THREE.BufferAttribute(idx, 1)); g.computeBoundingSphere();
   }
+  c.slotted = slot;
 }
 const GC = { snow: new THREE.Color(0xe6edf3), shade: new THREE.Color(0xb3c4d6), hollow: new THREE.Color(0xd5e0eb), rock: new THREE.Color(0x7d8794), cosStop: 0.7 };
 function buildPlanet(){
-  TERRAIN = PTR.terrain(LAYOUT, P.R);
+  TERRAIN = PTR.terrain(LAYOUT, P.R); ugDoorsFrom();
   GC.cosStop = 1/Math.sqrt(1 + TERRAIN.stop*TERRAIN.stop);
   for (const c of chunks){ c.mesh.geometry.dispose(); planet.remove(c.mesh); }
   chunks = [];
@@ -494,6 +501,7 @@ function buildPlanet(){
     buildChunk(c); chunks.push(c);
   }
   buildScatter();
+  buildUnderground();
 }
 // finer chunks round the skier: lod 4 within about 120 m, lod 2 within 300 m. one rebuilt per frame, nearest first
 function updateLod(){
@@ -1230,6 +1238,7 @@ function step(dt){
   // groomed or not: ungroomed snow multiplies friction and drag (a held glide works off the trail too, as in the game)
   const tq = nearestTrailAt(n); S.off = offTrail(tq.d); S.trail = tq.t; S.trailNames = tq.names;
   if (ONB){ S.off = 0; S.trail = null; }      // the deck glides like groomed trail
+  if (UG){ S.off = 0; S.trail = UG.trail; S.trailNames = null; }      // a cave's floor glides like groomed trail
   const surf = (1 + (P.off - 1)*S.off) * gm;
 
   const ws = weightLeg && lastSki[weightLeg], onSki = ws && ws.live && ws.glide;
@@ -1265,6 +1274,7 @@ function step(dt){
   frameMove[0] += mvx; frameMove[1] += mvy;
   if (!ONB) collide();
   bridgeStep();
+  ugStep();
   S.dist += Math.hypot(mvx, mvy);
 
   // planted skis: the mark grows along the ski as the body travels; lifted and re-set when the body drifts off it
@@ -1289,7 +1299,7 @@ function modelFootSD(o, p){ _fr.copy(p).sub(o.d).multiplyScalar(P.R); return Ski
 const nearSolid = (o, p, pad) => o.foot ? p.dot(o.d) > o.lim && modelFootSD(o, p) < pad : p.dot(o.d) > Math.cos((o.r + pad)/P.R);
 // rocks, beacon bases, mountains and buildings are solid: you're pushed out and lose the speed you had into them
 function collide(){
-  if (TEST.ghost) return;
+  if (TEST.ghost || UG) return;      // (the scenery is all on the surface)
   const R = P.R, lim = Math.cos(8/R);
   const hit = (x, y, z, rr) => {
     const ox = ((x - n.x)*ex.x + (y - n.y)*ex.y + (z - n.z)*ex.z)*R, oy = ((x - n.x)*ey.x + (y - n.y)*ey.y + (z - n.z)*ey.z)*R;
@@ -1385,6 +1395,136 @@ function poseFigure(dt){
   shadow.position.set(Math.cos(th)*rock, 0.04, Math.sin(th)*rock); shadow.rotation.z = -th;
 }
 
+// ---------- underground (a layout's layers, nested planetoids: planet-terrain.js PT.caveField) ----------
+// you go in at an entrance (a ramp's plateau, the tunnel's mouth in the pit's wall, with a rock portal round it) and out
+// the same way. inside, the ground is the cave's floor; its walls (and anywhere with under 2 m of headroom) are as steep
+// as cliffs, so they stop you as cliffs do. the caves are drawn from inside, floor and ceiling, only where there's
+// cave, and it's dark but for your lamp (and what comes in at the mouth)
+let ugLayers = [], ugDoors = [];
+const ugGroup = new THREE.Group(); scene.add(ugGroup);
+const ugMat = flatPatch(new THREE.MeshLambertMaterial({ vertexColors: true }));
+const portalMat = flatPatch(new THREE.MeshLambertMaterial({ color: 0x9a938b, side: THREE.DoubleSide }));
+const ugLamp = new THREE.PointLight(0xffe4bc, 0, 50, 1.4); scene.add(ugLamp);
+function ugHeight(x, y, z){
+  const a = UG.CF.at(x, y, z), base = -UG.depth;
+  if (a.open && a.ceil - a.floor >= 2) return base + a.floor;
+  if (a.open) return base + a.floor + 3;                              // too low to get under: a wall
+  return base + (isFinite(a.gap) ? a.gapFloor + 2 + 3*Math.min(a.gap, 6) : 22);
+}
+// the entrances (from the ramps' plateaus linked to a layer the layout has)
+function ugDoorsFrom(){
+  ugDoors = []; UG = null; if (!LAYOUT || !LAYOUT.layers || !LAYOUT.layers.length) return;
+  for (const B of TERRAIN.ramps || []) for (const d of B.doors){ if (!(d.link >= 0 && LAYOUT.layers[d.link])) continue;
+    const mouth = new THREE.Vector3(...d.mouth).normalize(), out = new THREE.Vector3(...d.out), side = new THREE.Vector3().crossVectors(mouth, out).normalize();
+    ugDoors.push({ k: d.link, mouth, out, side, h: d.h }); }
+}
+// a surface chunk's triangles, less those in front of a tunnel's mouth (between its floor and 8 m up, 5 m into the wall)
+function slotIndex(idx, vp, R){
+  const out = [], c = new THREE.Vector3(), rel = new THREE.Vector3();
+  for (let t = 0; t < idx.length; t += 3){
+    const a = idx[t]*3, b = idx[t + 1]*3, d = idx[t + 2]*3; c.set((vp[a] + vp[b] + vp[d])/3, (vp[a + 1] + vp[b + 1] + vp[d + 1])/3, (vp[a + 2] + vp[b + 2] + vp[d + 2])/3);
+    const r = c.length(), h = r - R; c.divideScalar(r); let cut = false;
+    for (const D of ugDoors){ if (c.dot(D.mouth) < 0.99) continue; rel.copy(c).sub(D.mouth); const along = rel.dot(D.out)*R, lat = rel.dot(D.side)*R;
+      if (along > -0.5 && along < 5 && Math.abs(lat) < 4.4 && h > D.h + 0.25 && h < D.h + 8){ cut = true; break; } }
+    if (!cut) out.push(idx[t], idx[t + 1], idx[t + 2]);
+  }
+  return idx instanceof Uint16Array && out.length < 65536*3 ? Uint16Array.from(out) : Uint32Array.from(out);
+}
+// directions covering a disc r metres round p (3 m apart)
+function ugDisc(p, r, Rk){ const a = Math.abs(p[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], e = new THREE.Vector3(...a).cross(new THREE.Vector3(...p)).normalize(), n2 = new THREE.Vector3(...p).cross(e), out = [], k = Math.ceil(r/3);
+  for (let i = -k; i <= k; i++) for (let j = -k; j <= k; j++){ const x = i*3, y = j*3; if (x*x + y*y > (r + 3)*(r + 3)) continue; const q = [p[0] + (e.x*x + n2.x*y)/Rk, p[1] + (e.y*x + n2.y*y)/Rk, p[2] + (e.z*x + n2.z*y)/Rk], l = Math.hypot(...q); out.push([q[0]/l, q[1]/l, q[2]/l]); }
+  return out; }
+// a layer's caves as one mesh: on a grid about a metre apart (in the cube faces' chunks any cave reaches), the floor
+// facing up and the ceiling facing down, meeting at the walls; left out where the cave is open to the air (the part of
+// an entrance's tunnel out on the plateau)
+function buildCaveMesh(CF){
+  const R = P.R, base = -CF.depth, Rk = CF.Rk, NG = Math.ceil(Math.PI/2*Rk/1.1), CS = 24, marks = new Set();
+  const mark = p => { const [f, u, v] = PTR.faceUV(p[0], p[1], p[2]), ci = Math.min(Math.floor(NG/CS), Math.floor((u + 1)/2*NG/CS)), cj = Math.min(Math.floor(NG/CS), Math.floor((v + 1)/2*NG/CS)); marks.add(f + ',' + ci + ',' + cj); };
+  for (const it of CF.items){ if (it.kind === 'tunnel') for (let i = 0; i < it.line.length; i += 2) for (const q of ugDisc(it.line[i], it.w + 4, Rk)) mark(q); else if (it.kind !== 'pillar') for (const q of ugDisc(it.d, it.r + 4, Rk)) mark(q); }
+  const pos = [], col = [], idx = [], q = [0, 0, 0];
+  for (const key of marks){
+    const [f, ci, cj] = key.split(',').map(Number), V = CS + 1, v0 = pos.length/3, inf = [];
+    for (let j = 0; j < V; j++) for (let i = 0; i < V; i++){
+      PTR.dirFromFace(f, -1 + 2*(ci*CS + i)/NG, -1 + 2*(cj*CS + j)/NG, q); const a = CF.at(q[0], q[1], q[2]);
+      const open = a.open, near = !open && a.gap < 2.5, fl = open ? a.floor : a.gapFloor, cl = open ? a.ceil : a.gapFloor;
+      const outside = TERRAIN.height(q[0], q[1], q[2]) < base + fl + 1;
+      inf.push({ open, use: (open || near) && !outside });
+      const nz = PTR.noise3(q[0]*R/4, q[1]*R/4, q[2]*R/4)*0.08, rf = R + base + fl, rc = R + base + cl;
+      pos.push(q[0]*rf, q[1]*rf, q[2]*rf); col.push(...(open ? [0.8 + nz, 0.85 + nz, 0.9 + nz] : [0.46 + nz, 0.42 + nz, 0.38 + nz]));
+      pos.push(q[0]*rc, q[1]*rc, q[2]*rc); col.push(0.4 + nz, 0.37 + nz, 0.34 + nz);
+    }
+    // (rock right beside the cave that couldn't say how far it was: closed at its neighbour's floor, so no gaps)
+    for (let j = 0; j < V; j++) for (let i = 0; i < V; i++){ const I = inf[j*V + i]; if (I.open || I.use) continue;
+      let nb = -1; for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]){ const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= V || jj >= V) continue; const o = inf[jj*V + ii]; if (o.open && o.use){ nb = jj*V + ii; break; } }
+      if (nb < 0) continue; I.use = true; const k0 = (v0 + (j*V + i)*2)*3, kn = (v0 + nb*2)*3, rN = Math.hypot(pos[kn], pos[kn + 1], pos[kn + 2]), r0 = Math.hypot(pos[k0], pos[k0 + 1], pos[k0 + 2]) || 1;
+      for (const c of [0, 3]) for (let a = 0; a < 3; a++) pos[k0 + c + a] = pos[k0 + a]/r0*rN; }
+    const vi = (i, j, ceil) => v0 + (j*V + i)*2 + (ceil ? 1 : 0);
+    const tri = (A, B, C, ceil) => {        // (facing out for the floor, in for the ceiling)
+      const pa = A*3, pb = B*3, pc = C*3, ux = pos[pb] - pos[pa], uy = pos[pb + 1] - pos[pa + 1], uz = pos[pb + 2] - pos[pa + 2], wx = pos[pc] - pos[pa], wy = pos[pc + 1] - pos[pa + 1], wz = pos[pc + 2] - pos[pa + 2];
+      const s = (uy*wz - uz*wy)*pos[pa] + (uz*wx - ux*wz)*pos[pa + 1] + (ux*wy - uy*wx)*pos[pa + 2];
+      if ((s > 0) !== !ceil) idx.push(A, C, B); else idx.push(A, B, C); };
+    for (let j = 0; j < CS; j++) for (let i = 0; i < CS; i++){
+      for (const T3 of [[[i, j], [i + 1, j], [i, j + 1]], [[i + 1, j], [i + 1, j + 1], [i, j + 1]]]){
+        const I = T3.map(([a, b]) => inf[b*V + a]); if (!I.every(x => x.use) || !I.some(x => x.open)) continue;
+        for (const ceil of [false, true]) tri(vi(T3[0][0], T3[0][1], ceil), vi(T3[1][0], T3[1][1], ceil), vi(T3[2][0], T3[2][1], ceil), ceil);
+      }
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx); g.computeVertexNormals(); g.computeBoundingSphere();
+  return new THREE.Mesh(g, ugMat);
+}
+// a rock face round each tunnel's mouth, with the tunnel's arch through it
+function portalMesh(D){
+  const sh = new THREE.Shape(); sh.moveTo(-4.6, -0.6); sh.lineTo(4.6, -0.6); sh.lineTo(4.6, 7.4); sh.quadraticCurveTo(4.6, 9.2, 0, 9.4); sh.quadraticCurveTo(-4.6, 9.2, -4.6, 7.4); sh.lineTo(-4.6, -0.6);
+  const hole = new THREE.Path(); hole.moveTo(-3.3, -0.6); hole.lineTo(3.3, -0.6); hole.lineTo(3.3, 3.2); hole.absarc(0, 3.2, 3.3, 0, Math.PI, false); hole.lineTo(-3.3, -0.6); sh.holes.push(hole);
+  const m = new THREE.Mesh(new THREE.ShapeGeometry(sh, 12), portalMat);
+  m.position.copy(D.mouth).multiplyScalar(P.R + D.h); m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(D.side, D.mouth, D.out));
+  return m;
+}
+function buildUnderground(){
+  while (ugGroup.children.length){ const c = ugGroup.children[0]; ugGroup.remove(c); c.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+  ugLayers = []; UG = null;
+  if (!ugDoors.length && !(LAYOUT && LAYOUT.layers && LAYOUT.layers.length)) return;
+  LAYOUT.layers.forEach((Ly, k) => {
+    const CF = PTR.caveField(LAYOUT, k, P.R, TERRAIN.under, TERRAIN.ramps || []); if (!CF) return;
+    const mesh = buildCaveMesh(CF); mesh.visible = false; ugGroup.add(mesh);
+    ugLayers[k] = { k, CF, mesh, name: Ly.name, depth: Ly.depth, trail: { name: Ly.name } };
+  });
+  for (const D of ugDoors){ const p = portalMesh(D); ugGroup.add(p); }
+}
+// going in and out: in front of a mouth (within 2 m of it, across its width, about level with its floor) heading in
+// takes you in; back out on the plateau (3.5 m out from the mouth) takes you out
+const _ur = new THREE.Vector3(), _uv = new THREE.Vector3();
+function ugStep(){
+  if (!ugDoors.length || ONB) return;
+  const R = P.R;
+  for (const D of ugDoors){
+    if (UG && UG.k !== D.k) continue;
+    _ur.copy(n).sub(D.mouth); const along = _ur.dot(D.out)*R, lat = _ur.dot(D.side)*R; if (Math.abs(along) > 30) continue;
+    if (!UG){
+      const into = local3(S.vx, S.vy, _uv).dot(D.out), level = Math.abs(TERRAIN.height(n.x, n.y, n.z) - D.h) < 2.5;
+      if (along > -2.2 && along < 6 && Math.abs(lat) < 3.2 && level && into > 0){ const Ly = ugLayers[D.k]; if (!Ly) continue; UG = Ly; camR = null; return; }
+    } else if (along < -3.5 && Math.abs(lat) < 7){ UG = null; camR = null; return; }
+  }
+}
+// each frame: the cave you're in (and those near an entrance, to see in), and the light down there
+let ugDeep = false;
+function ugFrame(k){
+  // (more than 25 m from any way out, the surface and its scenery aren't drawn: the cave hides them, and the surface's
+  // skirts would hang down into it)
+  ugDeep = !!UG && k < 0.5 && !ugDoors.some(D => D.k === UG.k && D.mouth.angleTo(_ur.copy(camera.position).normalize())*P.R < 25);
+  planet.visible = !ugDeep; for (const m of trailMeshes) m.visible = !ugDeep; modelsG.visible = bridgeGroup.visible = !ugDeep;
+  for (const L of ugLayers) if (L) L.mesh.visible = (UG === L) || ugDoors.some(D => D.k === L.k && D.mouth.angleTo(n)*P.R < 90);
+  if (UG){
+    const lit = 1 - k;
+    sun.intensity *= 1 - lit; hemi.intensity = 0.05 + (hemi.intensity - 0.05)*(1 - lit);
+    ugLamp.intensity = 1.8*lit; ugLamp.position.copy(n).multiplyScalar(surfaceR() + 2.4);
+    scene.fog.color.setRGB(0.03, 0.035, 0.045); if (lit > 0.5){ scene.fog.near = 6; scene.fog.far = 110; }
+    snowPts.visible = false;
+  } else ugLamp.intensity = 0;
+}
+
 // ---------- the chase camera (as the main game), and the planet view ----------
 let camTh = 0, camVel = 0, focusLat = 0, focusV = 0, camR = null, viewOn = false, viewK = 0;
 const frameMove = [0, 0];
@@ -1410,6 +1550,11 @@ function placeCamera(dt){
   const gr0 = surfaceR(); camR = camR === null ? gr0 : camR + (gr0 - camR)*Math.min(1, dt*4);
   dirLocal(fox - dx*back, foy - dy*back, _cd);
   _cp.copy(_cd).multiplyScalar(Math.max(camR + up, groundR(_cd) + 1.5));
+  // underground: the camera stays in the cave, under its ceiling (pulled in closer where the cave behind you is short)
+  if (UG){ const base = R - UG.depth; let ok = false;
+    for (const f of [1, 0.75, 0.5, 0.3, 0.15]){ dirLocal(fox - dx*back*f, foy - dy*back*f, _cd); const a = UG.CF.at(_cd.x, _cd.y, _cd.z);
+      if (a.open && a.ceil - a.floor > 1.6){ _cp.copy(_cd).multiplyScalar(Math.min(base + a.ceil - 0.45, Math.max(base + a.floor + 1.1, camR + up*f))); ok = true; break; } }
+    if (!ok) _cp.copy(n).multiplyScalar(camR + 1.5); }
   dirLocal(fox + dx*ahead, foy + dy*ahead, _cl).multiplyScalar(camR + 0.4);
   chaseCam.position.copy(_cp); chaseCam.up.copy(n); chaseCam.lookAt(_cl);
   // planet view: well out above you, looking at the centre with your heading up the screen
@@ -1496,6 +1641,7 @@ function frame(now){
     su.uCol.value.setRGB(1, 1, 1).multiplyScalar(0.35 + 0.65*dayK).lerp(AUR_GLOW, auK*0.3);
     snowPts.visible = sv > 0.005; }
 
+  ugFrame(k);
   updateLod();
   // only the chunks this side of the horizon (or all of them, in the planet view)
   const camDir = _t.copy(camera.position).normalize(), hc = camera.position.length() - R + 25;
@@ -1507,7 +1653,7 @@ function frame(now){
     // (rocks never, and trees only on small planets: from out here they'd be specks)
     if (k > 0.02){ b.mesh.visible = b.group !== 'rocks' && !(b.group === 'trees' && R > 500) && b.c.dot(camDir) > -Math.sin(b.ang + 0.1); continue; }
     const far = horizon + hzA(b.h + 12) + b.ang + 0.03;   // its top can show over the horizon from this far
-    b.mesh.visible = b.c.dot(camDir) > Math.cos(Math.min(Math.PI, far));
+    b.mesh.visible = !ugDeep && b.c.dot(camDir) > Math.cos(Math.min(Math.PI, far));
   }
   youMark.visible = k > 0.02; youMark.position.copy(n).multiplyScalar(surfaceR() + 2); youMark.quaternion.setFromUnitVectors(_up, n); youMark.scale.setScalar(R*0.012*k + 0.01);
 
@@ -1537,7 +1683,7 @@ function hud(){
       const rel = wv < 1 ? 'calm' : wf < -0.5 ? 'headwind' : wf > 0.5 ? 'tailwind' : 'crosswind';
       $('hWeather').textContent = WEATHER[WX.state].label + ' · ' + (wv < 1 ? 'calm' : wv.toFixed(0) + ' m/s ' + rel); }
     if (lt !== null && document.activeElement !== $('tClock')){ $('tClock').value = lt.toFixed(2); $('oClock').textContent = fmtTime(lt); } }
-  $('hSnow').textContent = ONB ? 'Light bridge · ' + ONB.b.name : S.off < 0.5 && S.trail ? 'Groomed · ' + (S.trailNames && S.trailNames.length > 1 ? S.trailNames.join(' / ') : S.trail.name) : 'Ungroomed';
+  $('hSnow').textContent = UG ? `Cave · ${UG.name}, ${UG.depth} m down` : ONB ? 'Light bridge · ' + ONB.b.name : S.off < 0.5 && S.trail ? 'Groomed · ' + (S.trailNames && S.trailNames.length > 1 ? S.trailNames.join(' / ') : S.trail.name) : 'Ungroomed';
   $('hGrade').textContent = (S.grade >= 0 ? '+' : '') + Math.round(S.grade*100) + '%';
   $('hWeight').textContent = Math.round(S.weight*100) + '%';
   const from = n.angleTo(START_N)*P.R;
@@ -1718,7 +1864,7 @@ bootLayout().then(() => {
   placeAtStart();
   buildPlanet(); faceTrail();
   $('loading').style.display = 'none';
-  window.__planetoid = { models: () => modelsG.children, trees: () => trees, rocks: () => rocks, S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList,
+  window.__planetoid = { dbg: { sky, ugGroup, planet, scene }, ug: () => UG && UG.name, doors: () => ugDoors, caveMeshes: () => ugLayers.map(L => L && L.mesh.geometry.index.count/3), models: () => modelsG.children, trees: () => trees, rocks: () => rocks, S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList,
     weather: WX, sun: { setTime: h => setLocalTime(h, n), get time(){ return localTime(n, sunD); }, get dir(){ return sunD; }, get axis(){ return AXIS; }, get phase(){ return dayPhase; }, set phase(v){ dayPhase = v; } } };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 });

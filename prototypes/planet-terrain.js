@@ -1055,7 +1055,11 @@ PT.caveField = function(L, k, R, under, builds){
   const layers = L.layers || [], Ly = layers[k]; if (!Ly) return null;
   const Rk = R - Ly.depth, CELL = 8, hash = new Map(), items = [];
   const key = (x, y, z) => Math.floor(x*Rk/CELL) + ',' + Math.floor(y*Rk/CELL) + ',' + Math.floor(z*Rk/CELL);
-  const addItem = (it, pts) => { const id = items.push(it) - 1, seen = new Set(); for (const p of pts){ const kk = key(...p); if (seen.has(kk)) continue; seen.add(kk); let l = hash.get(kk); if (!l) hash.set(kk, l = []); l.push(id); } };
+  // (each sample goes in its cell and the 26 round it: where the sphere only clips a cell's corner, no sample may land in
+  // it, but one lands next door)
+  const addItem = (it, pts) => { const id = items.push(it) - 1, seen = new Set();
+    for (const p of pts){ const cx = Math.floor(p[0]*Rk/CELL), cy = Math.floor(p[1]*Rk/CELL), cz = Math.floor(p[2]*Rk/CELL);
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++){ const kk = (cx + a) + ',' + (cy + b) + ',' + (cz + c); if (seen.has(kk)) continue; seen.add(kk); let l = hash.get(kk); if (!l) hash.set(kk, l = []); l.push(id); } } };
   // tunnels: a line 2 m apart, the floor going from h0 to h1 along it
   const tunnel = (pts, t) => { const line = PT.evenCurve(pts, false, 2, Rk); if (line.length < 2) return; const n = line.length, hf = line.map((_, i) => t.h0 + (t.h1 - t.h0)*i/(n - 1));
     const w = Math.max(1, t.width)/2;
@@ -1080,6 +1084,8 @@ PT.caveField = function(L, k, R, under, builds){
           if (it.kind === 'pillar'){ closed = true; continue; }
           open = true; fl = Math.min(fl, 0.6*q*q); ce = Math.max(ce, it.height*Math.pow(Math.max(0, 1 - q*q), 0.5)); }
       }
+      // (a pillar standing in a cave: rock right beside the cave's floor)
+      if (closed && open && isFinite(fl)){ gap = 0; gfl = fl; }
       const g = under(x, y, z) + Ly.depth;    // the land, above this layer's base
       // (closed: how far it is to the nearest opening, and that opening's floor there: for drawing the walls)
       const out = { open: open && !closed && ce > fl + 0.3, floor: fl, ceil: ce, sky: false, voidPit: g < -0.5, gap, gapFloor: gfl };

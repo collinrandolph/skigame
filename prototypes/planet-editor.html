@@ -1260,6 +1260,17 @@ function ugSelParts(parts){
   }
   if (sel.kind === 'ramp') rampPanel(parts, sel.ref);
 }
+// a plateau (linked, with an entrance) where the ramp passes each of these layers: the slope that reaches the layer's
+// depth is split there, the plateau between its two parts
+function rampFitLayers(rp, ks){
+  const G = PT.rampDefaults();
+  for (const k of ks.slice().sort((a, b) => L.layers[a].depth - L.layers[b].depth)){
+    const B = PT.rampBuild(rp, T.under, R, L.layers), t = -L.layers[k].depth;
+    const i = B.segs.findIndex(sg => sg.k === 'slope' && sg.h0 > t && sg.h1 < t && sg.eff > 0); if (i < 0) continue;
+    const sg = rp.segs[i], x = Math.max(0, Math.min(sg.len, (B.segs[i].h0 - t)/B.segs[i].eff));
+    rp.segs.splice(i, 1, Object.assign({}, sg, { len: Math.round(x*2)/2 }), { k: 'plateau', len: G.plateauLen, wide: G.plateauWide, link: k, lead: 'layer', door: { at: G.plateauLen/2 } }, Object.assign({}, sg, { len: Math.max(0, Math.round((sg.len - x)*2)/2) }));
+  }
+}
 function rampPanel(parts, rp){
   const B = rampB(rp), cap0 = rampCap(rp), changed = () => { rampRebuild(rp, cap0); commit(); };
   const layerOpts = cur => '<option value="-1">no layer</option>' + L.layers.map((l, i) => `<option value="${i}"${i === cur ? ' selected' : ''}>${escH(l.name)}</option>`).join('');
@@ -1277,6 +1288,9 @@ function rampPanel(parts, rp){
         ((sg.link ?? -1) >= 0 ? `<span class="full"><select data-i="${i}" data-f="lead"><option value="layer"${(sg.lead || 'layer') === 'layer' ? ' selected' : ''}>the layer sets its height</option><option value="plateau"${sg.lead === 'plateau' ? ' selected' : ''}>its height sets the layer's tunnel</option></select></span>` +
           `<label class="c full" style="margin-top:0"><input type="checkbox" data-i="${i}" data-f="door"${sg.door ? ' checked' : ''}> Entrance</label>` + (sg.door ? `<span>at (m)</span><input type="number" step="0.5" min="0" data-i="${i}" data-f="at" value="${sg.door.at ?? 15}"><span class="full">${(() => { const Ly = L.layers[sg.link]; return Ly ? `${(b.h0 + Ly.depth) >= 0 ? '+' : ''}${(b.h0 + Ly.depth).toFixed(1)} m from the layer's base` : ''; })()}</span>` : '') : '');
     return `<div class="rsRow${on}${wn}" data-row="${i}">${head}${body}${hh}${b.warn ? `<span class="wn">${b.warn}</span>` : ''}<span class="full row" style="margin-top:0"><button type="button" data-i="${i}" data-act="up">↑</button><button type="button" data-i="${i}" data-act="down">↓</button><button type="button" data-i="${i}" data-act="dup">Copy</button><button type="button" data-i="${i}" data-act="del">✕</button></span></div>`; }).join('');
+  { const linked = new Set(rp.segs.filter(sg => sg.k === 'plateau' && sg.link >= 0).map(sg => sg.link)), missing = L.layers.map((l, i) => i).filter(i => !linked.has(i) && -L.layers[i].depth < B.h[0] && -L.layers[i].depth > B.h[B.h.length - 1]);
+    parts.push({ html: `<p class="hint">${B.doors.length ? `${B.doors.length} entrance${B.doors.length === 1 ? '' : 's'} (orange on the globe and the strip).` : '<b>No entrances yet</b>: an entrance sits on a plateau linked to a layer.'}${missing.length ? ` The ramp passes ${missing.map(i => escH(L.layers[i].name)).join(', ')} without a plateau there.` : ''}</p>` + (missing.length ? '<div class="row"><button id="rsFit" type="button">Add a plateau and entrance at each layer it passes</button></div>' : ''),
+      bind(){ $('rsFit') && $('rsFit').addEventListener('click', () => { rampFitLayers(rp, missing); changed(); }); } }); }
   parts.push({ html: `<h3>Segments, from the top</h3><div class="rs" id="rsList">${rows}</div><div class="row"><button id="rsAddS" type="button">Add a slope</button><button id="rsAddP" type="button">Add a plateau</button></div><p class="hint">${fmtM(B.L)} long, ${B.h[0].toFixed(0)} m to ${B.h[B.h.length - 1].toFixed(0)} m${B.off ? ` <b style="color:var(--accent)">(${B.off*2} m of it off the wall: the land there isn't as high or low as the ramp)</b>` : ''}. Number boxes take arrow keys for fine steps; the strip below drags the joins.</p>`,
     bind(){ const list = $('rsList'), G = PT.rampDefaults();
       list.addEventListener('change', e => { const el = e.target, i = +el.dataset.i, sg = rp.segs[i], f = el.dataset.f; if (!sg || !f) return;

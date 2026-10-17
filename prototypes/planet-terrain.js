@@ -388,6 +388,7 @@ PT.trailNetwork = function(trails, R, join, spacing){
     const closed = !!trails[b].closed;
     for (let a = 0; a <= b; a++){
       const self = a === b, A = lines[a], B = lines[b], M = B.length; if (A.length < 2 || M < 3 || (!self && apart(a, b))) continue;
+      if (trails[b].build) continue;      // (a ramp's line is its own: nothing pulls it onto another, or onto itself)
       const H = lineHash(A, R, Math.max(4, join*1.5)), raw = new Uint8Array(M), Q = new Array(M);
       for (let i = 0; i < M; i++){
         const nq = nearestOn(H, B[i], !!trails[a].closed, self ? earlierOnly(i, M, closed) : null); if (!nq || nq.d > join*3) continue;
@@ -841,7 +842,7 @@ function bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev, caps
       if (inc){ const d0 = sg*P[k*3 + na], u0 = P[k*3 + ua]/d0, v0 = P[k*3 + va]/d0, r0 = reach*(1 + u0*u0 + v0*v0)/(R*du) + 4, g0 = (u0 + 1)/du + M, h0_ = (v0 + 1)/du + M;
         if (g0 + r0 < bi0 || g0 - r0 > bi1 || h0_ + r0 < bj0 || h0_ - r0 > bj1) continue; }
       const ax = P[k*3], ay = P[k*3 + 1], az = P[k*3 + 2], ex = P[k2*3] - ax, ey = P[k2*3 + 1] - ay, ez = P[k2*3 + 2] - az, L2 = ex*ex + ey*ey + ez*ez || 1e-12;
-      const p0 = c.prof[k], p1 = c.prof[k2], bed = c.bed, Ls = Math.sqrt(L2)*R;
+      const p0 = c.prof[k], p1 = c.prof[k2], bed = c.halves ? Math.max(c.halves[k], c.halves[k2]) : c.bed, Ls = Math.sqrt(L2)*R;   // (a ramp's bed is wider on its plateaus)
       // the strip square to this piece (a quarter of its length past each end, out to its reach either side). on a cube
       // face a great circle is a straight line, so the strip is a four-sided shape on the grid: fill it row by row
       const mx = ax + ex/2, my = ay + ey/2, mz = az + ez/2;
@@ -1196,16 +1197,24 @@ PT.terrain = function(L, R, prev, caps){
       const ix = i => cl2 ? ((i % M) + M) % M : Math.max(0, Math.min(M - 1, i));
       if (pr) return pr[ix(k)]*(1 - u) + pr[ix(k + 1)]*u;
       const a = l[ix(k)], b = l[ix(k + 1)], q = norm([a[0] + (b[0] - a[0])*u, a[1] + (b[1] - a[1])*u, a[2] + (b[2] - a[2])*u]); return under(q[0], q[1], q[2]); }); }
-  const corr = carves.length && !cl ? bakeCorridors(carves, under, R, side, corridor, FADE, allow, prev && prev.corr, caps) : null;
+  const plain = carves.filter(c => !c.fixed), ramps = carves.filter(c => c.fixed);
+  const corr = plain.length && !cl ? bakeCorridors(plain, under, R, side, corridor, FADE, allow, prev && prev.corr, caps) : null;
+  // a ramp is a bench cut into a pit's wall: its bed level, the wall beside it cut back (and the drop below built out)
+  // no steeper than 1.5 (56°) for 4 m past the bed, then back into the wall over 3 m. carved on the land (or on the
+  // cleaned ground, so a ramp made after a cleanup is carved at once; applying again takes it in)
+  const landC = cl ? (x, y, z) => under(x, y, z) + PT.sampleDetail(cl, x, y, z) : under;
+  const RS = 1.5, RC = 4, allowR = (c, dd) => dd <= 0 ? 0 : RS*dd + (dd > RC ? 3*(dd - RC)**3 : 0);
+  const corrR = ramps.length ? bakeCorridors(ramps, landC, R, RS, RC, 3, allowR, prev && prev.corrR, caps) : null;
   return {
-    R, stamps, carves: carves.length, net, links, corr, clean: !!cl, stop: L && L.cliffs ? L.cliffs.stop : 1.0,
+    R, stamps, carves: carves.length, net, links, corr, corrR, clean: !!cl, stop: L && L.cliffs ? L.cliffs.stop : 1.0,
     // each carved trail's bed profile along its line in net.lines (for the cleanup)
     beds: carves.map(c => ({ ti: c.ti, prof: c.prof, bed: c.bed, halves: c.halves })),
     // every trail, the ramps' after the layout's own (net.lines and links index these), and the ramps' builds
     trails: TR, ramps: TR.filter(t => t.build).map(t => t.build),
     height(x, y, z){
       const h = under(x, y, z);
-      return cl ? h + PT.sampleDetail(cl, x, y, z) : corr ? corridorAt(corr, x, y, z, h) : h;
+      const g = cl ? h + PT.sampleDetail(cl, x, y, z) : corr ? corridorAt(corr, x, y, z, h) : h;
+      return corrR ? corridorAt(corrR, x, y, z, g) : g;
     },
     // everything but the sculpt and detail layers and the carving
     shaped,

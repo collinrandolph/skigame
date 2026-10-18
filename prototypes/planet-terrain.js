@@ -993,7 +993,8 @@ PT.rampBuild = function(rp, under, R, layers){
   const rMax = rp.rMax || Math.min(600, R*0.9);
   const radiusAt = (th, h, guess) => {
     const g = r => under(...at(th, r)) - h; let lo = 0.5, hi = rMax;
-    if (g(hi) < 0) return { r: hi, ok: false }; if (g(lo) > 0) return { r: lo, ok: false };
+    // (the wall doesn't reach this height within reach: stay at the last radius rather than wander off)
+    if (g(hi) < 0) return { r: guess ?? hi, ok: false }; if (g(lo) > 0) return { r: guess ?? lo, ok: false };
     // (start near the last radius: a pit's wall can have more than one crossing far out)
     if (guess){ const a = Math.max(lo, guess - 30), b = Math.min(hi, guess + 30); if (g(a) <= 0 && g(b) >= 0){ lo = a; hi = b; } }
     for (let k = 0; k < 30; k++){ const m = (lo + hi)/2; if (g(m) < 0) lo = m; else hi = m; }
@@ -1042,6 +1043,8 @@ PT.rampBuild = function(rp, under, R, layers){
     const u = (want - ths[j])/((ths[j + 1] - ths[j]) || 1e-9), rA = rs[j] + (rs[j + 1] - rs[j])*u, hA = hw[j] + (hw[j + 1] - hw[j])*u, gap = Math.abs(rA - rs[i]) - hA - hw[i];
     const si = segs.findIndex(sg => ss[i] >= sg.s0 - 1e-6 && ss[i] <= sg.s1 + 1e-6); if (si >= 0 && gap < segs[si].gap){ segs[si].gap = gap; segs[si].gapAt = ss[i]; }
   }
+  for (const sg of segs) if (sg.k === 'plateau'){ const i0 = Math.round(sg.s0/STEP), lap = 2*Math.PI*(rs[Math.min(rs.length - 1, i0)] || 1);
+    if (sg.len > 0.9*lap) sg.warn = (sg.warn ? sg.warn + '; ' : '') + `${Math.round(sg.len)} m: longer than a lap round the pit here (${Math.round(lap)} m), so it runs round over itself`; }
   for (const sg of segs) if (sg.gap < 2) sg.warn = (sg.warn ? sg.warn + '; ' : '') + `crowds the turn above: ${sg.gap < 0 ? 'their benches overlap' : 'only ' + sg.gap.toFixed(1) + ' m of wall between them'} (about ${Math.round(sg.gapAt)} m along)`;
   return { pts, h: hs, half: hw, s: ss, L: s, segs, doors, off, c };
 };

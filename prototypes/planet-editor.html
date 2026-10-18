@@ -582,7 +582,7 @@ const TOOL_HELP = {
   stamp: 'Click to place. Ridges and valleys: click each point, then Enter (or double-click) to finish.',
   trail: 'Click points along the route; Enter (or double-click) finishes. Esc drops the last point. A carved trail cuts a level bed into the ground, its grade smoothed along the line.',
   landmark: 'Click to place a landmark.',
-  ramp: 'Click on a pit\'s wall where the ramp should start: it winds down from there, round the pit\'s middle, following the wall.',
+  ramp: 'Click on a pit\'s wall where the ramp should start: it winds down from there, round the pit\'s middle, following the wall (then Select takes over, so another click doesn\'t make a second ramp). Clicking a pit that has a ramp selects it; Shift+click adds another.',
   tunnel: 'Click points along the tunnel; Enter (or double-click) finishes. Start it at an entrance\'s tunnel (the short one into the wall) and it carries on from there at its height.',
   cave: 'Drag to dig caves out of the rock (a domed space, up to the height in the brush\'s middle), Fill to close them (or leave pillars), Smooth to even them, Floor to raise or lower their floor. A stroke started inside a cave digs on at that cave\'s floor, so passages join level; started in rock, at the floor set below. Shift swaps Dig and Fill. [ and ] change the brush size.',
   model: 'Click to place the model: one of the game\'s own, as the gallery shows it. Ones that vary (crew, camps, crystals) come out different each time; Re-roll in the selection makes another.',
@@ -1171,6 +1171,9 @@ function createRamp(p){
   let pit = null, best = Infinity; const P = new V3(...p);
   for (const s of L.stamps) if (['pit', 'crater', 'basin'].includes(s.type) && s.pts.length === 1){ const dd = P.angleTo(new V3(...s.pts[0]))*R; if (dd < s.radius && dd < best){ best = dd; pit = s; } }
   const c = pit ? pit.pts[0].slice() : p, { C, e, n } = rampFrame(c), v = P.clone().sub(C);
+  // (a pit that has a ramp already: that one is selected instead; Shift+click to add another)
+  const has = L.ramps.find(r => new V3(...r.c).angleTo(C)*R < 5);
+  if (has && !keys.shift){ sel = { kind: 'ramp', ref: has, i: 0 }; rampSel = -1; setTool('select'); rebuildOverlays(); showSel(); $('sHint').textContent = 'This pit has a ramp already (selected). Shift+click with Ramp to add another.'; return; }
   const start = Math.atan2(v.dot(n), v.dot(e))/D2R, top = T.under(...p), bottom = T.under(...c) + 3, G = PT.rampDefaults(), segs = [];
   let h = top;
   for (const [k, l] of L.layers.map((l, k) => [k, l]).sort((x, y) => x[1].depth - y[1].depth)){ const t = -l.depth; if (t >= h - 1 || t <= bottom) continue;
@@ -1178,7 +1181,8 @@ function createRamp(p){
   if (h > bottom + 1) segs.push({ k: 'slope', grade: G.grade, len: Math.round((h - bottom)/G.grade) });
   if (!segs.length) segs.push({ k: 'slope', grade: G.grade, len: 100 });
   const rp = { name: 'Ramp ' + (L.ramps.length + 1), c, turn: 1, start: Math.round(start*10)/10, top: Math.round(top*10)/10, width: G.width, maxGrade: G.maxGrade, segs };
-  L.ramps.push(rp); sel = { kind: 'ramp', ref: rp, i: 0 }; rampSel = -1; rampRebuild(rp); commit();
+  if (pit) rp.rMax = Math.round(pit.radius*1.2);      // (it keeps to the pit)
+  L.ramps.push(rp); sel = { kind: 'ramp', ref: rp, i: 0 }; rampSel = -1; setTool('select'); rampRebuild(rp); commit();
 }
 // each ramp: its line at its bed's heights (slopes blue, plateaus green, too steep red), its middle and start as handles,
 // and each entrance (the door: click it to pick its plateau)

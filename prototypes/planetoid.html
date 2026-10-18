@@ -126,6 +126,7 @@ body.clean.nopads .pads{display:none !important}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="planet-terrain.js"></script>
+<script src="planet-objects.js"></script>   <!-- the painted objects' shapes (trees, rocks) -->
 <script src="../models.js"></script>   <!-- the game's models, the skier among them -->
 <script>
 'use strict';
@@ -172,6 +173,7 @@ const save = () => { try { const o = { lift: P.lift, cycle: P.daynight, aurora: 
 // noise, stamps and sculpting when one is loaded
 const PTR = window.PlanetTerrain, noise3 = PTR.noise3;
 let LAYOUT = null, LAYOUT_RAW = null, TIDY = '', TERRAIN = PTR.terrain(null, P.R);
+let LAWN = null; const LAWN_T = { name: 'Lawn' };     // the layout's lawns (PT.lawnField), when it has any
 // (underground, the ground is the cave's floor: see ugHeight)
 let UG = null;
 function heightAt(x, y, z){ return UG ? ugHeight(x, y, z) : TERRAIN.height(x, y, z); }
@@ -464,7 +466,10 @@ function buildChunk(c){
     // snow, a touch bluer on steep faces and down in the hollows; ground too steep to ski is bare rock (snow doesn't
     // hold there), so cliffs read as cliffs
     const up = nx*D[o] + ny*D[o + 1] + nz*D[o + 2], slope = 1 - up, h = Math.hypot(Pp[o], Pp[o + 1], Pp[o + 2]) - R;
-    col.copy(GC.snow).lerp(GC.hollow, smooth01(2, -6, h)).lerp(GC.shade, Math.min(1, Math.sqrt(slope)*2.4)).lerp(GC.rock, smooth01(GC.cosStop + 0.03, GC.cosStop - 0.03, up));
+    col.copy(GC.snow).lerp(GC.hollow, smooth01(2, -6, h)).lerp(GC.shade, Math.min(1, Math.sqrt(slope)*2.4));
+    // a lawn: groomed, the trails' colour (it stops at a cliff: the rock below takes over there)
+    if (LAWN) { const w = smooth01(-0.4, 0.4, LAWN.at(D[o], D[o + 1], D[o + 2])); if (w > 0) col.lerp(GC.lawn, w); }
+    col.lerp(GC.rock, smooth01(GC.cosStop + 0.03, GC.cosStop - 0.03, up));
     vc[k] = col.r; vc[k + 1] = col.g; vc[k + 2] = col.b;
   }
   // skirts hide the gaps where a finer chunk meets a coarser one
@@ -486,9 +491,9 @@ function buildChunk(c){
   }
   c.slotted = slot;
 }
-const GC = { snow: new THREE.Color(0xe6edf3), shade: new THREE.Color(0xb3c4d6), hollow: new THREE.Color(0xd5e0eb), rock: new THREE.Color(0x7d8794), cosStop: 0.7 };
+const GC = { lawn: new THREE.Color(0xf6f9fc), snow: new THREE.Color(0xe6edf3), shade: new THREE.Color(0xb3c4d6), hollow: new THREE.Color(0xd5e0eb), rock: new THREE.Color(0x7d8794), cosStop: 0.7 };
 function buildPlanet(){
-  TERRAIN = PTR.terrain(LAYOUT, P.R); ugDoorsFrom();
+  TERRAIN = PTR.terrain(LAYOUT, P.R); ugDoorsFrom(); LAWN = TERRAIN.lawn && TERRAIN.lawn.any ? TERRAIN.lawn : null;
   GC.cosStop = 1/Math.sqrt(1 + TERRAIN.stop*TERRAIN.stop);
   for (const c of chunks){ c.mesh.geometry.dispose(); planet.remove(c.mesh); }
   chunks = [];
@@ -813,6 +818,7 @@ function buildTrees(rnd){
     if (d.angleTo(START_N)*R < 14) continue;
     if (nearestTrailAt(d).d < TRAIL_W/2 + 3 + rnd()*3 || !bridgeClear(d, 1.5)) continue;
     if (beaconDirs.some(b => d.angleTo(b)*R < 5)) continue;
+    if (TERRAIN && TERRAIN.lawn && TERRAIN.lawn.any && TERRAIN.lawn.at(d.x, d.y, d.z) > -3) continue;      // and off the lawns
     if (solids.some(o => nearSolid(o, d, 1.5))) continue;
     // not on steep ground
     t1.copy(Math.abs(d.y) < 0.9 ? up : new V(1, 0, 0)).cross(d).normalize(); t2.crossVectors(d, t1);
@@ -897,6 +903,36 @@ function buildModels(){
     modelSolids.push({ d, r: rf, lim: Math.cos((rf + 10)/R), foot, X, Z, ghost: m.solid === false });
   }
 }
+// ---------- painted objects: the layout's trees, rocks and the like (PT.OBJECT_KINDS; shapes in planet-objects.js) ----------
+// each stands on the ground (set in by its kind's sink), turned and sized as painted, tinted a little lighter or darker.
+// solid ones go in the trees' grid (solid round their middle, by kind and size). one a trail's bed, a junction, a lawn or
+// a model's footprint has since covered is left out
+const objMats = new Map();
+function objMat(){ if (!objMats.has(0)) objMats.set(0, flatPatch(new THREE.MeshLambertMaterial({ color: 0xffffff }))); return objMats.get(0); }
+function buildPainted(){
+  const R = P.R, V = THREE.Vector3, PO = window.PlanetObjects, K = PTR.OBJECT_KINDS; if (!PO) return;
+  const blocked = PTR.objectBlocker(LAYOUT, TERRAIN, R), up = new V(0, 1, 0), t1 = new V(), t2 = new V(), q = new V();
+  const byKind = K.map(() => []);
+  for (const o of LAYOUT.objects){
+    const kd = K[o.k]; if (!kd) continue;
+    const d = new V(o.d[0], o.d[1], o.d[2]).normalize();
+    if (blocked(d.x, d.y, d.z, 0.3 + kd.cr*o.s) || !bridgeClear(d, 0.5)) continue;
+    const it = { d, s: o.s, spin: o.rot, tint: o.t, k: o.k, cr: kd.cr ? kd.cr*o.s : 0, g: groundR(d) - kd.sink*o.s };
+    byKind[o.k].push(it); trees.push(it);
+    if (it.cr === 0) continue;
+    // into the grid: its own cell and any cell within its solid radius + 1.5 m
+    t1.copy(Math.abs(d.y) < 0.9 ? up : new V(1, 0, 0)).cross(d).normalize(); t2.crossVectors(d, t1);
+    const keys = new Set([cellOf(d.x, d.y, d.z)]), rr = it.cr + 1.5;
+    for (let k = 0; k < 8; k++){ const an = k/8*Math.PI*2; q.copy(d).multiplyScalar(R).addScaledVector(t1, Math.cos(an)*rr).addScaledVector(t2, Math.sin(an)*rr).normalize(); keys.add(cellOf(q.x, q.y, q.z)); }
+    for (const kk of keys){ let l = treeGrid.get(kk); if (!l) treeGrid.set(kk, l = []); l.push(it); }
+  }
+  const qq = new THREE.Quaternion(), q2 = new THREE.Quaternion(), sc = new V(), pos = new V();
+  byKind.forEach((list, k) => { if (!list.length) return; const parts = PO.parts(k), h = PO.height(k);
+    parts.forEach((part, pi) => addBucketed('objects', part.geo, objMat(), list, (t, M) => {
+      qq.setFromUnitVectors(up, t.d); q2.setFromAxisAngle(up, t.spin); qq.multiply(q2);
+      M.compose(pos.copy(t.d).multiplyScalar(t.g), qq, sc.set(t.s, t.s, t.s));
+    }, t => h*t.s, t => PO.tint(k, pi, t.tint))); });
+}
 function buildScatter(){
   const R = P.R;
   buildLandmarks();
@@ -904,7 +940,13 @@ function buildScatter(){
   buildModels();
   clearBuckets('rocks'); rocks = [];
   { let s2 = 777; buildStructures(() => (s2 = (s2 * 16807) % 2147483647) / 2147483647); }
-  { let s4 = 2468; buildTrees(() => (s4 = (s4 * 16807) % 2147483647) / 2147483647); }
+  // a layout with painted objects (the editor's Objects brush) has those instead of the random trees and rocks
+  // (unless it keeps both)
+  const painted = !!(LAYOUT && LAYOUT.objects && LAYOUT.objects.length), randomToo = !painted || !!(LAYOUT.scatter && LAYOUT.scatter.keep);
+  clearBuckets('trees'); trees = []; treeGrid = new Map(); clearBuckets('objects');
+  if (randomToo){ let s4 = 2468; buildTrees(() => (s4 = (s4 * 16807) % 2147483647) / 2147483647); }
+  if (painted) buildPainted();
+  if (!randomToo) return;
   let s = 4242; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
   const count = Math.max(150, Math.min(3000, Math.round(4*Math.PI*R*R/700)));
   const rockItems = [];
@@ -917,6 +959,7 @@ function buildScatter(){
     if (solids.some(o => nearSolid(o, d, 1))) continue;     // and out of the mountains, buildings and models
     const size = 0.35 + 1.3*Math.pow(rnd(), 2.2);
     if (nearestTrailAt(d).d < TRAIL_W/2 + size + 0.5 || !bridgeClear(d, size)) continue;    // and off the trails and the bridges' ramps
+    if (TERRAIN && TERRAIN.lawn && TERRAIN.lawn.any && TERRAIN.lawn.at(d.x, d.y, d.z) > -size - 1) continue;      // and the lawns
     { const tl = treeGrid.get(cellOf(d.x, d.y, d.z)); if (tl && tl.some(t => t.d.angleTo(d)*R < size + 1)) continue; }   // and clear of the trees
     p.copy(d).multiplyScalar(groundR(d) - 0.3*size);
     q.setFromUnitVectors(up, d); q2.setFromAxisAngle(up, rnd()*Math.PI*2); q.multiply(q2);
@@ -1237,6 +1280,8 @@ function step(dt){
   const gm = glideMult();
   // groomed or not: ungroomed snow multiplies friction and drag (a held glide works off the trail too, as in the game)
   const tq = nearestTrailAt(n); S.off = offTrail(tq.d); S.trail = tq.t; S.trailNames = tq.names;
+  // a lawn glides like a trail (the same half-metre soft edge)
+  if (LAWN && S.off > 0){ const lw = LAWN.at(n.x, n.y, n.z), lo = lw >= 0.5 ? 0 : lw <= 0 ? 1 : 1 - lw/0.5; if (lo < S.off){ S.off = lo; if (lo < 0.5){ S.trail = LAWN_T; S.trailNames = null; } } }
   if (ONB){ S.off = 0; S.trail = null; }      // the deck glides like groomed trail
   if (UG){ S.off = 0; S.trail = UG.trail; S.trailNames = null; }      // a cave's floor glides like groomed trail
   const surf = (1 + (P.off - 1)*S.off) * gm;
@@ -1312,7 +1357,7 @@ function collide(){
   for (const k of rocks) if (k.x*n.x + k.y*n.y + k.z*n.z > lim) hit(k.x, k.y, k.z, k.r);
   for (const b of beaconList) if (b.d.dot(n) > lim) hit(b.d.x, b.d.y, b.d.z, b.r);
   for (const p of pylons) if (p.d.dot(n) > lim) hit(p.d.x, p.d.y, p.d.z, p.r);
-  { const tl = treeGrid.get(cellOf(n.x, n.y, n.z)); if (tl) for (const t of tl) hit(t.d.x, t.d.y, t.d.z, 0.18*t.s + 0.05); }   // tree trunks
+  { const tl = treeGrid.get(cellOf(n.x, n.y, n.z)); if (tl) for (const t of tl) if (t.cr !== 0) hit(t.d.x, t.d.y, t.d.z, t.cr ?? 0.18*t.s + 0.05); }   // tree trunks, and the painted objects
   for (const o of solids){
     if (o.ghost || o.d.dot(n) < o.lim) continue;
     if (o.foot){
@@ -1655,7 +1700,7 @@ function frame(now){
   for (const c of chunks) c.mesh.visible = k > 0.02 ? c.c.dot(camDir) > -Math.sin(c.ang + 0.1) : c.c.dot(camDir) > Math.cos(Math.min(Math.PI, horizon + c.ang + 0.15));
   for (const b of buckets){
     // (rocks never, and trees only on small planets: from out here they'd be specks)
-    if (k > 0.02){ b.mesh.visible = b.group !== 'rocks' && !(b.group === 'trees' && R > 500) && b.c.dot(camDir) > -Math.sin(b.ang + 0.1); continue; }
+    if (k > 0.02){ b.mesh.visible = b.group !== 'rocks' && !((b.group === 'trees' || b.group === 'objects') && R > 500) && b.c.dot(camDir) > -Math.sin(b.ang + 0.1); continue; }
     const far = horizon + hzA(b.h + 12) + b.ang + 0.03;   // its top can show over the horizon from this far
     b.mesh.visible = !ugDeep && b.c.dot(camDir) > Math.cos(Math.min(Math.PI, far));
   }
@@ -1868,7 +1913,7 @@ bootLayout().then(() => {
   placeAtStart();
   buildPlanet(); faceTrail();
   $('loading').style.display = 'none';
-  window.__planetoid = { dbg: { sky, ugGroup, planet, scene }, ug: () => UG && UG.name, doors: () => ugDoors, caveMeshes: () => ugLayers.map(L => L && L.mesh.geometry.index.count/3), models: () => modelsG.children, trees: () => trees, rocks: () => rocks, S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList,
+  window.__planetoid = { dbg: { sky, ugGroup, planet, scene }, ug: () => UG && UG.name, doors: () => ugDoors, caveMeshes: () => ugLayers.map(L => L && L.mesh.geometry.index.count/3), models: () => modelsG.children, trees: () => trees, rocks: () => rocks, lawn: () => LAWN, S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList,
     weather: WX, sun: { setTime: h => setLocalTime(h, n), get time(){ return localTime(n, sunD); }, get dir(){ return sunD; }, get axis(){ return AXIS; }, get phase(){ return dayPhase; }, set phase(v){ dayPhase = v; } } };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 });

@@ -239,6 +239,7 @@ PC.PLAN_CLASSES = [
   ['unreached', 'Skiable, no trail in this region', [190, 196, 206]],
   ['slot', 'Slot walls (a trail through a ridge)', [160, 40, 60]],
   ['saddle', 'Saddle (a ridge cut wider for the trail)', [40, 165, 150]],
+  ['lawn', 'Lawn (kept skiable; stops at a kept cliff)', [120, 215, 135]],
 ];
 PC.plan = async function(A, L, T, opt, progress){
   opt = Object.assign(PC.planDefaults(), opt || {}); progress = progress || (() => {});
@@ -297,6 +298,16 @@ PC.plan = async function(A, L, T, opt, progress){
   }
   // the junction curves and the groomed wedges inside them: bed
   linkCells(A, T, a => { F[a] = 1; U[a] = 0; });
+  // lawns (round placed models, and painted): always skiable, but where one runs onto a kept cliff or mountain it stops
+  // at its edge, the cliff left as it is
+  let lawnArea = 0, lawnCut = 0;
+  if (T.lawn && T.lawn.any){ await say('Planning: lawns…', 0.32);
+    for (let id = 0; id < NC; id++){
+      if ((id & 0xFFFF) === 0 && due()) await say('Planning: lawns…', 0.32 + 0.03*id/NC);
+      if (F[id] || T.lawn.at(dir[id*3], dir[id*3 + 1], dir[id*3 + 2]) <= 0) continue;
+      if (was[id]){ lawnCut += AREA[id]; continue; }
+      F[id] = 4; U[id] = 0; lawnArea += AREA[id];
+    } }
   // ---- clean the map
   // unskiable strips thinner than minUnski: what an opening (narrow, then widen again by half the minimum) removes,
   // unless it's a tall wall
@@ -349,6 +360,7 @@ PC.plan = async function(A, L, T, opt, progress){
     if (u){ pcls[id] = keepWall[id] ? 6 : !w ? 5 : 1; if (!w) toUnski += AREA[id]; continue; }
     if (F[id] === 1){ pcls[id] = 2; if (w) toSki += AREA[id]; continue; }
     if (F[id] === 3){ pcls[id] = 10; if (w) toSki += AREA[id]; continue; }
+    if (F[id] === 4){ pcls[id] = 11; if (A.grid.S[id] > A.STOP) toSki += AREA[id]; continue; }
     if (F[id] === 2){ pcls[id] = w ? 4 : 3; if (w) toSki += AREA[id]; continue; }
     if (w || A.grid.S[id] > A.STOP){ pcls[id] = 4; toSki += AREA[id]; continue; }
     const sk = skis[skiComp[id]]; pcls[id] = sk && sk.trail === 0 ? (sk.area < A.opt.trap ? 7 : 8) : 0;
@@ -356,7 +368,7 @@ PC.plan = async function(A, L, T, opt, progress){
   // slot walls: unskiable ground within 4 m of a slot's floor
   { const seeds = []; for (let id = 0; id < NC; id++) if (slotBed[id]) seeds.push(id);
     if (seeds.length){ await flood(seeds, 4, () => true, dIn, 'Planning: checking…'); for (let id = 0; id < NC; id++) if (U[id] && dIn[id] <= 4) pcls[id] = 9; } }
-  const summary = { toSkiable: Math.round(toSki), toUnskiable: Math.round(toUnski), thinRemoved: Math.round(thinRemoved), gapsClosed: Math.round(gapsClosed), walls, specks, holes,
+  const summary = { toSkiable: Math.round(toSki), toUnskiable: Math.round(toUnski), thinRemoved: Math.round(thinRemoved), gapsClosed: Math.round(gapsClosed), walls, specks, holes, lawn: Math.round(lawnArea), lawnOnCliffs: Math.round(lawnCut),
     slots: notes.filter(n => n.what === 'slot').length, saddles: notes.filter(n => n.what === 'saddle').length, check: { thinLeft: Math.round(thinLeft), bedsBlocked } };
   await say('Planned', 1);
   return { U, F, keepWall, slotBed, pcls, summary, notes: notes.sort((a, b) => (a.what === 'wall') - (b.what === 'wall') || (b.area || 0) - (a.area || 0)), opt };
@@ -754,10 +766,12 @@ function fitPoints(t, l, ghost, o, R, tol = 0.5){
 // of date
 PC.signature = function(L){
   let h = 2166136261 >>> 0; const mix = v => { h ^= v; h = Math.imul(h, 16777619) >>> 0; };
-  const str = JSON.stringify([L.radius, L.noise, L.stamps, L.trails.map(t => [t.pts, t.closed, t.carve, t.bed, t.smooth, t.maxGrade]), L.network && L.network.join, L.cliffs && L.cliffs.stop, L.ramps || [], (L.layers || []).map(l => l.depth)]);
+  const str = JSON.stringify([L.radius, L.noise, L.stamps, L.trails.map(t => [t.pts, t.closed, t.carve, t.bed, t.smooth, t.maxGrade]), L.network && L.network.join, L.cliffs && L.cliffs.stop, L.ramps || [], (L.layers || []).map(l => l.depth),
+    (L.models || []).filter(m => m.lawn && m.lawn.r > 0).map(m => [m.d, m.rot, m.foot, m.lawn])]);
   for (let i = 0; i < str.length; i++) mix(str.charCodeAt(i));
   const f32 = a => { const u = new Uint32Array(a.buffer, a.byteOffset, a.length); for (let i = 0; i < u.length; i++) if (u[i]) mix(u[i] ^ i); };
   f32(L.sculpt.data); for (const [k, t] of [...L.detail.tiles].sort((a, b) => a[0] - b[0])){ mix(k); f32(t); }
+  if (L.lawn) for (const [k, t] of [...L.lawn.tiles].sort((a, b) => a[0] - b[0])){ mix(k ^ 0x5bd1e995); f32(t); }
   return h.toString(36);
 };
 

@@ -36,6 +36,9 @@ label.f input[type=range]{grid-column:1 / -1;width:100%;accent-color:var(--accen
 label.f output{color:var(--ink);font-variant-numeric:tabular-nums}
 label.c{display:flex;gap:8px;align-items:center;margin-top:8px;color:var(--muted);font-size:11px}
 label.c input{accent-color:var(--accent)}
+.obK{margin-top:3px}
+.obK input[type=number]{margin-left:auto;width:44px;font:inherit;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:4px;padding:1px 4px}
+.obKinds h3{margin:8px 0 2px}
 .tcLeg{display:grid;grid-template-columns:12px 1fr;gap:3px 7px;align-items:center;font-size:11px;color:var(--muted);margin-top:8px}
 .tcLeg i{width:12px;height:12px;border-radius:2px;border:1px solid rgba(0,0,0,.25)}
 .tcList{display:flex;flex-direction:column;gap:3px;margin-top:6px}
@@ -113,6 +116,8 @@ button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
   <button data-tool="bridge" class="surfT" type="button">Bridge <kbd>9</kbd></button>
   <button data-tool="model" class="surfT" type="button">Model <kbd>0</kbd></button>
   <button data-tool="ramp" class="surfT" type="button">Ramp <kbd>R</kbd></button>
+  <button data-tool="objects" class="surfT" type="button">Objects <kbd>O</kbd></button>
+  <button data-tool="lawn" class="surfT" type="button">Lawn <kbd>L</kbd></button>
   <button data-tool="tunnel" class="caveT" type="button">Tunnel <kbd>3</kbd></button>
   <button data-tool="cave" class="caveT" type="button">Cave <kbd>4</kbd></button>
 </div>
@@ -134,6 +139,8 @@ button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
   <label class="f" for="pMtn">Random mountains (game)<output id="oMtn"></output><input id="pMtn" type="range" min="0" max="3" step="0.25"></label>
   <label class="f" for="pBld">Buildings (game)<output id="oBld"></output><input id="pBld" type="range" min="0" max="3" step="0.25"></label>
   <label class="f" for="pTrees">Trees (game)<output id="oTrees"></output><input id="pTrees" type="range" min="0" max="3" step="0.25"></label>
+  <label class="c"><input id="pKeep" type="checkbox"> Random trees and rocks as well as painted ones</label>
+  <p class="hint" id="pObjNote"></p>
   <h3>Trails</h3>
   <label class="f" for="nJoin">Join trails within<output id="oJoin"></output><input id="nJoin" type="range" min="0" max="20" step="1"></label>
   <label class="f" for="nCorr">Corridor beside carved trails<output id="oCorr"></output><input id="nCorr" type="range" min="0" max="60" step="5"></label>
@@ -173,6 +180,7 @@ button.icon.on{background:var(--accent);border-color:var(--accent);color:#fff}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="planet-terrain.js"></script>
+<script src="planet-objects.js"></script>   <!-- the painted objects' shapes (Objects brush) -->
 <script src="planet-cleanup.js"></script>   <!-- the terrain cleanup (Planet panel, Terrain cleanup) -->
 <script src="../models.js"></script>   <!-- the game's models, for the Model tool -->
 <script>
@@ -224,9 +232,9 @@ const CH = 8;
 const terrainMat = new THREE.ShaderMaterial({
   extensions: { derivatives: true },
   uniforms: { uOver: { value: null }, uOverN: { value: 1 }, uOverOn: { value: 0 }, uR: { value: R }, uLo: { value: -10 }, uHi: { value: 60 }, uCi: { value: 5 }, uLight: { value: new V3(0, 1, 0) }, uSlope: { value: 0 }, uFrom: { value: 0.6 }, uStop: { value: 1.0 } },
-  vertexShader: `attribute float aH; varying vec3 vP; varying vec3 vN; varying float vH;
-    void main(){ vP = position; vN = normal; vH = aH; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }`,
-  fragmentShader: `uniform sampler2D uOver; uniform float uOverN, uOverOn; uniform float uR, uLo, uHi, uCi, uSlope, uFrom, uStop; uniform vec3 uLight; varying vec3 vP; varying vec3 vN; varying float vH;
+  vertexShader: `attribute float aH; attribute float aL; varying vec3 vP; varying vec3 vN; varying float vH; varying float vL;
+    void main(){ vP = position; vN = normal; vH = aH; vL = aL; gl_Position = projectionMatrix*modelViewMatrix*vec4(position, 1.0); }`,
+  fragmentShader: `uniform sampler2D uOver; uniform float uOverN, uOverOn; uniform float uR, uLo, uHi, uCi, uSlope, uFrom, uStop; uniform vec3 uLight; varying vec3 vP; varying vec3 vN; varying float vH; varying float vL;
     void main(){
       float h = vH;
       float k = clamp((h - uLo)/max(1.0, uHi - uLo), 0.0, 1.0);
@@ -236,6 +244,9 @@ const terrainMat = new THREE.ShaderMaterial({
       if (uSlope > 0.5){ float c = clamp(dot(n, up), 0.0, 1.0); float grade = sqrt(max(0.0, 1.0 - c*c))/max(c, 0.05);
         col = mix(col, vec3(0.95, 0.6, 0.2), smoothstep(uFrom*0.97, uFrom*1.03, grade)*0.6);
         col = mix(col, vec3(0.88, 0.22, 0.2), smoothstep(uStop*0.97, uStop*1.03, grade)*0.85); }
+      // a lawn (groomed): a green tint, only where the ground skis (it stops at a cliff's edge)
+      if (vL > -0.5){ float c2 = clamp(dot(n, up), 0.0, 1.0), g2 = sqrt(max(0.0, 1.0 - c2*c2))/max(c2, 0.05);
+        col = mix(col, vec3(0.58, 0.84, 0.62), smoothstep(-0.5, 0.5, vL)*(1.0 - smoothstep(uStop*0.97, uStop*1.03, g2))*0.6); }
       if (uOverOn > 0.5){
         // the cleanup's reading: which cube face and grid cell this point is in, and that cell's colour
         vec3 d = normalize(vP), a = abs(d); float f; vec2 uv;
@@ -312,16 +323,19 @@ function buildChunk(c){
   skirt(pos, nor, null, m, Math.max(2, (hi - lo)*0.3), R);
   // the height each vertex shades with (a skirt shades as the edge above it, so contours don't smear down it)
   const hs = new Float32Array(NV); for (let k = 0; k < V*V; k++) hs[k] = Math.hypot(pos[k*3], pos[k*3 + 1], pos[k*3 + 2]) - R;
-  { const edge = [t => t, t => m*V + t, t => t*V, t => t*V + m]; for (let e = 0; e < 4; e++) for (let t = 0; t <= m; t++) hs[V*V + e*V + t] = hs[edge[e](t)]; }
+  // how far inside a lawn each vertex is (metres; the shader tints it)
+  const ls = new Float32Array(NV).fill(-9);
+  if (T.lawn && T.lawn.any) for (let k = 0; k < V*V; k++){ const x = pos[k*3], y = pos[k*3 + 1], z = pos[k*3 + 2], r = Math.hypot(x, y, z); ls[k] = Math.max(-9, T.lawn.at(x/r, y/r, z/r)); }
+  { const edge = [t => t, t => m*V + t, t => t*V, t => t*V + m]; for (let e = 0; e < 4; e++) for (let t = 0; t <= m; t++){ hs[V*V + e*V + t] = hs[edge[e](t)]; ls[V*V + e*V + t] = ls[edge[e](t)]; } }
   if (c.mesh && c.builtLod !== lod){ globe.remove(c.mesh); c.mesh.geometry.dispose(); c.mesh = null; }
   c.builtLod = lod;
   if (!c.mesh){
     const g = new THREE.BufferGeometry(); g.setIndex(new THREE.BufferAttribute(chunkIndex(m), 1));
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('aH', new THREE.BufferAttribute(hs, 1));
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('aH', new THREE.BufferAttribute(hs, 1)); g.setAttribute('aL', new THREE.BufferAttribute(ls, 1));
     c.mesh = new THREE.Mesh(g, terrainMat); globe.add(c.mesh);
   } else {
-    const g = c.mesh.geometry; g.attributes.position.array.set(pos); g.attributes.normal.array.set(nor); g.attributes.aH.array.set(hs);
-    g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = g.attributes.aH.needsUpdate = true;
+    const g = c.mesh.geometry; g.attributes.position.array.set(pos); g.attributes.normal.array.set(nor); g.attributes.aH.array.set(hs); g.attributes.aL.array.set(ls);
+    g.attributes.position.needsUpdate = g.attributes.normal.needsUpdate = g.attributes.aH.needsUpdate = g.attributes.aL.needsUpdate = true;
   }
   c.mesh.geometry.computeBoundingSphere();
 }
@@ -336,7 +350,7 @@ function buildGlobe(){
     for (const [a, b] of [[0, 0], [m, 0], [0, m], [m, m]]){ faceDir(f, ci*m + a, cj*m + b, _d); c.ang = Math.max(c.ang, c.c.angleTo(_d)); }
     buildChunk(c); chunks.push(c);
   }
-  updateRange();
+  updateRange(); syncObjects(null);
 }
 // rebuild only the chunks touching a cap (centre direction, angular radius)
 function rebuildCaps(caps){
@@ -346,8 +360,17 @@ function rebuildCaps(caps){
   { const cs = carved(); if (cs.length){ const extra = (Math.max(...cs.map(t => (t.bed || 4) + (t.shoulder || 10) + (t.smooth || 40))) + corridorReach())/R; caps = caps.map(([d, a]) => [d, a + extra]); } }
   T = PT.terrain(L, R, T, caps);
   for (const c of chunks) if (caps.some(([d, a]) => c.c.angleTo(d) < a + c.ang + 0.002)) buildChunk(c);
-  updateRange(); miniDirty();
+  updateRange(); miniDirty(); syncObjects(caps);
 }
+// the lawns changed (the Lawn brush, a model's lawn): the ground's lawn tint round them, and the objects they clear
+function relawn(caps){
+  caps = caps.filter(Boolean); if (!caps.length) return;
+  T.lawn = PT.lawnField(L, R);
+  for (const c of chunks) if (caps.some(([d, a]) => c.c.angleTo(d) < a + c.ang + 0.002)) buildChunk(c);
+  syncObjects(caps);
+}
+// the cap a model's lawn covers (null if it has none)
+function lawnCap(m){ if (!m.lawn || !(m.lawn.r > 0)) return null; const f = m.foot || [3, 3]; return [new V3(...m.d).normalize(), (Math.hypot(f[0], f[1]) + m.lawn.r*(1 + (m.lawn.rough ?? 0.5)) + 4)/R]; }
 function updateRange(){
   let lo = Infinity, hi = -Infinity; for (const c of chunks){ lo = Math.min(lo, c.lo); hi = Math.max(hi, c.hi); }
   terrainMat.uniforms.uLo.value = lo; terrainMat.uniforms.uHi.value = Math.max(hi, lo + 10);
@@ -485,14 +508,74 @@ function syncModels(){
     if (o && o.key === key && o.T === T) continue;
     if (o) modelG.remove(o.g);
     const r = SkiModels.make(m.id, m.v, m.seed); if (!r){ modelObjs.delete(m); continue; }
-    modelG.add(r.g); modelObjs.set(m, Object.assign({ key, T, g: r.g }, seatModel(m, r)));
+    modelG.add(r.g); const no = Object.assign({ key, T, g: r.g }, seatModel(m, r)); modelObjs.set(m, no);
+    // its footprint (half its size each way, along its own x and z): its lawn reaches out from that
+    const foot = [Math.round(no.size.x*5)/10, Math.round(no.size.z*5)/10], fresh = !o || o.key !== key;
+    if (!m.foot || m.foot[0] !== foot[0] || m.foot[1] !== foot[1]){ const c0 = lawnCap(m); m.foot = foot; if (m.lawn) relawnLater.push(c0); }
+    if (fresh){ relawnLater.push(lawnCap(m)); if (o) relawnLater.push([new V3(...m.d).normalize(), (Math.hypot(...foot) + 8)/R]); }
   }
+  if (relawnLater.length){ const caps = relawnLater.splice(0); relawn(caps); }
 }
+const relawnLater = [];
 const modelEntry = id => SkiModels.CATALOG.find(e => e.id === id);
 const modelOptions = id => { const groups = []; for (const e of SkiModels.CATALOG){ let g = groups.find(x => x.n === e.group); if (!g) groups.push(g = { n: e.group, l: [] }); g.l.push(e); }
   return groups.map(g => `<optgroup label="${g.n}">${g.l.map(e => `<option value="${e.id}"${e.id === id ? ' selected' : ''}>${e.name}</option>`).join('')}</optgroup>`).join(''); };
 const variantOptions = (id, v) => { const e = modelEntry(id); return e && e.variants ? e.variants.map((n, k) => `<option value="${k}"${k === v ? ' selected' : ''}>${n}</option>`).join('') : ''; };
 const newSeed = () => 1 + Math.floor(Math.random()*2e9);
+
+// ---- the painted objects (the Objects brush): drawn instanced, a mesh per kind and part (planet-objects.js), each
+// object stood on the ground. a lookup by 6 m cells finds the ones near a point. any a trail's bed, a junction, a lawn
+// or a model covers are hidden (PT.objectBlocker), as the game leaves them out
+const objG = new THREE.Group(); scene.add(objG);
+const objMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+let objMesh = [], objHash = new Map(), objBlock = null;
+const OC = 6, oKey = (x, y, z) => ((Math.floor(x*R/OC) + 8192)*16384 + (Math.floor(y*R/OC) + 8192))*16384 + (Math.floor(z*R/OC) + 8192);
+function objHashAdd(o){ const k = oKey(o.d[0], o.d[1], o.d[2]); let l = objHash.get(k); if (!l) objHash.set(k, l = []); l.push(o); }
+function objHashDel(o){ const k = oKey(o.d[0], o.d[1], o.d[2]), l = objHash.get(k); if (!l) return; const i = l.indexOf(o); if (i >= 0) l.splice(i, 1); if (!l.length) objHash.delete(k); }
+// the objects within r metres of unit direction c ([x, y, z])
+function objNear(c, r){
+  const out = [], n = Math.ceil(r/OC), cx = Math.floor(c[0]*R/OC), cy = Math.floor(c[1]*R/OC), cz = Math.floor(c[2]*R/OC), r2 = r*r;
+  for (let a = -n; a <= n; a++) for (let b = -n; b <= n; b++) for (let e = -n; e <= n; e++){
+    const l = objHash.get(((cx + a + 8192)*16384 + (cy + b + 8192))*16384 + (cz + e + 8192)); if (!l) continue;
+    for (const o of l){ const dx = (o.d[0] - c[0])*R, dy = (o.d[1] - c[1])*R, dz = (o.d[2] - c[2])*R; if (dx*dx + dy*dy + dz*dz <= r2) out.push(o); } }
+  return out;
+}
+function objSeat(o){
+  const kd = PT.OBJECT_KINDS[o.k]; if (!objBlock) objBlock = PT.objectBlocker(L, T, R);
+  o._h = T.height(o.d[0], o.d[1], o.d[2]) - kd.sink*o.s; o._hide = objBlock(o.d[0], o.d[1], o.d[2], 0.3 + kd.cr*o.s);
+}
+// caps null: everything again (the hash too); otherwise the objects in these caps re-seated and re-checked
+function syncObjects(caps, kinds){
+  if (!L.objects) L.objects = [];
+  if (!caps || caps.length) objBlock = null;
+  const dirty = new Set(kinds || []);
+  if (!caps){ objHash = new Map(); for (const o of L.objects){ objHashAdd(o); objSeat(o); dirty.add(o.k); } }
+  else for (const [d, a] of caps){ const c = [d.x, d.y, d.z]; for (const o of objNear(c, a*R + 1)){ objSeat(o); dirty.add(o.k); } }
+  if (!caps) for (let k = 0; k < PT.OBJECT_KINDS.length; k++) dirty.add(k);
+  for (const k of dirty) drawKind(k);
+  if (tool === 'objects' && $('obCount')) $('obCount').textContent = L.objects.length.toLocaleString() + ' painted.';
+}
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _sc = new V3(), _ps = new V3(), _up = new V3(0, 1, 0), _dv = new V3(), _col = new THREE.Color();
+function drawKind(k){
+  const PO = window.PlanetObjects; if (!PO) return;
+  const list = L.objects.filter(o => o.k === k && !o._hide), parts = PO.parts(k);
+  if (!objMesh[k]) objMesh[k] = [];
+  parts.forEach((part, pi) => {
+    let m = objMesh[k][pi];
+    if (!m || m.instanceMatrix.count < list.length){
+      if (m){ objG.remove(m); m.dispose && m.dispose(); }
+      const cap = Math.max(64, 1 << Math.ceil(Math.log2(Math.max(1, list.length))));
+      m = objMesh[k][pi] = new THREE.InstancedMesh(part.geo, objMat, cap); m.frustumCulled = false;
+      m.setColorAt(0, _col.setHex(0xffffff)); objG.add(m);
+    }
+    list.forEach((o, i) => {
+      _dv.set(o.d[0], o.d[1], o.d[2]).normalize(); _q.setFromUnitVectors(_up, _dv); _q2.setFromAxisAngle(_up, o.rot); _q.multiply(_q2);
+      m.setMatrixAt(i, _m4.compose(_ps.copy(_dv).multiplyScalar(R + o._h), _q, _sc.set(o.s, o.s, o.s)));
+      m.setColorAt(i, _col.setHex(PO.tint(k, pi, o.t)));
+    });
+    m.count = list.length; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  });
+}
 
 // ============================================================================================================
 // picking: the point of the ground under the mouse, and the handle nearest the mouse
@@ -549,12 +632,13 @@ function handlePick(px, py, maxPx = 14){
 const undoStack = [], redoStack = [];
 function snapshot(){ return { json: JSON.stringify({ name: L.name, radius: L.radius, noise: L.noise, stamps: L.stamps, trails: L.trails, landmarks: L.landmarks, models: L.models, bridges: L.bridges, start: L.start, scatter: L.scatter, cliffs: L.cliffs, network: L.network, layers: L.layers, tunnels: L.tunnels, caveStamps: L.caveStamps, ramps: L.ramps }), sculpt: L.sculpt.data.slice(), detail: PT.cloneDetail(L.detail),
   clean: L.clean ? Object.assign(PT.cloneDetail(L.clean), { sig: L.clean.sig, stale: L.clean.stale }) : null,
-  caveBrush: (L.caveBrush || []).map(b => b ? { room: PT.cloneDetail(b.room), floor: PT.cloneDetail(b.floor) } : null) }; }
+  caveBrush: (L.caveBrush || []).map(b => b ? { room: PT.cloneDetail(b.room), floor: PT.cloneDetail(b.floor) } : null),
+  objects: (L.objects || []).slice(), lawn: L.lawn ? PT.cloneDetail(L.lawn) : null }; }
 let lastSnap = snapshot();
 function commit(keepReading, keepMoves){ if (!keepReading) tcStale(); if (!keepMoves) tcClearMoves(); cleanStaleCheck(); undoStack.push(lastSnap); if (undoStack.length > 40) undoStack.shift(); redoStack.length = 0; lastSnap = snapshot(); autosave(); }
 function restore(s){
   const o = JSON.parse(s.json); const oldR = L.radius;
-  Object.assign(L, o); L.sculpt.data.set(s.sculpt); L.detail = PT.cloneDetail(s.detail); L.clean = s.clean ? Object.assign(PT.cloneDetail(s.clean), { sig: s.clean.sig, stale: s.clean.stale }) : null; L.caveBrush = (s.caveBrush || []).map(b => b ? { room: PT.cloneDetail(b.room), floor: PT.cloneDetail(b.floor) } : null); lastSnap = s; sel = null; tcSync(); tcMoves = []; tcMoveList();
+  Object.assign(L, o); L.sculpt.data.set(s.sculpt); L.detail = PT.cloneDetail(s.detail); L.clean = s.clean ? Object.assign(PT.cloneDetail(s.clean), { sig: s.clean.sig, stale: s.clean.stale }) : null; L.caveBrush = (s.caveBrush || []).map(b => b ? { room: PT.cloneDetail(b.room), floor: PT.cloneDetail(b.floor) } : null); L.objects = (s.objects || []).slice(); L.lawn = s.lawn ? PT.cloneDetail(s.lawn) : null; lastSnap = s; objNote(); sel = null; tcSync(); tcMoves = []; tcMoveList();
   if (L.radius !== oldR) cam.dist *= L.radius/oldR;
   if (VL >= (L.layers || []).length) VL = -1;
   buildGlobe(); buildCave(); rebuildOverlays(); syncPlanetUI(); syncSlopeUniforms(); showSel(); ugSync(); autosave(); if (tool === 'cliffs') setTool('cliffs');
@@ -574,7 +658,8 @@ function autosave(){
 // tools
 // ============================================================================================================
 let tool = 'orbit', drawing = null;      // drawing: a ridge, valley or trail being clicked out point by point
-const opts = { bridge: PT.bridgeDefaults(), cliff: { radius: 30, strength: 3 }, sculpt: { mode: 'raise', radius: 60, strength: 6 }, stamp: { type: 'peak', radius: 80, height: 60, sharp: 0.3 }, trail: { closed: true, carve: true }, tunnel: PT.tunnelDefaults(), cave: { mode: 'dig', radius: 8, height: 7, strength: 5, floor: 0 }, landmark: { type: 'spire', height: 40, color: '#8a5cd6' }, model: { id: 'dome', v: 0, rot: 0, scale: 1 } };
+const opts = { bridge: PT.bridgeDefaults(), cliff: { radius: 30, strength: 3 }, sculpt: { mode: 'raise', radius: 60, strength: 6 }, stamp: { type: 'peak', radius: 80, height: 60, sharp: 0.3 }, trail: { closed: true, carve: true }, tunnel: PT.tunnelDefaults(), cave: { mode: 'dig', radius: 8, height: 7, strength: 5, floor: 0 }, landmark: { type: 'spire', height: 40, color: '#8a5cd6' }, model: { id: 'dome', v: 0, rot: 0, scale: 1, lawn: 0 },
+  objects: { mode: 'paint', radius: 12, density: 4, strength: 4, size: 1, vary: 0.3, spacing: 1, clear: 3, slope: 0.7, all: true, kinds: { spruce: 3, fir: 1 } }, lawn: { mode: 'paint', radius: 6, strength: 6 } };
 const TOOL_HELP = {
   orbit: 'Drag to turn the planet. Wheel to zoom.',
   select: 'Click a handle to select it, drag to move it. Delete removes it (for a trail or ridge, the point; Shift+Delete the whole thing).',
@@ -588,6 +673,8 @@ const TOOL_HELP = {
   model: 'Click to place the model: one of the game\'s own, as the gallery shows it. Ones that vary (crew, camps, crystals) come out different each time; Re-roll in the selection makes another.',
   start: 'Click where the skier should start.',
   bridge: 'Click the start ramp’s foot, any bends, then the end ramp’s foot; Enter (or double-click) finishes. The deck rises at each ramp and clears the ground between. You get on and off only at the feet (through a portal), heading in.',
+  objects: 'Drag to paint trees, rocks and the like: the kinds ticked, mixed by their weights, until the brush holds the density set (each kind keeps its own room round it). Erase removes them, Thin takes out a share. Shift swaps Paint and Erase; [ and ] change the brush size. Trails, lawns and models clear them (a trail drawn through a wood later hides the trees on its bed). Once anything is painted, the game leaves out its random trees and rocks.',
+  lawn: 'Drag to paint lawn: groomed ground that glides like a trail, and that the terrain cleanup keeps skiable (it stops at a kept cliff\'s edge). Shift (or Erase) rubs it out; [ and ] change the brush size. A model\'s own lawn is in its selection panel.',
   cliffs: 'Cliff-erator brush: drag over steep ground to cut it into cliff bands. Brushing over it again sharpens it further. [ and ] change the brush size.',
 };
 function slider(id, label, min, max, step, get, set, fmt){
@@ -603,7 +690,7 @@ function setTool(t){
   if (drawing) finishDrawing();
   tool = t;
   for (const b of document.querySelectorAll('#tools button')) b.classList.toggle('on', b.dataset.tool === t);
-  $('toolTitle').textContent = { orbit: 'Orbit', select: 'Select', sculpt: 'Sculpt', stamp: 'Stamp', trail: 'Trail', landmark: 'Landmark', model: 'Model', start: 'Start', cliffs: 'Cliffs', bridge: 'Light bridge', ramp: 'Spiral ramp', tunnel: 'Tunnel', cave: 'Cave' }[t];
+  $('toolTitle').textContent = { orbit: 'Orbit', select: 'Select', sculpt: 'Sculpt', stamp: 'Stamp', trail: 'Trail', landmark: 'Landmark', model: 'Model', start: 'Start', cliffs: 'Cliffs', bridge: 'Light bridge', ramp: 'Spiral ramp', objects: 'Objects', lawn: 'Lawn', tunnel: 'Tunnel', cave: 'Cave' }[t];
   const parts = [];
   if (t === 'sculpt'){
     parts.push(seg('sMode', [['raise', 'Raise'], ['lower', 'Lower'], ['smooth', 'Smooth'], ['flatten', 'Flatten']], () => opts.sculpt.mode, k => opts.sculpt.mode = k));
@@ -630,6 +717,7 @@ function setTool(t){
         $('mdV') && $('mdV').addEventListener('change', ev => { o.v = +ev.target.value; ev.target.blur(); }); } });
     parts.push(slider('mdRot', 'Turn (clockwise from facing north)', 0, 355, 5, () => o.rot, v => o.rot = v, v => v + '°'));
     parts.push(slider('mdS', 'Size', 0.25, 5, 0.25, () => o.scale, v => o.scale = v, v => '×' + v));
+    parts.push(slider('mdL', 'Lawn round it (past its footprint)', 0, 40, 0.5, () => o.lawn, v => o.lawn = v, v => v ? v + ' m' : 'none'));
     if (e) parts.push({ html: `<p class="hint">${e.about}</p><p class="hint"><a href="../gallery.html#${e.id}" target="_blank" rel="noopener" style="color:var(--sel)">See it in the gallery</a></p>`, bind(){} });
   }
   if (t === 'bridge'){
@@ -650,6 +738,35 @@ function setTool(t){
     if (o.mode === 'dig') parts.push(slider('cvH', 'Height (in the middle of the brush)', 2, 40, 0.5, () => o.height, v => o.height = v, v => v + ' m'));
     parts.push(slider('cvS', 'Strength', 1, 20, 0.5, () => o.strength, v => o.strength = v, v => '×' + v));
     parts.push(slider('cvF', o.mode === 'floor' ? 'Floor height to brush toward (m above the layer\'s base)' : 'Floor where you start digging in rock (m above the layer\'s base)', -40, 40, 0.5, () => o.floor, v => o.floor = v, v => (v > 0 ? '+' : '') + v + ' m'));
+  }
+  if (t === 'objects'){
+    const o = opts.objects, K = PT.OBJECT_KINDS, pct = v => v >= 3 ? 'anywhere' : Math.round(v*100) + '% (' + Math.round(Math.atan(v)/D2R) + '°)';
+    parts.push(seg('obMode', [['paint', 'Paint'], ['erase', 'Erase'], ['thin', 'Thin']], () => o.mode, k => { o.mode = k; setTool('objects'); }));
+    const groups = [...new Set(K.map(k => k.group))];
+    parts.push({ html: `<div class="obKinds">${groups.map(g => `<h3>${g}</h3>` + K.filter(k => k.group === g).map(k => `<label class="c obK"><input type="checkbox" data-k="${k.id}"${o.kinds[k.id] > 0 ? ' checked' : ''}> ${k.label}<input type="number" min="1" max="9" step="1" data-w="${k.id}" value="${o.kinds[k.id] || 1}" title="Its share of the mix" aria-label="${k.label}: its share of the mix"></label>`).join('')).join('')}</div>
+      <div class="row"><button type="button" data-pre="conifer">Conifers</button><button type="button" data-pre="mixed">Mixed woods</button><button type="button" data-pre="broad">Broadleaf</button><button type="button" data-pre="rocks">Rocks</button></div>`,
+      bind(){ const box = $('toolOpts');
+        for (const el of box.querySelectorAll('input[data-k]')) el.addEventListener('change', () => { const id = el.dataset.k, w = box.querySelector(`input[data-w="${id}"]`); o.kinds[id] = el.checked ? Math.max(1, +w.value || 1) : 0; el.blur(); });
+        for (const el of box.querySelectorAll('input[data-w]')) el.addEventListener('change', () => { const id = el.dataset.w, v = Math.max(1, Math.min(9, Math.round(+el.value || 1))); el.value = v; if (o.kinds[id] > 0) o.kinds[id] = v; });
+        const PRE = { conifer: { spruce: 4, fir: 3, pine: 2 }, mixed: { spruce: 3, fir: 1, birch: 2, aspen: 1, bare: 1, shrub: 1 }, broad: { birch: 3, oak: 2, aspen: 2, bare: 1, shrub: 1 }, rocks: { boulder: 4, slab: 1, pile: 2 } };
+        for (const b of box.querySelectorAll('button[data-pre]')) b.addEventListener('click', () => { o.kinds = Object.assign({}, PRE[b.dataset.pre]); setTool('objects'); }); } });
+    parts.push(slider('obR', 'Brush radius', 2, 80, 1, () => o.radius, v => o.radius = v, v => v + ' m'));
+    if (o.mode === 'paint'){
+      parts.push(slider('obD', 'Density (per 100 m², at most)', 0.5, 25, 0.5, () => o.density, v => o.density = v, v => v));
+      parts.push(slider('obS', 'Size', 0.4, 2.5, 0.05, () => o.size, v => o.size = v, v => '×' + v));
+      parts.push(slider('obV', 'Size varies by', 0, 0.6, 0.05, () => o.vary, v => o.vary = v, v => v ? '±' + Math.round(v*100) + '%' : 'none'));
+      parts.push(slider('obSp', 'Room round each (× its kind\'s own)', 0.5, 3, 0.1, () => o.spacing, v => o.spacing = v, v => '×' + v));
+      parts.push(slider('obC', 'Keep off trails, lawns and models by', 0, 15, 0.5, () => o.clear, v => o.clear = v, v => v + ' m'));
+      parts.push(slider('obSl', 'Not on ground steeper than', 0.1, 3, 0.05, () => o.slope, v => o.slope = v, pct));
+    } else parts.push({ html: `<label class="c"><input id="obAll" type="checkbox"${o.all ? ' checked' : ''}> Every kind (otherwise only the ones ticked)</label>`, bind(){ const el = $('obAll'); el.addEventListener('change', () => { o.all = el.checked; el.blur(); }); } });
+    parts.push(slider('obSt', 'Strength', 1, 10, 0.5, () => o.strength, v => o.strength = v, v => '×' + v));
+    parts.push({ html: `<p class="hint" id="obCount">${(L.objects || []).length.toLocaleString()} painted.</p>`, bind(){} });
+  }
+  if (t === 'lawn'){
+    const o = opts.lawn;
+    parts.push(seg('lwMode', [['paint', 'Paint'], ['erase', 'Erase']], () => o.mode, k => o.mode = k));
+    parts.push(slider('lwR', 'Brush radius', 1, 40, 0.5, () => o.radius, v => o.radius = v, v => v + ' m'));
+    parts.push(slider('lwS', 'Strength', 1, 12, 0.5, () => o.strength, v => o.strength = v, v => '×' + v));
   }
   if (t === 'ramp') parts.push({ html: `<p class="hint">${(L.layers || []).length ? 'It gets a slope down to each layer and a plateau there (linked, with an entrance), then a slope to the bottom.' : 'Add layers (Underground) first to get a plateau and entrance at each one.'}</p>`, bind(){} });
   if (t === 'cliffs'){
@@ -727,6 +844,21 @@ function showSel(){
         $('slRoll') && $('slRoll').addEventListener('click', () => { m.seed = newSeed(); commit(); redo(); }); } });
     parts.push(slider('slMRot', 'Turn (clockwise from facing north)', 0, 355, 5, () => m.rot, v => { m.rot = v; rebuildOverlays(); }, v => v + '°'));
     parts.push(slider('slMS', 'Size', 0.25, 5, 0.25, () => m.scale, v => { m.scale = v; rebuildOverlays(); }, v => '×' + v));
+    // its lawn: groomed ground reaching out from its footprint, the edge wandering in and out (roughness), its shape
+    // set by the seed. redrawn as a slider moves (on the next frame)
+    let lwCap = null, lwRaf = 0;
+    const lw = fn => v => { if (!lwCap) lwCap = lawnCap(m); if (!m.lawn) m.lawn = Object.assign(PT.lawnDefaults(), { r: 0, seed: newSeed() % 100000 }); fn(v); if (!(m.lawn.r > 0)) delete m.lawn;
+      cancelAnimationFrame(lwRaf); lwRaf = requestAnimationFrame(() => { relawn([lwCap, lawnCap(m)]); lwCap = lawnCap(m); }); };
+    parts.push({ html: '<h3>Lawn</h3>', bind(){} });
+    parts.push(slider('slLwR', 'Reaches past its footprint', 0, 40, 0.5, () => m.lawn ? m.lawn.r : 0, lw(v => m.lawn.r = v), v => v ? v + ' m' : 'none'));
+    if (m.lawn){
+      parts.push(slider('slLwRo', 'Edge roughness', 0, 1, 0.05, () => m.lawn.rough ?? 0.5, lw(v => m.lawn.rough = v), v => v ? Math.round(v*100) + '%' : 'smooth'));
+      parts.push({ html: `<label class="f" for="slLwS">Shape (seed)<input id="slLwS" type="number" step="1" min="1" style="grid-column:1/-1"></label><div class="row"><button id="slLwNew" type="button">New shape</button></div><p class="hint">Groomed (it glides like a trail), and the terrain cleanup keeps it skiable; where it meets a kept cliff it stops at the cliff's edge. Trees and rocks keep off it.</p>`,
+        bind(){ const el = $('slLwS'); el.value = m.lawn.seed;
+          const set = v => { const c0 = lawnCap(m); m.lawn.seed = Math.max(1, Math.round(v) || 1); el.value = m.lawn.seed; relawn([c0, lawnCap(m)]); commit(); };
+          el.addEventListener('change', () => set(+el.value)); $('slLwNew').addEventListener('click', e => { set(newSeed() % 100000); e.currentTarget.blur(); }); } });
+    }
+    parts.push({ html: '', bind(){ const had = !!m.lawn; $('slLwR').addEventListener('change', () => { if (!!m.lawn !== had) setTimeout(showSel, 0); }); } });
     if (o){ const z = o.size, f = v => v >= 10 ? v.toFixed(0) : v.toFixed(1);
       parts.push({ html: `<p class="hint">${f(z.x)} × ${f(z.z)} m, ${f(z.y)} m tall. It sits on the lowest ground under it${o.spread > 1 ? `; the ground under it varies by ${o.spread.toFixed(1)} m, so its uphill side is buried (Sculpt's Flatten levels it)` : ''}. <a href="../gallery.html#${m.id}" target="_blank" rel="noopener" style="color:var(--sel)">Gallery</a></p>`, bind(){} }); }
   }
@@ -772,7 +904,7 @@ function deleteSel(all){
   if (sel.kind === 'cavest'){ const cap = caveStampCap(r); L.caveStamps.splice(L.caveStamps.indexOf(r), 1); rebuildCaveCaps([cap]); }
   if (sel.kind === 'ramp'){ const cap = rampCap(r); L.ramps.splice(L.ramps.indexOf(r), 1); rebuildCaps([cap]); buildCave(); }
   if (sel.kind === 'landmark') L.landmarks.splice(L.landmarks.indexOf(r), 1);
-  if (sel.kind === 'model') L.models.splice(L.models.indexOf(r), 1);
+  if (sel.kind === 'model'){ const cap = lawnCap(r); L.models.splice(L.models.indexOf(r), 1); relawn([cap, [new V3(...r.d).normalize(), 60/R]]); }
   if (sel.kind === 'bridge'){ if (!all && r.pts.length > 2) r.pts.splice(sel.i, 1); else L.bridges.splice(L.bridges.indexOf(r), 1); }
   sel = null; rebuildOverlays(); showSel(); commit();
 }
@@ -811,7 +943,7 @@ cv.addEventListener('pointerdown', e => {
     const h = handlePick(px, py);
     sel = h ? { kind: h.kind, ref: h.ref, i: h.i } : null; rebuildOverlays(); showSel();
     if (h && h.kind === 'door'){ sel = { kind: 'ramp', ref: h.ref, i: 0 }; rampSel = h.i; rebuildOverlays(); showSel(); return; }
-    if (h) ptr = { mode: 'move', h, moved: false, cap0: h.kind === 'stamp' ? stampCap(h.ref) : h.kind === 'trail' && h.ref.carve ? pointCap(h.ref, h.i) : h.kind === 'tunnel' ? tunnelCap(h.ref) : h.kind === 'cavest' ? caveStampCap(h.ref) : h.kind === 'ramp' ? rampCap(h.ref) : null };
+    if (h) ptr = { mode: 'move', h, moved: false, cap0: h.kind === 'stamp' ? stampCap(h.ref) : h.kind === 'trail' && h.ref.carve ? pointCap(h.ref, h.i) : h.kind === 'tunnel' ? tunnelCap(h.ref) : h.kind === 'cavest' ? caveStampCap(h.ref) : h.kind === 'ramp' ? rampCap(h.ref) : h.kind === 'model' ? lawnCap(h.ref) : null };
     else if (!groundPick(px, py)) ptr = { mode: 'orbit', x: px, y: py };      // off the planet: turn it
     return;
   }
@@ -820,6 +952,7 @@ cv.addEventListener('pointerdown', e => {
   const arr = d.toArray();
   if (tool === 'sculpt'){ ptr = { mode: 'sculpt', x: px, y: py, target: groundAt(d), last: performance.now() }; return; }
   if (tool === 'cliffs'){ ptr = { mode: 'cliff', x: px, y: py, goals: new Map() }; return; }
+  if (tool === 'objects' || tool === 'lawn'){ ptr = { mode: tool, x: px, y: py }; return; }
   if (tool === 'stamp'){
     if (PT.STAMP_TYPES[opts.stamp.type].line){ if (!drawing) drawing = { kind: 'line', pts: [] }; drawing.pts.push(arr); rebuildOverlays(); }
     else { const s = { type: opts.stamp.type, pts: [arr], radius: opts.stamp.radius, height: opts.stamp.height, sharp: opts.stamp.sharp }; L.stamps.push(s); rebuildCaps([stampCap(s)]); sel = { kind: 'stamp', ref: s, i: 0 }; rebuildOverlays(); showSel(); commit(); }
@@ -836,6 +969,7 @@ cv.addEventListener('pointerdown', e => {
   if (tool === 'model'){
     const o = opts.model, e = modelEntry(o.id); if (!e) return;
     const m = { name: e.name, id: o.id, v: o.v, seed: e.random ? newSeed() : 1, d: arr, rot: o.rot, scale: o.scale, solid: true };
+    if (o.lawn > 0) m.lawn = Object.assign(PT.lawnDefaults(), { r: o.lawn, seed: newSeed() % 100000 });
     L.models.push(m); sel = { kind: 'model', ref: m, i: 0 }; rebuildOverlays(); showSel(); commit(); return;
   }
   if (tool === 'start'){ L.start.d = arr; sel = { kind: 'start', ref: L.start, i: 0 }; rebuildOverlays(); showSel(); commit(); }
@@ -864,12 +998,14 @@ cv.addEventListener('pointermove', e => {
     rebuildOverlays();
     return;
   }
-  if (ptr.mode === 'sculpt' || ptr.mode === 'cliff' || ptr.mode === 'cavebrush'){ ptr.x = px; ptr.y = py; }
+  if (ptr.mode === 'sculpt' || ptr.mode === 'cliff' || ptr.mode === 'cavebrush' || ptr.mode === 'objects' || ptr.mode === 'lawn'){ ptr.x = px; ptr.y = py; }
 });
 const endPtr = () => {
   if (!ptr) return;
-  if (ptr.mode === 'move'){ if (ptr.moved){ if (ptr.h.kind === 'trail' && ptr.h.ref.carve){ rebuildCaps([ptr.cap0, pointCap(ptr.h.ref, ptr.h.i)]); rebuildOverlays(); } if (ptr.h.kind === 'ramp') rampRebuild(ptr.h.ref, ptr.cap0); commit(); showSel(); } }
+  if (ptr.mode === 'move'){ if (ptr.moved){ if (ptr.h.kind === 'trail' && ptr.h.ref.carve){ rebuildCaps([ptr.cap0, pointCap(ptr.h.ref, ptr.h.i)]); rebuildOverlays(); } if (ptr.h.kind === 'ramp') rampRebuild(ptr.h.ref, ptr.cap0); if (ptr.h.kind === 'model') relawn([ptr.cap0, lawnCap(ptr.h.ref)]); if (ptr.h.kind === 'start' || ptr.h.kind === 'landmark' || ptr.h.kind === 'model') syncObjects([[new V3(...ptr.h.ref.d).normalize(), 60/R]]); commit(); showSel(); } }
   if (ptr.mode === 'sculpt' || ptr.mode === 'cliff' || ptr.mode === 'cavebrush') commit();
+  if (ptr.mode === 'objects'){ commit(true, true); objNote(); }
+  if (ptr.mode === 'lawn') commit();
   ptr = null; if (tool === 'orbit') cv.style.cursor = 'grab';
 };
 cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
@@ -941,6 +1077,75 @@ function cliffStep(dt){
   rebuildCaps([[d, ang + 0.004]]);
 }
 
+// ---- the Objects brush: each frame, Paint adds objects at random spots under the brush (more toward its middle)
+// until it holds the density set, each kind keeping its own room round it, off trails, lawns and models (by the
+// margin set) and off ground steeper than set; Erase and Thin take them out (Thin slowly)
+function objectStep(dt){
+  if (!ptr || ptr.mode !== 'objects') return;
+  const d = ptr.dir || groundPick(ptr.x, ptr.y); if (!d) return;
+  const o = opts.objects, K = PT.OBJECT_KINDS, c = [d.x, d.y, d.z], rad = o.radius;
+  let mode = o.mode; if (keys.shift && (mode === 'paint' || mode === 'erase')) mode = mode === 'paint' ? 'erase' : 'paint';
+  const t1 = new V3().crossVectors(Math.abs(d.y) < 0.9 ? new V3(0, 1, 0) : new V3(1, 0, 0), d).normalize(), t2 = new V3().crossVectors(d, t1);
+  const near = objNear(c, rad), dirty = new Set();
+  if (mode === 'paint'){
+    const kinds = Object.entries(o.kinds).filter(([id, w]) => w > 0 && PT.OBJECT_INDEX[id] !== undefined), tot = kinds.reduce((a, [, w]) => a + w, 0); if (!tot) return;
+    const want = o.density*Math.PI*rad*rad/100, have = near.length; if (have >= want) return;
+    const tries = Math.min(300, Math.ceil((want - have)*Math.min(1, o.strength*dt*0.6)) + 2), maxGap = Math.max(...K.map(k => k.gap))*3*o.spacing;
+    const p = new V3(), q = new V3();
+    for (let n = 0; n < tries; n++){
+      const r = rad*Math.sqrt(Math.random()), a = Math.random()*Math.PI*2, f = r/rad;
+      if (Math.random() > 1 - f*f*f*f) continue;      // (thinner toward the edge)
+      p.copy(d).multiplyScalar(R).addScaledVector(t1, Math.cos(a)*r).addScaledVector(t2, Math.sin(a)*r).normalize();
+      let pick = Math.random()*tot, id = kinds[0][0]; for (const [kid, w] of kinds){ if ((pick -= w) <= 0){ id = kid; break; } }
+      const k = PT.OBJECT_INDEX[id], kd = K[k], sz = Math.max(0.25, Math.min(3, o.size*(1 + o.vary*(2*Math.random() - 1))));
+      const pc = [p.x, p.y, p.z], room = kd.gap*sz*o.spacing;
+      // room: half its own and half the other's
+      if (objNear(pc, Math.min(maxGap, room + 3*o.spacing*sz + 6)).some(x => { const g = (room + K[x.k].gap*x.s*o.spacing)/2, dx = (x.d[0] - pc[0])*R, dy = (x.d[1] - pc[1])*R, dz = (x.d[2] - pc[2])*R; return dx*dx + dy*dy + dz*dz < g*g; })) continue;
+      // steepness (1 m either way)
+      if (o.slope < 3){ const at = (u, v) => { q.copy(p).multiplyScalar(R).addScaledVector(t1, u).addScaledVector(t2, v).normalize(); return T.height(q.x, q.y, q.z); };
+        if (Math.hypot(at(1, 0) - at(-1, 0), at(0, 1) - at(0, -1))/2 > o.slope) continue; }
+      if (!objBlock) objBlock = PT.objectBlocker(L, T, R);
+      if (objBlock(pc[0], pc[1], pc[2], o.clear + kd.cr*sz)) continue;
+      const ob = { k, d: pc, s: sz, rot: Math.random()*Math.PI*2, t: Math.random() };
+      L.objects.push(ob); objHashAdd(ob); objSeat(ob); dirty.add(k);
+    }
+  } else {
+    const rate = o.strength*dt*(mode === 'erase' ? 2.5 : 0.35), gone = new Set();
+    for (const x of near){
+      if (!o.all && !(o.kinds[K[x.k].id] > 0)) continue;
+      const dx = (x.d[0] - c[0])*R, dy = (x.d[1] - c[1])*R, dz = (x.d[2] - c[2])*R, f = Math.sqrt(dx*dx + dy*dy + dz*dz)/rad;
+      if (Math.random() < rate*(1 - f*f*f*f)){ gone.add(x); objHashDel(x); dirty.add(x.k); }
+    }
+    if (gone.size) L.objects = L.objects.filter(x => !gone.has(x));
+  }
+  if (dirty.size) syncObjects([], [...dirty]);
+}
+// ---- the Lawn brush: each frame, the lawn layer's points under it move toward 1 (Paint) or 0 (Erase), full strength
+// out to 70% of the radius, easing off to its edge
+function lawnStep(dt){
+  if (!ptr || ptr.mode !== 'lawn') return;
+  const d = ptr.dir || groundPick(ptr.x, ptr.y); if (!d) return;
+  if (!L.lawn) L.lawn = PT.newDetail(L.detail.n);
+  const o = opts.lawn, dl = L.lawn, n = dl.n, ang = o.radius/R, cosA = Math.cos(ang), c = [d.x, d.y, d.z], q = [0, 0, 0];
+  let erase = o.mode === 'erase'; if (keys.shift) erase = !erase;
+  const rate = Math.min(1, o.strength*dt*1.5), tgt = erase ? 0 : 1;
+  const AX = [[0, 1, 2, 1], [0, 1, 2, -1], [1, 0, 2, 1], [1, 0, 2, -1], [2, 0, 1, 1], [2, 0, 1, -1]];
+  for (let f = 0; f < 6; f++){
+    const [na, ua, va, sg] = AX[f], comp = c[na]*sg; if (comp < 0.3) continue;
+    const u = c[ua]/comp, v = c[va]/comp, half = ang*3*(n - 1)/2 + 2, ci = (u + 1)/2*(n - 1), cj = (v + 1)/2*(n - 1);
+    const i0 = Math.max(0, Math.floor(ci - half)), i1 = Math.min(n - 1, Math.ceil(ci + half)), j0 = Math.max(0, Math.floor(cj - half)), j1 = Math.min(n - 1, Math.ceil(cj + half));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++){
+      PT.dirFromFace(f, -1 + 2*i/(n - 1), -1 + 2*j/(n - 1), q);
+      const dot = q[0]*c[0] + q[1]*c[1] + q[2]*c[2]; if (dot < cosA) continue;
+      const t = Math.acos(Math.min(1, dot))/ang, w = t < 0.7 ? 1 : 1 - (t - 0.7)/0.3, cur = PT.detailGet(dl, f, i, j);
+      if (erase && !cur) continue;
+      PT.detailAdd(dl, f, i, j, (tgt - cur)*rate*w);
+    }
+  }
+  PT.weldDetail(dl);
+  relawn([[d, ang + 3/R]]);
+}
+
 // ---- phones: the wrench opens the tools, the gear the side panel (one at a time); picking a tool closes the tools ----
 const mobile = matchMedia('(max-width:760px)');
 function openPanel(which){
@@ -986,12 +1191,16 @@ addEventListener('keydown', e => {
   if (k >= '1' && k <= '9'){ if (tools[+k - 1]) setTool(tools[+k - 1]); return; }
   if (k === '0'){ if (VL < 0) setTool('model'); return; }
   if ((k === 'r' || k === 'R') && VL < 0){ setTool('ramp'); return; }
+  if ((k === 'o' || k === 'O') && VL < 0){ setTool('objects'); return; }
+  if ((k === 'l' || k === 'L') && VL < 0){ setTool('lawn'); return; }
   if (k === 'Enter'){ if (drawing) finishDrawing(); return; }
   if (k === 'Escape'){ if (drawing){ drawing.pts.pop(); if (!drawing.pts.length) drawing = null; rebuildOverlays(); } else { sel = null; rebuildOverlays(); showSel(); } return; }
   if (k === 'Delete' || k === 'Backspace'){ e.preventDefault(); deleteSel(e.shiftKey); return; }
   if (k === '[' || k === ']'){
     if (tool === 'cliffs'){ opts.cliff.radius = Math.max(5, Math.min(120, opts.cliff.radius + (k === ']' ? 3 : -3))); setTool('cliffs'); return; }
     if (tool === 'cave'){ opts.cave.radius = Math.max(2, Math.min(40, opts.cave.radius + (k === ']' ? 1 : -1))); setTool('cave'); return; }
+    if (tool === 'objects'){ opts.objects.radius = Math.max(2, Math.min(80, opts.objects.radius + (k === ']' ? 2 : -2))); setTool('objects'); return; }
+    if (tool === 'lawn'){ opts.lawn.radius = Math.max(1, Math.min(40, opts.lawn.radius + (k === ']' ? 1 : -1))); setTool('lawn'); return; }
     opts.sculpt.radius = Math.max(5, Math.min(300, opts.sculpt.radius + (k === ']' ? 5 : -5))); if (tool === 'sculpt') setTool('sculpt'); return; }
   if (k === 'k' || k === 'K') skiHere();
   if (k === 'f' || k === 'F'){ const d = selDir(); if (d){ cam.dir.copy(d); fixUp(); } }
@@ -1405,7 +1614,7 @@ async function tcPlan(){
   const P = await PlanetCleanup.plan(tcA, L, T, tcPlanOpt(), (text, f) => { $('tcStatus').textContent = text + ' ' + Math.round(f*100) + '%'; });
   tcP = P; tcTexture('plan', PlanetCleanup.overlayAtlas(tcA, 215, P.pcls, PlanetCleanup.PLAN_CLASSES)); tcShow('plan');
   const s = P.summary;
-  $('tcStatus').textContent = `Planned in ${((performance.now() - t0)/1000).toFixed(1)} s. ${m2(s.toSkiable)} becomes skiable (steep mistakes and thin strips smoothed away, trails' benches and slots cut back), ${m2(s.toUnskiable)} becomes unskiable (narrow gaps closed). ${s.walls} thin tall wall${s.walls === 1 ? '' : 's'} kept; ${s.slots} slot${s.slots === 1 ? '' : 's'} and ${s.saddles} saddle${s.saddles === 1 ? '' : 's'} through ridges. Check: ${s.check.bedsBlocked ? s.check.bedsBlocked + ' trail bed points blocked, ' : 'every trail bed skiable, '}${s.check.thinLeft ? m2(s.check.thinLeft) + ' of thin strip left' : 'no thin strips left'} besides the kept walls.`;
+  $('tcStatus').textContent = `Planned in ${((performance.now() - t0)/1000).toFixed(1)} s. ${m2(s.toSkiable)} becomes skiable (steep mistakes and thin strips smoothed away, trails' benches and slots cut back), ${m2(s.toUnskiable)} becomes unskiable (narrow gaps closed). ${s.lawn || s.lawnOnCliffs ? `${m2(s.lawn)} of lawn kept skiable${s.lawnOnCliffs ? ` (${m2(s.lawnOnCliffs)} over kept cliffs left to them)` : ''}. ` : ''}${s.walls} thin tall wall${s.walls === 1 ? '' : 's'} kept; ${s.slots} slot${s.slots === 1 ? '' : 's'} and ${s.saddles} saddle${s.saddles === 1 ? '' : 's'} through ridges. Check: ${s.check.bedsBlocked ? s.check.bedsBlocked + ' trail bed points blocked, ' : 'every trail bed skiable, '}${s.check.thinLeft ? m2(s.check.thinLeft) + ' of thin strip left' : 'no thin strips left'} besides the kept walls.`;
   tcList(P.notes.map(n => [n.text, n.at]));
 }
 ugSync();
@@ -1468,7 +1677,10 @@ function syncPlanetUI(){
   set('nJoin', 'oJoin', L.network.join, v => +v ? v + ' m' : 'off'); set('nPatch', 'oPatch', L.network.patch, v => +v ? v + ' m' : 'off');
   const ND = PT.networkDefaults(); set('nCorr', 'oCorr', L.network.corridor ?? ND.corridor, fmtCorr); set('nSide', 'oSide', L.network.side ?? ND.side, fmtSide);
   set('pMtn', 'oMtn', L.scatter.mountains, v => +v ? '×' + v : 'none'); set('pBld', 'oBld', L.scatter.buildings, v => +v ? '×' + v : 'none'); set('pTrees', 'oTrees', L.scatter.trees, v => +v ? '×' + v : 'none');
+  $('pKeep').checked = !!L.scatter.keep; objNote();
 }
+$('pKeep').addEventListener('change', () => { L.scatter.keep = $('pKeep').checked; commit(); objNote(); $('pKeep').blur(); });
+function objNote(){ const n = (L.objects || []).length; $('pObjNote').textContent = n ? `${n.toLocaleString()} painted object${n === 1 ? '' : 's'}: the game ${L.scatter.keep ? 'adds its random trees and rocks too' : 'leaves out its random trees and rocks (the Trees slider doesn\'t apply)'}.` : 'Nothing painted (the Objects brush): the game scatters trees and rocks at random.'; }
 $('nJoin').addEventListener('input', () => { $('oJoin').textContent = +$('nJoin').value ? $('nJoin').value + ' m' : 'off'; });
 $('nJoin').addEventListener('change', () => { L.network.join = +$('nJoin').value; busy(() => { rebuildCaps(L.trails.filter(t => t.carve && t.pts.length > 1).map(trailCap)); rebuildOverlays(); }); commit(); $('nJoin').blur(); });
 const fmtCorr = v => +v ? v + ' m' : 'off', fmtSide = v => Math.round(v*100) + '% (' + Math.round(Math.atan(v)*180/Math.PI) + '°)';
@@ -1523,10 +1735,21 @@ addEventListener('message', e => { if (e.data === 'planetoid:need-layout' && e.s
 // ============================================================================================================
 // go
 // ============================================================================================================
+// the brush's outline under the cursor (the Objects and Lawn brushes)
+const ring = new THREE.LineLoop(new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(64*3), 3)), new THREE.LineBasicMaterial({ color: 0xffd23f, depthTest: false, transparent: true, opacity: 0.85 }));
+ring.renderOrder = 12; ring.frustumCulled = false; scene.add(ring);
+function drawRing(){
+  const r = tool === 'objects' ? opts.objects.radius : tool === 'lawn' ? opts.lawn.radius : 0, d = ptr && ptr.dir ? ptr.dir : cursorDir;
+  ring.visible = !!(r && d && VL < 0); if (!ring.visible) return;
+  ring.material.color.setHex(tool === 'lawn' ? 0x7fe08a : 0xffd23f);
+  const a = ring.geometry.attributes.position, pts = circlePts(d.toArray(), r);
+  pts.forEach((p, i) => { const v = surf(p, 0.4); a.setXYZ(i, v.x, v.y, v.z); }); a.needsUpdate = true;
+}
 let last = performance.now();
 function frame(now){
   const dt = Math.min(0.1, (now - last)/1000); last = now;
-  sculptStep(dt); cliffStep(dt); caveBrushStep(dt);
+  sculptStep(dt); cliffStep(dt); caveBrushStep(dt); objectStep(dt); lawnStep(dt);
+  objG.visible = VL < 0; drawRing();
   placeCamera();
   // light from over the viewer's shoulder, so relief always reads
   const fwd = new V3(); camera.getWorldDirection(fwd);
@@ -1556,7 +1779,7 @@ $('oContour').textContent = CONTOURS[2] + ' m'; terrainMat.uniforms.uCi.value = 
 busy(() => {
   buildGlobe(); rebuildOverlays(); renderMiniTerrain(); showSel();
   window.__editor = { get L(){ return L; }, get T(){ return T; }, get VL(){ return VL; }, get CF(){ return CF; }, setLayer, createRamp, rampB, screenOf: d => { const p = surf(d, 0).project(camera); return [(p.x + 1)/2*W, (1 - p.y)/2*H]; }, setTool, undo, redo, commit, opts,
-    stroke(mode, dir, frames, dt = 1/30){ ptr = { mode, dir: new V3(dir.x, dir.y, dir.z).normalize(), goals: new Map(), target: 0 }; for (let i = 0; i < frames; i++) mode === 'cliff' ? cliffStep(dt) : sculptStep(dt); ptr = null; }, groundPick, handlePick, cam, get sel(){ return sel; }, finishDrawing, get chunks(){ return chunks; }, get handles(){ return handles; }, camera, modelObjs };   // test hook
+    stroke(mode, dir, frames, dt = 1/30){ ptr = { mode, dir: new V3(dir.x, dir.y, dir.z).normalize(), goals: new Map(), target: 0 }; for (let i = 0; i < frames; i++) mode === 'cliff' ? cliffStep(dt) : mode === 'objects' ? objectStep(dt) : mode === 'lawn' ? lawnStep(dt) : sculptStep(dt); ptr = null; }, relawn, syncObjects, objNear, groundPick, handlePick, cam, get sel(){ return sel; }, finishDrawing, get chunks(){ return chunks; }, get handles(){ return handles; }, camera, modelObjs };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 });
 </script>

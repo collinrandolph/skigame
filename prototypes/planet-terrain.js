@@ -25,7 +25,11 @@
 //                 `band` and `sharp` are the cliff-erator brush's settings (it steps ground steeper than `from` into
 //                 cliff bands `band` metres high, with risers about `sharp` times steeper than the slope was)
 //   scatter       how many random mountains, buildings and trees the game adds (mountains default to none, since
-//                 the layout has its own topography)
+//                 the layout has its own topography). once any objects are painted, the random trees and rocks are
+//                 left out (unless `keep` is set)
+//   objects       painted trees, rocks and the like (PT.OBJECT_KINDS), packed 8 bytes each (PT.encodeObjects)
+//   lawn          the Lawn brush's layer (the detail layer's format, 0..1); a model's own lawn is its `lawn`
+//                 ({ r, rough, seed }) round its footprint `foot` (half-size along its x and z, metres)
 // Directions are unit vectors [x, y, z] from the planet's centre (y is the planet's north).
 (function(){
 'use strict';
@@ -695,7 +699,7 @@ function easeAt(T, dl, cen, core, margin, stop, R){
 const norm = p => { const L = Math.hypot(p[0], p[1], p[2]) || 1; return [p[0]/L, p[1]/L, p[2]/L]; };
 PT.START = norm([0.15, 1, 0.25]);
 PT.cliffDefaults = () => ({ from: 0.6, band: 12, sharp: 8, stop: 1.0 });
-PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), detail: PT.newDetail(1024), trails: [], landmarks: [], models: [], bridges: [], layers: [], tunnels: [], caveStamps: [], caveBrush: [], ramps: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults(), network: PT.networkDefaults() });
+PT.blankLayout = R => ({ version: 1, name: 'Untitled planet', radius: R || 800, noise: { amp: 1 }, stamps: [], sculpt: PT.newSculpt(128), detail: PT.newDetail(1024), trails: [], landmarks: [], models: [], objects: [], lawn: null, bridges: [], layers: [], tunnels: [], caveStamps: [], caveBrush: [], ramps: [], start: { d: PT.START.slice() }, scatter: { mountains: 0, buildings: 1, trees: 1 }, cliffs: PT.cliffDefaults(), network: PT.networkDefaults() });
 // a small example so every tool has something to show: a peak, a ridge, a crater, a basin and a trail past them
 PT.exampleLayout = function(R){
   R = R || 800;
@@ -735,6 +739,113 @@ PT.modelSeat = function(d, r, height, R){
   return { base: lo - 0.15, spread: hi - lo };
 };
 PT.LANDMARK_TYPES = { beacon: 'Beacon', spire: 'Spire', tower: 'Tower', camp: 'Camp', terminal: 'Terminal', altar: 'Altar', marker: 'Marker' };
+
+// ---------- painted objects (the Objects brush): trees, rocks and the like, each a record { k, d, s, rot, t } ----------
+// k: the kind (an index into OBJECT_KINDS; the order never changes, so saved layouts keep their kinds), d: where
+// (a unit direction), s: its size (×), rot: its turn about its own up (radians), t: a tint (0..1, a little lighter or
+// darker). per kind (metres at size 1): gap, the least room between two (centre to centre); cr, how far round its
+// middle it's solid (0: you ski through it); sink, how far it's set into the ground. the shapes are in planet-objects.js
+PT.OBJECT_KINDS = [
+  { id: 'spruce', label: 'Spruce', group: 'Conifers', gap: 2.2, cr: 0.2, sink: 0.1 },
+  { id: 'fir', label: 'Fir', group: 'Conifers', gap: 1.8, cr: 0.18, sink: 0.1 },
+  { id: 'pine', label: 'Pine', group: 'Conifers', gap: 2.6, cr: 0.22, sink: 0.1 },
+  { id: 'birch', label: 'Birch', group: 'Broadleaf', gap: 2.0, cr: 0.15, sink: 0.1 },
+  { id: 'oak', label: 'Oak', group: 'Broadleaf', gap: 4.0, cr: 0.3, sink: 0.1 },
+  { id: 'aspen', label: 'Aspen', group: 'Broadleaf', gap: 1.6, cr: 0.14, sink: 0.1 },
+  { id: 'bare', label: 'Bare tree', group: 'Broadleaf', gap: 2.6, cr: 0.2, sink: 0.1 },
+  { id: 'snag', label: 'Snag', group: 'Broadleaf', gap: 1.5, cr: 0.18, sink: 0.1 },
+  { id: 'shrub', label: 'Shrub', group: 'Low', gap: 1.4, cr: 0, sink: 0.15 },
+  { id: 'boulder', label: 'Boulder', group: 'Rocks', gap: 2.4, cr: 0.85, sink: 0.3 },
+  { id: 'slab', label: 'Slab', group: 'Rocks', gap: 3.0, cr: 1.1, sink: 0.25 },
+  { id: 'pile', label: 'Rock pile', group: 'Rocks', gap: 2.8, cr: 1.0, sink: 0.2 },
+  { id: 'cairn', label: 'Cairn', group: 'Rocks', gap: 1.6, cr: 0.45, sink: 0.05 },
+];
+PT.OBJECT_INDEX = Object.fromEntries(PT.OBJECT_KINDS.map((k, i) => [k.id, i]));
+// packed: 8 bytes each. the kind and cube face, where on the face (16 bits each way: about 1 cm on a 550 m planet),
+// size (0.25-3), turn and tint
+PT.encodeObjects = function(list){
+  if (!list || !list.length) return '';
+  const out = new Uint8Array(list.length*8), q16 = v => Math.max(0, Math.min(65535, Math.round((v + 1)/2*65535)));
+  list.forEach((o, n) => { const [f, u, v] = PT.faceUV(o.d[0], o.d[1], o.d[2]), a = q16(u), b = q16(v), k = n*8;
+    out[k] = (o.k & 31) | (f << 5); out[k + 1] = a & 255; out[k + 2] = a >> 8; out[k + 3] = b & 255; out[k + 4] = b >> 8;
+    out[k + 5] = Math.max(0, Math.min(255, Math.round((o.s - 0.25)/2.75*255)));
+    out[k + 6] = Math.round((((o.rot || 0) % (2*Math.PI)) + 2*Math.PI) % (2*Math.PI)/(2*Math.PI)*256) & 255;
+    out[k + 7] = Math.max(0, Math.min(255, Math.round((o.t ?? 0.5)*255))); });
+  return b64FromBytes(out);
+};
+PT.decodeObjects = function(b){
+  if (!b || typeof b !== 'string') return [];
+  const B = bytesFromB64(b), list = [];
+  for (let k = 0; k + 7 < B.length; k += 8){
+    const kind = B[k] & 31, f = B[k] >> 5; if (kind >= PT.OBJECT_KINDS.length || f > 5) continue;
+    const u = (B[k + 1] | (B[k + 2] << 8))/65535*2 - 1, v = (B[k + 3] | (B[k + 4] << 8))/65535*2 - 1;
+    list.push({ k: kind, d: PT.dirFromFace(f, u, v), s: 0.25 + B[k + 5]/255*2.75, rot: B[k + 6]/256*2*Math.PI, t: B[k + 7]/255 });
+  }
+  return list;
+};
+
+// ---------- lawns: groomed ground (it glides like a trail) that the cleanup keeps skiable ----------
+// round a placed model: its lawn reaches `r` metres out from the model's footprint (a box, m.foot = its half-size
+// along its own x and z), the edge wandering in and out by up to `rough` of r, its shape set by `seed`. painted (the
+// Lawn brush): L.lawn, a layer like the detail layer, 0..1 (lawn where it's over a half). a lawn is groomed only where
+// the ground skis: where it runs onto a cliff, it stops at the cliff's edge
+PT.lawnDefaults = () => ({ r: 8, rough: 0.5, seed: 1 });
+PT.lawnField = function(L, R){
+  const items = [];
+  for (const m of (L && L.models) || []){
+    const lw = m.lawn; if (!lw || !(lw.r > 0) || !m.d) continue;
+    const [X, , Z] = PT.modelBasis(m.d, m.rot), foot = m.foot || [3, 3], rough = Math.max(0, Math.min(1, lw.rough ?? 0.5));
+    const reach = Math.hypot(foot[0], foot[1]) + lw.r*(1 + rough) + 2;
+    items.push({ c: norm(m.d), X, Z, hx: foot[0], hz: foot[1], r: lw.r, rough, seed: (lw.seed | 0) || 1, cosR: Math.cos(reach/R), reach });
+  }
+  const dl = L && L.lawn && L.lawn.tiles && L.lawn.tiles.size ? L.lawn : null, cs = dl ? Math.PI/2*R/(dl.n - 1) : 1;
+  // how far inside a lawn the point is (metres; negative: outside, by about that much near the edge)
+  const at = (x, y, z) => {
+    let best = -1e9;
+    if (dl){ const v = PT.sampleDetail(dl, x, y, z); if (v > 0) best = (v - 0.5)*2*cs; }
+    for (let i = 0; i < items.length; i++){
+      const it = items[i], c = it.c; if (x*c[0] + y*c[1] + z*c[2] < it.cosR) continue;
+      const px = (x - c[0])*R, py = (y - c[1])*R, pz = (z - c[2])*R, lx = px*it.X[0] + py*it.X[1] + pz*it.X[2], lz = px*it.Z[0] + py*it.Z[1] + pz*it.Z[2];
+      const qx = Math.abs(lx) - it.hx, qz = Math.abs(lz) - it.hz, sd = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0);
+      if (sd > it.r*(1 + it.rough) + 1){ if (-sd > best) best = Math.max(best, it.r*(1 + it.rough) - sd); continue; }
+      const s = it.seed, n = 0.7*noise3(lx/16 + s*7.31, lz/16 - s*3.17, s*0.371) + 0.3*noise3(lx/6.5 + 11.3 + s*1.9, lz/6.5 - 5.1, s*1.27 + 0.5);
+      const ins = it.r*(1 + it.rough*1.4*n) - sd; if (ins > best) best = ins;
+    }
+    return best;
+  };
+  return { any: !!(items.length || dl), items, at, cs };
+};
+
+// ---------- what painted objects keep clear of: trail beds (and junction curves and islands), lawns, and the placed
+// models' footprints. blocked(x, y, z, extra) says whether a point is within `extra` metres of any. an object that a
+// later trail, lawn or model covers is hidden there (kept, so moving the trail away brings it back)
+PT.objectBlocker = function(L, T, R){
+  const C = 8, cell = (x, y, z) => ((Math.floor(x*R/C) + 4096)*8192 + (Math.floor(y*R/C) + 4096))*8192 + (Math.floor(z*R/C) + 4096);
+  const H = new Map(), put = (p, half) => { const k = cell(p[0], p[1], p[2]); let l = H.get(k); if (!l) H.set(k, l = []); l.push(p[0], p[1], p[2], half); };
+  const lines = T && T.net ? T.net.lines : [], TR = (T && T.trails) || (L && L.trails) || [], beds = new Map(((T && T.beds) || []).map(b => [b.ti, b]));
+  let maxHalf = 0;
+  lines.forEach((l, ti) => { const t = TR[ti]; if (!t || !l) return; const b = beds.get(ti);
+    for (let i = 0; i < l.length; i++){ const half = b ? (b.halves ? b.halves[i] : b.bed) : 2.5; maxHalf = Math.max(maxHalf, half);
+      put(l[i], half); if (i + 1 < l.length) put(norm([(l[i][0] + l[i + 1][0])/2, (l[i][1] + l[i + 1][1])/2, (l[i][2] + l[i + 1][2])/2]), half); } });
+  const fil = T && T.links ? T.links.fillets : [];
+  for (const f of fil){ for (const p of f.pts) put(p, f.bed || 2.5); }
+  const lawn = T && T.lawn ? T.lawn : PT.lawnField(L, R);
+  const foots = ((L && L.models) || []).filter(m => m.d).map(m => { const [X, , Z] = PT.modelBasis(m.d, m.rot), f = m.foot || [3, 3]; return { c: norm(m.d), X, Z, hx: f[0], hz: f[1], cosR: Math.cos((Math.hypot(f[0], f[1]) + 6)/R) }; });
+  return function(x, y, z, extra = 0){
+    // trail beds and junction curves: points 1 m apart, each with its half-width
+    const reach = maxHalf + extra + 1.5, n = Math.ceil(reach/C), cx = Math.floor(x*R/C), cy = Math.floor(y*R/C), cz = Math.floor(z*R/C);
+    for (let a = -n; a <= n; a++) for (let b = -n; b <= n; b++) for (let c = -n; c <= n; c++){
+      const l = H.get(((cx + a + 4096)*8192 + (cy + b + 4096))*8192 + (cz + c + 4096)); if (!l) continue;
+      for (let i = 0; i < l.length; i += 4){ const dx = (l[i] - x)*R, dy = (l[i + 1] - y)*R, dz = (l[i + 2] - z)*R, lim = l[i + 3] + extra + 0.6; if (dx*dx + dy*dy + dz*dz < lim*lim) return true; }
+    }
+    for (const f of fil){ const w = f.wedge && f.wedge[0]; if (w && Math.acos(Math.min(1, x*w[0] + y*w[1] + z*w[2]))*R < (f._r || 10) + extra + 2 && PT.inWedge(f, [x, y, z], R)) return true; }
+    if (lawn.any && lawn.at(x, y, z) > -extra - 0.3) return true;
+    for (const m of foots){ const c = m.c; if (x*c[0] + y*c[1] + z*c[2] < m.cosR) continue;
+      const px = (x - c[0])*R, py = (y - c[1])*R, pz = (z - c[2])*R, lx = px*m.X[0] + py*m.X[1] + pz*m.X[2], lz = px*m.Z[0] + py*m.Z[1] + pz*m.Z[2];
+      if (Math.abs(lx) < m.hx + extra + 0.5 && Math.abs(lz) < m.hz + extra + 0.5) return true; }
+    return false;
+  };
+};
 // to and from JSON (the sculpt layer goes as base64 centimetres)
 PT.serialize = function(L){
   const r5 = p => p.map(v => Math.round(v*1e6)/1e6);
@@ -744,7 +855,10 @@ PT.serialize = function(L){
     sculpt: PT.encodeSculpt(L.sculpt), detail: PT.encodeDetail(L.detail),
     trails: L.trails.map(t => ({ name: t.name, closed: !!t.closed, pts: t.pts.map(r5), carve: !!t.carve, bed: t.bed, shoulder: t.shoulder, smooth: t.smooth, maxGrade: t.maxGrade })),
     landmarks: L.landmarks.map(m => ({ name: m.name, type: m.type, d: r5(m.d), height: m.height, color: m.color })),
-    models: (L.models || []).map(m => ({ name: m.name, id: m.id, v: m.v, seed: m.seed, d: r5(m.d), rot: m.rot, scale: m.scale, solid: m.solid !== false })),
+    models: (L.models || []).map(m => Object.assign({ name: m.name, id: m.id, v: m.v, seed: m.seed, d: r5(m.d), rot: m.rot, scale: m.scale, solid: m.solid !== false },
+      m.foot ? { foot: m.foot.map(v => Math.round(v*100)/100) } : {}, m.lawn && m.lawn.r > 0 ? { lawn: { r: m.lawn.r, rough: m.lawn.rough, seed: m.lawn.seed } } : {})),
+    objects: PT.encodeObjects(L.objects),
+    lawn: L.lawn && L.lawn.tiles.size ? PT.encodeDetail(L.lawn) : undefined,
     bridges: (L.bridges || []).map(b => ({ name: b.name, pts: b.pts.map(r5), clearance: b.clearance, ramp: b.ramp, width: b.width, maxGrade: b.maxGrade })),
     start: { d: r5(L.start.d) }, scatter: Object.assign({}, L.scatter), cliffs: Object.assign({}, L.cliffs), network: Object.assign(PT.networkDefaults(), L.network || {}),
     layers: (L.layers || []).map(l => ({ name: l.name, depth: l.depth })),
@@ -763,7 +877,10 @@ PT.parse = function(json){
     sculpt: PT.decodeSculpt(o.sculpt), detail: PT.decodeDetail(o.detail),
     trails: (o.trails || []).map(t => Object.assign({ name: t.name || 'Trail', closed: !!t.closed, pts: t.pts.map(norm) }, PT.carveDefaults(), { carve: !!t.carve }, pick(t, ['bed', 'shoulder', 'smooth', 'maxGrade']))),
     landmarks: (o.landmarks || []).map(m => ({ name: m.name || 'Landmark', type: m.type || 'marker', d: norm(m.d), height: +m.height || 10, color: m.color || '#d2462e' })),
-    models: (o.models || []).filter(m => m && m.id && m.d).map(m => ({ name: m.name || m.id, id: String(m.id), v: Math.max(0, m.v | 0), seed: Math.max(1, m.seed | 0), d: norm(m.d), rot: +m.rot || 0, scale: +m.scale > 0 ? +m.scale : 1, solid: m.solid !== false })),
+    models: (o.models || []).filter(m => m && m.id && m.d).map(m => Object.assign({ name: m.name || m.id, id: String(m.id), v: Math.max(0, m.v | 0), seed: Math.max(1, m.seed | 0), d: norm(m.d), rot: +m.rot || 0, scale: +m.scale > 0 ? +m.scale : 1, solid: m.solid !== false },
+      Array.isArray(m.foot) && m.foot.length === 2 ? { foot: [+m.foot[0] || 1, +m.foot[1] || 1] } : {}, m.lawn && +m.lawn.r > 0 ? { lawn: Object.assign(PT.lawnDefaults(), pick(m.lawn, ['r', 'rough', 'seed'])) } : {})),
+    objects: PT.decodeObjects(o.objects),
+    lawn: o.lawn && o.lawn.tiles && o.lawn.tiles.length ? PT.decodeDetail(o.lawn) : null,
     bridges: (o.bridges || []).filter(b => b.pts && b.pts.length >= 2).map(b => Object.assign({ name: b.name || 'Light bridge', pts: b.pts.map(norm) }, PT.bridgeDefaults(), pick(b, ['clearance', 'ramp', 'width', 'maxGrade']))),
     start: { d: norm(o.start && o.start.d || B.start.d) }, scatter: Object.assign({}, B.scatter, o.scatter || {}),
     cliffs: Object.assign(PT.cliffDefaults(), pick(o.cliffs || {}, ['from', 'band', 'sharp', 'stop'])),
@@ -778,6 +895,7 @@ PT.parse = function(json){
   };
   // older layouts may have steps where the cube faces meet: weld them, easing the change back into each face
   PT.weldSculpt(L.sculpt, 3); PT.weldDetail(L.detail, 8);
+  if (L.lawn) PT.weldDetail(L.lawn);
   return L;
 };
 
@@ -1219,6 +1337,8 @@ PT.terrain = function(L, R, prev, caps){
       const g = cl ? h + PT.sampleDetail(cl, x, y, z) : corr ? corridorAt(corr, x, y, z, h) : h;
       return corrR ? corridorAt(corrR, x, y, z, g) : g;
     },
+    // the lawns (PT.lawnField)
+    lawn: PT.lawnField(L, R),
     // everything but the sculpt and detail layers and the carving
     shaped,
     // the ground before the trails carve it

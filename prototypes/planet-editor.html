@@ -365,12 +365,17 @@ function rebuildCaps(caps){
 // the lawns changed (the Lawn brush, a model's lawn): the ground's lawn tint round them, and the objects they clear
 function relawn(caps){
   caps = caps.filter(Boolean); if (!caps.length) return;
-  T.lawn = PT.lawnField(L, R);
+  T.lawn = PT.lawnField(L, R, L.trails.length ? PT.trailNetwork(L.trails, R, L.network ? L.network.join : 0, 2).lines : null);
   for (const c of chunks) if (caps.some(([d, a]) => c.c.angleTo(d) < a + c.ang + 0.002)) buildChunk(c);
   syncObjects(caps);
 }
+// a trail changed: the lawns whose tongues may reach for it again (their whole caps, old tongue and new)
+function relawnTrail(t){
+  const caps = []; for (const m of L.models){ const c = lawnCap(m); if (!c || m.lawn.tongue === false) continue; if (t.pts.some(p => c[0].angleTo(new V3(...p).normalize()) < c[1] + 0.01)) caps.push(c); }
+  if (caps.length) relawn(caps);
+}
 // the cap a model's lawn covers (null if it has none)
-function lawnCap(m){ if (!m.lawn || !(m.lawn.r > 0)) return null; const f = m.foot || [3, 3]; return [new V3(...m.d).normalize(), (Math.hypot(f[0], f[1]) + m.lawn.r*(1 + (m.lawn.rough ?? 0.5)) + 4)/R]; }
+function lawnCap(m){ if (!m.lawn || !(m.lawn.r > 0)) return null; const f = m.foot || [3, 3], Rl = Math.hypot(f[0], f[1])*0.85 + m.lawn.r; return [new V3(...m.d).normalize(), ((m.lawn.tongue !== false ? 3.4*Rl + 80 : 1.4*Rl) + 3*PT.LAWN_K + 4)/R]; }
 function updateRange(){
   let lo = Infinity, hi = -Infinity; for (const c of chunks){ lo = Math.min(lo, c.lo); hi = Math.max(hi, c.hi); }
   terrainMat.uniforms.uLo.value = lo; terrainMat.uniforms.uHi.value = Math.max(hi, lo + 10);
@@ -847,13 +852,15 @@ function showSel(){
     // its lawn: groomed ground reaching out from its footprint, the edge wandering in and out (roughness), its shape
     // set by the seed. redrawn as a slider moves (on the next frame)
     let lwCap = null, lwRaf = 0;
-    const lw = fn => v => { if (!lwCap) lwCap = lawnCap(m); if (!m.lawn) m.lawn = Object.assign(PT.lawnDefaults(), { r: 0, seed: newSeed() % 100000 }); fn(v); if (!(m.lawn.r > 0)) delete m.lawn;
+    const lw = fn => v => { if (!lwCap) lwCap = lawnCap(m) || lawnCap(Object.assign({}, m, { lawn: { r: 40 } })); if (!m.lawn) m.lawn = Object.assign(PT.lawnDefaults(), { r: 0, seed: newSeed() % 100000 }); fn(v); if (!(m.lawn.r > 0)) delete m.lawn;
       cancelAnimationFrame(lwRaf); lwRaf = requestAnimationFrame(() => { relawn([lwCap, lawnCap(m)]); lwCap = lawnCap(m); }); };
     parts.push({ html: '<h3>Lawn</h3>', bind(){} });
-    parts.push(slider('slLwR', 'Reaches past its footprint', 0, 40, 0.5, () => m.lawn ? m.lawn.r : 0, lw(v => m.lawn.r = v), v => v ? v + ' m' : 'none'));
+    parts.push(slider('slLwR', 'Reaches past its footprint (about)', 0, 40, 0.5, () => m.lawn ? m.lawn.r : 0, lw(v => m.lawn.r = v), v => v ? v + ' m' : 'none'));
     if (m.lawn){
       parts.push(slider('slLwRo', 'Edge roughness', 0, 1, 0.05, () => m.lawn.rough ?? 0.5, lw(v => m.lawn.rough = v), v => v ? Math.round(v*100) + '%' : 'smooth'));
-      parts.push({ html: `<label class="f" for="slLwS">Shape (seed)<input id="slLwS" type="number" step="1" min="1" style="grid-column:1/-1"></label><div class="row"><button id="slLwNew" type="button">New shape</button></div><p class="hint">Groomed (it glides like a trail), and the terrain cleanup keeps it skiable; where it meets a kept cliff it stops at the cliff's edge. Trees and rocks keep off it.</p>`,
+      parts.push({ html: `<label class="c"><input id="slLwT" type="checkbox"${m.lawn.tongue !== false ? ' checked' : ''}> Join it to the nearest trail (a groomed tongue)</label>`, bind(){ const el = $('slLwT');
+        el.addEventListener('change', () => { const c0 = lawnCap(Object.assign({}, m, { lawn: Object.assign({}, m.lawn, { tongue: true }) })); m.lawn.tongue = el.checked; relawn([c0, lawnCap(m)]); commit(); el.blur(); }); } });
+      parts.push({ html: `<label class="f" for="slLwS">Shape (seed)<input id="slLwS" type="number" step="1" min="1" style="grid-column:1/-1"></label><div class="row"><button id="slLwNew" type="button">New shape</button></div><p class="hint">Round, its edge in a few broad lobes, melting into any lawn nearby. Groomed (it glides like a trail), and the terrain cleanup keeps it skiable; where it meets a kept cliff it stops at the cliff's edge. Trees and rocks keep off it.</p>`,
         bind(){ const el = $('slLwS'); el.value = m.lawn.seed;
           const set = v => { const c0 = lawnCap(m); m.lawn.seed = Math.max(1, Math.round(v) || 1); el.value = m.lawn.seed; relawn([c0, lawnCap(m)]); commit(); };
           el.addEventListener('change', () => set(+el.value)); $('slLwNew').addEventListener('click', e => { set(newSeed() % 100000); e.currentTarget.blur(); }); } });
@@ -911,6 +918,7 @@ function deleteSel(all){
 function finishDrawing(){
   const d = drawing; drawing = null;
   if (!d) return;
+  if (d.kind === 'trail') setTimeout(() => relawnTrail({ pts: d.pts }), 0);
   if (d.kind === 'trail' && d.pts.length >= 2){
     const t = Object.assign({ name: 'Trail ' + (L.trails.length + 1), closed: opts.trail.closed && d.pts.length >= 3, pts: d.pts }, PT.carveDefaults(), { carve: opts.trail.carve });
     L.trails.push(t); sel = { kind: 'trail', ref: t, i: 0 };
@@ -1002,7 +1010,7 @@ cv.addEventListener('pointermove', e => {
 });
 const endPtr = () => {
   if (!ptr) return;
-  if (ptr.mode === 'move'){ if (ptr.moved){ if (ptr.h.kind === 'trail' && ptr.h.ref.carve){ rebuildCaps([ptr.cap0, pointCap(ptr.h.ref, ptr.h.i)]); rebuildOverlays(); } if (ptr.h.kind === 'ramp') rampRebuild(ptr.h.ref, ptr.cap0); if (ptr.h.kind === 'model') relawn([ptr.cap0, lawnCap(ptr.h.ref)]); if (ptr.h.kind === 'start' || ptr.h.kind === 'landmark' || ptr.h.kind === 'model') syncObjects([[new V3(...ptr.h.ref.d).normalize(), 60/R]]); commit(); showSel(); } }
+  if (ptr.mode === 'move'){ if (ptr.moved){ if (ptr.h.kind === 'trail' && ptr.h.ref.carve){ rebuildCaps([ptr.cap0, pointCap(ptr.h.ref, ptr.h.i)]); rebuildOverlays(); } if (ptr.h.kind === 'ramp') rampRebuild(ptr.h.ref, ptr.cap0); if (ptr.h.kind === 'model') relawn([ptr.cap0, lawnCap(ptr.h.ref)]); if (ptr.h.kind === 'trail') relawnTrail(ptr.h.ref); if (ptr.h.kind === 'start' || ptr.h.kind === 'landmark' || ptr.h.kind === 'model') syncObjects([[new V3(...ptr.h.ref.d).normalize(), 60/R]]); commit(); showSel(); } }
   if (ptr.mode === 'sculpt' || ptr.mode === 'cliff' || ptr.mode === 'cavebrush') commit();
   if (ptr.mode === 'objects'){ commit(true, true); objNote(); }
   if (ptr.mode === 'lawn') commit();

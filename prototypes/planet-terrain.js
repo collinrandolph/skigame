@@ -29,7 +29,7 @@
 //                 left out (unless `keep` is set)
 //   objects       painted trees, rocks and the like (PT.OBJECT_KINDS), packed 8 bytes each (PT.encodeObjects)
 //   lawn          the Lawn brush's layer (the detail layer's format, 0..1); a model's own lawn is its `lawn`
-//                 ({ r, rough, seed }) round its footprint `foot` (half-size along its x and z, metres)
+//                 ({ r, rough, seed, tongue }) round its footprint `foot` (half-size along its x and z, metres)
 // Directions are unit vectors [x, y, z] from the planet's centre (y is the planet's north).
 (function(){
 'use strict';
@@ -785,35 +785,65 @@ PT.decodeObjects = function(b){
 };
 
 // ---------- lawns: groomed ground (it glides like a trail) that the cleanup keeps skiable ----------
-// round a placed model: its lawn reaches `r` metres out from the model's footprint (a box, m.foot = its half-size
-// along its own x and z), the edge wandering in and out by up to `rough` of r, its shape set by `seed`. painted (the
-// Lawn brush): L.lawn, a layer like the detail layer, 0..1 (lawn where it's over a half). a lawn is groomed only where
-// the ground skis: where it runs onto a cliff, it stops at the cliff's edge
-PT.lawnDefaults = () => ({ r: 8, rough: 0.5, seed: 1 });
-PT.lawnField = function(L, R){
-  const items = [];
+// shaped as game 2.0's lawns. round a placed model (its `lawn`): a round lawn centred on it, reaching `r` metres past
+// its footprint (m.foot, half its size along its own x and z: the lawn starts from 85% of the footprint's corner),
+// its edge wandering in and out in a few broad lobes (sines of 3, 5 and 8 round; `rough` scales them, `seed` sets
+// their phases). unless `tongue` is false, a groomed tongue joins it to the nearest trail within reach (if the lawn
+// doesn't already run into one): a gently bent curve about as wide as the lawn, narrowing toward the trail and
+// swelling and narrowing a little along the way. painted (the Lawn brush): L.lawn, a layer like the detail layer,
+// 0..1 (lawn where it's over a half). every lawn, tongue and painted patch melts into its neighbours (a smooth union,
+// 5 m soft), so where they come close they make one rounded shape. a lawn is groomed only where the ground skis:
+// where it runs onto a cliff, it stops at the cliff's edge
+PT.lawnDefaults = () => ({ r: 8, rough: 0.5, seed: 1, tongue: true });
+PT.LAWN_K = 5;
+PT.lawnField = function(L, R, lines){
+  const K = PT.LAWN_K, parts = [];
+  const trailPts = [];
+  if (lines) for (const l of lines) if (l) for (let i = 0; i < l.length; i += 2) trailPts.push(l[i]);
   for (const m of (L && L.models) || []){
     const lw = m.lawn; if (!lw || !(lw.r > 0) || !m.d) continue;
-    const [X, , Z] = PT.modelBasis(m.d, m.rot), foot = m.foot || [3, 3], rough = Math.max(0, Math.min(1, lw.rough ?? 0.5));
-    const reach = Math.hypot(foot[0], foot[1]) + lw.r*(1 + rough) + 2;
-    items.push({ c: norm(m.d), X, Z, hx: foot[0], hz: foot[1], r: lw.r, rough, seed: (lw.seed | 0) || 1, cosR: Math.cos(reach/R), reach });
+    const c = norm(m.d), [X, , Z] = PT.modelBasis(m.d, 0), foot = m.foot || [3, 3], rough = Math.max(0, Math.min(1, lw.rough ?? 0.5));
+    let sd = ((lw.seed | 0) || 1) % 2147483646 + 1; const rnd = () => (sd = (sd * 16807) % 2147483647)/2147483647;
+    const Rl = Math.hypot(foot[0], foot[1])*0.85 + lw.r, k = rough/0.5;
+    const ph = [rnd()*6.3, rnd()*6.3, rnd()*6.3], wob = [(0.1 + rnd()*0.06)*k, (0.05 + rnd()*0.04)*k, 0.03*k];
+    const ext = Rl*(1 + wob[0] + wob[1] + wob[2]);
+    const part = { kind: 'lawn', c, X, Z, R: Rl, ph, wob, ext };
+    // (in the model's own flat frame, metres)
+    const loc = p => { const px = (p[0] - c[0])*R, py = (p[1] - c[1])*R, pz = (p[2] - c[2])*R; return [px*X[0] + py*X[1] + pz*X[2], px*Z[0] + py*Z[1] + pz*Z[2]]; };
+    parts.push(part);
+    if (lw.tongue === false || !trailPts.length) continue;
+    // the tongue: to the nearest trail point (within the lawn's reach + 80 m), unless the lawn already runs into a trail
+    let best = null, bd = Infinity; const lim = Math.cos((Rl + 80)/R);
+    for (const q of trailPts){ if (q[0]*c[0] + q[1]*c[1] + q[2]*c[2] < lim) continue; const [x, z] = loc(q), d = Math.hypot(x, z); if (d < bd){ bd = d; best = [x, z]; } }
+    if (!best || bd < Rl*0.7) continue;
+    const [tx, tz] = best, bend = (rnd() - 0.5)*0.7*bd, nx = -tz/bd, nz = tx/bd, cx = tx/2 + nx*bend, cz = tz/2 + nz*bend, pts = [];
+    for (let s = 0; s <= 16; s++){ const u = s/16; pts.push(2*(1 - u)*u*cx + u*u*tx, 2*(1 - u)*u*cz + u*u*tz); }
+    const w = 2*Rl*(0.8 + rnd()*0.4), wph = rnd()*6.3;
+    parts.push({ kind: 'tongue', c, X, Z, pts, w, wph, ext: bd + w });
   }
+  for (const p of parts) p.cosR = Math.cos((p.ext + 3*K + 2)/R);
   const dl = L && L.lawn && L.lawn.tiles && L.lawn.tiles.size ? L.lawn : null, cs = dl ? Math.PI/2*R/(dl.n - 1) : 1;
-  // how far inside a lawn the point is (metres; negative: outside, by about that much near the edge)
-  const at = (x, y, z) => {
-    let best = -1e9;
-    if (dl){ const v = PT.sampleDetail(dl, x, y, z); if (v > 0) best = (v - 0.5)*2*cs; }
-    for (let i = 0; i < items.length; i++){
-      const it = items[i], c = it.c; if (x*c[0] + y*c[1] + z*c[2] < it.cosR) continue;
-      const px = (x - c[0])*R, py = (y - c[1])*R, pz = (z - c[2])*R, lx = px*it.X[0] + py*it.X[1] + pz*it.X[2], lz = px*it.Z[0] + py*it.Z[1] + pz*it.Z[2];
-      const qx = Math.abs(lx) - it.hx, qz = Math.abs(lz) - it.hz, sd = Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0);
-      if (sd > it.r*(1 + it.rough) + 1){ if (-sd > best) best = Math.max(best, it.r*(1 + it.rough) - sd); continue; }
-      const s = it.seed, n = 0.7*noise3(lx/16 + s*7.31, lz/16 - s*3.17, s*0.371) + 0.3*noise3(lx/6.5 + 11.3 + s*1.9, lz/6.5 - 5.1, s*1.27 + 0.5);
-      const ins = it.r*(1 + it.rough*1.4*n) - sd; if (ins > best) best = ins;
-    }
-    return best;
+  const partSD = (p, lx, lz) => {
+    if (p.kind === 'lawn'){ const th = Math.atan2(lz, lx), w = p.wob, ph = p.ph;
+      return Math.hypot(lx, lz) - p.R*(1 + w[0]*Math.sin(3*th + ph[0]) + w[1]*Math.sin(5*th + ph[1]) + w[2]*Math.sin(8*th + ph[2])); }
+    const q = p.pts, n = q.length/2 - 1; let best = Infinity, bu = 0;
+    for (let i = 0; i < n; i++){ const ax = q[i*2], ay = q[i*2 + 1], ex = q[i*2 + 2] - ax, ey = q[i*2 + 3] - ay, L2 = ex*ex + ey*ey;
+      const u = L2 ? Math.max(0, Math.min(1, ((lx - ax)*ex + (lz - ay)*ey)/L2)) : 0, d = Math.hypot(lx - ax - u*ex, lz - ay - u*ey); if (d < best){ best = d; bu = (i + u)/n; } }
+    return best - p.w/2*(1 - 0.45*bu)*(1 + 0.14*Math.sin(bu*Math.PI*2.5 + p.wph));
   };
-  return { any: !!(items.length || dl), items, at, cs };
+  // how far inside the lawns the point is (metres; negative outside, by about that much near the edge)
+  const at = (x, y, z) => {
+    let acc = 0, any = false;
+    if (dl){ const v = PT.sampleDetail(dl, x, y, z); if (v > 0){ acc += Math.exp((v - 0.5)*2*cs/K)*Math.min(1, v/0.2); any = true; } }
+    for (let i = 0; i < parts.length; i++){
+      const p = parts[i], c = p.c; if (x*c[0] + y*c[1] + z*c[2] < p.cosR) continue;
+      const px = (x - c[0])*R, py = (y - c[1])*R, pz = (z - c[2])*R, lx = px*p.X[0] + py*p.X[1] + pz*p.X[2], lz = px*p.Z[0] + py*p.Z[1] + pz*p.Z[2];
+      const d = partSD(p, lx, lz); if (d > 3*K) continue;
+      acc += Math.exp(-d/K); any = true;
+    }
+    return any ? K*Math.log(acc) : -1e9;
+  };
+  return { any: !!(parts.length || dl), items: parts, at, cs };
 };
 
 // ---------- what painted objects keep clear of: trail beds (and junction curves and islands), lawns, and the placed
@@ -829,7 +859,7 @@ PT.objectBlocker = function(L, T, R){
       put(l[i], half); if (i + 1 < l.length) put(norm([(l[i][0] + l[i + 1][0])/2, (l[i][1] + l[i + 1][1])/2, (l[i][2] + l[i + 1][2])/2]), half); } });
   const fil = T && T.links ? T.links.fillets : [];
   for (const f of fil){ for (const p of f.pts) put(p, f.bed || 2.5); }
-  const lawn = T && T.lawn ? T.lawn : PT.lawnField(L, R);
+  const lawn = T && T.lawn ? T.lawn : PT.lawnField(L, R, T && T.net ? T.net.lines : null);
   const foots = ((L && L.models) || []).filter(m => m.d).map(m => { const [X, , Z] = PT.modelBasis(m.d, m.rot), f = m.foot || [3, 3]; return { c: norm(m.d), X, Z, hx: f[0], hz: f[1], cosR: Math.cos((Math.hypot(f[0], f[1]) + 6)/R) }; });
   return function(x, y, z, extra = 0){
     // trail beds and junction curves: points 1 m apart, each with its half-width
@@ -856,7 +886,7 @@ PT.serialize = function(L){
     trails: L.trails.map(t => ({ name: t.name, closed: !!t.closed, pts: t.pts.map(r5), carve: !!t.carve, bed: t.bed, shoulder: t.shoulder, smooth: t.smooth, maxGrade: t.maxGrade })),
     landmarks: L.landmarks.map(m => ({ name: m.name, type: m.type, d: r5(m.d), height: m.height, color: m.color })),
     models: (L.models || []).map(m => Object.assign({ name: m.name, id: m.id, v: m.v, seed: m.seed, d: r5(m.d), rot: m.rot, scale: m.scale, solid: m.solid !== false },
-      m.foot ? { foot: m.foot.map(v => Math.round(v*100)/100) } : {}, m.lawn && m.lawn.r > 0 ? { lawn: { r: m.lawn.r, rough: m.lawn.rough, seed: m.lawn.seed } } : {})),
+      m.foot ? { foot: m.foot.map(v => Math.round(v*100)/100) } : {}, m.lawn && m.lawn.r > 0 ? { lawn: { r: m.lawn.r, rough: m.lawn.rough, seed: m.lawn.seed, tongue: m.lawn.tongue !== false } } : {})),
     objects: PT.encodeObjects(L.objects),
     lawn: L.lawn && L.lawn.tiles.size ? PT.encodeDetail(L.lawn) : undefined,
     bridges: (L.bridges || []).map(b => ({ name: b.name, pts: b.pts.map(r5), clearance: b.clearance, ramp: b.ramp, width: b.width, maxGrade: b.maxGrade })),
@@ -878,7 +908,7 @@ PT.parse = function(json){
     trails: (o.trails || []).map(t => Object.assign({ name: t.name || 'Trail', closed: !!t.closed, pts: t.pts.map(norm) }, PT.carveDefaults(), { carve: !!t.carve }, pick(t, ['bed', 'shoulder', 'smooth', 'maxGrade']))),
     landmarks: (o.landmarks || []).map(m => ({ name: m.name || 'Landmark', type: m.type || 'marker', d: norm(m.d), height: +m.height || 10, color: m.color || '#d2462e' })),
     models: (o.models || []).filter(m => m && m.id && m.d).map(m => Object.assign({ name: m.name || m.id, id: String(m.id), v: Math.max(0, m.v | 0), seed: Math.max(1, m.seed | 0), d: norm(m.d), rot: +m.rot || 0, scale: +m.scale > 0 ? +m.scale : 1, solid: m.solid !== false },
-      Array.isArray(m.foot) && m.foot.length === 2 ? { foot: [+m.foot[0] || 1, +m.foot[1] || 1] } : {}, m.lawn && +m.lawn.r > 0 ? { lawn: Object.assign(PT.lawnDefaults(), pick(m.lawn, ['r', 'rough', 'seed'])) } : {})),
+      Array.isArray(m.foot) && m.foot.length === 2 ? { foot: [+m.foot[0] || 1, +m.foot[1] || 1] } : {}, m.lawn && +m.lawn.r > 0 ? { lawn: Object.assign(PT.lawnDefaults(), pick(m.lawn, ['r', 'rough', 'seed']), { tongue: m.lawn.tongue !== false }) } : {})),
     objects: PT.decodeObjects(o.objects),
     lawn: o.lawn && o.lawn.tiles && o.lawn.tiles.length ? PT.decodeDetail(o.lawn) : null,
     bridges: (o.bridges || []).filter(b => b.pts && b.pts.length >= 2).map(b => Object.assign({ name: b.name || 'Light bridge', pts: b.pts.map(norm) }, PT.bridgeDefaults(), pick(b, ['clearance', 'ramp', 'width', 'maxGrade']))),
@@ -1338,7 +1368,7 @@ PT.terrain = function(L, R, prev, caps){
       return corrR ? corridorAt(corrR, x, y, z, g) : g;
     },
     // the lawns (PT.lawnField)
-    lawn: PT.lawnField(L, R),
+    lawn: PT.lawnField(L, R, net ? net.lines.filter((l, i) => !TR[i].build) : null),
     // everything but the sculpt and detail layers and the carving
     shaped,
     // the ground before the trails carve it

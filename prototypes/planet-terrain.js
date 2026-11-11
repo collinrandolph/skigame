@@ -889,7 +889,7 @@ PT.serialize = function(L){
       m.foot ? { foot: m.foot.map(v => Math.round(v*100)/100) } : {}, m.lawn && m.lawn.r > 0 ? { lawn: { r: m.lawn.r, rough: m.lawn.rough, seed: m.lawn.seed, tongue: m.lawn.tongue !== false } } : {})),
     objects: PT.encodeObjects(L.objects),
     lawn: L.lawn && L.lawn.tiles.size ? PT.encodeDetail(L.lawn) : undefined,
-    bridges: (L.bridges || []).map(b => ({ name: b.name, pts: b.pts.map(r5), clearance: b.clearance, ramp: b.ramp, width: b.width, maxGrade: b.maxGrade })),
+    bridges: (L.bridges || []).map(b => Object.assign({ name: b.name, pts: b.pts.map(r5), clearance: b.clearance, ramp: b.ramp, width: b.width, maxGrade: b.maxGrade }, b.kind ? { kind: b.kind } : {})),
     start: { d: r5(L.start.d) }, scatter: Object.assign({}, L.scatter), cliffs: Object.assign({}, L.cliffs), network: Object.assign(PT.networkDefaults(), L.network || {}),
     layers: (L.layers || []).map(l => ({ name: l.name, depth: l.depth })),
     tunnels: (L.tunnels || []).map(t => ({ name: t.name, layer: t.layer, pts: t.pts.map(r5), width: t.width, height: t.height, h0: t.h0, h1: t.h1 })),
@@ -897,6 +897,7 @@ PT.serialize = function(L){
     caveBrush: (L.caveBrush || []).map(b => b && b.room.tiles.size ? { room: PT.encodeDetail(b.room), floor: PT.encodeDetail(b.floor) } : null),
     ramps: (L.ramps || []).map(rp => ({ name: rp.name, c: r5(rp.c), turn: rp.turn, start: rp.start, top: rp.top, width: rp.width, maxGrade: rp.maxGrade, rMax: rp.rMax, segs: rp.segs.map(sg => Object.assign({}, sg)) })),
     clean: L.clean && L.clean.tiles.size ? Object.assign(PT.encodeDetail(L.clean), { sig: L.clean.sig || '', stale: !!L.clean.stale }) : undefined,
+    game: L.game || undefined,
   });
 };
 PT.parse = function(json){
@@ -911,7 +912,7 @@ PT.parse = function(json){
       Array.isArray(m.foot) && m.foot.length === 2 ? { foot: [+m.foot[0] || 1, +m.foot[1] || 1] } : {}, m.lawn && +m.lawn.r > 0 ? { lawn: Object.assign(PT.lawnDefaults(), pick(m.lawn, ['r', 'rough', 'seed']), { tongue: m.lawn.tongue !== false }) } : {})),
     objects: PT.decodeObjects(o.objects),
     lawn: o.lawn && o.lawn.tiles && o.lawn.tiles.length ? PT.decodeDetail(o.lawn) : null,
-    bridges: (o.bridges || []).filter(b => b.pts && b.pts.length >= 2).map(b => Object.assign({ name: b.name || 'Light bridge', pts: b.pts.map(norm) }, PT.bridgeDefaults(), pick(b, ['clearance', 'ramp', 'width', 'maxGrade']))),
+    bridges: (o.bridges || []).filter(b => b.pts && b.pts.length >= 2).map(b => Object.assign({ name: b.name || 'Light bridge', pts: b.pts.map(norm) }, PT.bridgeDefaults(), pick(b, ['clearance', 'ramp', 'width', 'maxGrade']), b.kind ? { kind: String(b.kind) } : {})),
     start: { d: norm(o.start && o.start.d || B.start.d) }, scatter: Object.assign({}, B.scatter, o.scatter || {}),
     cliffs: Object.assign(PT.cliffDefaults(), pick(o.cliffs || {}, ['from', 'band', 'sharp', 'stop'])),
     network: Object.assign(PT.networkDefaults(), pick(o.network || {}, ['join', 'patch', 'corridor', 'side'])),
@@ -922,6 +923,8 @@ PT.parse = function(json){
     ramps: (o.ramps || []).filter(rp => rp.c && rp.segs).map(rp => ({ name: rp.name || 'Ramp', c: norm(rp.c), turn: rp.turn === -1 ? -1 : 1, start: +rp.start || 0, top: +rp.top || 0, width: +rp.width || 6, maxGrade: +rp.maxGrade || 0.25, rMax: rp.rMax ? +rp.rMax : undefined,
       segs: rp.segs.map(sg => ({ k: sg.k === 'plateau' ? 'plateau' : 'slope', len: +sg.len || 0, grade: +sg.grade || 0, wide: sg.wide ? +sg.wide : undefined, link: sg.link ?? -1, lead: sg.lead === 'plateau' ? 'plateau' : 'layer', door: sg.door ? { at: +sg.door.at || 0 } : undefined })) })),
     clean: o.clean && o.clean.tiles && o.clean.tiles.length ? Object.assign(PT.decodeDetail(o.clean), { sig: o.clean.sig || '', stale: !!o.clean.stale }) : null,
+    // the game's own data (zones, terminals, gates, what opens what): kept as it is, the editor doesn't edit it
+    game: o.game && typeof o.game === 'object' ? o.game : null,
   };
   // older layouts may have steps where the cube faces meet: weld them, easing the change back into each face
   PT.weldSculpt(L.sculpt, 3); PT.weldDetail(L.detail, 8);

@@ -1,0 +1,678 @@
+{
+ "warnings": [],
+ "surface": {
+  "warnings": [],
+  "newTrailMetres": 12490,
+  "oldTrailMetres": 14311,
+  "zoneAreasHa": {
+   "1": 7.3,
+   "2": 115.3,
+   "3": 89.6,
+   "4": 18,
+   "E": 7.2
+  },
+  "zoneTrailMetres": {
+   "1": 887,
+   "2": 12053,
+   "3": 9056,
+   "4": 2247,
+   "E": 2558
+  }
+ },
+ "ramp": {
+  "length": 1530,
+  "top": 4.9,
+  "segs": [
+   {
+    "k": "slope",
+    "len": 791,
+    "grade": 12,
+    "from": 5,
+    "to": -90,
+    "gap": 40
+   },
+   {
+    "k": "plateau",
+    "len": 36,
+    "grade": 0,
+    "from": -90,
+    "to": -90,
+    "gap": 22
+   },
+   {
+    "k": "slope",
+    "len": 667,
+    "grade": 12,
+    "from": -90,
+    "to": -170,
+    "gap": 17
+   },
+   {
+    "k": "plateau",
+    "len": 36,
+    "grade": 0,
+    "from": -170,
+    "to": -170,
+    "gap": 14
+   }
+  ],
+  "doors": [
+   {
+    "layer": 0,
+    "at": [
+     -173.1,
+     48.2
+    ],
+    "fromPitCentre": 101
+   },
+   {
+    "layer": 1,
+    "at": [
+     167.3,
+     59.3
+    ],
+    "fromPitCentre": 64
+   }
+  ],
+  "startsAt": [
+   -171.9,
+   39.5
+  ],
+  "fromMineHead": 5
+ },
+ "trails": [
+  {
+   "name": "Trail 2",
+   "isNew": false,
+   "closed": false,
+   "metres": 662,
+   "maxGrade": 20,
+   "steepPoints": 0,
+   "worstSlope": 21
+  },
+  {
+   "name": "Trail 3",
+   "isNew": false,
+   "closed": false,
+   "metres": 330,
+   "maxGrade": 19,
+   "steepPoints": 0,
+   "worstSlope": 26
+  },
+  {
+   "name": "Trail 4",
+   "isNew": false,
+   "closed": true,
+   "metres": 302,
+   "maxGrade": 12,
+   "steepPoints": 0,
+   "worstSlope": 14
+  },
+  {
+   "name": "Trail 5",
+   "isNew": false,
+   "closed": false,
+   "metres": 179,
+   "maxGrade": 18,
+   "steepPoints": 0,
+   "worstSlope": 25
+  },
+  {
+   "name": "Trail 6",
+   "isNew": false,
+   "closed": true,
+   "metres": 192,
+   "maxGrade": 8,
+   "steepPoints": 0,
+   "worstSlope": 10
+  },
+  {
+   "name": "Trail 9",
+   "isNew": false,
+   "closed": true,
+   "metres": 823,
+   "maxGrade": 7,
+   "steepPoints": 0,
+   "worstSlope": 11
+  },
+  {
+   "name": "Trail 11",
+   "isNew": false,
+   "closed": false,
+   "metres": 577,
+   "maxGrade": 13,
+   "steepPoints": 0,
+   "worstSlope": 14
+  },
+  {
+   "name": "Trail 12",
+   "isNew": false,
+   "closed": false,
+   "metres": 316,
+   "maxGrade": 8,
+   "steepPoints": 0,
+   "worstSlope": 8
+  },
+  {
+   "name": "Trail 13",
+   "isNew": false,
+   "closed": false,
+   "metres": 1089,
+   "maxGrade": 14,
+   "steepPoints": 0,
+   "worstSlope": 20
+  },
+  {
+   "name": "Trail 14",
+   "isNew": false,
+   "closed": false,
+   "metres": 1776,
+   "maxGrade": 17,
+   "steepPoints": 0,
+   "worstSlope": 17
+  },
+  {
+   "name": "Trail 16",
+   "isNew": false,
+   "closed": false,
+   "metres": 1719,
+   "maxGrade": 10,
+   "steepPoints": 0,
+   "worstSlope": 10
+  },
+  {
+   "name": "Trail 17",
+   "isNew": false,
+   "closed": false,
+   "metres": 68,
+   "maxGrade": 8,
+   "steepPoints": 0,
+   "worstSlope": 9
+  },
+  {
+   "name": "Trail 8",
+   "isNew": false,
+   "closed": false,
+   "metres": 661,
+   "maxGrade": 23,
+   "steepPoints": 1,
+   "worstSlope": 45
+  },
+  {
+   "name": "Trail 10",
+   "isNew": false,
+   "closed": false,
+   "metres": 4218,
+   "maxGrade": 20,
+   "steepPoints": 0,
+   "worstSlope": 25
+  },
+  {
+   "name": "Trail 18",
+   "isNew": false,
+   "closed": false,
+   "metres": 477,
+   "maxGrade": 17,
+   "steepPoints": 0,
+   "worstSlope": 24
+  },
+  {
+   "name": "Trail 19",
+   "isNew": false,
+   "closed": false,
+   "metres": 73,
+   "maxGrade": 3,
+   "steepPoints": 0,
+   "worstSlope": 4
+  },
+  {
+   "name": "Trail 20",
+   "isNew": false,
+   "closed": false,
+   "metres": 883,
+   "maxGrade": 9,
+   "steepPoints": 0,
+   "worstSlope": 10
+  },
+  {
+   "name": "Northfield loop",
+   "isNew": true,
+   "closed": true,
+   "metres": 548,
+   "maxGrade": 12,
+   "steepPoints": 0,
+   "worstSlope": 12
+  },
+  {
+   "name": "Longlight loop",
+   "isNew": true,
+   "closed": true,
+   "metres": 633,
+   "maxGrade": 9,
+   "steepPoints": 0,
+   "worstSlope": 11
+  },
+  {
+   "name": "Eastbank loop",
+   "isNew": true,
+   "closed": true,
+   "metres": 540,
+   "maxGrade": 9,
+   "steepPoints": 0,
+   "worstSlope": 11
+  },
+  {
+   "name": "Northfield road",
+   "isNew": true,
+   "closed": false,
+   "metres": 578,
+   "maxGrade": 13,
+   "steepPoints": 0,
+   "worstSlope": 15
+  },
+  {
+   "name": "High traverse",
+   "isNew": true,
+   "closed": false,
+   "metres": 148,
+   "maxGrade": 5,
+   "steepPoints": 0,
+   "worstSlope": 7
+  },
+  {
+   "name": "Longlight road",
+   "isNew": true,
+   "closed": false,
+   "metres": 221,
+   "maxGrade": 5,
+   "steepPoints": 0,
+   "worstSlope": 8
+  },
+  {
+   "name": "Trenchside",
+   "isNew": true,
+   "closed": false,
+   "metres": 144,
+   "maxGrade": 7,
+   "steepPoints": 0,
+   "worstSlope": 8
+  },
+  {
+   "name": "Bridge road east",
+   "isNew": true,
+   "closed": false,
+   "metres": 238,
+   "maxGrade": 9,
+   "steepPoints": 0,
+   "worstSlope": 10
+  },
+  {
+   "name": "Mouth road",
+   "isNew": true,
+   "closed": false,
+   "metres": 461,
+   "maxGrade": 6,
+   "steepPoints": 0,
+   "worstSlope": 9
+  },
+  {
+   "name": "Far north trail",
+   "isNew": true,
+   "closed": false,
+   "metres": 317,
+   "maxGrade": 8,
+   "steepPoints": 0,
+   "worstSlope": 11
+  },
+  {
+   "name": "Northcap loop",
+   "isNew": true,
+   "closed": true,
+   "metres": 310,
+   "maxGrade": 7,
+   "steepPoints": 0,
+   "worstSlope": 8
+  },
+  {
+   "name": "Northcap road",
+   "isNew": true,
+   "closed": false,
+   "metres": 37,
+   "maxGrade": 7,
+   "steepPoints": 0,
+   "worstSlope": 9
+  },
+  {
+   "name": "Westreach loop",
+   "isNew": true,
+   "closed": true,
+   "metres": 528,
+   "maxGrade": 10,
+   "steepPoints": 0,
+   "worstSlope": 16
+  },
+  {
+   "name": "Basin loop",
+   "isNew": true,
+   "closed": true,
+   "metres": 1148,
+   "maxGrade": 17,
+   "steepPoints": 0,
+   "worstSlope": 23
+  },
+  {
+   "name": "Farside loop",
+   "isNew": true,
+   "closed": true,
+   "metres": 541,
+   "maxGrade": 9,
+   "steepPoints": 0,
+   "worstSlope": 12
+  },
+  {
+   "name": "Peakfoot loop",
+   "isNew": true,
+   "closed": true,
+   "metres": 609,
+   "maxGrade": 18,
+   "steepPoints": 0,
+   "worstSlope": 19
+  },
+  {
+   "name": "Westreach road",
+   "isNew": true,
+   "closed": false,
+   "metres": 71,
+   "maxGrade": 7,
+   "steepPoints": 0,
+   "worstSlope": 7
+  },
+  {
+   "name": "Peakfoot road",
+   "isNew": true,
+   "closed": false,
+   "metres": 242,
+   "maxGrade": 9,
+   "steepPoints": 0,
+   "worstSlope": 11
+  },
+  {
+   "name": "Basin road",
+   "isNew": true,
+   "closed": false,
+   "metres": 358,
+   "maxGrade": 13,
+   "steepPoints": 0,
+   "worstSlope": 17
+  },
+  {
+   "name": "Riverside south",
+   "isNew": true,
+   "closed": false,
+   "metres": 958,
+   "maxGrade": 10,
+   "steepPoints": 0,
+   "worstSlope": 16
+  },
+  {
+   "name": "Farside road",
+   "isNew": true,
+   "closed": false,
+   "metres": 288,
+   "maxGrade": 14,
+   "steepPoints": 0,
+   "worstSlope": 16
+  },
+  {
+   "name": "Bridge road west",
+   "isNew": true,
+   "closed": false,
+   "metres": 258,
+   "maxGrade": 10,
+   "steepPoints": 0,
+   "worstSlope": 13
+  },
+  {
+   "name": "Deepsouth loop",
+   "isNew": true,
+   "closed": true,
+   "metres": 171,
+   "maxGrade": 6,
+   "steepPoints": 0,
+   "worstSlope": 13
+  },
+  {
+   "name": "Deepsouth road",
+   "isNew": true,
+   "closed": false,
+   "metres": 128,
+   "maxGrade": 5,
+   "steepPoints": 0,
+   "worstSlope": 12
+  },
+  {
+   "name": "Pitside loop",
+   "isNew": true,
+   "closed": true,
+   "metres": 382,
+   "maxGrade": 12,
+   "steepPoints": 0,
+   "worstSlope": 14
+  },
+  {
+   "name": "Pitside road",
+   "isNew": true,
+   "closed": false,
+   "metres": 66,
+   "maxGrade": 3,
+   "steepPoints": 0,
+   "worstSlope": 5
+  },
+  {
+   "name": "Northreach loop",
+   "isNew": true,
+   "closed": true,
+   "metres": 342,
+   "maxGrade": 16,
+   "steepPoints": 0,
+   "worstSlope": 19
+  },
+  {
+   "name": "Northreach road",
+   "isNew": true,
+   "closed": false,
+   "metres": 164,
+   "maxGrade": 8,
+   "steepPoints": 0,
+   "worstSlope": 10
+  },
+  {
+   "name": "Rimway",
+   "isNew": true,
+   "closed": false,
+   "metres": 60,
+   "maxGrade": 6,
+   "steepPoints": 0,
+   "worstSlope": 8
+  },
+  {
+   "name": "Herd round",
+   "isNew": true,
+   "closed": true,
+   "metres": 844,
+   "maxGrade": 20,
+   "steepPoints": 0,
+   "worstSlope": 21
+  },
+  {
+   "name": "Altar loop",
+   "isNew": true,
+   "closed": true,
+   "metres": 513,
+   "maxGrade": 16,
+   "steepPoints": 0,
+   "worstSlope": 21
+  },
+  {
+   "name": "South pass road",
+   "isNew": true,
+   "closed": false,
+   "metres": 92,
+   "maxGrade": 8,
+   "steepPoints": 0,
+   "worstSlope": 11
+  },
+  {
+   "name": "Altar road",
+   "isNew": true,
+   "closed": false,
+   "metres": 134,
+   "maxGrade": 7,
+   "steepPoints": 0,
+   "worstSlope": 7
+  },
+  {
+   "name": "Bridgehead trail",
+   "isNew": true,
+   "closed": false,
+   "metres": 37,
+   "maxGrade": 17,
+   "steepPoints": 0,
+   "worstSlope": 26
+  },
+  {
+   "name": "Southcrown loop",
+   "isNew": true,
+   "closed": true,
+   "metres": 376,
+   "maxGrade": 10,
+   "steepPoints": 0,
+   "worstSlope": 10
+  },
+  {
+   "name": "Southcrown road",
+   "isNew": true,
+   "closed": false,
+   "metres": 22,
+   "maxGrade": 9,
+   "steepPoints": 0,
+   "worstSlope": 10
+  }
+ ],
+ "trailMetres": 26851,
+ "bridges": [
+  {
+   "name": "West drawbridge",
+   "kind": "draw",
+   "metres": 120,
+   "climb": 27,
+   "descent": 21,
+   "highest": 23,
+   "ends": [
+    -1,
+    -3
+   ]
+  },
+  {
+   "name": "East drawbridge",
+   "kind": "draw",
+   "metres": 115,
+   "climb": 32,
+   "descent": 30,
+   "highest": 24,
+   "ends": [
+    -2,
+    -3
+   ]
+  },
+  {
+   "name": "Highland bridge",
+   "kind": "light",
+   "metres": 158,
+   "climb": 20,
+   "descent": 16,
+   "highest": 30,
+   "ends": [
+    44,
+    67
+   ]
+  },
+  {
+   "name": "Crystal bridge",
+   "kind": "light",
+   "metres": 162,
+   "climb": 27,
+   "descent": 29,
+   "highest": 70,
+   "ends": [
+    45,
+    46
+   ]
+  }
+ ],
+ "caves": [
+  {
+   "layer": "The mine",
+   "depth": 90,
+   "tunnelMetres": 580,
+   "closedPoints": 0,
+   "lowestHeadroom": 5.5,
+   "skylightPoints": 0,
+   "intoThePit": 0,
+   "rooms": [
+    {
+     "radius": 32,
+     "open": true,
+     "headroom": 17,
+     "rockAbove": 93
+    },
+    {
+     "radius": 40,
+     "open": true,
+     "headroom": 24,
+     "rockAbove": 64
+    },
+    {
+     "radius": 20,
+     "open": true,
+     "headroom": 11,
+     "rockAbove": 76
+    }
+   ],
+   "doorsOpen": [
+    true
+   ]
+  },
+  {
+   "layer": "The deep",
+   "depth": 170,
+   "tunnelMetres": 146,
+   "closedPoints": 0,
+   "lowestHeadroom": 8,
+   "skylightPoints": 0,
+   "intoThePit": 0,
+   "rooms": [
+    {
+     "radius": 46,
+     "open": true,
+     "headroom": 28,
+     "rockAbove": 145
+    }
+   ],
+   "doorsOpen": [
+    true
+   ]
+  }
+ ],
+ "counts": {
+  "trails": 53,
+  "newTrails": 36,
+  "models": 72,
+  "landmarks": 10,
+  "bridges": 4,
+  "tunnels": 5,
+  "caveStamps": 19,
+  "bytes": 4056964
+ },
+ "roundTrip": true
+}

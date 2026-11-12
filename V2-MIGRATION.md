@@ -74,9 +74,11 @@ zones, terminals with orbs, gates, bridge kinds, crystals, underground rooms), s
 ## Status
 
 - Done: rows 1 and 2 of the port order, and row 4 (crystals, crystal gate), in `prototypes/game-core.js`.
-- Added to the list, ahead of row 3: **the main game's skiing and controls**. The planetoid has only skate kicks,
-  glide, loaded strokes, tuck and plow. Classic stride, double pole, twin-stick, touch and haptics are in `index.html`
-  (about lines 1900 to 2640).
+- Done: the base game's skiing and controls, in `prototypes/planetoid.html`: one scheme for keyboard, controller
+  (triggers, sticks as legs, LB/RB tuck) and touch (tap, swipe, two-thumb tuck, plow, lean, pinch), loaded strokes,
+  deep tuck, trail assist and junction snapping on the planet's trail network, vibration. Classic and double pole are
+  deprecated and were left out. Not yet ported: tilt-to-lean, pinch on the scene, the stick debug recorder, sound.
+- Next: row 3 (maps), then rows 6 and 7 (creatures, the ending), row 8's props, row 9 (station), sound and tutorial.
 
 ## 7. Conventions for later sessions
 

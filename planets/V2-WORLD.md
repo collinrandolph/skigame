@@ -77,8 +77,8 @@ The rules are in `prototypes/game-core.js`; tests in `tools/test`.
 
 ## Not done, or needs your eye
 
-- **The skiing is the planetoid's, not the main game's.** Classic stride, double pole, the twin-stick and touch
-  schemes, kick-turn tuning and haptics are still to port.
+- **Controls are the base game's** (keyboard, controller, touch; trail assist, junction snapping, vibration), without
+  classic and double pole. Still to bring over: tilt-to-lean, pinch on the scene itself, and all sound.
 - **Chapters 7 to 9** (moose puzzle and altar, crown door, Starway) have places and data but no rules yet.
 - **Drawbridges are a plain steel deck** that appears when lowered: no towers, leaf or lifting animation.
 - **Underground props are stand-ins**: the altar model and a simple ring for the dead teleporter.

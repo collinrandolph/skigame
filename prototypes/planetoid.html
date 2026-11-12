@@ -53,7 +53,9 @@ details .btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
 .pads{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);display:none;justify-content:space-between;padding:0 16px;pointer-events:none}
 .pad{pointer-events:auto;width:min(34vw,170px);height:110px;border-radius:10px;background:var(--panel);border:1px solid var(--line);font:700 15px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--ink);display:flex;align-items:center;justify-content:center}
 .pad.mid{width:min(20vw,96px)}
+.pad{touch-action:none;-webkit-user-select:none;user-select:none}
 .pad.on{background:var(--skier);color:#fff;border-color:var(--skier)}
+.pad.pull{box-shadow:inset 0 0 0 3px var(--skier)}
 @media (max-width:560px){ .top-right{flex-direction:column;align-items:flex-end} .rad{gap:6px;padding:5px 8px} .rad span{display:none} .rad input{width:60px} .rad output{min-width:40px} .hud{min-width:0;max-width:calc(100vw - 84px);padding:10px 12px} .hud .opt,.hud .help{display:none} .hud h1{font-size:18px} }
 @media (pointer:coarse){ .pads{display:flex} details{--sb:calc(env(safe-area-inset-bottom,0px) + 140px)} .help{display:none} }
 button.icon{width:40px;height:40px;padding:0;display:grid;place-items:center}
@@ -95,7 +97,7 @@ div.gbox{font-size:12px;color:var(--muted)}
   <div class="row opt"><span>Skied</span><b id="hDist">0 m</b></div>
   <div class="row opt"><span>Nearest landmark</span><b id="hBeacon">–</b></div>
   <div class="legs"><div class="leg" id="legL">Left</div><div class="leg" id="legR">Right</div></div>
-  <div class="help"><b>← →</b> kick (hold to ride the glide) · <b>Space</b> + kick: loaded stroke · <b>↑</b> tuck, <b>← →</b> lean · <b>↓</b> snow plow · <b>V</b> planet view · <b>P</b> 800 m / 300 m planet · <b>R</b> reset (back to your last terminal) · <b>Enter</b> agree</div>
+  <div class="help"><b>← →</b> kick (hold to ride the glide) · <b>Space</b> + kick: loaded stroke · <b>↑</b> tuck, <b>← →</b> lean, <b>Space</b> deeper · <b>↓</b> snow plow · controller: triggers or stick flicks kick, <b>LB/RB</b> tuck · <b>V</b> planet view · <b>P</b> 800 m / 300 m planet · <b>R</b> reset (back to your last terminal) · <b>Enter</b> agree</div>
 </div>
 
 <div id="steepBan" role="status">Too steep to ski</div>
@@ -137,7 +139,6 @@ div.gbox{font-size:12px;color:var(--muted)}
 
 <div class="pads" aria-hidden="true">
   <div class="pad" id="padL">Left kick</div>
-  <div class="pad mid" id="padT">Tuck</div>
   <div class="pad" id="padR">Right kick</div>
 </div>
 
@@ -170,6 +171,8 @@ const P = {
   push: 2.5, tap: 80, klen: 50, turn: 5, turn2: 5, turn3: 15, k180: 8, k180t: 6, kfloor: 15, kwin: 450,
   tfStop: 180, tfMove: 90, tfVlo: 1, tfVhi: 14, decay: 20, snap: 160, splay: 11, fric: 0.4, glide: 0.25, grip: 25,
   gwin: 600, gcut: 95, max: 38, lboost: 1.4, plow: 2.5, tuck: 50, lean: 50, camd: 15, sway: 0.8, cam: 0.6, pixel: 4,
+  rumble: 5, rumble2: 25, rumbleL: 1, swait: 90, sthrow: 34, rest: 250, tmin: 0.7, fedge: 0.92, offglide: 100,
+  assist: 0.5, acap: 25, alook: 1.2, acenter: 1.5, ajunc: 18, bsnap: 20, aswitch: 1500, aramp: 1500,
   R: 800, flat: 0.4, lift: false, daynight: false, mtn: 1, bld: 1, off: 1.5, trees: 1,
 };
 const SETTINGS = [
@@ -582,7 +585,7 @@ const trailMat = twilightPatch(flatPatch(new THREE.MeshLambertMaterial({ color: 
 function buildTrails(rnd){
   const R = P.R, V = THREE.Vector3;
   for (const m of trailMeshes){ scene.remove(m); m.geometry.dispose(); }
-  trailMeshes = []; trails = []; tgrid = new Map(); wedges = []; wgrid = new Map();
+  trailMeshes = []; trails = []; tgrid = new Map(); wedges = []; wgrid = new Map(); JUNCS = null;
   TG = Math.max(16, Math.min(160, Math.round(Math.PI/2*R/8)));
   const nT = Math.max(4, Math.min(12, Math.round(2 + R/100)));
   const randUnit = () => { const z = 2*rnd() - 1, a = rnd()*Math.PI*2, r = Math.sqrt(1 - z*z); return new V(r*Math.cos(a), z, r*Math.sin(a)); };
@@ -637,7 +640,7 @@ function buildTrails(rnd){
     TRL.forEach((t, ti) => { if (net.lines[ti].length >= 2) addTrail(t.name, net.lines[ti].map(a => new V(...a)), !!t.closed, net.shared[ti]); });
     // the junctions: each corner rounded by a groomed curve, and the corner inside it (the wedge) groomed too
     for (const f of (TERRAIN.links ? TERRAIN.links.fillets : [])){
-      addTrail(f.names.join(' / '), f.pts.map(a => new V(...a)), false);
+      addTrail(f.names.join(' / '), f.pts.map(a => new V(...a)), false); trails[trails.length - 1].fillet = true;
       const w = { name: f.names.join(' / '), f, pts: [] }; wedges.push(w);
       const keys = new Set(f.wedge.map(p => cellOf(p[0], p[1], p[2]))); for (const k of keys){ let l = wgrid.get(k); if (!l) wgrid.set(k, l = []); l.push(w); }
       // the wedge's surface: rings from the junction out to its edge, laid on the ground
@@ -1176,6 +1179,10 @@ const S = { x: 0, y: 0, vx: 0, vy: 0, th: 0, thv: 0, tgt: 0, dist: 0, grade: 0, 
 const PUSH_LEN = 0.7, REACH = 0.6, STANCE = 0.12, PLOW_STANCE = 0.35, CAM_RELEASE_MS = 1500;
 let skis = [], lastSki = { L: null, R: null }, weightLeg = null, lastLeg = null, lastKickAt = 0, camPending = 0, mode = null;
 let kickDrive = null, streak = 0, kickPrevT = -1e9, streakKmh = 0, streakTrig = false, snapSkip = 0, sideRun = 0, runTurn = 0, turnRestart = false, lastTurnDeg = 0;
+// the instant part of the last push, so a touch kick that turns out to be a swipe can be topped up to a loaded stroke
+// (kickTop is that top-up, spread over a short time); the arms wait (armPending) while a touch decides which it is
+let lastPush = null, kickTop = null, lastPushAt = 0, armAt = 0, armPending = false, junctionTurnAt = -1e9, assistQuietUntil = 0;
+let tuckDeep = 0;      // 0..1: a deeper tuck (Space, sticks forward, thumbs forward), up to half the remaining drag gone
 const held = { L: false, R: false }, legFlash = { L: 0, R: 0 };
 let glideLeg = null, glideStart = 0;
 const speed = () => Math.hypot(S.vx, S.vy);
@@ -1229,7 +1236,8 @@ function enterMode(m){
 function kick(leg, opt = {}){
   // leg 'L' pushes off the left ski: heading steps right (+). leg 'R' pushes off the right ski: steps left (-)
   const side = leg === 'L' ? 1 : -1, out = -side, sameSide = leg === lastLeg;
-  const tNow = performance.now(), quick = tNow - kickPrevT <= P.kwin;
+  // (a loaded stroke counts from when you began it, so its longer wind-up doesn't break a kick turn's build)
+  const tNow = performance.now(), quick = (opt.startT !== undefined ? Math.min(opt.startT, tNow) : tNow) - kickPrevT <= P.kwin;
   streak = sameSide && quick ? streak + 1 : 1;
   sideRun = sameSide ? sideRun + 1 : 1;
   kickPrevT = tNow;
@@ -1246,18 +1254,27 @@ function kick(leg, opt = {}){
   if (sameSide && sideRun >= 3) lastTurnDeg = Math.max(lastTurnDeg, P.kfloor);
   if (!sameSide || sideRun === 1){ runTurn = 0; turnRestart = false; }
   if (sameSide && turnRestart){ lastTurnDeg = P.kfloor; turnRestart = false; }
-  const a = side * lastTurnDeg * D2R;
+  let a = side * lastTurnDeg * D2R;
   let camRef = S.tgt - camPending; const prev = S.tgt;
   if (sameSide){
+    // near a junction, a kick turn that would swing past one of its trails stops lined up with it (and doesn't use up
+    // a step of the build)
+    const sn = branchSnap(prev, side, lastTurnDeg);
+    if (sn !== null){ a = sn; lastTurnDeg = Math.abs(sn)/D2R; snapSkip++; }
     runTurn += lastTurnDeg;
     if (runTurn >= fullTurnDeg(streakKmh) - 0.5){ runTurn = 0; turnRestart = true; snapSkip = streak - 2; }
     S.tgt = prev + a; camRef = prev;
+    // you're steering: the trail assist stands back (near a junction, only for the kick-turn window, then settles you)
+    const nearJ = P.bsnap > 0 && nearestJunction() < P.bsnap;
+    if (nearJ) junctionTurnAt = performance.now();
+    assistQuietUntil = performance.now() + (nearJ ? P.kwin : 800);
   } else { S.tgt = camRef + a; runTurn = lastTurnDeg; }
   camPending = S.tgt - camRef;
   // 3. impulse, limited by top speed. part lands now, the rest over the kick length while the key is held
   const ang = S.tgt + side*sp*D2R, v = speed(), vmax = P.max/3.6;
   const eff = Math.max(0.08, 1 - v/vmax) * (1 - 0.5*S.off) * sameLegPower(), tap = P.tap/100, push = P.push*bst;   // half the push sinks into loose snow
   S.vx += Math.sin(ang)*push*eff*tap; S.vy += -Math.cos(ang)*push*eff*tap;
+  lastPush = { dx: Math.sin(ang), dy: -Math.cos(ang), amt: P.push*eff*tap };
   kickDrive = { leg, dx: Math.sin(ang), dy: -Math.cos(ang), base: push*(1 - 0.5*S.off)*sameLegPower()*(1 - tap), done: 0 };
   // 4. the other ski takes the weight (re-set along the new heading in a kick turn)
   const other = leg === 'L' ? 'R' : 'L', o = lastSki[other];
@@ -1267,9 +1284,10 @@ function kick(leg, opt = {}){
     lastSki[other].glide = true;
   }
   weightLeg = other; lastSki[leg] = null;
-  lastLeg = leg; lastKickAt = performance.now(); legFlash[leg] = 1;
+  lastLeg = leg; lastKickAt = lastPushAt = armAt = performance.now(); armPending = false; legFlash[leg] = 1;
 }
-function press(leg, boost = 1, src = null){ mode = null; strideV1 = boost <= 1; held[leg] = true; kick(leg, { boost, src }); glideLeg = leg; glideStart = performance.now(); }
+// any kick goes back to skating, whatever was held
+function press(leg, boost = 1, src = null, startT){ hold.tuck.clear(); hold.plow.clear(); mode = null; strideV1 = boost <= 1; held[leg] = true; kick(leg, { boost, src, startT }); glideLeg = leg; glideStart = performance.now(); rumble(leg, kickBuzz(boost)); }
 function release(leg){ held[leg] = false; }
 function glideMult(){
   if (!glideLeg || !held[glideLeg]) return 1;
@@ -1288,9 +1306,162 @@ function syncMode(){
   if (want && want !== mode) enterMode(want);
   else if (!want && mode) mode = null;           // both skis stay down until your next stroke
 }
-let keyLean = 0, touchLean = 0, padLean = 0;
+let keyLean = 0, touchLean = 0, lean = 0;      // -1..1 while tucked: the keys, both thumbs, or the sticks lean you that way
+
+// ---------- trail assist and junction snapping, as the game's, on the planet's trail network ----------
+// within a few tens of metres the ground is as good as flat, so trails are read in your own frame: metres along ex and
+// ey from where you stand, bearings in the skier's convention (0 = -y, clockwise)
+let JUNCS = null;      // each junction: where it is, and the ways out of it (10 m along every trail through it, both ways)
+function buildJunctions(){
+  JUNCS = [];
+  const fl = (typeof TERRAIN !== 'undefined' && TERRAIN && TERRAIN.links && TERRAIN.links.fillets) || [], R = P.R, V = THREE.Vector3;
+  for (const f of fl){ const c = new V(...f.wedge[0]).normalize(); if (!JUNCS.some(j => j.d.distanceTo(c)*R < 8)) JUNCS.push({ d: c, b: [] }); }
+  for (const J of JUNCS) for (const tr of trails){
+    if (tr.fillet) continue;
+    const p = tr.pts, M = p.length; let bi = -1, bd = 4;
+    for (let i = 0; i < M; i++){ const d = p[i].distanceTo(J.d)*R; if (d < bd){ bd = d; bi = i; } }
+    if (bi < 0) continue;
+    const at = k => tr.closed ? p[((k % M) + M) % M] : p[k];
+    for (const dir of [-1, 1]){
+      let i = bi, steps = 0;
+      while ((tr.closed || (i + dir >= 0 && i + dir < M)) && steps < M && at(i).distanceTo(J.d)*R < 10){ i += dir; steps++; }
+      if (i === bi || at(i).distanceTo(J.d)*R < 5) continue;                 // the trail ends here
+      const t = at(i).clone().sub(J.d); t.addScaledVector(J.d, -t.dot(J.d)).normalize();
+      if (!J.b.some(q => q.angleTo(t) < 8*D2R)) J.b.push(t);
+    }
+  }
+}
+const juncs = () => JUNCS || (buildJunctions(), JUNCS);
+function nearestJunction(){ if (ONB || UG) return Infinity; let m = Infinity; for (const j of juncs()){ const d = j.d.distanceTo(n)*P.R; if (d < m) m = d; } return m; }
+// near a junction, a kick turn that would swing past (or end just short of) one of its trails stops lined up with it.
+// returns the turn to use instead, in radians (signed like side), or null to turn as normal
+function branchSnap(heading, side, stepDeg){
+  if (!(P.bsnap > 0) || ONB || UG) return null;
+  let J = null, jd = P.bsnap;
+  for (const j of juncs()){ const d = j.d.distanceTo(n)*P.R; if (d < jd){ jd = d; J = j; } }
+  if (!J) return null;
+  let best = null;
+  for (const b3 of J.b){
+    let r = (Math.atan2(b3.dot(ex), -b3.dot(ey)) - heading)*side; r = Math.atan2(Math.sin(r), Math.cos(r))/D2R;   // how far round, in the turn's direction
+    if (r > 1.5 && r <= stepDeg + 4 && (best === null || r < best)) best = r;
+  }
+  return best === null ? null : side*best*D2R;
+}
+// the point m metres along a trail from its segment i (a fraction u along it), one way or the other: [x, y] in your frame
+const _wk = new THREE.Vector3();
+function walkTrail(tr, i, u, dir, m){
+  const p = tr.pts, M = p.length, segN = tr.closed ? M : M - 1, R = P.R; let k = i, f = u, left = m;
+  for (let guard = 0; guard < 600; guard++){
+    const L = p[k].distanceTo(p[(k + 1) % M])*R || 1e-6, room = dir > 0 ? (1 - f)*L : f*L;
+    if (left <= room){ f += dir*left/L; break; }
+    left -= room;
+    const nk = k + dir;
+    if (nk < 0 || nk >= segN){ if (!tr.closed){ f = dir > 0 ? 1 : 0; break; } k = (nk + segN) % segN; } else k = nk;
+    f = dir > 0 ? 0 : 1;
+  }
+  _wk.copy(p[k]).lerp(p[(k + 1) % M], f).sub(n);
+  return [_wk.dot(ex)*R, _wk.dot(ey)*R];
+}
+// the look-ahead bearing on whichever nearby trail (and direction along it) best matches where you're pointed
+function trailAssistTarget(heading, ahead, prefer, centring = 1){
+  const list = tgrid.get(cellOf(n.x, n.y, n.z)); if (!list) return null;
+  const near = new Map(), R = P.R;                       // each trail in reach: its nearest segment
+  for (let q = 0; q < list.length; q += 2){
+    const tr = trails[list[q]], k = list[q + 1], a = tr.pts[k], b = tr.pts[(k + 1) % tr.pts.length];
+    const bx = b.x - a.x, by = b.y - a.y, bz = b.z - a.z, L2 = bx*bx + by*by + bz*bz || 1e-12;
+    const u = Math.max(0, Math.min(1, ((n.x - a.x)*bx + (n.y - a.y)*by + (n.z - a.z)*bz)/L2));
+    const d = Math.hypot(n.x - a.x - u*bx, n.y - a.y - u*by, n.z - a.z - u*bz)*R, o = near.get(tr);
+    if (!o || d < o.d) near.set(tr, { d, k, u });
+  }
+  const wrap = a => a - Math.round(a/(2*Math.PI))*2*Math.PI, bearing = (ax, ay, bx, by) => Math.atan2(bx - ax, -(by - ay));
+  const W = TRAIL_W, capR = P.acap*D2R; let best = null;
+  for (const [t, o] of near){
+    if (o.d > W*1.5) continue;
+    for (const dir of [1, -1]){
+      const [cx, cy] = walkTrail(t, o.k, o.u, dir, 0), [nx, ny] = walkTrail(t, o.k, o.u, dir, 1.5);
+      if (Math.hypot(nx - cx, ny - cy) < 0.5) continue;                 // at the very end of this trail
+      const tanNear = bearing(cx, cy, nx, ny);
+      // look ahead, but less far through a bend, so the target stays on the curve you're actually skiing
+      let look = ahead, tx, ty, ux, uy;
+      for (let k = 0; k < 3; k++){
+        [tx, ty] = walkTrail(t, o.k, o.u, dir, look); [ux, uy] = walkTrail(t, o.k, o.u, dir, look + 1);
+        const bend = Math.abs(wrap(bearing(tx, ty, ux, uy) - tanNear));
+        if (bend <= 0.35) break;
+        look = Math.max(3, look*0.35/bend);
+      }
+      if (Math.hypot(tx, ty) < 1) continue;                             // ran off the end of this trail
+      // centring: aim across the centre line, at the mirror of your own offset, so you're drawn back through the middle
+      const tl = Math.hypot(nx - cx, ny - cy), nrx = -(ny - cy)/tl, nry = (nx - cx)/tl, lat = -cx*nrx - cy*nry;
+      const shift = Math.max(-W/2, Math.min(W/2, -Math.max(-W/2, Math.min(W/2, lat))*P.acenter*centring));
+      const off = wrap(bearing(0, 0, tx + nrx*shift, ty + nry*shift) - heading), offRaw = wrap(bearing(0, 0, tx, ty) - heading);
+      // how far you are from lined up: against the trail's direction here and the look-ahead bearing, whichever is closer
+      const lineup = Math.min(Math.abs(offRaw), Math.abs(wrap(tanNear - heading)));
+      const c = { off, lineup, t, d: o.d, w: W };
+      // stick with the trail you were already following while it's still within reach
+      const ok = x => x <= capR, closer = lineup < (best ? best.lineup : Infinity); let better;
+      if (!best) better = true;
+      else if (t === prefer && best.t !== prefer) better = ok(lineup) || (!ok(best.lineup) && closer);
+      else if (t !== prefer && best.t === prefer) better = !ok(best.lineup) && closer;
+      else better = closer;
+      if (better) best = c;
+    }
+  }
+  return best;
+}
+let assistTrail = null, assistPrev = null, assistSince = 0, assistSwitch = false, assistW = 0;
+function trailAssist(dt){
+  assistW = 0;
+  if (P.assist <= 0 || ONB || UG){ assistTrail = null; return; }
+  // hands off while you lean and for a moment after, and forget which trail you were on: you're steering yourself
+  const now = performance.now();
+  if (lean || keyLean || touchLean){ assistQuietUntil = now + 800; assistTrail = null; return; }
+  if (now < assistQuietUntil){ assistTrail = null; return; }
+  const v = speed(); if (v < 0.5) return;
+  const skating = !mode, ref = skating ? S.tgt - camPending : S.tgt;     // the stride's centre line, not the ski you're on
+  // centring is eased off near a junction and eased back in after changing trails
+  const jd = nearestJunction(), jFade = P.ajunc > 0 ? smooth01(P.ajunc*0.35, P.ajunc, jd) : 1;
+  const cRamp = Math.min(1, (now - assistSince)/Math.max(1, P.aswitch));
+  const tg = trailAssistTarget(ref, Math.max(4, v*P.alook), assistTrail, jFade*cRamp*cRamp);
+  if (!tg){ assistTrail = null; return; }
+  const cap = P.acap*D2R, a = tg.lineup;
+  if (a > cap){ assistTrail = null; return; }                            // pointed well away: you meant it, let go
+  if (assistTrail !== tg.t){ assistSince = now; assistSwitch = !!assistPrev && assistPrev !== tg.t; }
+  assistTrail = tg.t; assistPrev = tg.t;
+  // it eases in slowly after you steered yourself, over the trail-switch time between trails, quickly after a kick turn
+  // at a junction, and otherwise within a few tenths of a second
+  const settle = now - junctionTurnAt < 2500;
+  const rampMs = settle ? 300 : (assistSince - assistQuietUntil < 1500) ? P.aramp : assistSwitch ? P.aswitch : 300;
+  const ramp = Math.min(1, (now - assistSince)/Math.max(1, rampMs));
+  const fade = 1 - (a/cap)**2, near = Math.max(0, Math.min(1, (tg.w*1.5 - tg.d)/tg.w));
+  const r = Math.max(-cap, Math.min(cap, tg.off))*Math.min(1, P.assist*2.5*fade*ramp*ramp*near*dt);
+  assistW = Math.min(1, P.assist*2)*fade*ramp*ramp*near;
+  if (skating) camPending -= r;                                          // shift where the next alternating stroke is centred
+  else S.tgt += r;                                                       // tuck and plow: turn the heading
+}
+// ---------- controller vibration, where the browser supports it ----------
+let padIndex = null, buzzAt = 0;
+function buzz(leg, mag, ms){
+  if (mag <= 0) return;
+  const gp = padIndex !== null && navigator.getGamepads ? (() => { try { return navigator.getGamepads()[padIndex]; } catch (e){ return null; } })() : null;
+  const act = gp && gp.vibrationActuator; if (!act || !act.playEffect) return;
+  const effect = (act.effects && act.effects.includes && act.effects.includes('trigger-rumble')) ? 'trigger-rumble' : 'dual-rumble';
+  const m = Math.min(1, mag), params = effect === 'trigger-rumble'
+    ? { duration: ms, leftTrigger: leg !== 'R' ? m : 0, rightTrigger: leg !== 'L' ? m : 0 }
+    : { duration: ms, strongMagnitude: m*0.5, weakMagnitude: m };
+  try { const r = act.playEffect(effect, params); if (r && r.catch) r.catch(() => {}); } catch (e){}
+}
+// a short buzz on the side that kicked: its level is the snow you're on (groomed 5%, ungroomed 25%), k shapes it
+function rumble(leg, k = 1){ const level = (P.rumble + (P.rumble2 - P.rumble)*Math.max(0, Math.min(1, S.off)))/100; buzzAt = performance.now(); buzz(leg, level*k, Math.round(45 + 30*Math.min(1.2, k))); }
+// a plain kick from a standstill is the level itself, a loaded stroke 30% more, pushes at speed up to 30% lighter, kick
+// turns a little firmer, and never quite the same twice
+function kickBuzz(boost){ const fast = Math.min(1, speed()*3.6/Math.max(1, P.max)); return (boost > 1 ? 1.3 : 1)*(1 - 0.3*fast)*(1 + 0.06*Math.min(3, streak - 1))*(0.9 + 0.2*Math.random()); }
 
 function step(dt){
+  if (kickTop){
+    const f = Math.min(kickTop.left, dt)/0.15; kickTop.left -= dt;
+    S.vx += kickTop.dx*kickTop.amt*f; S.vy += kickTop.dy*kickTop.amt*f;
+    if (kickTop.left <= 1e-6) kickTop = null;
+  }
   // the rest of the kick, pushed out while the key is held
   if (kickDrive){
     if (!held[kickDrive.leg] || mode) kickDrive = null;
@@ -1302,8 +1473,10 @@ function step(dt){
     }
   }
   // leaning in a tuck carves you round (fading out below about 10 km/h)
-  const steer = keyLean || touchLean || padLean;
+  trailAssist(dt);
+  const steer = keyLean || lean || touchLean;
   if (mode === 'tuck' && steer) S.tgt += steer * P.lean * D2R * dt * Math.min(1, speed()/3);
+  if (mode !== 'tuck'){ lean = 0; tuckDeep = 0; }
   // the heading eases toward the kick's heading on a critically damped spring
   if (P.snap <= 0){ S.th = S.tgt; S.thv = 0; }
   else { const w = 5000/P.snap, h = dt/4; for (let i = 0; i < 4; i++){ S.thv += (w*w*(S.tgt - S.th) - 2*w*S.thv)*h; S.th += S.thv*h; } }
@@ -1323,7 +1496,8 @@ function step(dt){
   if (LAWN && S.off > 0){ const lw = LAWN.at(n.x, n.y, n.z), lo = lw >= 0.5 ? 0 : lw <= 0 ? 1 : 1 - lw/0.5; if (lo < S.off){ S.off = lo; if (lo < 0.5){ S.trail = LAWN_T; S.trailNames = null; } } }
   if (ONB){ S.off = 0; S.trail = null; }      // the deck glides like groomed trail
   if (UG){ S.off = 0; S.trail = UG.trail; S.trailNames = null; }      // a cave's floor glides like groomed trail
-  const surf = (1 + (P.off - 1)*S.off) * gm;
+  // (a held glide's friction cut works off the trail at the share set by offglide: 100 = the same as on it)
+  const surf = (1 + (P.off - 1)*S.off) * (gm + (1 - gm)*S.off*(1 - P.offglide/100));
 
   const ws = weightLeg && lastSki[weightLeg], onSki = ws && ws.live && ws.glide;
   const fx = (onSki && !mode) ? ws.dx : Math.sin(S.th), fy = (onSki && !mode) ? ws.dy : -Math.cos(S.th);
@@ -1336,7 +1510,7 @@ function step(dt){
     // no change). a skier's drag area ~0.5 m² upright, ~0.3 tucked, 75 kg: a 10 m/s headwind at speed costs ~1 m/s²
     if (P.windPush){ const wf = WX.vel.dot(ex)*fx + WX.vel.dot(ey)*fy, kd = 0.004*(mode === 'tuck' ? 0.6 : 1), rel = wf - fwd;
       fwd += kd*(Math.abs(rel)*rel + Math.abs(fwd)*fwd)*dt; }
-    fwd *= Math.exp(-P.glide * surf * (mode === 'tuck' ? 1 - P.tuck/100 : 1) * dt);
+    fwd *= Math.exp(-P.glide * surf * (mode === 'tuck' ? 1 - P.tuck/100 - (1 - P.tuck/100)*0.5*tuckDeep : 1) * dt);
     const dec = (P.fric * surf * wK + (mode === 'plow' ? P.plow : 0)) * dt;
     fwd = Math.abs(fwd) <= dec ? 0 : fwd - Math.sign(fwd)*dec;
   }
@@ -1474,8 +1648,8 @@ function poseFigure(dt){
   const w = 9, h = Math.min(0.05, dt)/4; for (let i = 0; i < 4; i++){ rockV += (w*w*(target - rock) - 2*w*rockV)*h; rock += rockV*h; }
   rock = Math.max(-STANCE, Math.min(STANCE, rock));
   const now = performance.now();
-  const th = SKIER.pose({ x: S.x, y: S.y, h0, ground: ONB ? () => h0 : (x, y) => hLocal(x - S.x, y - S.y), face: S.th, now, dt, mode, tuckDeep: 0,
-    ld: NO_LOAD, tk: (now - lastKickAt)/1000, tka: (now - lastKickAt)/1000, rock, lastSki, lastLeg, legFlash, v1: strideV1, v1side: false });
+  const th = SKIER.pose({ x: S.x, y: S.y, h0, ground: ONB ? () => h0 : (x, y) => hLocal(x - S.x, y - S.y), face: S.th, now, dt, mode, tuckDeep,
+    ld: loadState(), tk: (now - lastPushAt)/1000, tka: armPending ? null : (now - armAt)/1000, rock, lastSki, lastLeg, legFlash, v1: strideV1, v1side: false });
   SKIER.rig.position.set(0, 0, 0); SKIER.rig.rotation.y = -th;
   shadow.position.set(Math.cos(th)*rock, 0.04, Math.sin(th)*rock); shadow.rotation.z = -th;
 }
@@ -1855,23 +2029,32 @@ function hud(){
   $('legR').classList.toggle('on', legFlash.R > 0.1 || weightLeg === 'R');
 }
 
-// ---------- input: keyboard (as the game), controller triggers, touch pads ----------
-const kb = { left: false, right: false, space: false };
+// ---------- input: one scheme for keyboard, controller and touch, as the game's ----------
+//   keyboard    ←/→ (A/D) kick off that leg; hold the key to ride the glide · Space held: kicks are loaded strokes ·
+//               ↑ (W) held: tuck, where ←/→ lean instead of kicking and Space deepens it · ↓ (S) held: snow plow
+//   controller  LT/RT kick · each stick is a leg: flick it out to kick, or pull it down and in, then throw it up and
+//               out, for a loaded stroke · LB or RB held: tuck, where the sticks lean (sideways), deepen it (forward)
+//               or snow plow (back)
+//   touch       tap a pad to kick; swipe up it for a loaded stroke · both thumbs down: tuck; slide them sideways to
+//               lean, forward to deepen it, back for a snow plow; spread or close them to move the camera
+const kb = { up: false, down: false, space: false, left: false, right: false };
 const keyLeg = k => (k === 'a' || k === 'arrowleft') ? 'L' : (k === 'd' || k === 'arrowright') ? 'R' : null;
-function updKeyLean(){ keyLean = (kb.right ? 1 : 0) - (kb.left ? 1 : 0); }
+function updKeyLean(){ keyLean = kb.up ? (kb.right ? 1 : 0) - (kb.left ? 1 : 0) : 0; }
+const keyDeep = () => { tuckDeep = mode === 'tuck' && kb.up && kb.space ? 1 : 0; };
 addEventListener('keydown', e => {
-  if (e.target instanceof HTMLInputElement) return;
+  if (e.target && e.target.closest && e.target.closest('input,textarea,select')) return;
   const k = e.key.toLowerCase(), leg = keyLeg(k);
+  if (k === ' '){ e.preventDefault(); kb.space = true; keyDeep(); return; }
+  if (k === 'arrowup' || k === 'w'){ e.preventDefault(); if (e.repeat) return; kb.up = true; setTuck(true, 'key'); updKeyLean(); keyDeep(); return; }
+  if (k === 'arrowdown' || k === 's'){ e.preventDefault(); if (e.repeat) return; kb.down = true; setPlow(true, 'key'); tuckDeep = 0; return; }
   if (leg){
-    e.preventDefault(); if (e.repeat) return;
-    if (leg === 'L') kb.left = true; else kb.right = true;
-    if (mode === 'tuck') updKeyLean(); else if (mode !== 'plow') press(leg, kb.space ? P.lboost : 1, 'key');
+    e.preventDefault(); if (leg === 'L') kb.left = true; else kb.right = true;
+    if (kb.up){ updKeyLean(); return; }                    // tucking: lean, don't kick
+    if (e.repeat) return;                                  // holding doesn't kick again; you have to press
+    press(leg, kb.space ? P.lboost : 1, 'key');            // Space held: a loaded stroke, like a swipe on a phone
     return;
   }
-  if (k === ' '){ e.preventDefault(); kb.space = true; return; }
   if ((k === 'enter' || k === 'e') && !e.repeat){ if (gameConfirm()) e.preventDefault(); return; }
-  if (k === 'arrowup' || k === 'w'){ e.preventDefault(); if (!e.repeat){ setTuck(true, 'key'); updKeyLean(); } return; }
-  if (k === 'arrowdown' || k === 's'){ e.preventDefault(); if (!e.repeat) setPlow(true, 'key'); return; }
   if (k === 'v' && !e.repeat) toggleView();
   if (k === 'h' && !e.repeat) toggleDev();
   if (k === 'r' && !e.repeat) resetSkier();
@@ -1880,38 +2063,196 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => {
   const k = e.key.toLowerCase(), leg = keyLeg(k);
   if (leg){ if (leg === 'L') kb.left = false; else kb.right = false; release(leg); updKeyLean(); return; }
-  if (k === ' ') kb.space = false;
-  if (k === 'arrowup' || k === 'w'){ setTuck(false, 'key'); keyLean = 0; }
-  if (k === 'arrowdown' || k === 's') setPlow(false, 'key');
+  if (k === ' '){ kb.space = false; keyDeep(); return; }
+  if (k === 'arrowup' || k === 'w'){ kb.up = false; setTuck(false, 'key'); updKeyLean(); tuckDeep = 0; return; }
+  if (k === 'arrowdown' || k === 's'){ kb.down = false; setPlow(false, 'key'); keyDeep(); }      // back in the tuck if ↑ is still down
 });
-addEventListener('blur', () => { held.L = held.R = false; kb.left = kb.right = kb.space = false; keyLean = 0; hold.tuck.clear(); hold.plow.clear(); syncMode(); });
+addEventListener('blur', () => { held.L = held.R = false; kb.up = kb.down = kb.space = kb.left = kb.right = false; keyLean = 0; tuckDeep = 0; hold.tuck.clear(); hold.plow.clear(); syncMode(); });
 
-const padSt = { L: false, R: false, tuck: false, plow: false };
+// ---- the controller (standard mapping). pulling a trigger past halfway kicks; keep it pulled to hold the glide.
+// each stick is one leg. load: pull the stick down and in to sink onto that ski. throw: drive it up and out to push
+// off and send your weight onto the other ski. a flick straight out from rest is exactly a trigger press
+const PAD_ON = 0.5, PAD_OFF = 0.3, padDown = { L: false, R: false }, padBtn = {}, padTuck = { on: false };
+const twin = { L: { phase: 'idle', load: null, x: 0, y: 0, armed: false, loadT: 0, restSince: 0 }, R: { phase: 'idle', load: null, x: 0, y: 0, armed: false, loadT: 0, restSince: 0 } };
+const pushLeg = stickLeg => stickLeg === 'L' ? 'R' : 'L';     // a stick's throw steps that foot's ski out, so the push comes off the other leg
+addEventListener('gamepadconnected', e => { padIndex = e.gamepad.index; });
+addEventListener('gamepaddisconnected', e => { if (e.gamepad.index === padIndex){ padIndex = null; release('L'); release('R'); padDown.L = padDown.R = false; } });
+// loading: while a stick is pulled into its load the skier sinks and moves their weight onto the leg about to push
+function loadState(){ for (const k of ['L', 'R']){ const t = twin[k]; if (t.phase === 'loading') return { depth: Math.min(1, Math.hypot(t.x, t.y)), leg: pushLeg(k), both: false }; } return NO_LOAD; }
+// a stroke is a kick, exactly as if you'd pulled the trigger for that leg; thrown from a load it has the loaded boost
+function strokeThrow(leg, t, loaded){ t.phase = 'thrown'; t.armed = false; press(pushLeg(leg), loaded ? P.lboost : 1, null, loaded ? t.loadT : undefined); }
 function pollPad(){
-  const gps = navigator.getGamepads ? navigator.getGamepads() : [];
-  let g = null; for (const p of gps) if (p){ g = p; break; }
-  if (!g) return;
-  const tuckOn = !!((g.buttons[4] && g.buttons[4].pressed) || (g.buttons[5] && g.buttons[5].pressed));
-  if (tuckOn !== padSt.tuck){ padSt.tuck = tuckOn; setTuck(tuckOn, 'pad'); }
-  { const a = !!(g.buttons[0] && g.buttons[0].pressed); if (a && !padSt.ok) gameConfirm(); padSt.ok = a; }
-  const plowOn = !!(g.buttons[1] && g.buttons[1].pressed);
-  if (plowOn !== padSt.plow){ padSt.plow = plowOn; setPlow(plowOn, 'pad'); }
-  for (const [leg, b] of [['L', g.buttons[6]], ['R', g.buttons[7]]]){
-    const v = b ? b.value : 0;
-    if (!padSt[leg] && v > 0.5){ padSt[leg] = true; if (!mode) press(leg, 1, 'trigger'); }
-    else if (padSt[leg] && v < 0.3){ padSt[leg] = false; release(leg); }
+  let pads; try { pads = navigator.getGamepads ? navigator.getGamepads() : []; } catch (err){ return; }
+  let gp = padIndex !== null ? pads[padIndex] : null;
+  if (!gp) for (const p of pads) if (p && p.connected !== false){ gp = p; padIndex = p.index; break; }
+  if (!gp){ if (padTuck.on){ padTuck.on = false; setPlow(false, 'twin'); setTuck(false, 'pad'); } return; }
+  const trig = i => { const b = gp.buttons[i]; return b ? (typeof b === 'object' ? (b.value || (b.pressed ? 1 : 0)) : b) : 0; };
+  const edge = (i, fn) => { const on = trig(i) > 0.5; if (on && !padBtn[i]) fn(); padBtn[i] = on; };
+  edge(0, gameConfirm);            // A: agree to what's offered
+  edge(3, toggleView);             // Y: planet view
+  const ax = gp.axes || [], sticks = { L: [ax[0] || 0, ax[1] || 0], R: [ax[2] || 0, ax[3] || 0] };
+  const [lx, ly] = sticks.L, [rx, ry] = sticks.R, dz = v => Math.abs(v) < 0.15 ? 0 : v;
+  const setPhase = p => { for (const k of ['L', 'R']){ twin[k].phase = p; twin[k].load = null; twin[k].armed = false; } };
+  lean = 0;
+  // ---- LB or RB held: tuck, the same as both thumbs down on a phone. while it's held the sticks shape it: pull them
+  // both back for a snow plow (push forward again to tuck), push them forward for a deeper tuck, tilt them left or
+  // right to lean. no kicks while it's held: let go to skate again
+  const bump = trig(4) > 0.5 || trig(5) > 0.5, avgY = (ly + ry)/2;
+  if (bump){
+    if (!padTuck.on){ padTuck.on = true; setTuck(true, 'pad'); setPhase('idle'); }
+    for (const leg of ['L', 'R']){ twin[leg].x = sticks[leg][0]; twin[leg].y = sticks[leg][1]; }
+    if (mode === 'tuck' && avgY > 0.55){ setPlow(true, 'twin'); tuckDeep = 0; }
+    else if (mode === 'plow' && hold.plow.has('twin') && avgY < 0.25) setPlow(false, 'twin');
+    if (mode === 'tuck'){ tuckDeep = Math.max(0, Math.min(1, (-avgY - 0.2)/0.7)); lean = Math.max(-1, Math.min(1, dz((lx + rx)/2)/0.6)); }
+    for (const leg of ['L', 'R']) if (padDown[leg] && trig(leg === 'L' ? 6 : 7) <= PAD_OFF){ padDown[leg] = false; release(leg); }
+    return;
   }
-  const ax = g.axes[0] || 0; padLean = mode === 'tuck' && Math.abs(ax) > 0.15 ? ax : 0;
-  if (g.buttons[3] && g.buttons[3].pressed && !padSt.view){ padSt.view = true; toggleView(); } else if (!(g.buttons[3] && g.buttons[3].pressed)) padSt.view = false;
+  if (padTuck.on){ padTuck.on = false; setPlow(false, 'twin'); setTuck(false, 'pad'); tuckDeep = 0; setPhase('idle'); }
+  // ---- triggers kick (LT left leg, RT right leg; hold to push the kick all the way out and ride the glide)
+  for (const [leg, i] of [['L', 6], ['R', 7]]){
+    const v = trig(i);
+    if (!padDown[leg] && v >= PAD_ON){ padDown[leg] = true; press(leg, 1, 'trigger'); }
+    else if (padDown[leg] && v <= PAD_OFF){ padDown[leg] = false; release(leg); }
+  }
+  // ---- sticks stroke
+  for (const leg of ['L', 'R']){
+    const t = twin[leg], [x, y] = sticks[leg], inSign = leg === 'L' ? 1 : -1, mag = Math.hypot(x, y);      // inward is toward the other leg
+    t.x = x; t.y = y;
+    const inLoad = mag > 0.5 && y > 0.25 && x*inSign > -0.25;          // down, and not outward
+    if (inLoad && t.phase !== 'loading'){
+      if (t.phase === 'thrown') release(pushLeg(leg));
+      t.phase = 'loading'; t.load = [x, y]; t.loadT = performance.now(); t.restSince = 0;
+      if (performance.now() - buzzAt > 120) buzz(leg, P.rumbleL/100, 50);   // one short buzz on that side as the load starts
+    }
+    if (t.phase === 'loading'){
+      if (inLoad && mag > Math.hypot(t.load[0], t.load[1])) t.load = [x, y];   // deepest point of the load
+      // throw: judged by the stroke itself, not by where the stick ends up. it has to travel far enough from the load
+      // point, out toward the rim, and leave the load zone, so a flat, sideways stroke counts too
+      if (!inLoad && mag > 0.55 && Math.hypot(x - t.load[0], y - t.load[1]) >= P.tmin){ strokeThrow(leg, t, true); strideV1 = false; }
+      else if (mag < 0.25){
+        // the stroke passes through the centre on its way, so only give up on the load if the stick rests there
+        t.restSince = t.restSince || performance.now();
+        if (performance.now() - t.restSince > P.rest){ t.phase = 'idle'; t.load = null; t.restSince = 0; }
+      } else t.restSince = 0;
+    } else if (t.phase === 'thrown' && (mag < 0.3 || y > 0)){ t.phase = 'idle'; release(pushLeg(leg)); }
+    if (t.phase === 'idle'){
+      // a flick without a load, from rest straight out to the edge of the stick's range (and not while both sticks are up)
+      if (mag < 0.3) t.armed = true;
+      else if (t.armed && !inLoad && mag >= P.fedge && !(y < -0.3 && sticks[pushLeg(leg)][1] < -0.4)) strokeThrow(leg, t, false);
+    }
+  }
 }
-function bindPad(el, down, up){
-  el.addEventListener('pointerdown', e => { e.preventDefault(); el.setPointerCapture(e.pointerId); el.classList.add('on'); down(); });
-  const end = () => { el.classList.remove('on'); up(); };
-  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+
+// ---- touch pads: the kick goes through the moment your finger touches down. if the finger then swipes up the pad,
+// the same kick is upgraded to a loaded stroke: the extra push is added over the next 150 ms (and the rest of the held
+// push grows to match). a swipe counts once it has travelled the swipe distance, or on lifting if it got at least
+// halfway, as long as that's within 400 ms.
+// both thumbs down together (the second within 150 ms of the first) is a two-pad gesture instead, and the first
+// thumb's kick is taken back: both thumbs down is a tuck straight away, pulling both back (down the screen) turns it
+// into a snow plow and pushing forward again back into the tuck, and spreading or closing them sideways moves the
+// camera like a pinch. the plow and tuck last until a thumb lifts
+const padTouch = { L: null, R: null }, DUAL_MS = 150;
+let dual = null;
+// everything a kick changes, so a kick that turns out to be half of a two-pad gesture can be undone
+function snapKick(){
+  return { vx: S.vx, vy: S.vy, tgt: S.tgt, camPending, streak, sideRun, kickPrevT, streakKmh, streakTrig, snapSkip, runTurn, turnRestart, lastTurnDeg, kickDrive, kickTop,
+    lastSki: { ...lastSki }, ski: ['L', 'R'].map(k => lastSki[k] && { live: lastSki[k].live, len: lastSki[k].len }), tail: skis[skis.length - 1],
+    weightLeg, lastLeg, lastKickAt, lastPushAt, glideLeg, glideStart, held: { ...held }, strideV1, mode, armAt, armPending, junctionTurnAt, assistQuietUntil, legFlash: { ...legFlash } };
 }
-bindPad($('padL'), () => { if (mode === 'tuck') touchLean = -1; else press('L', 1, 'touch'); }, () => { release('L'); if (touchLean < 0) touchLean = 0; });
-bindPad($('padR'), () => { if (mode === 'tuck') touchLean = 1; else press('R', 1, 'touch'); }, () => { release('R'); if (touchLean > 0) touchLean = 0; });
-bindPad($('padT'), () => setTuck(true, 'touch'), () => { setTuck(false, 'touch'); touchLean = 0; });
+function undoKick(q){
+  ({ camPending, streak, sideRun, kickPrevT, streakKmh, streakTrig, snapSkip, runTurn, turnRestart, lastTurnDeg, kickDrive, kickTop, weightLeg, lastLeg, lastKickAt, lastPushAt,
+     glideLeg, glideStart, strideV1, mode, armAt, armPending, junctionTurnAt, assistQuietUntil } = q);
+  S.vx = q.vx; S.vy = q.vy; S.tgt = q.tgt;
+  for (let i = skis.indexOf(q.tail) + 1; i < skis.length; i++){ skis[i].len = 0; skis[i].live = false; skis[i].dirty = true; }   // the new prints vanish
+  lastSki = { ...q.lastSki }; ['L', 'R'].forEach((k, i) => { if (lastSki[k] && q.ski[i]){ lastSki[k].live = q.ski[i].live; lastSki[k].len = q.ski[i].len; lastSki[k].dirty = true; } });
+  Object.assign(held, q.held); Object.assign(legFlash, q.legFlash);
+}
+function dualMove(){
+  const { a, b } = dual, ua = a.y0 - a.y, ub = b.y0 - b.y, T = 18, span = Math.abs(a.x - b.x), mid = (a.x + b.x)/2;
+  // thumbs moving apart or together (not both the same way) is a pinch: it takes over from the tuck
+  if (dual.act === 'tuck' && !dual.leaned && Math.abs(span - dual.s0) > 40 && Math.abs(mid - dual.lx) < 15 && Math.abs(ua) < T*1.5 && Math.abs(ub) < T*1.5){
+    setTuck(false, 'dual'); touchLean = 0; tuckDeep = 0; dual.act = 'pinch'; dual.s0 = span; dual.c0 = P.camd;
+  }
+  // pulling both thumbs back switches a tuck to a plow, and pushing them forward again switches back, without lifting.
+  // a tuck turns into a plow only once both thumbs are well behind where the tuck began (72 px; 24 px in the first
+  // 400 ms, before any lean). a plow turns back into a tuck after 18 px forward from wherever the thumbs got to
+  if (dual.act === 'plow' || dual.act === 'tuck'){
+    if (dual.act === 'tuck'){
+      const early = !dual.leaned && performance.now() - dual.t0 < 400, TS = early ? 24 : 72;
+      if (a.y - dual.ay > TS && b.y - dual.by > TS){ dual.act = 'plow'; setPlow(true, 'dual'); setTuck(false, 'dual'); touchLean = 0; tuckDeep = 0; dual.ea = -ua; dual.eb = -ub; }
+    } else {
+      const pa = -ua, pb = -ub;                                           // how far back the thumbs are
+      dual.ea = Math.max(dual.ea ?? pa, pa); dual.eb = Math.max(dual.eb ?? pb, pb);
+      if (dual.ea - pa > T && dual.eb - pb > T){ dual.act = 'tuck'; setTuck(true, 'dual'); setPlow(false, 'dual'); dual.lx = mid; dual.fy = (a.y + b.y)/2; dual.ay = a.y; dual.by = b.y; }
+    }
+    // while tucking, sliding both thumbs left or right leans that way (full lean at 60 px from where the tuck began),
+    // and pushing them further forward is a deeper tuck (full at 120 px)
+    if (dual.act === 'tuck'){ const d = mid - dual.lx; touchLean = Math.abs(d) < 6 ? 0 : Math.max(-1, Math.min(1, d/60)); if (Math.abs(d) > 15) dual.leaned = true;
+      tuckDeep = Math.max(0, Math.min(1, (dual.fy - (a.y + b.y)/2 - 10)/110)); }
+    return;
+  }
+  if (dual.act === 'pinch'){
+    const el = $('tCamd'), lo = +el.min, hi = +el.max, st = +el.step || 0.5;
+    const v = Math.max(lo, Math.min(hi, Math.round(dual.c0*Math.max(40, dual.s0)/Math.max(40, span)/st)*st));
+    if (+el.value !== v){ el.value = v; el.dispatchEvent(new Event('input')); }
+  }
+}
+function dualEnd(){ if (!dual) return; setPlow(false, 'dual'); setTuck(false, 'dual'); dual = null; touchLean = 0; tuckDeep = 0; }
+function padSettle(t){ if (t.timer){ clearTimeout(t.timer); t.timer = null; } if (t.state !== 'done'){ t.state = 'done'; if (t.kicked){ armPending = false; armAt = performance.now(); } } }
+function padLoaded(leg, t){
+  const ok = t.state !== 'done' && t.kicked && t.push && performance.now() - t.t0 < 400;
+  padSettle(t);
+  if (!ok || P.lboost <= 1) return;
+  kickTop = { dx: t.push.dx, dy: t.push.dy, amt: t.push.amt*(P.lboost - 1), left: 0.15 };
+  if (kickDrive && kickDrive.leg === leg) kickDrive.base *= P.lboost;
+  strideV1 = false; rumble(leg, kickBuzz(P.lboost));
+}
+for (const [id, leg] of [['padL', 'L'], ['padR', 'R']]){
+  const el = $(id), other = leg === 'L' ? 'R' : 'L';
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault(); try { el.setPointerCapture(e.pointerId); } catch (_){} el.classList.add('on');
+    const old = padTouch[leg]; if (old){ padSettle(old); if (old.dual) dualEnd(); }
+    const now = performance.now();
+    const t = padTouch[leg] = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, state: 'wait', timer: null, t0: now };
+    const o = padTouch[other];
+    if (o && !o.dual && !dual && now - o.t0 < DUAL_MS && Math.hypot(o.x - o.x0, o.y - o.y0) < 20){
+      // the second thumb: a two-pad gesture. take back the first thumb's kick
+      if (o.timer){ clearTimeout(o.timer); o.timer = null; }
+      if (o.kicked && o.snap){ undoKick(o.snap); kickTop = null; }
+      o.state = t.state = 'done'; o.kicked = false; o.dual = t.dual = true; armPending = false;
+      $(other === 'L' ? 'padL' : 'padR').classList.remove('pull');
+      dual = { a: o, b: t, act: 'tuck', s0: Math.abs(t.x - o.x), c0: P.camd, lx: (t.x + o.x)/2, fy: (t.y + o.y)/2, ay: o.y, by: t.y, t0: now, leaned: false };
+      setTuck(true, 'dual');                    // both thumbs down: tuck straight away
+      return;
+    }
+    t.snap = snapKick();
+    const before = lastKickAt; lastPush = null; press(leg, 1, 'touch');
+    t.kicked = lastKickAt !== before; t.push = lastPush;
+    if (t.kicked) armPending = true;
+    if (P.swait > 0) t.timer = setTimeout(() => padSettle(t), P.swait); else padSettle(t);
+  });
+  el.addEventListener('pointermove', e => {
+    const t = padTouch[leg]; if (!t || t.id !== e.pointerId) return;
+    t.x = e.clientX; t.y = e.clientY;
+    if (t.dual){ if (dual) dualMove(); return; }
+    const dx = e.clientX - t.x0, up = t.y0 - e.clientY;
+    if (t.state === 'wait'){
+      if (up > 8 && up > Math.abs(dx)*0.6){ clearTimeout(t.timer); t.timer = setTimeout(() => padSettle(t), 400); t.state = 'swipe'; el.classList.add('pull'); }
+      else if (Math.hypot(dx, up) > 12) padSettle(t);        // a slide that isn't upward: just the kick
+    }
+    if (t.state === 'swipe' && up >= P.sthrow){ el.classList.remove('pull'); padLoaded(leg, t); }
+  });
+  for (const ev of ['pointerup', 'pointercancel']) el.addEventListener(ev, e => {
+    const t = padTouch[leg];
+    if (t && t.id === e.pointerId){
+      if (t.dual) dualEnd();
+      else if (t.state === 'swipe'){ if (ev === 'pointerup' && t.y0 - e.clientY >= P.sthrow/2) padLoaded(leg, t); else padSettle(t); }   // a short flick up still counts
+      else padSettle(t);
+      padTouch[leg] = null;
+    }
+    el.classList.remove('on', 'pull'); release(leg);
+  });
+}
 document.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('dblclick', e => e.preventDefault());
 
@@ -2027,7 +2368,7 @@ bootLayout().then(() => {
   placeAtStart();
   buildPlanet(); faceTrail();
   $('loading').style.display = 'none';
-  window.__planetoid = { game: () => GAME, gameSynced: () => !GAME || GAME.rev === gameRev, gameItems: () => gameG.children.length, bridgeLocks: () => bridgesG.map(B => [B.name, B.locked, B.lit.visible]), modelVariants: () => modelRecs.map(r => [r.m.name, r.v]), dbg: { sky, ugGroup, planet, scene }, ug: () => UG && UG.name, doors: () => ugDoors, caveMeshes: () => ugLayers.map(L => L && L.mesh.geometry.index.count/3), models: () => modelsG.children, trees: () => trees, rocks: () => rocks, lawn: () => LAWN, S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList,
+  window.__planetoid = { game: () => GAME, gameSynced: () => !GAME || GAME.rev === gameRev, gameItems: () => gameG.children.length, bridgeLocks: () => bridgesG.map(B => [B.name, B.locked, B.lit.visible]), modelVariants: () => modelRecs.map(r => [r.m.name, r.v]), dbg: { sky, ugGroup, planet, scene }, ug: () => UG && UG.name, doors: () => ugDoors, caveMeshes: () => ugLayers.map(L => L && L.mesh.geometry.index.count/3), models: () => modelsG.children, trees: () => trees, rocks: () => rocks, lawn: () => LAWN, S, n, P, kick: press, release, get mode(){ return mode; }, ctl: () => ({ mode, tuckDeep, lean, keyLean, touchLean, v1: strideV1, streak, lastLeg, lastTurnDeg, held: { ...held }, kickTop: !!kickTop, assist: assistTrail && assistTrail.name, assistW, twin: [twin.L.phase, twin.R.phase], dual: dual && dual.act, junctions: juncs().length, camPending }), branchSnap, nearestJunction, junctionList: () => juncs().map(j => ({ d: j.d.toArray(), b: j.b.map(v => v.toArray()) })), chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList,
     weather: WX, sun: { setTime: h => setLocalTime(h, n), get time(){ return localTime(n, sunD); }, get dir(){ return sunD; }, get axis(){ return AXIS; }, get phase(){ return dayPhase; }, set phase(v){ dayPhase = v; } } };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 });

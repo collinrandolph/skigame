@@ -62,6 +62,19 @@ button.icon.on{background:var(--skier);border-color:var(--skier);color:#fff}
 body.clean .hud, body.clean #settings, body.clean #steepBan{display:none !important}
 body.clean.nopads .pads{display:none !important}
 #steepBan{position:fixed;left:50%;top:22%;transform:translateX(-50%);padding:8px 16px;border-radius:6px;background:var(--skier);color:#fff;font:700 18px var(--display);letter-spacing:.06em;text-transform:uppercase;display:none;pointer-events:none}
+.goal{display:grid;gap:2px;padding:6px 8px;border-left:3px solid var(--skier);background:rgba(127,127,127,.09);border-radius:0 4px 4px 0}
+.goal b{font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:.03em;line-height:1.15}
+.goal span{color:var(--muted);font-size:11px}
+/* the game's offer (agree with Enter, E, A or a tap), the reason something won't open, and the news */
+.gbox{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 56px);max-width:min(460px,calc(100vw - 32px));padding:10px 16px;text-align:center;line-height:1.35}
+button.gbox{display:grid;gap:2px;justify-items:center;border-color:var(--skier);border-width:2px;border-radius:8px}
+button.gbox b{font:700 19px var(--display);letter-spacing:.04em;text-transform:uppercase}
+button.gbox span{color:var(--muted);font-size:11px}
+button.gbox kbd{font:500 10.5px var(--mono);color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px;margin-top:3px}
+div.gbox{font-size:12px;color:var(--muted)}
+#gToast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 14%);transform:translateX(-50%);max-width:min(520px,calc(100vw - 32px));padding:8px 16px;border-radius:6px;background:var(--ink);color:var(--bg);font:700 17px var(--display);letter-spacing:.04em;text-align:center;pointer-events:none}
+[hidden]{display:none !important}
+@media (pointer:coarse){ .gbox{bottom:calc(env(safe-area-inset-bottom,0px) + 140px)} }
 #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font:700 20px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);pointer-events:none}
 </style>
 </head>
@@ -71,6 +84,7 @@ body.clean.nopads .pads{display:none !important}
 
 <div class="hud panel" aria-live="off">
   <h1>Planetoid</h1>
+  <div class="goal" id="gGoal" hidden><b id="gTitle"></b><span id="gDetail"></span></div>
   <div class="row"><span>Speed</span><b id="hSpeed">0.0 km/h</b></div>
   <div class="row"><span>Snow</span><b id="hSnow">–</b></div>
   <div class="row"><span>Grade</span><b id="hGrade">0%</b></div>
@@ -81,10 +95,13 @@ body.clean.nopads .pads{display:none !important}
   <div class="row opt"><span>Skied</span><b id="hDist">0 m</b></div>
   <div class="row opt"><span>Nearest landmark</span><b id="hBeacon">–</b></div>
   <div class="legs"><div class="leg" id="legL">Left</div><div class="leg" id="legR">Right</div></div>
-  <div class="help"><b>← →</b> kick (hold to ride the glide) · <b>Space</b> + kick: loaded stroke · <b>↑</b> tuck, <b>← →</b> lean · <b>↓</b> snow plow · <b>V</b> planet view · <b>P</b> 800 m / 300 m planet · <b>R</b> reset</div>
+  <div class="help"><b>← →</b> kick (hold to ride the glide) · <b>Space</b> + kick: loaded stroke · <b>↑</b> tuck, <b>← →</b> lean · <b>↓</b> snow plow · <b>V</b> planet view · <b>P</b> 800 m / 300 m planet · <b>R</b> reset (back to your last terminal) · <b>Enter</b> agree</div>
 </div>
 
 <div id="steepBan" role="status">Too steep to ski</div>
+<div id="gToast" role="status" hidden></div>
+<button id="gPrompt" class="gbox panel" type="button" hidden><b id="gPromptT"></b><span id="gPromptD"></span><kbd>Enter · E · A · tap</kbd></button>
+<div id="gHint" class="gbox panel" hidden></div>
 <div class="top-right"><button id="devBtn" class="icon" type="button" aria-pressed="false" aria-label="Dev mode" title="Dev mode: hide the UI (H)"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7 3 12l5 5M16 7l5 5-5 5M13.5 4.5l-3 15"/></svg></button><button id="viewBtn" class="icon" type="button" aria-pressed="false" aria-label="Planet view" title="Planet view (V)"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="6.5"/><path d="M4.2 15.6c-2 1.5-2.7 2.9-2 3.6 1.4 1.4 7.6-1.7 13.8-7.9S24.3 1.6 22.9.2c-.6-.6-2 0-3.6 2"/></svg></button></div>
 
 <details class="panel" id="settings">
@@ -112,7 +129,7 @@ body.clean.nopads .pads{display:none !important}
   <label for="tBld">Buildings<output id="oBld"></output><input id="tBld" type="range" min="0" max="3" step="0.25" value="1"></label>
   <label for="tOff">Ungroomed snow (× friction)<output id="oOff"></output><input id="tOff" type="range" min="1" max="12" step="0.5" value="1.5"></label>
   <label for="tPush">Push per kick<output id="oPush"></output><input id="tPush" type="range" min="0.2" max="2.5" step="0.05" value="2.5"></label>
-  <div class="btns"><button id="resetBtn" type="button">Reset skier</button><button id="defaultsBtn" type="button">Defaults</button><button id="procBtn" type="button" hidden>Back to procedural planet</button></div>
+  <div class="btns"><button id="resetBtn" type="button">Reset skier</button><button id="newGameBtn" type="button" hidden title="Forget this world's progress and start again">New game</button><button id="defaultsBtn" type="button">Defaults</button><button id="procBtn" type="button" hidden>Back to procedural planet</button></div>
   <label class="check"><input id="tTidy" type="checkbox" checked> Tidy editor layouts as they load (join trails, ease small steep bits)</label>
   <p class="note" id="layoutNote">Drop a planet.json from the planet editor here to ski it.</p>
   <p class="note">Kick, turn and glide tuning are the main game's defaults.</p>
@@ -126,6 +143,7 @@ body.clean.nopads .pads{display:none !important}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="planet-terrain.js"></script>
+<script src="game-core.js"></script>     <!-- the game's rules (zones, terminals, gates, crystals): for layouts with a game block -->
 <script src="planet-objects.js"></script>   <!-- the painted objects' shapes (trees, rocks) -->
 <script src="../models.js"></script>   <!-- the game's models, the skier among them -->
 <script>
@@ -173,6 +191,7 @@ const save = () => { try { const o = { lift: P.lift, cycle: P.daynight, aurora: 
 // noise, stamps and sculpting when one is loaded
 const PTR = window.PlanetTerrain, noise3 = PTR.noise3;
 let LAYOUT = null, LAYOUT_RAW = null, TIDY = '', TERRAIN = PTR.terrain(null, P.R);
+let GAME = null;      // the game's rules for this layout (game-core.js), when it has a game block
 let LAWN = null; const LAWN_T = { name: 'Lawn' };     // the layout's lawns (PT.lawnField), when it has any
 // (underground, the ground is the cave's floor: see ugHeight)
 let UG = null;
@@ -507,6 +526,7 @@ function buildPlanet(){
   }
   buildScatter();
   buildUnderground();
+  gameRev = -1; gameUI();      // (everything the game shows is redrawn on the new ground)
 }
 // finer chunks round the skier: lod 4 within about 120 m, lod 2 within 300 m. one rebuilt per frame, nearest first
 function updateLod(){
@@ -883,26 +903,40 @@ function buildLandmarks(){
 // into walls, legs and posts. a layout can make one not solid. trees, rocks and the random buildings keep clear of
 // every one, solid or not
 const modelsG = new THREE.Group(); scene.add(modelsG);
-let modelSolids = [];
-function buildModels(){
-  modelsG.clear(); modelSolids = [];
-  if (!LAYOUT || !LAYOUT.models || !LAYOUT.models.length || !window.SkiModels) return;
+let modelSolids = [], modelRecs = [];
+// (the game says how its own models look now: a terminal running, a gate open. the rest are as the layout has them)
+function makeModel(m){
   const R = P.R, V = THREE.Vector3, m4 = new THREE.Matrix4();
-  for (const m of LAYOUT.models){
-    const r = SkiModels.make(m.id, m.v, m.seed); if (!r) continue;
-    const s = m.scale || 1, size = r.box.getSize(new V()), rf = Math.hypot(size.x, size.z)/2*s, d = new V(...m.d).normalize();
-    const seat = PTR.modelSeat(m.d, rf, heightAt, R), [bx, by, bz] = PTR.modelBasis(m.d, m.rot);
-    r.g.traverse(o => { if (o.material) for (const mt of [].concat(o.material)) flatPatch(mt); });   // drawn with the flatten view, like the ground
-    // the footprint, in the model's own frame (x, z along the ground, metres): the snow under it from the planet
-    const X = new V(...bx), Z = new V(...bz), q = new V();
-    r.g.scale.setScalar(s); r.g.updateMatrixWorld(true);
-    const foot = SkiModels.footprint([r.g], (x, z) => { q.copy(d).multiplyScalar(R).addScaledVector(X, x).addScaledVector(Z, z).normalize(); return heightAt(q.x, q.y, q.z) - seat.base; });
-    r.g.position.copy(d).multiplyScalar(R + seat.base);
-    r.g.quaternion.setFromRotationMatrix(m4.makeBasis(new V(...bx), new V(...by), new V(...bz)));
-    modelsG.add(r.g);
-    modelSolids.push({ d, r: rf, lim: Math.cos((rf + 10)/R), foot, X, Z, ghost: m.solid === false });
+  const gv = GAME ? GAME.modelVariant(m.name, m.id) : null, v = gv === null ? m.v : gv;
+  const r = SkiModels.make(m.id, v, m.seed); if (!r) return null;
+  const s = m.scale || 1, size = r.box.getSize(new V()), rf = Math.hypot(size.x, size.z)/2*s, d = new V(...m.d).normalize();
+  const seat = PTR.modelSeat(m.d, rf, heightAt, R), [bx, by, bz] = PTR.modelBasis(m.d, m.rot);
+  r.g.traverse(o => { if (o.material) for (const mt of [].concat(o.material)) flatPatch(mt); });   // drawn with the flatten view, like the ground
+  // the footprint, in the model's own frame (x, z along the ground, metres): the snow under it from the planet
+  const X = new V(...bx), Z = new V(...bz), q = new V();
+  r.g.scale.setScalar(s); r.g.updateMatrixWorld(true);
+  const foot = SkiModels.footprint([r.g], (x, z) => { q.copy(d).multiplyScalar(R).addScaledVector(X, x).addScaledVector(Z, z).normalize(); return heightAt(q.x, q.y, q.z) - seat.base; });
+  r.g.position.copy(d).multiplyScalar(R + seat.base);
+  r.g.quaternion.setFromRotationMatrix(m4.makeBasis(new V(...bx), new V(...by), new V(...bz)));
+  return { m, v, g: r.g, solid: { d, r: rf, lim: Math.cos((rf + 10)/R), foot, X, Z, ghost: m.solid === false } };
+}
+function buildModels(){
+  modelsG.clear(); modelSolids = []; modelRecs = [];
+  if (!LAYOUT || !LAYOUT.models || !LAYOUT.models.length || !window.SkiModels) return;
+  for (const m of LAYOUT.models){ const rec = makeModel(m); if (!rec) continue; modelsG.add(rec.g); modelSolids.push(rec.solid); modelRecs.push(rec); }
+}
+// the models the game has changed since they were built: each made again where it stands, its footprint with it (so an
+// opened gate lets you through)
+function syncModels(){
+  for (const rec of modelRecs){
+    const v = GAME.modelVariant(rec.m.name, rec.m.id); if (v === null || v === rec.v) continue;
+    const nw = makeModel(rec.m); if (!nw) continue;
+    modelsG.remove(rec.g); modelsG.add(nw.g);
+    for (const list of [modelSolids, solids]){ const i = list.indexOf(rec.solid); if (i >= 0) list[i] = nw.solid; }
+    Object.assign(rec, nw);
   }
 }
+
 // ---------- painted objects: the layout's trees, rocks and the like (PT.OBJECT_KINDS; shapes in planet-objects.js) ----------
 // each stands on the ground (set in by its kind's sink), turned and sized as painted, tinted a little lighter or darker.
 // solid ones go in the trees' grid (solid round their middle, by kind and size). one a trail's bed, a junction, a lawn or
@@ -995,7 +1029,8 @@ const n = new THREE.Vector3(), ex = new THREE.Vector3(), ey = new THREE.Vector3(
 let AT_ONCE = null;      // ?at=x,y,z (from the editor's Ski here): where to put the skier the first time
 { const a = new URLSearchParams(location.search).get('at'); if (a){ const v = a.split(',').map(Number); if (v.length === 3 && v.every(isFinite)) AT_ONCE = new THREE.Vector3(...v).normalize(); } }
 function placeAtStart(){
-  n.copy(AT_ONCE || START_N); AT_ONCE = null; ONB = null; exitLock = null;
+  const cp = !AT_ONCE && GAME ? GAME.checkpoint() : null;       // back to the last terminal you powered
+  n.copy(AT_ONCE || START_N); if (cp) n.set(cp[0], cp[1], cp[2]).normalize(); AT_ONCE = null; ONB = null; exitLock = null;
   ex.set(1, 0, 0).addScaledVector(n, -n.x).normalize();
   ey.crossVectors(ex, n).normalize();        // as in the game's 3D: X east, Y up, Z south (east × up = south)
 }
@@ -1035,6 +1070,9 @@ const BR_MATS = {
   pylon: flatPatch(new THREE.MeshLambertMaterial({ color: 0x9aa3b5 })),
   pole: flatPatch(new THREE.MeshLambertMaterial({ color: 0xf4f6fa })),
   arch: flatPatch(new THREE.MeshBasicMaterial({ color: 0xc7b8ff })),
+  // a drawbridge (a layout's bridge of kind 'draw'): a steel deck and rails, until the game has its own
+  dDeck: flatPatch(new THREE.MeshLambertMaterial({ color: 0x7c8794, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })),
+  dRail: flatPatch(new THREE.MeshLambertMaterial({ color: 0xd9822b, side: THREE.DoubleSide })),
 };
 const local3 = (x, y, out = new THREE.Vector3()) => out.set(0, 0, 0).addScaledVector(ex, x).addScaledVector(ey, y);
 function buildBridges(){
@@ -1046,6 +1084,7 @@ function buildBridges(){
   const up = new V(0, 1, 0), tmp = new V(), side = new V();
   for (const b of LAYOUT.bridges){
     const D = PTR.bridgeDeck(b, heightAt, R), Vs = D.pts.map(p => new V(...p)), M = Vs.length; if (M < 3) continue;
+    const draw = b.kind === 'draw', lit = new THREE.Group(); bridgeGroup.add(lit);      // (lit: what's gone while the bridge is dark, or up)
     const w = D.width, sideAt = i => side.crossVectors(tmp.copy(Vs[Math.min(M - 1, i + 1)]).sub(Vs[Math.max(0, i - 1)]), Vs[i]).normalize();
     // deck and railings: ribbons along the line
     const ribbon = (offs, lift0, lift1, mat) => {
@@ -1053,10 +1092,10 @@ function buildBridges(){
       for (let i = 0; i < M; i++){ sideAt(i); offs.forEach((o, c) => { const q = Vs[i].clone().multiplyScalar(R).addScaledVector(side, o[0]).normalize().multiplyScalar(R + D.h[i] + (c % 2 ? lift1 : lift0)), k = (i*offs.length + c)*3; pos[k] = q.x; pos[k + 1] = q.y; pos[k + 2] = q.z; }); }
       for (let i = 0; i < M - 1; i++) for (let c = 0; c < offs.length; c += 2){ const a = i*offs.length + c, bb = a + 1, cc = a + offs.length, d = cc + 1; idx.push(a, cc, bb, bb, cc, d); }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(idx); g.computeBoundingSphere();
-      const m = new THREE.Mesh(g, mat); m.renderOrder = 2; bridgeGroup.add(m);
+      const m = new THREE.Mesh(g, mat); m.renderOrder = 2; lit.add(m);
     };
-    ribbon([[-w], [w]], 0.04, 0.04, BR_MATS.deck);
-    ribbon([[-w], [-w], [w], [w]], 0.04, 1.05, BR_MATS.rail);
+    ribbon([[-w], [w]], 0.04, 0.04, draw ? BR_MATS.dDeck : BR_MATS.deck);
+    ribbon([[-w], [-w], [w], [w]], 0.04, 1.05, draw ? BR_MATS.dRail : BR_MATS.rail);
     // pylons where the deck is high, about every 40 m (solid)
     let last = -1e9;
     for (let i = 0; i < M; i++) if (D.h[i] - D.g[i] > 6 && D.s[i] - last > 40 && D.s[i] > 20 && D.L - D.s[i] > 20){
@@ -1072,10 +1111,10 @@ function buildBridges(){
       sideAt(i); const g = new THREE.Group(); g.position.copy(Vs[i]).multiplyScalar(R + D.g[i] - 0.2);
       const m = new THREE.Matrix4().makeBasis(side.clone(), Vs[i].clone(), t.clone().negate()); g.quaternion.setFromRotationMatrix(m);
       for (const sg of [-1, 1]){ const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.18, 4.6, 8), BR_MATS.pole); pole.position.set(sg*(w + 0.5), 2.3, 0); g.add(pole); }
-      const arch = new THREE.Mesh(new THREE.TorusGeometry(w + 0.5, 0.12, 6, 24, Math.PI), BR_MATS.arch); arch.position.y = 4.6; g.add(arch);
+      const arch = new THREE.Mesh(new THREE.TorusGeometry(w + 0.5, 0.12, 6, 24, Math.PI), BR_MATS.arch); arch.position.y = 4.6; arch.visible = !draw; g.add(arch); lit.userData.arches = (lit.userData.arches || []).concat(arch);
       bridgeGroup.add(g);
     }
-    const B = { name: b.name, D, V: Vs, w, tIn };
+    const B = { name: b.name, D, V: Vs, w, tIn, lit, draw, locked: false };
     bridgesG.push(B);
     // keep the ground clear: buildings from under the whole bridge, trees and rocks where the deck is low (and round
     // the portals)
@@ -1126,7 +1165,7 @@ function bridgeStep(){
   }
   const v = speed(); if (v < 0.3 || !bridgesG.length) return;
   const mv = local3(S.vx/v, S.vy/v);
-  for (const B of bridgesG) for (const f of [0, 1]){
+  for (const B of bridgesG) if (!B.locked) for (const f of [0, 1]){
     const foot = f ? B.V[B.V.length - 1] : B.V[0], d = foot.angleTo(n)*R;
     if (exitLock && exitLock.B === B && exitLock.foot === f){ if (d > 10) exitLock = null; else continue; }
     if (d > B.w + 0.6 || mv.dot(B.tIn[f]) < Math.cos(55*D2R)) continue;
@@ -1357,6 +1396,7 @@ function collide(){
   for (const k of rocks) if (k.x*n.x + k.y*n.y + k.z*n.z > lim) hit(k.x, k.y, k.z, k.r);
   for (const b of beaconList) if (b.d.dot(n) > lim) hit(b.d.x, b.d.y, b.d.z, b.r);
   for (const p of pylons) if (p.d.dot(n) > lim) hit(p.d.x, p.d.y, p.d.z, p.r);
+  for (const b of gameBlocks) if (b.d.dot(n) > lim) hit(b.d.x, b.d.y, b.d.z, b.r);      // what the game keeps shut
   { const tl = treeGrid.get(cellOf(n.x, n.y, n.z)); if (tl) for (const t of tl) if (t.cr !== 0) hit(t.d.x, t.d.y, t.d.z, t.cr ?? 0.18*t.s + 0.05); }   // tree trunks, and the painted objects
   for (const o of solids){
     if (o.ghost || o.d.dot(n) < o.lim) continue;
@@ -1550,6 +1590,7 @@ function ugStep(){
   const R = P.R;
   for (const D of ugDoors){
     if (UG && UG.k !== D.k) continue;
+    if (!UG && GAME && !GAME.doorOpen(D.k)) continue;       // a door the game keeps shut (the crown door)
     _ur.copy(n).sub(D.mouth); const along = _ur.dot(D.out)*R, lat = _ur.dot(D.side)*R; if (Math.abs(along) > 30) continue;
     if (!UG){
       const into = local3(S.vx, S.vy, _uv).dot(D.out), level = Math.abs(TERRAIN.height(n.x, n.y, n.z) - D.h) < 2.5;
@@ -1573,6 +1614,75 @@ function ugFrame(k){
     snowPts.visible = false;
   } else ugLamp.intensity = 0;
 }
+
+// ---------- the game (game-core.js): a layout's game block, played ----------
+// the rules are game-core.js's; this is what they look like here. terminals, gates and posts change their models,
+// bridges stay dark (or up) until earned, a running terminal's orbs and the woken altar's crystals stand on the snow,
+// and the HUD carries the goal, an offer to agree to (Enter, E, A or a tap) and the news. progress is saved in this
+// browser, per layout name; R takes you back to the last terminal you powered
+const GAME_STORE = 'skate-v2-save';
+const gameG = new THREE.Group(); scene.add(gameG);
+const ugPropsG = new THREE.Group(); scene.add(ugPropsG);
+let gameRev = -1, gameBlocks = [], toastQ = [], toastUntil = 0, gPromptKey = null, gHintTxt = null;
+const gameKey = () => GAME_STORE + ':' + (LAYOUT_RAW ? LAYOUT_RAW.name : '');
+function gameLoad(){ gameRev = -1; toastQ = []; if (!GAME) return; try { const s = localStorage.getItem(gameKey()); if (s) GAME.restore(s); } catch (e) {} GAME.toasts.length = 0; }
+function gameSave(){ try { localStorage.setItem(gameKey(), GAME.serialize()); } catch (e) {} }
+// one of the game's own models (models.js) stood at d, or a plain shape if there's none
+function gameModel(id, v, plain){
+  let g = null; try { const r = window.SkiModels && SkiModels.make(id, v, 1); if (r) g = r.g; } catch (e) {}
+  if (!g) g = plain();
+  g.traverse(o => { if (o.material) for (const mt of [].concat(o.material)) flatPatch(mt); });
+  return g;
+}
+function gameItem(id, d, plain){
+  const v = new THREE.Vector3(d[0], d[1], d[2]).normalize(), g = gameModel(id, 0, plain);
+  g.position.copy(v).multiplyScalar(P.R + TERRAIN.height(v.x, v.y, v.z)); g.quaternion.setFromUnitVectors(_up, v); gameG.add(g);
+}
+// the cave rooms' props: the crystal altar (asleep or woken) and the dead teleporter's ring, each on its room's floor
+function syncUgProps(){
+  ugPropsG.clear(); const U = GAME.game.underground; if (!U) return;
+  const put = (g, spot) => { const Ly = ugLayers[spot.layer]; if (!Ly) return; const v = new THREE.Vector3(...spot.d).normalize(), a = Ly.CF.at(v.x, v.y, v.z);
+    g.position.copy(v).multiplyScalar(P.R - Ly.depth + (a.open ? a.floor : 0)); g.quaternion.setFromUnitVectors(_up, v); g.userData.layer = spot.layer; ugPropsG.add(g); };
+  const woken = GAME.state().altar;
+  if (U.crystalAltar) put(gameModel('altar', woken ? 1 : 0, () => { const m = new THREE.Mesh(new THREE.OctahedronGeometry(1.6), new THREE.MeshBasicMaterial({ color: woken ? 0xc77dff : 0x5a4a6a })); m.position.y = 2; const g = new THREE.Group(); g.add(m); return g; }), U.crystalAltar);
+  if (U.teleporter){ const g = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.35, 8, 28), flatPatch(new THREE.MeshLambertMaterial({ color: 0x4a5560 }))); ring.position.y = 3.8; g.add(ring);
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.9, 0.4, 20), flatPatch(new THREE.MeshLambertMaterial({ color: 0x5b6570 }))); pad.position.y = 0.2; g.add(pad);
+    put(g, U.teleporter); }
+}
+// progress changed (or the planet was rebuilt): bring everything the game shows up to date, and save
+function syncGame(){
+  gameRev = GAME.rev;
+  syncModels();
+  for (const B of bridgesG){ const lk = !GAME.bridgeOpen(B.name); B.locked = lk; B.lit.visible = !lk; for (const a of B.lit.userData.arches || []) a.visible = !lk && !B.draw; if (lk && ONB && ONB.b === B) ONB = null; }
+  gameBlocks = GAME.blockers().map(b => ({ d: new THREE.Vector3(...b.d).normalize(), r: b.r }));
+  gameG.clear();       // (only what's still to collect)
+  for (const o of GAME.orbs()) if (!o.got) gameItem('orb', o.d, () => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffd35c })); m.position.y = 1.1; const g = new THREE.Group(); g.add(m); return g; });
+  for (const c of GAME.crystals()) if (!c.got) gameItem('crystal', c.d, () => { const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.9), new THREE.MeshBasicMaterial({ color: 0xb06cff })); m.position.y = 1.2; const g = new THREE.Group(); g.add(m); return g; });
+  syncUgProps();
+  gameSave(); gameUI();
+}
+function gameUI(){
+  const on = !!GAME; $('gGoal').hidden = !on; $('newGameBtn').hidden = !on;
+  if (!on){ $('gPrompt').hidden = $('gHint').hidden = $('gToast').hidden = true; gPromptKey = gHintTxt = null; gameG.clear(); ugPropsG.clear(); gameBlocks = []; return; }
+  const g = GAME.goal(); $('gTitle').textContent = g.title; $('gDetail').textContent = g.detail;
+}
+function gameFrame(dt){
+  GAME.update({ n: [n.x, n.y, n.z], ug: UG ? UG.k : -1 });
+  if (GAME.rev !== gameRev) syncGame();
+  for (const t of GAME.toasts.splice(0)) toastQ.push(t);
+  for (const g of gameG.children) g.rotateY(dt*1.4);
+  gameG.visible = !ugDeep; ugPropsG.visible = !!UG; if (UG) for (const c of ugPropsG.children) c.visible = c.userData.layer === UG.k;
+  // the offer, the reason, the news (one line at a time, quicker when more is waiting)
+  const p = GAME.prompt, key = p ? p.key : null;
+  if (key !== gPromptKey){ gPromptKey = key; $('gPrompt').hidden = !p; if (p){ $('gPromptT').textContent = p.text; $('gPromptD').textContent = p.detail || ''; $('gPromptD').hidden = !p.detail; } }
+  const h = GAME.hint || ''; if (h !== gHintTxt){ gHintTxt = h; $('gHint').hidden = !h; $('gHint').textContent = h; }
+  const now = performance.now();
+  if (now > toastUntil){ if (toastQ.length){ $('gToast').textContent = toastQ.shift(); $('gToast').hidden = false; toastUntil = now + (toastQ.length ? 1700 : 3800); } else $('gToast').hidden = true; }
+}
+function gameConfirm(){ return !!(GAME && GAME.prompt && GAME.confirm()); }
+$('gPrompt').addEventListener('click', e => { gameConfirm(); e.currentTarget.blur(); });
+$('newGameBtn').addEventListener('click', e => { if (!GAME) return; GAME.reset(); resetSkier(); e.currentTarget.blur(); });
 
 // ---------- the chase camera (as the main game), and the planet view ----------
 let camTh = 0, camVel = 0, focusLat = 0, focusV = 0, camR = null, viewOn = false, viewK = 0;
@@ -1625,6 +1735,7 @@ function frame(now){
   pollPad();
   const nsub = Math.max(1, Math.ceil(dt*60 - 1e-6));
   for (let i = 0; i < nsub; i++) step(dt/nsub);
+  if (GAME) gameFrame(dt);
   poseFigure(dt);
   const k = placeCamera(dt);
   updateMarks();
@@ -1758,6 +1869,7 @@ addEventListener('keydown', e => {
     return;
   }
   if (k === ' '){ e.preventDefault(); kb.space = true; return; }
+  if ((k === 'enter' || k === 'e') && !e.repeat){ if (gameConfirm()) e.preventDefault(); return; }
   if (k === 'arrowup' || k === 'w'){ e.preventDefault(); if (!e.repeat){ setTuck(true, 'key'); updKeyLean(); } return; }
   if (k === 'arrowdown' || k === 's'){ e.preventDefault(); if (!e.repeat) setPlow(true, 'key'); return; }
   if (k === 'v' && !e.repeat) toggleView();
@@ -1781,6 +1893,7 @@ function pollPad(){
   if (!g) return;
   const tuckOn = !!((g.buttons[4] && g.buttons[4].pressed) || (g.buttons[5] && g.buttons[5].pressed));
   if (tuckOn !== padSt.tuck){ padSt.tuck = tuckOn; setTuck(tuckOn, 'pad'); }
+  { const a = !!(g.buttons[0] && g.buttons[0].pressed); if (a && !padSt.ok) gameConfirm(); padSt.ok = a; }
   const plowOn = !!(g.buttons[1] && g.buttons[1].pressed);
   if (plowOn !== padSt.plow){ padSt.plow = plowOn; setPlow(plowOn, 'pad'); }
   for (const [leg, b] of [['L', g.buttons[6]], ['R', g.buttons[7]]]){
@@ -1873,6 +1986,7 @@ function tidied(Lz){
 }
 function applyLayout(Lz){
   LAYOUT_RAW = Lz; LAYOUT = tidied(Lz);
+  GAME = Lz.game && window.SkiGame ? SkiGame.create(Lz.game, Lz.radius) : null; gameLoad();
   START_N.set(...Lz.start.d).normalize();
   P.R = Lz.radius; $('tR').value = Lz.radius; $('oR').textContent = Lz.radius + ' m';
   for (const [id, o, k, f] of SETTINGS){ const v = { mtn: Lz.scatter.mountains, bld: Lz.scatter.buildings, trees: Lz.scatter.trees }[k]; if (v === undefined) continue; P[k] = v; $(id).value = v; $(o).textContent = f(v); }
@@ -1904,7 +2018,7 @@ document.addEventListener('drop', e => {
 });
 $('tTidy').addEventListener('change', () => { if (!LAYOUT_RAW) return; LAYOUT = tidied(LAYOUT_RAW); layoutUI(); rebuild(false); });
 $('procBtn').addEventListener('click', e => {
-  LAYOUT = LAYOUT_RAW = null; START_N.set(0.15, 1, 0.25).normalize(); history.replaceState(null, '', location.pathname); layoutUI(); rebuild(true); e.currentTarget.blur();
+  LAYOUT = LAYOUT_RAW = null; GAME = null; START_N.set(0.15, 1, 0.25).normalize(); history.replaceState(null, '', location.pathname); layoutUI(); rebuild(true); e.currentTarget.blur();
 });
 
 // ---------- go ----------
@@ -1913,7 +2027,7 @@ bootLayout().then(() => {
   placeAtStart();
   buildPlanet(); faceTrail();
   $('loading').style.display = 'none';
-  window.__planetoid = { dbg: { sky, ugGroup, planet, scene }, ug: () => UG && UG.name, doors: () => ugDoors, caveMeshes: () => ugLayers.map(L => L && L.mesh.geometry.index.count/3), models: () => modelsG.children, trees: () => trees, rocks: () => rocks, lawn: () => LAWN, S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList,
+  window.__planetoid = { game: () => GAME, gameSynced: () => !GAME || GAME.rev === gameRev, gameItems: () => gameG.children.length, bridgeLocks: () => bridgesG.map(B => [B.name, B.locked, B.lit.visible]), modelVariants: () => modelRecs.map(r => [r.m.name, r.v]), dbg: { sky, ugGroup, planet, scene }, ug: () => UG && UG.name, doors: () => ugDoors, caveMeshes: () => ugLayers.map(L => L && L.mesh.geometry.index.count/3), models: () => modelsG.children, trees: () => trees, rocks: () => rocks, lawn: () => LAWN, S, n, P, kick: press, release, get mode(){ return mode; }, chunks: () => chunks, toggleView, TEST, solids: () => solids, counts: () => Object.assign({ trees: trees.length, bridges: bridgesG.length, pylons: pylons.length }, buildCounts), bridges: () => bridgesG, get onBridge(){ return ONB && ONB.b.name; }, drawn: () => ({ buckets: buckets.length, visible: buckets.filter(b => b.mesh.visible).length, chunks: chunks.filter(c => c.mesh.visible).length + '/' + chunks.length }), ex, ey, trails: () => trails, nearestTrailAt, get layout(){ return LAYOUT; }, height: (x, y, z) => heightAt(x, y, z), landmarks: () => beaconList,
     weather: WX, sun: { setTime: h => setLocalTime(h, n), get time(){ return localTime(n, sunD); }, get dir(){ return sunD; }, get axis(){ return AXIS; }, get phase(){ return dayPhase; }, set phase(v){ dayPhase = v; } } };   // test hook
   requestAnimationFrame(t => { last = t; frame(t); });
 });

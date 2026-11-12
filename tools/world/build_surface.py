@@ -248,14 +248,13 @@ def beside(name_or_line, i, off, side=None):
     if side is None: side = 0 if clf[node(c[0])] >= clf[node(c[1])] else 1
     return c[side], p
 
-# gates
-put("gate", GATES["east"]["d"], rot=GATES["east"]["rot"], name="East gate")
-put("gate", GATES["north"]["d"], rot=GATES["north"]["rot"], name="North gate")
-put("gate", GATES["south"]["d"], rot=GATES["south"]["rot"], name="South pass gate")
+# gates. (the gate and mine portal models have their doorway across their own z, so the way through is their x:
+# a quarter turn from the trail's bearing. the crystal gate's doorway is across its x: it faces along the trail as it is)
+for _k, _nm in (("east", "East gate"), ("north", "North gate"), ("south", "South pass gate")): put("gate", GATES[_k]["d"], rot=(GATES[_k]["rot"] - 90) % 360, name=_nm)
 lb1 = [norm(p) for p in REF["bridges"][0]["pts"]]; cg = lb1[0] if zone_of(lb1[0]) == "E" else lb1[-1]; cg_other = lb1[-1] if cg is lb1[0] else lb1[0]
 i, q = nearest_on("Trail 2", cg); cgd = T("Trail 2")["line"][max(0, min(len(T("Trail 2")["line"]) - 1, i + (8 if i < 20 else -8)))]
 put("crystalgate", cgd, rot=bearing(cgd, cg), name="Crystal gate")
-if MINE: put("mineportal", MINE["portal"], rot=bearing(MINE["portal"], MINE["d"]), name="Mine portal")
+if MINE: put("mineportal", MINE["portal"], rot=(bearing(MINE["portal"], MINE["d"]) - 90) % 360, name="Mine portal")
 
 # terminals: a kiosk beside its loop, a tall marker behind it, orbs round the loop
 TERMINALS = []; LANDMARKS = []
@@ -342,12 +341,12 @@ out = dict(
         zones=[dict(id=1, name="The Bowl", ref=r6(d_of(*ZREF[1]))), dict(id=2, name="Home plain", ref=r6(d_of(*ZREF[2]))), dict(id=3, name="Far plain", ref=r6(d_of(*ZREF[3]))),
                dict(id="highlands", name="The Highlands", ref=r6(d_of(*ZREF["E"]))), dict(id=4, name="South plain", ref=r6(d_of(*ZREF[4])))],
         trailZones=tz, terminals=TERMINALS,
-        gates=[dict(name="East gate", d=r6(GATES["east"]["d"]), between=[1, 2], opens="zone 1 terminals powered"), dict(name="North gate", d=r6(GATES["north"]["d"]), between=[1, 2], opens="zone 1 terminals powered"),
-               dict(name="Mine portal", d=r6(MINE["portal"]) if MINE else None, between=[3, "mine"], opens="zone 3 terminals powered"),
-               dict(name="Crystal gate", d=r6(cgd), between=["highlands", 4], opens="20 crystals offered; lights the Crystal bridge"),
-               dict(name="South pass gate", d=r6(GATES["south"]["d"]), between=[3, 4], opens="from the zone 4 side, once reached")],
-        bridges=[dict(name="West drawbridge", kind="draw", opens="zone 2 terminals powered"), dict(name="East drawbridge", kind="draw", opens="zone 2 terminals powered"),
-                 dict(name="Highland bridge", kind="light", opens="the crystal altar woken"), dict(name="Crystal bridge", kind="light", opens="20 crystals offered at the Crystal gate")],
+        gates=[dict(name="East gate", d=r6(GATES["east"]["d"]), between=[1, 2], opens="zone 1 terminals powered", when=dict(zone=1)), dict(name="North gate", d=r6(GATES["north"]["d"]), between=[1, 2], opens="zone 1 terminals powered", when=dict(zone=1)),
+               dict(name="Mine portal", d=r6(MINE["portal"]) if MINE else None, between=[3, "mine"], opens="zone 3 terminals powered", when=dict(zone=3)),
+               dict(name="Crystal gate", d=r6(cgd), between=["highlands", 4], opens="20 crystals offered; lights the Crystal bridge", when=dict(flag="offered")),
+               dict(name="South pass gate", d=r6(GATES["south"]["d"]), between=[3, 4], opens="from the zone 4 side, once reached", when=dict(flag="southGate"))],
+        bridges=[dict(name="West drawbridge", kind="draw", opens="zone 2 terminals powered", when=dict(zone=2), post=BRIDGES[0]["home"]), dict(name="East drawbridge", kind="draw", opens="zone 2 terminals powered", when=dict(zone=2), post=BRIDGES[1]["home"]),
+                 dict(name="Highland bridge", kind="light", opens="the crystal altar woken", when=dict(flag="altar")), dict(name="Crystal bridge", kind="light", opens="20 crystals offered at the Crystal gate", when=dict(flag="offered"))],
         crystals=[r6(c) for c in CRYSTALS], altar=r6(ALTAR) if ALTAR is not None else None, giant=r6(GIANT) if GIANT is not None else None, starway=SW,
         chapters=["Zone 1: power 2 terminals; the East and North gates open", "Zone 2: power 3 terminals; the two drawbridges over the river lower", "Zone 3: power 3 terminals; the mine portal opens",
                   "The mine: reach the teleporter (dead) and wake the crystal altar; the Highland bridge lights, back in the Bowl", "Crystal search: find 20 crystals in the highlands", "Crystal gate: offer them; the Crystal bridge lights down into zone 4",

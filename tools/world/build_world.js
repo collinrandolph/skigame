@@ -56,7 +56,7 @@ if (A.mine){
     const [bay, tb] = step(dr.p, dr.t, 16, Rk); chamber(k, bay, 20, 11);
     const bk = walk(step(bay, turn(bay, tb, 96), 16, Rk)[0], turn(bay, tb, 96), [[44, 30], [40, 34]], Rk);
     tunnel('Back drift', k, [bay].concat(bk.pts, [g.pts[Math.floor(g.pts.length/2)]]), 6, 5.5);
-    UG.mineDoor = { layer: 0, d: r6(d.d) }; UG.teleporter = { layer: 0, d: r6(hall), name: 'Teleporter hall' }; UG.crystalAltar = { layer: 0, d: r6(cave), name: 'Altar cave' }; UG.oreBay = { layer: 0, d: r6(bay) };
+    UG.rampStart = r6(B.pts[0]); UG.mineDoor = { layer: 0, d: r6(d.d) }; UG.teleporter = { layer: 0, d: r6(hall), name: 'Teleporter hall' }; UG.crystalAltar = { layer: 0, d: r6(cave), name: 'Altar cave' }; UG.oreBay = { layer: 0, d: r6(bay) };
   }
   { // layer 1, the deep: behind the crown door, one long passage winding to the crown room
     const k = 1, Rk = R - DEPTH[k], d = doors.find(x => x.link === k), t = tang(d.end, d.out);

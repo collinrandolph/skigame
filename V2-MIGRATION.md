@@ -71,6 +71,13 @@ On `planets/v2-world.json`, served over http:
 Built: `planets/v2-world.json`, described in `planets/V2-WORLD.md`. It carries a `game` block (section 4's fields:
 zones, terminals with orbs, gates, bridge kinds, crystals, underground rooms), so the first slice has data to run on.
 
+## Status
+
+- Done: rows 1 and 2 of the port order, and row 4 (crystals, crystal gate), in `prototypes/game-core.js`.
+- Added to the list, ahead of row 3: **the main game's skiing and controls**. The planetoid has only skate kicks,
+  glide, loaded strokes, tuck and plow. Classic stride, double pole, twin-stick, touch and haptics are in `index.html`
+  (about lines 1900 to 2640).
+
 ## 7. Conventions for later sessions
 
 - Every new system registers `save()`, `load(data)`, `reset()` and `update(dt)` with the core.

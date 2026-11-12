@@ -5,7 +5,7 @@
 
 Maps: `v2-world-map.png` (surface), `v2-underground.png` (the mine). Checks: `v2-world-report.json`.
 
-To see it: open `prototypes/planet-editor.html`, Import `v2-world.json`, then Ski here.
+To edit it: open `prototypes/planet-editor.html` and Import `v2-world.json`.
 
 ## Progression
 
@@ -62,17 +62,30 @@ The layout carries a `game` block the editor keeps but does not edit: zones, eac
 positions, gates and what opens them, bridge kinds, crystals, altar, giant, Starway, and the underground's rooms.
 `prototypes/planet-terrain.js` was changed (5 lines) to pass it through, along with a bridge's `kind`.
 
+## What plays now
+
+Open `prototypes/planetoid.html?layout=../planets/v2-world.json` (served over http). Chapters 1 to 6 work:
+
+- Terminals start, their orbs collect, and they power on when you return. The goal line in the HUD follows along.
+- The East and North gates stop you until zone 1 is live, then open.
+- Each drawbridge lowers at its control post once zone 2 is live. Raised, it can't be skied.
+- The mine portal opens with zone 3. In the altar cave, waking the altar lights the Highland bridge.
+- The 20 crystals appear in the highlands and collect; offering them at the Crystal gate lights the Crystal bridge.
+- Progress saves in the browser per layout. R returns you to the last terminal you powered. Settings has New game.
+
+The rules are in `prototypes/game-core.js`; tests in `tools/test`.
+
 ## Not done, or needs your eye
 
-- **Not skied.** Checked by building the terrain with the game's own code, not by playing. three.js loads from a CDN
-  this build environment can't reach.
-- **Drawbridges still draw as light bridges.** The data says drawbridge; the game code to lower them is part of the port.
-- **Gates, terminals and crystals are props for now.** Nothing locks or collects until the game core is ported.
+- **The skiing is the planetoid's, not the main game's.** Classic stride, double pole, the twin-stick and touch
+  schemes, kick-turn tuning and haptics are still to port.
+- **Chapters 7 to 9** (moose puzzle and altar, crown door, Starway) have places and data but no rules yet.
+- **Drawbridges are a plain steel deck** that appears when lowered: no towers, leaf or lifting animation.
+- **Underground props are stand-ins**: the altar model and a simple ring for the dead teleporter.
 - **The Starway is game data only**: 247 m long rising 193 m, too steep for the bridge builder.
 - **Random buildings are off** (`scatter.buildings: 0`), so only placed ones appear.
 - **Your Trail 8** has one point on ground steeper than the 40% stop (it was there before).
-- **Underground props** (teleporter, altars, crown) have positions in `game.underground` but no models: the model
-  list places on the surface only.
+- **Played by script, not by hand.** The browser test places the skier and pushes it; nobody has skied a full loop.
 
 ## Rebuilding
 

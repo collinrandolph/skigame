@@ -24,31 +24,31 @@
   "bare"
  ],
  "overall": [
-  0.303,
-  0.202,
-  0.04,
-  0.075,
-  0.381
+  0.705,
+  0.186,
+  0.018,
+  0.058,
+  0.032
  ],
  "zones": {
   "E": {
    "metres": 2512,
    "share": [
-    0.522,
-    0.27,
-    0.057,
+    0.538,
+    0.274,
+    0.051,
     0.026,
-    0.125
+    0.111
    ]
   },
   "2": {
    "metres": 12034,
    "share": [
-    0.289,
-    0.182,
-    0.035,
-    0.078,
-    0.416
+    0.721,
+    0.174,
+    0.011,
+    0.069,
+    0.024
    ]
   },
   "1": {
@@ -64,21 +64,21 @@
   "3": {
    "metres": 9043,
    "share": [
-    0.222,
-    0.186,
-    0.038,
-    0.054,
-    0.5
+    0.78,
+    0.159,
+    0.011,
+    0.031,
+    0.019
    ]
   },
   "4": {
    "metres": 2240,
    "share": [
-    0.396,
-    0.225,
-    0.055,
-    0.175,
-    0.149
+    0.618,
+    0.182,
+    0.044,
+    0.114,
+    0.042
    ]
   }
  },
@@ -89,13 +89,13 @@
    "zone": "E",
    "metres": 662,
    "share": [
-    0.612,
+    0.701,
     0.239,
-    0.045,
+    0.03,
     0.0,
-    0.104
+    0.03
    ],
-   "longest_bare": 50.0,
+   "longest_bare": 20.0,
    "longest_nothing_new": 150.0
   },
   {
@@ -150,13 +150,13 @@
    "metres": 300,
    "share": [
     0.387,
-    0.194,
+    0.226,
     0.161,
     0.0,
-    0.258
+    0.226
    ],
-   "longest_bare": 60.0,
-   "longest_nothing_new": 170.0
+   "longest_bare": 30.0,
+   "longest_nothing_new": 140.0
   },
   {
    "trail": "Trail 4",
@@ -164,11 +164,11 @@
    "zone": "E",
    "metres": 300,
    "share": [
-    0.29,
+    0.323,
     0.323,
     0.065,
     0.0,
-    0.323
+    0.29
    ],
    "longest_bare": 60.0,
    "longest_nothing_new": 110.0
@@ -201,7 +201,7 @@
     0.0
    ],
    "longest_bare": 0,
-   "longest_nothing_new": 110.0
+   "longest_nothing_new": 60.0
   },
   {
    "trail": "Trail 6",
@@ -224,9 +224,9 @@
    "zone": "E",
    "metres": 190,
    "share": [
-    0.211,
     0.263,
-    0.053,
+    0.263,
+    0.0,
     0.158,
     0.316
    ],
@@ -239,14 +239,14 @@
    "zone": 2,
    "metres": 821,
    "share": [
-    0.458,
-    0.181,
-    0.048,
+    0.831,
+    0.169,
     0.0,
-    0.313
+    0.0,
+    0.0
    ],
-   "longest_bare": 190.0,
-   "longest_nothing_new": 190.0
+   "longest_bare": 0,
+   "longest_nothing_new": 70.0
   },
   {
    "trail": "Trail 9",
@@ -254,14 +254,14 @@
    "zone": 2,
    "metres": 821,
    "share": [
-    0.41,
-    0.217,
-    0.036,
+    0.831,
+    0.169,
     0.0,
-    0.337
+    0.0,
+    0.0
    ],
-   "longest_bare": 280.0,
-   "longest_nothing_new": 380.0
+   "longest_bare": 0,
+   "longest_nothing_new": 70.0
   },
   {
    "trail": "Trail 11",
@@ -329,14 +329,14 @@
    "zone": 2,
    "metres": 1089,
    "share": [
-    0.211,
-    0.055,
+    0.853,
+    0.147,
     0.0,
     0.0,
-    0.734
+    0.0
    ],
-   "longest_bare": 520.0,
-   "longest_nothing_new": 540.0
+   "longest_bare": 0,
+   "longest_nothing_new": 90.0
   },
   {
    "trail": "Trail 13",
@@ -344,14 +344,14 @@
    "zone": 2,
    "metres": 1089,
    "share": [
-    0.128,
-    0.156,
-    0.018,
+    0.862,
+    0.138,
     0.0,
-    0.697
+    0.0,
+    0.0
    ],
-   "longest_bare": 410.0,
-   "longest_nothing_new": 470.0
+   "longest_bare": 0,
+   "longest_nothing_new": 90.0
   },
   {
    "trail": "Trail 14",
@@ -359,14 +359,14 @@
    "zone": 2,
    "metres": 1776,
    "share": [
-    0.225,
-    0.135,
-    0.062,
-    0.225,
-    0.354
+    0.596,
+    0.163,
+    0.011,
+    0.18,
+    0.051
    ],
-   "longest_bare": 150.0,
-   "longest_nothing_new": 400.0
+   "longest_bare": 40.0,
+   "longest_nothing_new": 250.0
   },
   {
    "trail": "Trail 14",
@@ -374,29 +374,29 @@
    "zone": 2,
    "metres": 1776,
    "share": [
-    0.112,
+    0.646,
+    0.169,
+    0.011,
+    0.14,
+    0.034
+   ],
+   "longest_bare": 50.0,
+   "longest_nothing_new": 180.0
+  },
+  {
+   "trail": "Trail 16",
+   "dir": 1,
+   "zone": 3,
+   "metres": 1719,
+   "share": [
+    0.837,
     0.157,
-    0.045,
-    0.146,
-    0.539
-   ],
-   "longest_bare": 370.0,
-   "longest_nothing_new": 440.0
-  },
-  {
-   "trail": "Trail 16",
-   "dir": 1,
-   "zone": 3,
-   "metres": 1719,
-   "share": [
-    0.366,
-    0.122,
-    0.058,
     0.0,
-    0.453
+    0.0,
+    0.006
    ],
-   "longest_bare": 240.0,
-   "longest_nothing_new": 370.0
+   "longest_bare": 10.0,
+   "longest_nothing_new": 140.0
   },
   {
    "trail": "Trail 16",
@@ -404,14 +404,14 @@
    "zone": 3,
    "metres": 1719,
    "share": [
-    0.32,
-    0.221,
-    0.087,
+    0.808,
+    0.157,
+    0.012,
     0.017,
-    0.355
+    0.006
    ],
-   "longest_bare": 190.0,
-   "longest_nothing_new": 280.0
+   "longest_bare": 10.0,
+   "longest_nothing_new": 160.0
   },
   {
    "trail": "Trail 17",
@@ -419,14 +419,14 @@
    "zone": 3,
    "metres": 68,
    "share": [
-    0.286,
-    0.571,
-    0.143,
+    1.0,
+    0.0,
+    0.0,
     0.0,
     0.0
    ],
    "longest_bare": 0,
-   "longest_nothing_new": 60.0
+   "longest_nothing_new": 30.0
   },
   {
    "trail": "Trail 17",
@@ -449,44 +449,44 @@
    "zone": 4,
    "metres": 661,
    "share": [
-    0.313,
-    0.239,
+    0.373,
+    0.373,
     0.015,
-    0.134,
-    0.299
+    0.104,
+    0.134
    ],
-   "longest_bare": 120.0,
+   "longest_bare": 70.0,
+   "longest_nothing_new": 180.0
+  },
+  {
+   "trail": "Trail 8",
+   "dir": -1,
+   "zone": 4,
+   "metres": 661,
+   "share": [
+    0.687,
+    0.104,
+    0.03,
+    0.06,
+    0.119
+   ],
+   "longest_bare": 50.0,
    "longest_nothing_new": 190.0
   },
   {
-   "trail": "Trail 8",
-   "dir": -1,
-   "zone": 4,
-   "metres": 661,
-   "share": [
-    0.343,
-    0.06,
-    0.0,
-    0.09,
-    0.507
-   ],
-   "longest_bare": 130.0,
-   "longest_nothing_new": 440.0
-  },
-  {
    "trail": "Trail 10",
    "dir": 1,
    "zone": 2,
    "metres": 4218,
    "share": [
-    0.232,
-    0.164,
-    0.021,
-    0.161,
-    0.422
+    0.637,
+    0.166,
+    0.019,
+    0.154,
+    0.024
    ],
-   "longest_bare": 530.0,
-   "longest_nothing_new": 580.0
+   "longest_bare": 40.0,
+   "longest_nothing_new": 570.0
   },
   {
    "trail": "Trail 10",
@@ -494,14 +494,14 @@
    "zone": 2,
    "metres": 4218,
    "share": [
-    0.306,
-    0.182,
-    0.007,
-    0.107,
-    0.398
+    0.675,
+    0.185,
+    0.012,
+    0.09,
+    0.038
    ],
-   "longest_bare": 380.0,
-   "longest_nothing_new": 610.0
+   "longest_bare": 50.0,
+   "longest_nothing_new": 260.0
   },
   {
    "trail": "Trail 18",
@@ -525,8 +525,8 @@
    "metres": 477,
    "share": [
     0.542,
-    0.292,
-    0.104,
+    0.312,
+    0.083,
     0.0,
     0.062
    ],
@@ -569,14 +569,14 @@
    "zone": 3,
    "metres": 883,
    "share": [
-    0.045,
-    0.225,
-    0.034,
+    0.798,
+    0.079,
+    0.022,
     0.101,
-    0.596
+    0.0
    ],
-   "longest_bare": 280.0,
-   "longest_nothing_new": 440.0
+   "longest_bare": 0,
+   "longest_nothing_new": 290.0
   },
   {
    "trail": "Trail 20",
@@ -584,209 +584,209 @@
    "zone": 3,
    "metres": 883,
    "share": [
-    0.247,
-    0.18,
+    0.831,
+    0.124,
     0.022,
-    0.034,
-    0.517
+    0.022,
+    0.0
    ],
-   "longest_bare": 460.0,
-   "longest_nothing_new": 550.0
-  },
-  {
-   "trail": "Northfield loop",
-   "dir": 1,
-   "zone": 2,
-   "metres": 546,
-   "share": [
-    0.345,
-    0.309,
-    0.164,
-    0.0,
-    0.182
-   ],
-   "longest_bare": 100.0,
-   "longest_nothing_new": 190.0
-  },
-  {
-   "trail": "Northfield loop",
-   "dir": -1,
-   "zone": 2,
-   "metres": 546,
-   "share": [
-    0.164,
-    0.273,
-    0.255,
-    0.0,
-    0.309
-   ],
-   "longest_bare": 120.0,
-   "longest_nothing_new": 120.0
-  },
-  {
-   "trail": "Longlight loop",
-   "dir": 1,
-   "zone": 2,
-   "metres": 631,
-   "share": [
-    0.328,
-    0.219,
-    0.0,
-    0.031,
-    0.422
-   ],
-   "longest_bare": 90.0,
-   "longest_nothing_new": 120.0
-  },
-  {
-   "trail": "Longlight loop",
-   "dir": -1,
-   "zone": 2,
-   "metres": 631,
-   "share": [
-    0.438,
-    0.188,
-    0.031,
-    0.047,
-    0.297
-   ],
-   "longest_bare": 130.0,
+   "longest_bare": 0,
    "longest_nothing_new": 160.0
   },
   {
-   "trail": "Eastbank loop",
+   "trail": "Northfield loop",
    "dir": 1,
    "zone": 2,
-   "metres": 538,
+   "metres": 546,
    "share": [
-    0.074,
-    0.278,
-    0.148,
+    0.782,
+    0.127,
+    0.091,
     0.0,
-    0.5
+    0.0
    ],
-   "longest_bare": 100.0,
-   "longest_nothing_new": 150.0
+   "longest_bare": 0,
+   "longest_nothing_new": 60.0
   },
   {
-   "trail": "Eastbank loop",
+   "trail": "Northfield loop",
    "dir": -1,
    "zone": 2,
-   "metres": 538,
+   "metres": 546,
    "share": [
-    0.13,
-    0.13,
-    0.185,
+    0.618,
+    0.345,
     0.0,
-    0.556
+    0.0,
+    0.036
    ],
-   "longest_bare": 80.0,
+   "longest_bare": 10.0,
    "longest_nothing_new": 120.0
   },
   {
-   "trail": "Northfield road",
+   "trail": "Longlight loop",
    "dir": 1,
    "zone": 2,
-   "metres": 578,
+   "metres": 631,
    "share": [
-    0.552,
-    0.259,
+    0.906,
+    0.062,
     0.0,
-    0.0,
-    0.19
+    0.031,
+    0.0
    ],
-   "longest_bare": 90.0,
-   "longest_nothing_new": 130.0
+   "longest_bare": 0,
+   "longest_nothing_new": 60.0
   },
   {
-   "trail": "Northfield road",
+   "trail": "Longlight loop",
    "dir": -1,
    "zone": 2,
-   "metres": 578,
+   "metres": 631,
    "share": [
-    0.603,
-    0.259,
-    0.017,
+    0.844,
+    0.109,
     0.0,
-    0.121
+    0.031,
+    0.016
    ],
-   "longest_bare": 50.0,
-   "longest_nothing_new": 150.0
+   "longest_bare": 10.0,
+   "longest_nothing_new": 70.0
   },
   {
-   "trail": "High traverse",
+   "trail": "Eastbank loop",
    "dir": 1,
    "zone": 2,
-   "metres": 148,
+   "metres": 538,
    "share": [
-    0.6,
-    0.2,
+    0.648,
+    0.259,
     0.0,
-    0.2,
+    0.0,
+    0.093
+   ],
+   "longest_bare": 50.0,
+   "longest_nothing_new": 120.0
+  },
+  {
+   "trail": "Eastbank loop",
+   "dir": -1,
+   "zone": 2,
+   "metres": 538,
+   "share": [
+    0.593,
+    0.315,
+    0.093,
+    0.0,
     0.0
    ],
    "longest_bare": 0,
    "longest_nothing_new": 90.0
   },
   {
-   "trail": "High traverse",
+   "trail": "Northfield road",
+   "dir": 1,
+   "zone": 2,
+   "metres": 578,
+   "share": [
+    0.759,
+    0.224,
+    0.0,
+    0.0,
+    0.017
+   ],
+   "longest_bare": 10.0,
+   "longest_nothing_new": 90.0
+  },
+  {
+   "trail": "Northfield road",
    "dir": -1,
    "zone": 2,
-   "metres": 148,
+   "metres": 578,
    "share": [
-    0.6,
-    0.4,
+    0.759,
+    0.224,
     0.0,
     0.0,
-    0.0
+    0.017
    ],
-   "longest_bare": 0,
+   "longest_bare": 10.0,
    "longest_nothing_new": 80.0
   },
   {
+   "trail": "High traverse",
+   "dir": 1,
+   "zone": 2,
+   "metres": 148,
+   "share": [
+    0.6,
+    0.2,
+    0.0,
+    0.2,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 50.0
+  },
+  {
+   "trail": "High traverse",
+   "dir": -1,
+   "zone": 2,
+   "metres": 148,
+   "share": [
+    0.8,
+    0.2,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 20.0
+  },
+  {
    "trail": "Longlight road",
    "dir": 1,
    "zone": 2,
    "metres": 221,
    "share": [
-    0.348,
-    0.348,
-    0.0,
-    0.0,
-    0.304
-   ],
-   "longest_bare": 70.0,
-   "longest_nothing_new": 160.0
-  },
-  {
-   "trail": "Longlight road",
-   "dir": -1,
-   "zone": 2,
-   "metres": 221,
-   "share": [
+    0.739,
     0.261,
-    0.217,
     0.0,
     0.0,
-    0.522
+    0.0
    ],
-   "longest_bare": 90.0,
+   "longest_bare": 0,
    "longest_nothing_new": 90.0
   },
   {
+   "trail": "Longlight road",
+   "dir": -1,
+   "zone": 2,
+   "metres": 221,
+   "share": [
+    0.522,
+    0.261,
+    0.0,
+    0.0,
+    0.217
+   ],
+   "longest_bare": 30.0,
+   "longest_nothing_new": 60.0
+  },
+  {
    "trail": "Trenchside",
    "dir": 1,
    "zone": 2,
    "metres": 144,
    "share": [
+    0.933,
+    0.067,
     0.0,
     0.0,
-    0.0,
-    0.0,
-    1.0
+    0.0
    ],
-   "longest_bare": 150.0,
-   "longest_nothing_new": 150.0
+   "longest_bare": 0,
+   "longest_nothing_new": 50.0
   },
   {
    "trail": "Trenchside",
@@ -794,44 +794,44 @@
    "zone": 2,
    "metres": 144,
    "share": [
-    0.4,
-    0.4,
+    0.733,
+    0.267,
     0.0,
     0.0,
-    0.2
+    0.0
    ],
-   "longest_bare": 30.0,
+   "longest_bare": 0,
+   "longest_nothing_new": 30.0
+  },
+  {
+   "trail": "Bridge road east",
+   "dir": 1,
+   "zone": 2,
+   "metres": 238,
+   "share": [
+    0.875,
+    0.125,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
    "longest_nothing_new": 40.0
   },
   {
    "trail": "Bridge road east",
-   "dir": 1,
-   "zone": 2,
-   "metres": 238,
-   "share": [
-    0.167,
-    0.25,
-    0.0,
-    0.0,
-    0.583
-   ],
-   "longest_bare": 90.0,
-   "longest_nothing_new": 110.0
-  },
-  {
-   "trail": "Bridge road east",
    "dir": -1,
    "zone": 2,
    "metres": 238,
    "share": [
-    0.792,
+    0.958,
     0.042,
     0.0,
     0.0,
-    0.167
+    0.0
    ],
-   "longest_bare": 40.0,
-   "longest_nothing_new": 80.0
+   "longest_bare": 0,
+   "longest_nothing_new": 50.0
   },
   {
    "trail": "Mouth road",
@@ -839,14 +839,14 @@
    "zone": 2,
    "metres": 461,
    "share": [
-    0.553,
-    0.383,
-    0.021,
+    0.766,
+    0.234,
     0.0,
-    0.043
+    0.0,
+    0.0
    ],
-   "longest_bare": 20.0,
-   "longest_nothing_new": 250.0
+   "longest_bare": 0,
+   "longest_nothing_new": 130.0
   },
   {
    "trail": "Mouth road",
@@ -854,104 +854,104 @@
    "zone": 2,
    "metres": 461,
    "share": [
-    0.383,
-    0.085,
-    0.021,
+    0.851,
+    0.128,
     0.0,
-    0.511
+    0.0,
+    0.021
    ],
-   "longest_bare": 170.0,
-   "longest_nothing_new": 290.0
+   "longest_bare": 10.0,
+   "longest_nothing_new": 130.0
   },
   {
    "trail": "Far north trail",
    "dir": 1,
-   "zone": 2,
-   "metres": 317,
-   "share": [
-    0.219,
-    0.094,
-    0.0,
-    0.0,
-    0.688
-   ],
-   "longest_bare": 220.0,
-   "longest_nothing_new": 220.0
-  },
-  {
-   "trail": "Far north trail",
-   "dir": -1,
    "zone": 2,
    "metres": 317,
    "share": [
     0.875,
-    0.031,
+    0.125,
     0.0,
     0.0,
-    0.094
+    0.0
    ],
-   "longest_bare": 30.0,
+   "longest_bare": 0,
+   "longest_nothing_new": 80.0
+  },
+  {
+   "trail": "Far north trail",
+   "dir": -1,
+   "zone": 2,
+   "metres": 317,
+   "share": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 40.0
+  },
+  {
+   "trail": "Northcap loop",
+   "dir": 1,
+   "zone": 2,
+   "metres": 308,
+   "share": [
+    0.742,
+    0.258,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 60.0
+  },
+  {
+   "trail": "Northcap loop",
+   "dir": -1,
+   "zone": 2,
+   "metres": 308,
+   "share": [
+    0.774,
+    0.161,
+    0.0,
+    0.0,
+    0.065
+   ],
+   "longest_bare": 20.0,
+   "longest_nothing_new": 70.0
+  },
+  {
+   "trail": "Westreach loop",
+   "dir": 1,
+   "zone": 3,
+   "metres": 526,
+   "share": [
+    0.774,
+    0.189,
+    0.038,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
    "longest_nothing_new": 90.0
   },
   {
-   "trail": "Northcap loop",
-   "dir": 1,
-   "zone": 2,
-   "metres": 308,
-   "share": [
-    0.194,
-    0.258,
-    0.0,
-    0.0,
-    0.548
-   ],
-   "longest_bare": 150.0,
-   "longest_nothing_new": 150.0
-  },
-  {
-   "trail": "Northcap loop",
-   "dir": -1,
-   "zone": 2,
-   "metres": 308,
-   "share": [
-    0.129,
-    0.258,
-    0.0,
-    0.0,
-    0.613
-   ],
-   "longest_bare": 190.0,
-   "longest_nothing_new": 220.0
-  },
-  {
-   "trail": "Westreach loop",
-   "dir": 1,
-   "zone": 3,
-   "metres": 526,
-   "share": [
-    0.075,
-    0.453,
-    0.113,
-    0.0,
-    0.358
-   ],
-   "longest_bare": 140.0,
-   "longest_nothing_new": 260.0
-  },
-  {
    "trail": "Westreach loop",
    "dir": -1,
    "zone": 3,
    "metres": 526,
    "share": [
-    0.321,
-    0.151,
-    0.038,
+    0.887,
+    0.094,
     0.0,
-    0.491
+    0.0,
+    0.019
    ],
-   "longest_bare": 130.0,
-   "longest_nothing_new": 150.0
+   "longest_bare": 10.0,
+   "longest_nothing_new": 80.0
   },
   {
    "trail": "Basin loop",
@@ -959,29 +959,29 @@
    "zone": 3,
    "metres": 1146,
    "share": [
-    0.157,
-    0.174,
-    0.009,
+    0.748,
+    0.191,
+    0.017,
+    0.017,
+    0.026
+   ],
+   "longest_bare": 20.0,
+   "longest_nothing_new": 140.0
+  },
+  {
+   "trail": "Basin loop",
+   "dir": -1,
+   "zone": 3,
+   "metres": 1146,
+   "share": [
+    0.809,
     0.104,
-    0.557
+    0.026,
+    0.052,
+    0.009
    ],
-   "longest_bare": 240.0,
-   "longest_nothing_new": 470.0
-  },
-  {
-   "trail": "Basin loop",
-   "dir": -1,
-   "zone": 3,
-   "metres": 1146,
-   "share": [
-    0.157,
-    0.226,
-    0.043,
-    0.157,
-    0.417
-   ],
-   "longest_bare": 250.0,
-   "longest_nothing_new": 380.0
+   "longest_bare": 10.0,
+   "longest_nothing_new": 100.0
   },
   {
    "trail": "Farside loop",
@@ -989,14 +989,14 @@
    "zone": 3,
    "metres": 539,
    "share": [
-    0.278,
+    0.833,
     0.111,
-    0.056,
+    0.037,
     0.0,
-    0.556
+    0.019
    ],
-   "longest_bare": 170.0,
-   "longest_nothing_new": 230.0
+   "longest_bare": 10.0,
+   "longest_nothing_new": 100.0
   },
   {
    "trail": "Farside loop",
@@ -1004,14 +1004,14 @@
    "zone": 3,
    "metres": 539,
    "share": [
+    0.741,
     0.222,
-    0.093,
-    0.167,
     0.0,
-    0.519
+    0.0,
+    0.037
    ],
-   "longest_bare": 160.0,
-   "longest_nothing_new": 210.0
+   "longest_bare": 20.0,
+   "longest_nothing_new": 80.0
   },
   {
    "trail": "Peakfoot loop",
@@ -1019,14 +1019,14 @@
    "zone": 3,
    "metres": 607,
    "share": [
-    0.23,
-    0.098,
-    0.0,
-    0.18,
-    0.492
+    0.738,
+    0.197,
+    0.016,
+    0.049,
+    0.0
    ],
-   "longest_bare": 140.0,
-   "longest_nothing_new": 320.0
+   "longest_bare": 0,
+   "longest_nothing_new": 70.0
   },
   {
    "trail": "Peakfoot loop",
@@ -1034,14 +1034,14 @@
    "zone": 3,
    "metres": 607,
    "share": [
-    0.131,
-    0.098,
+    0.836,
+    0.164,
     0.0,
     0.0,
-    0.77
+    0.0
    ],
-   "longest_bare": 280.0,
-   "longest_nothing_new": 330.0
+   "longest_bare": 0,
+   "longest_nothing_new": 120.0
   },
   {
    "trail": "Westreach road",
@@ -1049,8 +1049,8 @@
    "zone": 3,
    "metres": 71,
    "share": [
-    0.0,
     1.0,
+    0.0,
     0.0,
     0.0,
     0.0
@@ -1064,13 +1064,13 @@
    "zone": 3,
    "metres": 71,
    "share": [
+    1.0,
     0.0,
     0.0,
-    0.625,
     0.0,
-    0.375
+    0.0
    ],
-   "longest_bare": 30.0,
+   "longest_bare": 0,
    "longest_nothing_new": 40.0
   },
   {
@@ -1079,14 +1079,14 @@
    "zone": 3,
    "metres": 242,
    "share": [
-    0.08,
+    0.88,
     0.12,
     0.0,
     0.0,
-    0.8
+    0.0
    ],
-   "longest_bare": 200.0,
-   "longest_nothing_new": 200.0
+   "longest_bare": 0,
+   "longest_nothing_new": 60.0
   },
   {
    "trail": "Peakfoot road",
@@ -1094,14 +1094,14 @@
    "zone": 3,
    "metres": 242,
    "share": [
-    0.44,
-    0.4,
+    0.96,
+    0.04,
     0.0,
     0.0,
-    0.16
+    0.0
    ],
-   "longest_bare": 40.0,
-   "longest_nothing_new": 60.0
+   "longest_bare": 0,
+   "longest_nothing_new": 40.0
   },
   {
    "trail": "Basin road",
@@ -1109,14 +1109,14 @@
    "zone": 3,
    "metres": 358,
    "share": [
-    0.583,
-    0.25,
+    1.0,
     0.0,
     0.0,
-    0.167
+    0.0,
+    0.0
    ],
-   "longest_bare": 60.0,
-   "longest_nothing_new": 260.0
+   "longest_bare": 0,
+   "longest_nothing_new": 120.0
   },
   {
    "trail": "Basin road",
@@ -1124,29 +1124,29 @@
    "zone": 3,
    "metres": 358,
    "share": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 100.0
+  },
+  {
+   "trail": "Riverside south",
+   "dir": 1,
+   "zone": 3,
+   "metres": 958,
+   "share": [
+    0.833,
     0.167,
     0.0,
     0.0,
-    0.0,
-    0.833
+    0.0
    ],
-   "longest_bare": 300.0,
-   "longest_nothing_new": 300.0
-  },
-  {
-   "trail": "Riverside south",
-   "dir": 1,
-   "zone": 3,
-   "metres": 958,
-   "share": [
-    0.25,
-    0.115,
-    0.0,
-    0.0,
-    0.635
-   ],
-   "longest_bare": 610.0,
-   "longest_nothing_new": 690.0
+   "longest_bare": 0,
+   "longest_nothing_new": 110.0
   },
   {
    "trail": "Riverside south",
@@ -1154,59 +1154,59 @@
    "zone": 3,
    "metres": 958,
    "share": [
-    0.146,
-    0.302,
-    0.042,
-    0.0,
-    0.51
-   ],
-   "longest_bare": 260.0,
-   "longest_nothing_new": 290.0
-  },
-  {
-   "trail": "Farside road",
-   "dir": 1,
-   "zone": 3,
-   "metres": 288,
-   "share": [
-    0.069,
-    0.103,
-    0.034,
-    0.103,
-    0.69
-   ],
-   "longest_bare": 100.0,
-   "longest_nothing_new": 150.0
-  },
-  {
-   "trail": "Farside road",
-   "dir": -1,
-   "zone": 3,
-   "metres": 288,
-   "share": [
-    0.414,
-    0.345,
+    0.844,
+    0.156,
     0.0,
     0.0,
-    0.241
+    0.0
    ],
-   "longest_bare": 70.0,
+   "longest_bare": 0,
    "longest_nothing_new": 140.0
   },
   {
+   "trail": "Farside road",
+   "dir": 1,
+   "zone": 3,
+   "metres": 288,
+   "share": [
+    0.483,
+    0.448,
+    0.034,
+    0.0,
+    0.034
+   ],
+   "longest_bare": 10.0,
+   "longest_nothing_new": 110.0
+  },
+  {
+   "trail": "Farside road",
+   "dir": -1,
+   "zone": 3,
+   "metres": 288,
+   "share": [
+    0.621,
+    0.241,
+    0.0,
+    0.0,
+    0.138
+   ],
+   "longest_bare": 40.0,
+   "longest_nothing_new": 110.0
+  },
+  {
    "trail": "Bridge road west",
    "dir": 1,
    "zone": 3,
    "metres": 258,
    "share": [
-    0.346,
-    0.423,
+    0.885,
+    0.115,
     0.0,
     0.0,
-    0.231
+    0.0
    ],
-   "longest_bare": 60.0,
-   "longest_nothing_new": 80.0
+   "longest_bare": 0,
+   "longest_nothing_new": 60.0
   },
   {
    "trail": "Bridge road west",
@@ -1214,14 +1214,14 @@
    "zone": 3,
    "metres": 258,
    "share": [
-    0.231,
-    0.269,
+    0.808,
+    0.192,
     0.0,
     0.0,
-    0.5
+    0.0
    ],
-   "longest_bare": 130.0,
-   "longest_nothing_new": 170.0
+   "longest_bare": 0,
+   "longest_nothing_new": 50.0
   },
   {
    "trail": "Deepsouth loop",
@@ -1229,14 +1229,14 @@
    "zone": 3,
    "metres": 169,
    "share": [
-    0.176,
-    0.294,
+    0.471,
+    0.118,
     0.0,
     0.412,
-    0.118
+    0.0
    ],
-   "longest_bare": 20.0,
-   "longest_nothing_new": 80.0
+   "longest_bare": 0,
+   "longest_nothing_new": 60.0
   },
   {
    "trail": "Deepsouth loop",
@@ -1244,14 +1244,14 @@
    "zone": 3,
    "metres": 169,
    "share": [
+    0.412,
+    0.118,
     0.0,
-    0.235,
-    0.0,
-    0.529,
-    0.235
+    0.471,
+    0.0
    ],
-   "longest_bare": 30.0,
-   "longest_nothing_new": 130.0
+   "longest_bare": 0,
+   "longest_nothing_new": 100.0
   },
   {
    "trail": "Deepsouth road",
@@ -1274,13 +1274,13 @@
    "zone": 3,
    "metres": 128,
    "share": [
-    0.462,
+    0.615,
     0.385,
     0.0,
     0.0,
-    0.154
+    0.0
    ],
-   "longest_bare": 20.0,
+   "longest_bare": 0,
    "longest_nothing_new": 50.0
   },
   {
@@ -1289,14 +1289,14 @@
    "zone": 3,
    "metres": 380,
    "share": [
-    0.158,
-    0.211,
+    0.763,
+    0.237,
     0.0,
-    0.053,
-    0.579
+    0.0,
+    0.0
    ],
-   "longest_bare": 80.0,
-   "longest_nothing_new": 170.0
+   "longest_bare": 0,
+   "longest_nothing_new": 90.0
   },
   {
    "trail": "Pitside loop",
@@ -1304,14 +1304,14 @@
    "zone": 3,
    "metres": 380,
    "share": [
-    0.105,
-    0.158,
+    0.5,
+    0.5,
     0.0,
-    0.079,
-    0.658
+    0.0,
+    0.0
    ],
-   "longest_bare": 140.0,
-   "longest_nothing_new": 260.0
+   "longest_bare": 0,
+   "longest_nothing_new": 80.0
   },
   {
    "trail": "Pitside road",
@@ -1319,14 +1319,14 @@
    "zone": 3,
    "metres": 66,
    "share": [
+    1.0,
     0.0,
     0.0,
     0.0,
-    0.0,
-    1.0
+    0.0
    ],
-   "longest_bare": 70.0,
-   "longest_nothing_new": 70.0
+   "longest_bare": 0,
+   "longest_nothing_new": 60.0
   },
   {
    "trail": "Pitside road",
@@ -1334,14 +1334,14 @@
    "zone": 3,
    "metres": 66,
    "share": [
+    1.0,
     0.0,
     0.0,
     0.0,
-    0.0,
-    1.0
+    0.0
    ],
-   "longest_bare": 70.0,
-   "longest_nothing_new": 70.0
+   "longest_bare": 0,
+   "longest_nothing_new": 60.0
   },
   {
    "trail": "Northreach loop",
@@ -1349,14 +1349,14 @@
    "zone": 3,
    "metres": 340,
    "share": [
-    0.229,
-    0.0,
-    0.0,
-    0.114,
-    0.657
+    0.686,
+    0.086,
+    0.029,
+    0.086,
+    0.114
    ],
-   "longest_bare": 120.0,
-   "longest_nothing_new": 280.0
+   "longest_bare": 30.0,
+   "longest_nothing_new": 120.0
   },
   {
    "trail": "Northreach loop",
@@ -1364,14 +1364,14 @@
    "zone": 3,
    "metres": 340,
    "share": [
-    0.057,
-    0.143,
+    0.486,
+    0.314,
     0.0,
     0.029,
-    0.771
+    0.171
    ],
-   "longest_bare": 110.0,
-   "longest_nothing_new": 110.0
+   "longest_bare": 40.0,
+   "longest_nothing_new": 40.0
   },
   {
    "trail": "Northreach road",
@@ -1379,14 +1379,14 @@
    "zone": 3,
    "metres": 164,
    "share": [
+    0.824,
+    0.176,
     0.0,
     0.0,
-    0.0,
-    0.0,
-    1.0
+    0.0
    ],
-   "longest_bare": 170.0,
-   "longest_nothing_new": 170.0
+   "longest_bare": 0,
+   "longest_nothing_new": 70.0
   },
   {
    "trail": "Northreach road",
@@ -1394,14 +1394,14 @@
    "zone": 3,
    "metres": 164,
    "share": [
+    0.706,
+    0.294,
     0.0,
     0.0,
-    0.0,
-    0.0,
-    1.0
+    0.0
    ],
-   "longest_bare": 170.0,
-   "longest_nothing_new": 170.0
+   "longest_bare": 0,
+   "longest_nothing_new": 120.0
   },
   {
    "trail": "Rimway",
@@ -1425,13 +1425,13 @@
    "metres": 60,
    "share": [
     0.0,
+    0.143,
+    0.143,
     0.0,
-    0.0,
-    0.0,
-    1.0
+    0.714
    ],
-   "longest_bare": 70.0,
-   "longest_nothing_new": 70.0
+   "longest_bare": 30.0,
+   "longest_nothing_new": 30.0
   },
   {
    "trail": "Herd round",
@@ -1439,13 +1439,13 @@
    "zone": 4,
    "metres": 842,
    "share": [
-    0.447,
-    0.447,
-    0.024,
+    0.835,
+    0.094,
+    0.0,
     0.071,
-    0.012
+    0.0
    ],
-   "longest_bare": 10.0,
+   "longest_bare": 0,
    "longest_nothing_new": 130.0
   },
   {
@@ -1454,14 +1454,14 @@
    "zone": 4,
    "metres": 842,
    "share": [
-    0.494,
-    0.353,
-    0.071,
+    0.8,
+    0.118,
+    0.024,
     0.047,
-    0.035
+    0.012
    ],
    "longest_bare": 10.0,
-   "longest_nothing_new": 170.0
+   "longest_nothing_new": 150.0
   },
   {
    "trail": "Altar loop",
@@ -1469,14 +1469,14 @@
    "zone": 4,
    "metres": 511,
    "share": [
-    0.231,
-    0.096,
+    0.327,
+    0.308,
     0.212,
-    0.404,
-    0.058
+    0.135,
+    0.019
    ],
-   "longest_bare": 20.0,
-   "longest_nothing_new": 230.0
+   "longest_bare": 10.0,
+   "longest_nothing_new": 150.0
   },
   {
    "trail": "Altar loop",
@@ -1484,14 +1484,14 @@
    "zone": 4,
    "metres": 511,
    "share": [
-    0.173,
-    0.135,
-    0.096,
-    0.577,
-    0.019
+    0.231,
+    0.269,
+    0.038,
+    0.462,
+    0.0
    ],
-   "longest_bare": 10.0,
-   "longest_nothing_new": 310.0
+   "longest_bare": 0,
+   "longest_nothing_new": 270.0
   },
   {
    "trail": "South pass road",
@@ -1514,14 +1514,14 @@
    "zone": 4,
    "metres": 92,
    "share": [
+    0.7,
+    0.1,
+    0.2,
     0.0,
-    0.0,
-    0.0,
-    0.4,
-    0.6
+    0.0
    ],
-   "longest_bare": 60.0,
-   "longest_nothing_new": 100.0
+   "longest_bare": 0,
+   "longest_nothing_new": 60.0
   },
   {
    "trail": "Altar road",
@@ -1584,1494 +1584,8 @@
    "longest_nothing_new": 100.0
   }
  ],
- "bare": [
-  {
-   "trail": "Riverside south",
-   "dir": 1,
-   "zone": 3,
-   "frm": 90,
-   "metres": 610.0,
-   "seconds": 94,
-   "start": [
-    -79.14,
-    -45.97
-   ],
-   "mid": [
-    -77.73,
-    -16.51
-   ],
-   "heading": 2,
-   "aim": [
-    -77.21,
-    0.15
-   ],
-   "aim_slope": 0.08,
-   "skyline": -9.2
-  },
-  {
-   "trail": "Trail 10",
-   "dir": 1,
-   "zone": 2,
-   "frm": 470,
-   "metres": 530.0,
-   "seconds": 82,
-   "start": [
-    -69.8,
-    44.73
-   ],
-   "mid": [
-    -81.79,
-    70.09
-   ],
-   "heading": 323,
-   "aim": [
-    -139.11,
-    78.24
-   ],
-   "aim_slope": 0.02,
-   "skyline": -5.0
-  },
-  {
-   "trail": "Trail 13",
-   "dir": 1,
-   "zone": 2,
-   "frm": 30,
-   "metres": 520.0,
-   "seconds": 80,
-   "start": [
-    -64.52,
-    35.69
-   ],
-   "mid": [
-    -67.89,
-    9.33
-   ],
-   "heading": 178,
-   "aim": [
-    -67.26,
-    -7.33
-   ],
-   "aim_slope": 0.97,
-   "skyline": -8.6
-  },
-  {
-   "trail": "Trail 20",
-   "dir": -1,
-   "zone": 3,
-   "frm": 780,
-   "metres": 460.0,
-   "seconds": 71,
-   "start": [
-    147.61,
-    -22.58
-   ],
-   "mid": [
-    165.38,
-    -6.17
-   ],
-   "heading": 26,
-   "aim": [
-    172.76,
-    8.78
-   ],
-   "aim_slope": 0.02,
-   "skyline": -7.8
-  },
-  {
-   "trail": "Trail 13",
-   "dir": -1,
-   "zone": 2,
-   "frm": 610,
-   "metres": 410.0,
-   "seconds": 63,
-   "start": [
-    -52.18,
-    -19.39
-   ],
-   "mid": [
-    -64.16,
-    -2.55
-   ],
-   "heading": 338,
-   "aim": [
-    -70.39,
-    12.93
-   ],
-   "aim_slope": 0.08,
-   "skyline": -7.4
-  },
-  {
-   "trail": "Trail 10",
-   "dir": -1,
-   "zone": 2,
-   "frm": 1240,
-   "metres": 380.0,
-   "seconds": 58,
-   "start": [
-    99.06,
-    58.42
-   ],
-   "mid": [
-    101.51,
-    77.98
-   ],
-   "heading": 14,
-   "aim": [
-    -121.22,
-    84.29
-   ],
-   "aim_slope": 0.06,
-   "skyline": -11.3
-  },
-  {
-   "trail": "Trail 14",
-   "dir": -1,
-   "zone": 2,
-   "frm": 670,
-   "metres": 370.0,
-   "seconds": 57,
-   "start": [
-    -37.64,
-    -34.11
-   ],
-   "mid": [
-    -18.54,
-    -29.65
-   ],
-   "heading": 35,
-   "aim": [
-    -8.71,
-    -15.65
-   ],
-   "aim_slope": 0.14,
-   "skyline": 3.3
-  },
-  {
-   "trail": "Trail 10",
-   "dir": -1,
-   "zone": 2,
-   "frm": 2510,
-   "metres": 370.0,
-   "seconds": 57,
-   "start": [
-    63.68,
-    -16.43
-   ],
-   "mid": [
-    76.89,
-    -26.88
-   ],
-   "heading": 77,
-   "aim": [
-    94.45,
-    -22.11
-   ],
-   "aim_slope": 0.55,
-   "skyline": -9.5
-  },
-  {
-   "trail": "Trail 10",
-   "dir": -1,
-   "zone": 2,
-   "frm": 1890,
-   "metres": 360.0,
-   "seconds": 55,
-   "start": [
-    113.86,
-    1.35
-   ],
-   "mid": [
-    119.36,
-    19.13
-   ],
-   "heading": 12,
-   "aim": [
-    123.61,
-    35.37
-   ],
-   "aim_slope": 0.06,
-   "skyline": -6.5
-  },
-  {
-   "trail": "Trail 10",
-   "dir": 1,
-   "zone": 2,
-   "frm": 1900,
-   "metres": 310.0,
-   "seconds": 48,
-   "start": [
-    113.25,
-    0.51
-   ],
-   "mid": [
-    103.05,
-    -11.35
-   ],
-   "heading": 227,
-   "aim": [
-    90.03,
-    -22.45
-   ],
-   "aim_slope": 0.08,
-   "skyline": -6.2
-  },
-  {
-   "trail": "Basin road",
-   "dir": -1,
-   "zone": 3,
-   "frm": 350,
-   "metres": 300.0,
-   "seconds": 46,
-   "start": [
-    -100.0,
-    -27.37
-   ],
-   "mid": [
-    -95.59,
-    -12.39
-   ],
-   "heading": 6,
-   "aim": [
-    -93.82,
-    4.18
-   ],
-   "aim_slope": 0.09,
-   "skyline": -4.8
-  },
-  {
-   "trail": "Trail 9",
-   "dir": -1,
-   "zone": 2,
-   "frm": 380,
-   "metres": 280.0,
-   "seconds": 43,
-   "start": [
-    -48.56,
-    24.16
-   ],
-   "mid": [
-    -57.62,
-    13.45
-   ],
-   "heading": 189,
-   "aim": [
-    -60.16,
-    -3.03
-   ],
-   "aim_slope": 0.11,
-   "skyline": -9.9
-  },
-  {
-   "trail": "Trail 13",
-   "dir": 1,
-   "zone": 2,
-   "frm": 600,
-   "metres": 280.0,
-   "seconds": 43,
-   "start": [
-    -53.18,
-    -18.95
-   ],
-   "mid": [
-    -37.95,
-    -20.14
-   ],
-   "heading": 76,
-   "aim": [
-    -21.22,
-    -15.25
-   ],
-   "aim_slope": 0.02,
-   "skyline": -1.9
-  },
-  {
-   "trail": "Trail 20",
-   "dir": 1,
-   "zone": 3,
-   "frm": 480,
-   "metres": 280.0,
-   "seconds": 43,
-   "start": [
-    169.69,
-    -0.44
-   ],
-   "mid": [
-    161.15,
-    -12.03
-   ],
-   "heading": 229,
-   "aim": [
-    147.68,
-    -22.67
-   ],
-   "aim_slope": 0.03,
-   "skyline": -3.9
-  },
-  {
-   "trail": "Peakfoot loop",
-   "dir": -1,
-   "zone": 3,
-   "frm": 530,
-   "metres": 280.0,
-   "seconds": 43,
-   "start": [
-    -112.85,
-    24.28
-   ],
-   "mid": [
-    -119.46,
-    12.74
-   ],
-   "heading": 183,
-   "aim": [
-    -120.45,
-    -3.9
-   ],
-   "aim_slope": 0.54,
-   "skyline": -0.8
-  },
-  {
-   "trail": "Riverside south",
-   "dir": -1,
-   "zone": 3,
-   "frm": 910,
-   "metres": 260.0,
-   "seconds": 40,
-   "start": [
-    -89.35,
-    34.26
-   ],
-   "mid": [
-    -86.74,
-    21.79
-   ],
-   "heading": 142,
-   "aim": [
-    -76.54,
-    8.33
-   ],
-   "aim_slope": 1.21,
-   "skyline": -8.4
-  },
-  {
-   "trail": "Trail 13",
-   "dir": -1,
-   "zone": 2,
-   "frm": 1060,
-   "metres": 250.0,
-   "seconds": 38,
-   "start": [
-    -30.36,
-    7.25
-   ],
-   "mid": [
-    -27.05,
-    -4.1
-   ],
-   "heading": 180,
-   "aim": [
-    -27.05,
-    -20.77
-   ],
-   "aim_slope": 0.06,
-   "skyline": -5.0
-  },
-  {
-   "trail": "Basin loop",
-   "dir": -1,
-   "zone": 3,
-   "frm": 1000,
-   "metres": 250.0,
-   "seconds": 38,
-   "start": [
-    -113.57,
-    -32.13
-   ],
-   "mid": [
-    -108.1,
-    -20.64
-   ],
-   "heading": 33,
-   "aim": [
-    -99.1,
-    -6.44
-   ],
-   "aim_slope": 0.03,
-   "skyline": -6.7
-  },
-  {
-   "trail": "Trail 16",
-   "dir": 1,
-   "zone": 3,
-   "frm": 280,
-   "metres": 240.0,
-   "seconds": 37,
-   "start": [
-    125.04,
-    -6.22
-   ],
-   "mid": [
-    129.55,
-    5.29
-   ],
-   "heading": 34,
-   "aim": [
-    139.37,
-    18.94
-   ],
-   "aim_slope": 0.07,
-   "skyline": -6.0
-  },
-  {
-   "trail": "Basin loop",
-   "dir": 1,
-   "zone": 3,
-   "frm": 20,
-   "metres": 240.0,
-   "seconds": 37,
-   "start": [
-    -98.36,
-    -29.43
-   ],
-   "mid": [
-    -87.21,
-    -37.59
-   ],
-   "heading": 168,
-   "aim": [
-    -81.24,
-    -53.74
-   ],
-   "aim_slope": 0.07,
-   "skyline": -4.2
-  },
-  {
-   "trail": "Trail 16",
-   "dir": 1,
-   "zone": 3,
-   "frm": 640,
-   "metres": 230.0,
-   "seconds": 35,
-   "start": [
-    151.45,
-    12.14
-   ],
-   "mid": [
-    162.49,
-    14.58
-   ],
-   "heading": 59,
-   "aim": [
-    177.87,
-    22.72
-   ],
-   "aim_slope": 0.05,
-   "skyline": -9.9
-  },
-  {
-   "trail": "Far north trail",
-   "dir": 1,
-   "zone": 2,
-   "frm": 0,
-   "metres": 220.0,
-   "seconds": 34,
-   "start": [
-    -2.4,
-    64.71
-   ],
-   "mid": [
-    -26.24,
-    63.13
-   ],
-   "heading": 240,
-   "aim": [
-    -50.26,
-    52.23
-   ],
-   "aim_slope": 0.08,
-   "skyline": -7.5
-  },
-  {
-   "trail": "Trail 10",
-   "dir": 1,
-   "zone": 2,
-   "frm": 1030,
-   "metres": 210.0,
-   "seconds": 32,
-   "start": [
-    104.75,
-    79.97
-   ],
-   "mid": [
-    96.86,
-    69.74
-   ],
-   "heading": 184,
-   "aim": [
-    95.01,
-    53.09
-   ],
-   "aim_slope": 0.07,
-   "skyline": -7.4
-  },
-  {
-   "trail": "Trail 10",
-   "dir": 1,
-   "zone": 2,
-   "frm": 1250,
-   "metres": 210.0,
-   "seconds": 32,
-   "start": [
-    99.71,
-    57.44
-   ],
-   "mid": [
-    107.21,
-    48.14
-   ],
-   "heading": 139,
-   "aim": [
-    120.58,
-    34.76
-   ],
-   "aim_slope": 0.16,
-   "skyline": -8.9
-  },
-  {
-   "trail": "Trail 10",
-   "dir": -1,
-   "zone": 2,
-   "frm": 1520,
-   "metres": 200.0,
-   "seconds": 31,
-   "start": [
-    125.29,
-    38.12
-   ],
-   "mid": [
-    115.66,
-    44.1
-   ],
-   "heading": 287,
-   "aim": [
-    92.12,
-    46.7
-   ],
-   "aim_slope": 0.03,
-   "skyline": -9.0
-  },
-  {
-   "trail": "Peakfoot road",
-   "dir": 1,
-   "zone": 3,
-   "frm": 0,
-   "metres": 200.0,
-   "seconds": 31,
-   "start": [
-    -99.44,
-    38.62
-   ],
-   "mid": [
-    -100.08,
-    28.49
-   ],
-   "heading": 215,
-   "aim": [
-    -109.79,
-    14.46
-   ],
-   "aim_slope": 0.01,
-   "skyline": -8.7
-  },
-  {
-   "trail": "Trail 9",
-   "dir": 1,
-   "zone": 2,
-   "frm": 0,
-   "metres": 190.0,
-   "seconds": 29,
-   "start": [
-    -42.42,
-    -2.06
-   ],
-   "mid": [
-    -51.42,
-    0.19
-   ],
-   "heading": 304,
-   "aim": [
-    -65.37,
-    9.41
-   ],
-   "aim_slope": 0.07,
-   "skyline": -10.6
-  },
-  {
-   "trail": "Trail 16",
-   "dir": -1,
-   "zone": 3,
-   "frm": 1060,
-   "metres": 190.0,
-   "seconds": 29,
-   "start": [
-    -168.22,
-    30.94
-   ],
-   "mid": [
-    -176.29,
-    25.19
-   ],
-   "heading": 244,
-   "aim": [
-    168.1,
-    17.04
-   ],
-   "aim_slope": 0.12,
-   "skyline": -8.2
-  },
-  {
-   "trail": "Northcap loop",
-   "dir": -1,
-   "zone": 2,
-   "frm": 260,
-   "metres": 190.0,
-   "seconds": 29,
-   "start": [
-    29.34,
-    69.89
-   ],
-   "mid": [
-    36.19,
-    78.09
-   ],
-   "heading": 348,
-   "aim": [
-    -106.97,
-    84.46
-   ],
-   "aim_slope": 0.02,
-   "skyline": -9.5
-  },
-  {
-   "trail": "Basin loop",
-   "dir": 1,
-   "zone": 3,
-   "frm": 600,
-   "metres": 180.0,
-   "seconds": 28,
-   "start": [
-    -89.62,
-    -28.62
-   ],
-   "mid": [
-    -92.14,
-    -19.84
-   ],
-   "heading": 345,
-   "aim": [
-    -96.4,
-    -3.69
-   ],
-   "aim_slope": 0.08,
-   "skyline": -7.6
-  },
-  {
-   "trail": "Mouth road",
-   "dir": -1,
-   "zone": 2,
-   "frm": 460,
-   "metres": 170.0,
-   "seconds": 26,
-   "start": [
-    87.59,
-    15.31
-   ],
-   "mid": [
-    81.36,
-    9.68
-   ],
-   "heading": 230,
-   "aim": [
-    68.61,
-    -1.12
-   ],
-   "aim_slope": 0.05,
-   "skyline": 0.1
-  },
-  {
-   "trail": "Farside loop",
-   "dir": 1,
-   "zone": 3,
-   "frm": 210,
-   "metres": 170.0,
-   "seconds": 26,
-   "start": [
-    150.83,
-    0.87
-   ],
-   "mid": [
-    144.09,
-    1.76
-   ],
-   "heading": 346,
-   "aim": [
-    140.02,
-    17.94
-   ],
-   "aim_slope": 0.07,
-   "skyline": -4.6
-  },
-  {
-   "trail": "Northreach road",
-   "dir": 1,
-   "zone": 3,
-   "frm": 0,
-   "metres": 170.0,
-   "seconds": 26,
-   "start": [
-    -137.61,
-    53.38
-   ],
-   "mid": [
-    -140.28,
-    45.82
-   ],
-   "heading": 157,
-   "aim": [
-    -132.79,
-    30.22
-   ],
-   "aim_slope": 0.02,
-   "skyline": -9.5
-  },
-  {
-   "trail": "Northreach road",
-   "dir": -1,
-   "zone": 3,
-   "frm": 160,
-   "metres": 170.0,
-   "seconds": 26,
-   "start": [
-    -135.3,
-    38.49
-   ],
-   "mid": [
-    -140.28,
-    45.82
-   ],
-   "heading": 337,
-   "aim": [
-    -153.53,
-    60.56
-   ],
-   "aim_slope": 0.2,
-   "skyline": -0.6
-  },
-  {
-   "trail": "Trail 16",
-   "dir": -1,
-   "zone": 3,
-   "frm": 1470,
-   "metres": 160.0,
-   "seconds": 25,
-   "start": [
-    -118.68,
-    40.38
-   ],
-   "mid": [
-    -129.5,
-    40.4
-   ],
-   "heading": 250,
-   "aim": [
-    -148.18,
-    32.98
-   ],
-   "aim_slope": 0.03,
-   "skyline": -5.7
-  },
-  {
-   "trail": "Trail 10",
-   "dir": 1,
-   "zone": 2,
-   "frm": 1480,
-   "metres": 160.0,
-   "seconds": 25,
-   "start": [
-    123.67,
-    42.02
-   ],
-   "mid": [
-    123.69,
-    34.19
-   ],
-   "heading": 204,
-   "aim": [
-    116.68,
-    18.73
-   ],
-   "aim_slope": 0.01,
-   "skyline": -6.1
-  },
-  {
-   "trail": "Farside loop",
-   "dir": -1,
-   "zone": 3,
-   "frm": 420,
-   "metres": 160.0,
-   "seconds": 25,
-   "start": [
-    147.83,
-    8.41
-   ],
-   "mid": [
-    143.55,
-    6.93
-   ],
-   "heading": 180,
-   "aim": [
-    143.43,
-    -9.74
-   ],
-   "aim_slope": 0.11,
-   "skyline": -6.0
-  },
-  {
-   "trail": "Trail 14",
-   "dir": 1,
-   "zone": 2,
-   "frm": 150,
-   "metres": 150.0,
-   "seconds": 23,
-   "start": [
-    -28.85,
-    -31.48
-   ],
-   "mid": [
-    -24.8,
-    -25.86
-   ],
-   "heading": 7,
-   "aim": [
-    -22.76,
-    -9.31
-   ],
-   "aim_slope": 0.1,
-   "skyline": -8.1
-  },
-  {
-   "trail": "Trenchside",
-   "dir": 1,
-   "zone": 2,
-   "frm": 0,
-   "metres": 150.0,
-   "seconds": 23,
-   "start": [
-    70.19,
-    64.39
-   ],
-   "mid": [
-    84.85,
-    66.8
-   ],
-   "heading": 119,
-   "aim": [
-    111.44,
-    55.74
-   ],
-   "aim_slope": 0.99,
-   "skyline": -6.8
-  },
-  {
-   "trail": "Northcap loop",
-   "dir": 1,
-   "zone": 2,
-   "frm": 0,
-   "metres": 150.0,
-   "seconds": 23,
-   "start": [
-    15.27,
-    69.65
-   ],
-   "mid": [
-    -0.85,
-    74.98
-   ],
-   "heading": 350,
-   "aim": [
-    -116.09,
-    86.74
-   ],
-   "aim_slope": 0.07,
-   "skyline": -7.5
-  },
-  {
-   "trail": "Basin loop",
-   "dir": -1,
-   "zone": 3,
-   "frm": 480,
-   "metres": 150.0,
-   "seconds": 23,
-   "start": [
-    -80.17,
-    -37.88
-   ],
-   "mid": [
-    -83.04,
-    -44.81
-   ],
-   "heading": 201,
-   "aim": [
-    -94.87,
-    -59.89
-   ],
-   "aim_slope": 0.04,
-   "skyline": -1.2
-  },
-  {
-   "trail": "Trail 14",
-   "dir": 1,
-   "zone": 2,
-   "frm": 570,
-   "metres": 140.0,
-   "seconds": 22,
-   "start": [
-    -25.43,
-    -35.54
-   ],
-   "mid": [
-    -34.14,
-    -35.32
-   ],
-   "heading": 296,
-   "aim": [
-    -50.95,
-    -26.84
-   ],
-   "aim_slope": 0.08,
-   "skyline": -7.3
-  },
-  {
-   "trail": "Trail 14",
-   "dir": -1,
-   "zone": 2,
-   "frm": 130,
-   "metres": 140.0,
-   "seconds": 22,
-   "start": [
-    -31.13,
-    -30.84
-   ],
-   "mid": [
-    -35.74,
-    -24.96
-   ],
-   "heading": 354,
-   "aim": [
-    -37.38,
-    -8.36
-   ],
-   "aim_slope": 0.1,
-   "skyline": -8.8
-  },
-  {
-   "trail": "Trail 10",
-   "dir": 1,
-   "zone": 2,
-   "frm": 3690,
-   "metres": 140.0,
-   "seconds": 22,
-   "start": [
-    19.59,
-    29.93
-   ],
-   "mid": [
-    13.19,
-    25.35
-   ],
-   "heading": 228,
-   "aim": [
-    0.48,
-    13.73
-   ],
-   "aim_slope": 0.8,
-   "skyline": -10.1
-  },
-  {
-   "trail": "Trail 10",
-   "dir": -1,
-   "zone": 2,
-   "frm": 800,
-   "metres": 140.0,
-   "seconds": 22,
-   "start": [
-    -94.41,
-    76.35
-   ],
-   "mid": [
-    -81.79,
-    70.09
-   ],
-   "heading": 143,
-   "aim": [
-    -64.24,
-    55.33
-   ],
-   "aim_slope": 0.01,
-   "skyline": -7.7
-  },
-  {
-   "trail": "Westreach loop",
-   "dir": 1,
-   "zone": 3,
-   "frm": 250,
-   "metres": 140.0,
-   "seconds": 22,
-   "start": [
-    -117.93,
-    44.1
-   ],
-   "mid": [
-    -123.48,
-    49.89
-   ],
-   "heading": 329,
-   "aim": [
-    -142.54,
-    62.98
-   ],
-   "aim_slope": 0.18,
-   "skyline": -2.1
-  },
-  {
-   "trail": "Peakfoot loop",
-   "dir": 1,
-   "zone": 3,
-   "frm": 270,
-   "metres": 140.0,
-   "seconds": 22,
-   "start": [
-    -116.01,
-    0.88
-   ],
-   "mid": [
-    -118.37,
-    7.7
-   ],
-   "heading": 340,
-   "aim": [
-    -124.41,
-    23.33
-   ],
-   "aim_slope": 0.03,
-   "skyline": -6.9
-  },
-  {
-   "trail": "Riverside south",
-   "dir": -1,
-   "zone": 3,
-   "frm": 180,
-   "metres": 140.0,
-   "seconds": 22,
-   "start": [
-    -74.0,
-    -37.89
-   ],
-   "mid": [
-    -76.76,
-    -44.79
-   ],
-   "heading": 214,
-   "aim": [
-    -94.24,
-    -57.48
-   ],
-   "aim_slope": 0.03,
-   "skyline": -3.9
-  },
-  {
-   "trail": "Pitside loop",
-   "dir": -1,
-   "zone": 3,
-   "frm": 240,
-   "metres": 140.0,
-   "seconds": 22,
-   "start": [
-    -153.22,
-    20.61
-   ],
-   "mid": [
-    -146.93,
-    16.66
-   ],
-   "heading": 99,
-   "aim": [
-    -129.98,
-    13.47
-   ],
-   "aim_slope": 0.22,
-   "skyline": -6.5
-  },
-  {
-   "trail": "Trail 8",
-   "dir": -1,
-   "zone": 4,
-   "frm": 490,
-   "metres": 130.0,
-   "seconds": 20,
-   "start": [
-    134.75,
-    -51.23
-   ],
-   "mid": [
-    125.8,
-    -48.94
-   ],
-   "heading": 304,
-   "aim": [
-    108.19,
-    -38.11
-   ],
-   "aim_slope": 0.49,
-   "skyline": 1.7
-  },
-  {
-   "trail": "Trail 20",
-   "dir": 1,
-   "zone": 3,
-   "frm": 100,
-   "metres": 130.0,
-   "seconds": 20,
-   "start": [
-    -168.43,
-    30.46
-   ],
-   "mid": [
-    -173.98,
-    26.72
-   ],
-   "heading": 229,
-   "aim": [
-    173.12,
-    15.17
-   ],
-   "aim_slope": 0.09,
-   "skyline": -8.8
-  },
-  {
-   "trail": "Longlight loop",
-   "dir": -1,
-   "zone": 2,
-   "frm": 140,
-   "metres": 130.0,
-   "seconds": 20,
-   "start": [
-    73.38,
-    52.43
-   ],
-   "mid": [
-    79.94,
-    56.95
-   ],
-   "heading": 13,
-   "aim": [
-    92.15,
-    72.87
-   ],
-   "aim_slope": 0.09,
-   "skyline": -7.7
-  },
-  {
-   "trail": "Westreach loop",
-   "dir": -1,
-   "zone": 3,
-   "frm": 120,
-   "metres": 130.0,
-   "seconds": 20,
-   "start": [
-    -99.87,
-    46.36
-   ],
-   "mid": [
-    -99.39,
-    52.49
-   ],
-   "heading": 354,
-   "aim": [
-    -103.87,
-    69.03
-   ],
-   "aim_slope": 0.18,
-   "skyline": -9.5
-  },
-  {
-   "trail": "Peakfoot loop",
-   "dir": -1,
-   "zone": 3,
-   "frm": 230,
-   "metres": 130.0,
-   "seconds": 20,
-   "start": [
-    -112.79,
-    2.1
-   ],
-   "mid": [
-    -106.91,
-    3.94
-   ],
-   "heading": 63,
-   "aim": [
-    -91.77,
-    11.22
-   ],
-   "aim_slope": 0.07,
-   "skyline": -5.0
-  },
-  {
-   "trail": "Bridge road west",
-   "dir": -1,
-   "zone": 3,
-   "frm": 200,
-   "metres": 130.0,
-   "seconds": 20,
-   "start": [
-    130.71,
-    -2.62
-   ],
-   "mid": [
-    134.21,
-    2.56
-   ],
-   "heading": 36,
-   "aim": [
-    144.22,
-    16.0
-   ],
-   "aim_slope": 0.06,
-   "skyline": -6.6
-  },
-  {
-   "trail": "Trail 14",
-   "dir": -1,
-   "zone": 2,
-   "frm": 980,
-   "metres": 120.0,
-   "seconds": 18,
-   "start": [
-    -28.03,
-    -40.93
-   ],
-   "mid": [
-    -36.26,
-    -41.94
-   ],
-   "heading": 260,
-   "aim": [
-    -58.84,
-    -42.69
-   ],
-   "aim_slope": 0.12,
-   "skyline": -6.4
-  },
-  {
-   "trail": "Trail 16",
-   "dir": -1,
-   "zone": 3,
-   "frm": 620,
-   "metres": 120.0,
-   "seconds": 18,
-   "start": [
-    149.34,
-    12.44
-   ],
-   "mid": [
-    143.02,
-    13.5
-   ],
-   "heading": 281,
-   "aim": [
-    126.0,
-    16.15
-   ],
-   "aim_slope": 0.17,
-   "skyline": -515.7
-  },
-  {
-   "trail": "Trail 16",
-   "dir": -1,
-   "zone": 3,
-   "frm": 240,
-   "metres": 120.0,
-   "seconds": 18,
-   "start": [
-    125.29,
-    -10.11
-   ],
-   "mid": [
-    129.19,
-    -15.01
-   ],
-   "heading": 133,
-   "aim": [
-    142.6,
-    -26.01
-   ],
-   "aim_slope": 0.06,
-   "skyline": -3.1
-  },
-  {
-   "trail": "Trail 8",
-   "dir": 1,
-   "zone": 4,
-   "frm": 0,
-   "metres": 120.0,
-   "seconds": 18,
-   "start": [
-    65.93,
-    -44.57
-   ],
-   "mid": [
-    74.37,
-    -46.62
-   ],
-   "heading": 106,
-   "aim": [
-    99.02,
-    -48.54
-   ],
-   "aim_slope": 0.7,
-   "skyline": -12.7
-  },
-  {
-   "trail": "Trail 8",
-   "dir": -1,
-   "zone": 4,
-   "frm": 350,
-   "metres": 120.0,
-   "seconds": 18,
-   "start": [
-    116.03,
-    -44.02
-   ],
-   "mid": [
-    107.78,
-    -43.35
-   ],
-   "heading": 257,
-   "aim": [
-    84.58,
-    -44.85
-   ],
-   "aim_slope": 0.21,
-   "skyline": -2.4
-  },
-  {
-   "trail": "Northfield loop",
-   "dir": -1,
-   "zone": 2,
-   "frm": 530,
-   "metres": 120.0,
-   "seconds": 18,
-   "start": [
-    5.9,
-    66.57
-   ],
-   "mid": [
-    -6.92,
-    63.43
-   ],
-   "heading": 236,
-   "aim": [
-    -29.53,
-    51.74
-   ],
-   "aim_slope": 0.04,
-   "skyline": -8.6
-  },
-  {
-   "trail": "Basin loop",
-   "dir": 1,
-   "zone": 3,
-   "frm": 890,
-   "metres": 120.0,
-   "seconds": 18,
-   "start": [
-    -108.67,
-    -21.54
-   ],
-   "mid": [
-    -111.13,
-    -27.37
-   ],
-   "heading": 202,
-   "aim": [
-    -119.45,
-    -42.6
-   ],
-   "aim_slope": 0.56,
-   "skyline": 0.3
-  },
-  {
-   "trail": "Northreach loop",
-   "dir": 1,
-   "zone": 3,
-   "frm": 230,
-   "metres": 120.0,
-   "seconds": 18,
-   "start": [
-    -141.94,
-    56.6
-   ],
-   "mid": [
-    -138.73,
-    61.84
-   ],
-   "heading": 39,
-   "aim": [
-    -103.44,
-    71.71
-   ],
-   "aim_slope": 0.28,
-   "skyline": -10.7
-  }
- ],
+ "bare": [],
  "nothing_new": [
-  {
-   "trail": "Riverside south",
-   "dir": 1,
-   "zone": 3,
-   "frm": 0,
-   "metres": 690.0,
-   "seconds": 106,
-   "start": [
-    -91.95,
-    -43.97
-   ]
-  },
-  {
-   "trail": "Trail 10",
-   "dir": -1,
-   "zone": 2,
-   "frm": 1940,
-   "metres": 610.0,
-   "seconds": 94,
-   "start": [
-    110.74,
-    -2.82
-   ]
-  },
-  {
-   "trail": "Trail 10",
-   "dir": 1,
-   "zone": 2,
-   "frm": 410,
-   "metres": 580.0,
-   "seconds": 89,
-   "start": [
-    -66.08,
-    39.22
-   ]
-  },
   {
    "trail": "Trail 10",
    "dir": 1,
@@ -3082,318 +1596,6 @@
    "start": [
     48.99,
     -2.28
-   ]
-  },
-  {
-   "trail": "Trail 20",
-   "dir": -1,
-   "zone": 3,
-   "frm": 880,
-   "metres": 550.0,
-   "seconds": 85,
-   "start": [
-    139.68,
-    -29.66
-   ]
-  },
-  {
-   "trail": "Trail 13",
-   "dir": 1,
-   "zone": 2,
-   "frm": 0,
-   "metres": 540.0,
-   "seconds": 83,
-   "start": [
-    -65.63,
-    38.69
-   ]
-  },
-  {
-   "trail": "Trail 13",
-   "dir": -1,
-   "zone": 2,
-   "frm": 680,
-   "metres": 470.0,
-   "seconds": 72,
-   "start": [
-    -44.56,
-    -20.73
-   ]
-  },
-  {
-   "trail": "Trail 10",
-   "dir": -1,
-   "zone": 2,
-   "frm": 2620,
-   "metres": 470.0,
-   "seconds": 72,
-   "start": [
-    54.12,
-    -11.15
-   ]
-  },
-  {
-   "trail": "Basin loop",
-   "dir": 1,
-   "zone": 3,
-   "frm": 530,
-   "metres": 470.0,
-   "seconds": 72,
-   "start": [
-    -83.38,
-    -33.59
-   ]
-  },
-  {
-   "trail": "Trail 10",
-   "dir": -1,
-   "zone": 2,
-   "frm": 1320,
-   "metres": 450.0,
-   "seconds": 69,
-   "start": [
-    104.54,
-    50.73
-   ]
-  },
-  {
-   "trail": "Trail 14",
-   "dir": -1,
-   "zone": 2,
-   "frm": 750,
-   "metres": 440.0,
-   "seconds": 68,
-   "start": [
-    -46.98,
-    -35.52
-   ]
-  },
-  {
-   "trail": "Trail 8",
-   "dir": -1,
-   "zone": 4,
-   "frm": 540,
-   "metres": 440.0,
-   "seconds": 68,
-   "start": [
-    141.98,
-    -49.07
-   ]
-  },
-  {
-   "trail": "Trail 20",
-   "dir": 1,
-   "zone": 3,
-   "frm": 400,
-   "metres": 440.0,
-   "seconds": 68,
-   "start": [
-    175.65,
-    5.39
-   ]
-  },
-  {
-   "trail": "Trail 14",
-   "dir": 1,
-   "zone": 2,
-   "frm": 1250,
-   "metres": 400.0,
-   "seconds": 62,
-   "start": [
-    -35.98,
-    -47.17
-   ]
-  },
-  {
-   "trail": "Trail 10",
-   "dir": 1,
-   "zone": 2,
-   "frm": 1240,
-   "metres": 390.0,
-   "seconds": 60,
-   "start": [
-    99.06,
-    58.42
-   ]
-  },
-  {
-   "trail": "Trail 9",
-   "dir": -1,
-   "zone": 2,
-   "frm": 490,
-   "metres": 380.0,
-   "seconds": 58,
-   "start": [
-    -36.22,
-    23.15
-   ]
-  },
-  {
-   "trail": "Basin loop",
-   "dir": -1,
-   "zone": 3,
-   "frm": 1140,
-   "metres": 380.0,
-   "seconds": 58,
-   "start": [
-    -101.07,
-    -27.82
-   ]
-  },
-  {
-   "trail": "Trail 16",
-   "dir": 1,
-   "zone": 3,
-   "frm": 140,
-   "metres": 370.0,
-   "seconds": 57,
-   "start": [
-    131.5,
-    -18.51
-   ]
-  },
-  {
-   "trail": "Trail 10",
-   "dir": 1,
-   "zone": 2,
-   "frm": 1840,
-   "metres": 360.0,
-   "seconds": 55,
-   "start": [
-    116.16,
-    5.96
-   ]
-  },
-  {
-   "trail": "Trail 16",
-   "dir": 1,
-   "zone": 3,
-   "frm": 1250,
-   "metres": 340.0,
-   "seconds": 52,
-   "start": [
-    -146.37,
-    34.7
-   ]
-  },
-  {
-   "trail": "Trail 16",
-   "dir": 1,
-   "zone": 3,
-   "frm": 530,
-   "metres": 330.0,
-   "seconds": 51,
-   "start": [
-    139.83,
-    13.8
-   ]
-  },
-  {
-   "trail": "Peakfoot loop",
-   "dir": -1,
-   "zone": 3,
-   "frm": 590,
-   "metres": 330.0,
-   "seconds": 51,
-   "start": [
-    -110.33,
-    18.81
-   ]
-  },
-  {
-   "trail": "Trail 13",
-   "dir": 1,
-   "zone": 2,
-   "frm": 550,
-   "metres": 320.0,
-   "seconds": 49,
-   "start": [
-    -56.92,
-    -15.24
-   ]
-  },
-  {
-   "trail": "Trail 14",
-   "dir": 1,
-   "zone": 2,
-   "frm": 380,
-   "metres": 320.0,
-   "seconds": 49,
-   "start": [
-    -15.38,
-    -18.93
-   ]
-  },
-  {
-   "trail": "Peakfoot loop",
-   "dir": 1,
-   "zone": 3,
-   "frm": 80,
-   "metres": 320.0,
-   "seconds": 49,
-   "start": [
-    -103.32,
-    11.41
-   ]
-  },
-  {
-   "trail": "Trail 14",
-   "dir": 1,
-   "zone": 2,
-   "frm": 60,
-   "metres": 310.0,
-   "seconds": 48,
-   "start": [
-    -35.74,
-    -24.96
-   ]
-  },
-  {
-   "trail": "Trail 10",
-   "dir": -1,
-   "zone": 2,
-   "frm": 4160,
-   "metres": 310.0,
-   "seconds": 48,
-   "start": [
-    -28.33,
-    25.23
-   ]
-  },
-  {
-   "trail": "Trail 10",
-   "dir": -1,
-   "zone": 2,
-   "frm": 3840,
-   "metres": 310.0,
-   "seconds": 48,
-   "start": [
-    5.94,
-    20.51
-   ]
-  },
-  {
-   "trail": "Altar loop",
-   "dir": -1,
-   "zone": 4,
-   "frm": 370,
-   "metres": 310.0,
-   "seconds": 48,
-   "start": [
-    -178.23,
-    -62.61
-   ]
-  },
-  {
-   "trail": "Basin road",
-   "dir": -1,
-   "zone": 3,
-   "frm": 350,
-   "metres": 300.0,
-   "seconds": 46,
-   "start": [
-    -100.0,
-    -27.37
    ]
   }
  ],
@@ -3430,9 +1632,13 @@
    ],
    "opens_to": 290,
    "skyline": -10.3,
-   "sees": [],
+   "sees": [
+    "shard 131",
+    "watcher 132"
+   ],
    "hidden_in_line": [
-    "outcrop"
+    "outcrop",
+    "shard 119"
    ],
    "aim": [
     62.3,
@@ -3640,8 +1846,13 @@
    ],
    "opens_to": 395,
    "skyline": -23.5,
-   "sees": [],
-   "hidden_in_line": [],
+   "sees": [
+    "comms 61"
+   ],
+   "hidden_in_line": [
+    "fuel 31",
+    "haul 53"
+   ],
    "aim": [
     -5.65,
     -44.91
@@ -3658,9 +1869,12 @@
    ],
    "opens_to": 440,
    "skyline": -5.5,
-   "sees": [],
+   "sees": [
+    "comms 141"
+   ],
    "hidden_in_line": [
-    "shard"
+    "shard",
+    "outcrop 109"
    ],
    "aim": [
     -21.86,
@@ -3678,8 +1892,13 @@
    ],
    "opens_to": 230,
    "skyline": -10.6,
-   "sees": [],
-   "hidden_in_line": [],
+   "sees": [
+    "outcrop 88",
+    "signal 107"
+   ],
+   "hidden_in_line": [
+    "weather 32"
+   ],
    "aim": [
     -33.92,
     -9.19
@@ -3696,9 +1915,12 @@
    ],
    "opens_to": 485,
    "skyline": -6.0,
-   "sees": [],
+   "sees": [
+    "comms 61"
+   ],
    "hidden_in_line": [
-    "shard"
+    "shard",
+    "weather 32"
    ],
    "aim": [
     -25.58,
@@ -3716,8 +1938,12 @@
    ],
    "opens_to": 425,
    "skyline": -5.0,
-   "sees": [],
-   "hidden_in_line": [],
+   "sees": [
+    "fuel 128"
+   ],
+   "hidden_in_line": [
+    "camp 29"
+   ],
    "aim": [
     -33.22,
     -43.6
@@ -3734,8 +1960,12 @@
    ],
    "opens_to": 365,
    "skyline": -3.3,
-   "sees": [],
-   "hidden_in_line": [],
+   "sees": [
+    "signal 142"
+   ],
+   "hidden_in_line": [
+    "watcher 160"
+   ],
    "aim": [
     -51.24,
     -57.38
@@ -3752,7 +1982,9 @@
    ],
    "opens_to": 365,
    "skyline": -8.2,
-   "sees": [],
+   "sees": [
+    "signal 142"
+   ],
    "hidden_in_line": [],
    "aim": [
     -65.5,
@@ -3793,7 +2025,9 @@
    "sees": [
     "haul"
    ],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "fuel 31"
+   ],
    "aim": [
     -21.49,
     -28.45
@@ -3810,7 +2044,9 @@
    ],
    "opens_to": 275,
    "skyline": -5.8,
-   "sees": [],
+   "sees": [
+    "watcher 69"
+   ],
    "hidden_in_line": [],
    "aim": [
     137.64,
@@ -3849,7 +2085,9 @@
    ],
    "opens_to": 365,
    "skyline": -8.4,
-   "sees": [],
+   "sees": [
+    "arch 67"
+   ],
    "hidden_in_line": [],
    "aim": [
     118.97,
@@ -3868,7 +2106,9 @@
    "opens_to": 380,
    "skyline": -8.8,
    "sees": [],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "outcrop 25"
+   ],
    "aim": [
     174.13,
     49.82
@@ -3887,7 +2127,8 @@
    "skyline": -13.0,
    "sees": [],
    "hidden_in_line": [
-    "South pass gate"
+    "South pass gate",
+    "shard 119"
    ],
    "aim": [
     100.6,
@@ -3905,7 +2146,9 @@
    ],
    "opens_to": 575,
    "skyline": -10.5,
-   "sees": [],
+   "sees": [
+    "shard 146"
+   ],
    "hidden_in_line": [],
    "aim": [
     160.34,
@@ -3948,7 +2191,9 @@
    "opens_to": 335,
    "skyline": -8.5,
    "sees": [],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "weather 11"
+   ],
    "aim": [
     -109.03,
     75.37
@@ -3970,6 +2215,9 @@
     "Terminal 8",
     "camp",
     "signal",
+    "outcrop 96",
+    "watcher 97",
+    "shard 129",
     "Terminal 8"
    ],
    "aim": [
@@ -4009,7 +2257,8 @@
    "sees": [],
    "hidden_in_line": [
     "Crystal gate",
-    "The sleeping ribs"
+    "The sleeping ribs",
+    "haul 35"
    ],
    "aim": [
     74.9,
@@ -4072,7 +2321,10 @@
    "opens_to": 170,
    "skyline": -18.5,
    "sees": [],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "weather 90",
+    "outcrop 154"
+   ],
    "aim": [
     22.78,
     34.69
@@ -4090,11 +2342,13 @@
    "opens_to": 335,
    "skyline": -22.2,
    "sees": [
+    "tower 150",
     "Terminal 4"
    ],
    "hidden_in_line": [
     "Terminal 4",
-    "biolab"
+    "biolab",
+    "solar 105"
    ],
    "aim": [
     17.2,
@@ -4117,6 +2371,7 @@
    ],
    "hidden_in_line": [
     "Processing plant",
+    "comms 141",
     "Terminal 3"
    ],
    "aim": [
@@ -4135,8 +2390,13 @@
    ],
    "opens_to": 305,
    "skyline": -11.4,
-   "sees": [],
-   "hidden_in_line": [],
+   "sees": [
+    "comms 151"
+   ],
+   "hidden_in_line": [
+    "beacon 18",
+    "plant 48"
+   ],
    "aim": [
     -42.21,
     10.44
@@ -4154,7 +2414,8 @@
    "opens_to": 350,
    "skyline": -6.9,
    "sees": [
-    "beacon"
+    "beacon",
+    "beacon 110"
    ],
    "hidden_in_line": [],
    "aim": [
@@ -4229,7 +2490,8 @@
    ],
    "hidden_in_line": [
     "Crystal gate",
-    "Terminal 2"
+    "Terminal 2",
+    "watcher 132"
    ],
    "aim": [
     35.74,
@@ -4248,7 +2510,9 @@
    "opens_to": 290,
    "skyline": -4.6,
    "sees": [],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "shard 119"
+   ],
    "aim": [
     77.34,
     -27.61
@@ -4266,7 +2530,9 @@
    "opens_to": 335,
    "skyline": -7.1,
    "sees": [],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "solar 84"
+   ],
    "aim": [
     123.69,
     35.36
@@ -4283,8 +2549,12 @@
    ],
    "opens_to": 365,
    "skyline": -9.0,
-   "sees": [],
-   "hidden_in_line": [],
+   "sees": [
+    "fuel 83"
+   ],
+   "hidden_in_line": [
+    "signal 152"
+   ],
    "aim": [
     89.08,
     46.68
@@ -4325,7 +2595,8 @@
    "skyline": -10.2,
    "sees": [],
    "hidden_in_line": [
-    "outcrop"
+    "outcrop",
+    "shard 145"
    ],
    "aim": [
     39.73,
@@ -4399,7 +2670,9 @@
    ],
    "opens_to": 275,
    "skyline": -5.2,
-   "sees": [],
+   "sees": [
+    "watcher 153"
+   ],
    "hidden_in_line": [],
    "aim": [
     171.1,
@@ -4417,9 +2690,14 @@
    ],
    "opens_to": 395,
    "skyline": -7.9,
-   "sees": [],
+   "sees": [
+    "shard 21",
+    "outcrop 54"
+   ],
    "hidden_in_line": [
-    "South pass gate"
+    "South pass gate",
+    "moose 118",
+    "shard 119"
    ],
    "aim": [
     156.32,
@@ -4438,7 +2716,9 @@
    "opens_to": 380,
    "skyline": -9.3,
    "sees": [],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "outcrop 25"
+   ],
    "aim": [
     175.64,
     49.37
@@ -4455,7 +2735,9 @@
    ],
    "opens_to": 470,
    "skyline": -3.3,
-   "sees": [],
+   "sees": [
+    "outcrop 154"
+   ],
    "hidden_in_line": [
     "beacon"
    ],
@@ -4475,9 +2757,12 @@
    ],
    "opens_to": 425,
    "skyline": -0.7,
-   "sees": [],
+   "sees": [
+    "tower 150"
+   ],
    "hidden_in_line": [
-    "North gate"
+    "North gate",
+    "beacon 110"
    ],
    "aim": [
     17.63,
@@ -4495,7 +2780,9 @@
    ],
    "opens_to": 500,
    "skyline": -6.2,
-   "sees": [],
+   "sees": [
+    "tower 155"
+   ],
    "hidden_in_line": [
     "shard"
    ],
@@ -4537,7 +2824,9 @@
    "opens_to": 350,
    "skyline": -7.6,
    "sees": [],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "camp 26"
+   ],
    "aim": [
     93.36,
     70.09
@@ -4554,8 +2843,13 @@
    ],
    "opens_to": 290,
    "skyline": -5.3,
-   "sees": [],
-   "hidden_in_line": [],
+   "sees": [
+    "tower 150",
+    "outcrop 154"
+   ],
+   "hidden_in_line": [
+    "beacon 110"
+   ],
    "aim": [
     24.85,
     48.54
@@ -4611,7 +2905,9 @@
    ],
    "opens_to": 320,
    "skyline": -5.8,
-   "sees": [],
+   "sees": [
+    "comms 156"
+   ],
    "hidden_in_line": [],
    "aim": [
     71.38,
@@ -4633,7 +2929,11 @@
     "Terminal 3"
    ],
    "hidden_in_line": [
-    "Terminal 3"
+    "Terminal 3",
+    "shard 6",
+    "solar 15",
+    "solar 49",
+    "outcrop 50"
    ],
    "aim": [
     -48.75,
@@ -4671,9 +2971,13 @@
    ],
    "opens_to": 335,
    "skyline": -7.4,
-   "sees": [],
+   "sees": [
+    "beacon 110",
+    "tower 150"
+   ],
    "hidden_in_line": [
-    "beacon"
+    "beacon",
+    "signal 152"
    ],
    "aim": [
     -0.31,
@@ -4712,7 +3016,9 @@
    "sees": [
     "fuel"
    ],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "haul 94"
+   ],
    "aim": [
     84.27,
     16.45
@@ -4751,7 +3057,9 @@
    "opens_to": 350,
    "skyline": -5.4,
    "sees": [],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "shard 131"
+   ],
    "aim": [
     72.37,
     -24.44
@@ -4773,7 +3081,8 @@
    ],
    "hidden_in_line": [
     "Terminal 4",
-    "beacon"
+    "beacon",
+    "signal 152"
    ],
    "aim": [
     15.65,
@@ -4830,7 +3139,9 @@
    "opens_to": 380,
    "skyline": -5.5,
    "sees": [],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "signal 152"
+   ],
    "aim": [
     30.22,
     56.56
@@ -4847,11 +3158,15 @@
    ],
    "opens_to": 320,
    "skyline": -7.5,
-   "sees": [],
+   "sees": [
+    "shard 157"
+   ],
    "hidden_in_line": [
     "excavator",
     "haul",
-    "shacks"
+    "shacks",
+    "outcrop 74",
+    "shard 89"
    ],
    "aim": [
     -135.42,
@@ -4869,7 +3184,10 @@
    ],
    "opens_to": 440,
    "skyline": -4.2,
-   "sees": [],
+   "sees": [
+    "watcher 70",
+    "outcrop 113"
+   ],
    "hidden_in_line": [],
    "aim": [
     -80.18,
@@ -4887,8 +3205,13 @@
    ],
    "opens_to": 290,
    "skyline": -7.2,
-   "sees": [],
-   "hidden_in_line": [],
+   "sees": [
+    "watcher 55"
+   ],
+   "hidden_in_line": [
+    "outcrop 114",
+    "shard 116"
+   ],
    "aim": [
     -111.23,
     -5.45
@@ -4905,7 +3228,9 @@
    ],
    "opens_to": 215,
    "skyline": -9.8,
-   "sees": [],
+   "sees": [
+    "shard 73"
+   ],
    "hidden_in_line": [],
    "aim": [
     -91.58,
@@ -4941,7 +3266,9 @@
    ],
    "opens_to": 410,
    "skyline": 8.8,
-   "sees": [],
+   "sees": [
+    "watcher 133"
+   ],
    "hidden_in_line": [
     "The observatory"
    ],
@@ -4961,7 +3288,9 @@
    ],
    "opens_to": 290,
    "skyline": -7.4,
-   "sees": [],
+   "sees": [
+    "shard 65"
+   ],
    "hidden_in_line": [],
    "aim": [
     -105.41,
@@ -4981,7 +3310,8 @@
    "skyline": -7.4,
    "sees": [],
    "hidden_in_line": [
-    "South pass gate"
+    "South pass gate",
+    "outcrop 54"
    ],
    "aim": [
     154.2,
@@ -5018,7 +3348,9 @@
    "opens_to": 590,
    "skyline": -5.0,
    "sees": [],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "arch 23"
+   ],
    "aim": [
     166.46,
     1.53
@@ -5056,7 +3388,11 @@
    "opens_to": 425,
    "skyline": -5.0,
    "sees": [],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "watcher 20",
+    "outcrop 54",
+    "shard 146"
+   ],
    "aim": [
     148.62,
     -16.45
@@ -5073,7 +3409,9 @@
    ],
    "opens_to": 485,
    "skyline": -8.6,
-   "sees": [],
+   "sees": [
+    "arch 23"
+   ],
    "hidden_in_line": [],
    "aim": [
     172.62,
@@ -5109,7 +3447,9 @@
    ],
    "opens_to": 440,
    "skyline": 3.2,
-   "sees": [],
+   "sees": [
+    "watcher 55"
+   ],
    "hidden_in_line": [
     "The observatory"
    ],
@@ -5129,7 +3469,10 @@
    ],
    "opens_to": 440,
    "skyline": -7.3,
-   "sees": [],
+   "sees": [
+    "outcrop 114",
+    "shard 158"
+   ],
    "hidden_in_line": [],
    "aim": [
     -132.61,
@@ -5147,7 +3490,9 @@
    ],
    "opens_to": 305,
    "skyline": -6.4,
-   "sees": [],
+   "sees": [
+    "watcher 112"
+   ],
    "hidden_in_line": [],
    "aim": [
     -128.58,
@@ -5165,9 +3510,12 @@
    ],
    "opens_to": 590,
    "skyline": -8.3,
-   "sees": [],
+   "sees": [
+    "watcher 85"
+   ],
    "hidden_in_line": [
-    "shacks"
+    "shacks",
+    "shard 58"
    ],
    "aim": [
     -112.33,
@@ -5187,7 +3535,8 @@
    "skyline": -6.1,
    "sees": [],
    "hidden_in_line": [
-    "shacks"
+    "shacks",
+    "shard 58"
    ],
    "aim": [
     -114.95,
@@ -5205,7 +3554,10 @@
    ],
    "opens_to": 380,
    "skyline": -9.4,
-   "sees": [],
+   "sees": [
+    "watcher 45",
+    "watcher 133"
+   ],
    "hidden_in_line": [
     "camp"
    ],
@@ -5225,7 +3577,9 @@
    ],
    "opens_to": 500,
    "skyline": -8.0,
-   "sees": [],
+   "sees": [
+    "outcrop 1"
+   ],
    "hidden_in_line": [],
    "aim": [
     -75.04,
@@ -5243,7 +3597,10 @@
    ],
    "opens_to": 500,
    "skyline": 0.4,
-   "sees": [],
+   "sees": [
+    "shard 73",
+    "watcher 133"
+   ],
    "hidden_in_line": [
     "The observatory"
    ],
@@ -5283,7 +3640,10 @@
    ],
    "opens_to": 410,
    "skyline": -9.7,
-   "sees": [],
+   "sees": [
+    "outcrop 126",
+    "watcher 130"
+   ],
    "hidden_in_line": [
     "camp"
    ],
@@ -5322,7 +3682,10 @@
    "opens_to": 350,
    "skyline": -8.4,
    "sees": [],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "watcher 55",
+    "shard 64"
+   ],
    "aim": [
     -109.36,
     -39.62
@@ -5339,7 +3702,9 @@
    ],
    "opens_to": 275,
    "skyline": -6.9,
-   "sees": [],
+   "sees": [
+    "shard 89"
+   ],
    "hidden_in_line": [],
    "aim": [
     -166.74,
@@ -5357,7 +3722,9 @@
    ],
    "opens_to": 320,
    "skyline": 9.7,
-   "sees": [],
+   "sees": [
+    "shard 158"
+   ],
    "hidden_in_line": [
     "The observatory"
    ],
@@ -5377,8 +3744,13 @@
    ],
    "opens_to": 260,
    "skyline": -11.2,
-   "sees": [],
-   "hidden_in_line": [],
+   "sees": [
+    "weather 11"
+   ],
+   "hidden_in_line": [
+    "weather 80",
+    "haul 81"
+   ],
    "aim": [
     -102.68,
     70.88
@@ -5492,7 +3864,10 @@
    "sees": [
     "outcrop"
    ],
-   "hidden_in_line": [],
+   "hidden_in_line": [
+    "watcher 20",
+    "outcrop 54"
+   ],
    "aim": [
     168.6,
     -55.36
@@ -5536,7 +3911,8 @@
     "Herd moose",
     "Herd moose",
     "outcrop",
-    "outcrop"
+    "outcrop",
+    "shard 131"
    ],
    "aim": [
     142.48,
@@ -5651,7 +4027,8 @@
    "skyline": -1.4,
    "sees": [],
    "hidden_in_line": [
-    "outcrop"
+    "outcrop",
+    "shard 145"
    ],
    "aim": [
     56.44,
@@ -5671,7 +4048,12 @@
    "skyline": -23.9,
    "sees": [],
    "hidden_in_line": [
-    "haul"
+    "haul",
+    "beacon 30",
+    "weather 52",
+    "haul 53",
+    "comms 61",
+    "haul 108"
    ],
    "aim": [
     -10.41,
@@ -6636,6 +5018,1623 @@
    "height": 16,
    "seen_from": 0,
    "ahead_from": 0
+  },
+  {
+   "name": "watcher 0",
+   "kind": "watcher",
+   "at": [
+    -85.63,
+    -1.04
+   ],
+   "height": 32,
+   "seen_from": 166,
+   "ahead_from": 61
+  },
+  {
+   "name": "outcrop 1",
+   "kind": "outcrop",
+   "at": [
+    -73.96,
+    -44.38
+   ],
+   "height": 6.0,
+   "seen_from": 64,
+   "ahead_from": 51
+  },
+  {
+   "name": "watcher 2",
+   "kind": "watcher",
+   "at": [
+    -73.13,
+    -34.38
+   ],
+   "height": 9.6,
+   "seen_from": 83,
+   "ahead_from": 34
+  },
+  {
+   "name": "shard 3",
+   "kind": "shard",
+   "at": [
+    -74.37,
+    -25.62
+   ],
+   "height": 7,
+   "seen_from": 43,
+   "ahead_from": 26
+  },
+  {
+   "name": "shard 4",
+   "kind": "shard",
+   "at": [
+    -79.38,
+    -16.46
+   ],
+   "height": 11.200000000000001,
+   "seen_from": 69,
+   "ahead_from": 39
+  },
+  {
+   "name": "arch 5",
+   "kind": "arch",
+   "at": [
+    -76.46,
+    -6.46
+   ],
+   "height": 9,
+   "seen_from": 57,
+   "ahead_from": 28
+  },
+  {
+   "name": "shard 6",
+   "kind": "shard",
+   "at": [
+    -80.21,
+    11.46
+   ],
+   "height": 7,
+   "seen_from": 49,
+   "ahead_from": 24
+  },
+  {
+   "name": "signal 7",
+   "kind": "signal",
+   "at": [
+    -85.62,
+    84.79
+   ],
+   "height": 23.8,
+   "seen_from": 93,
+   "ahead_from": 37
+  },
+  {
+   "name": "camp 8",
+   "kind": "camp",
+   "at": [
+    -66.04,
+    46.87
+   ],
+   "height": 3,
+   "seen_from": 19,
+   "ahead_from": 14
+  },
+  {
+   "name": "beacon 9",
+   "kind": "beacon",
+   "at": [
+    -70.21,
+    56.46
+   ],
+   "height": 10,
+   "seen_from": 72,
+   "ahead_from": 43
+  },
+  {
+   "name": "fuel 10",
+   "kind": "fuel",
+   "at": [
+    -79.38,
+    63.96
+   ],
+   "height": 6,
+   "seen_from": 55,
+   "ahead_from": 17
+  },
+  {
+   "name": "weather 11",
+   "kind": "weather",
+   "at": [
+    -93.13,
+    73.12
+   ],
+   "height": 6,
+   "seen_from": 49,
+   "ahead_from": 40
+  },
+  {
+   "name": "weather 12",
+   "kind": "weather",
+   "at": [
+    164.37,
+    84.37
+   ],
+   "height": 6,
+   "seen_from": 37,
+   "ahead_from": 30
+  },
+  {
+   "name": "weather 13",
+   "kind": "weather",
+   "at": [
+    -65.21,
+    32.71
+   ],
+   "height": 6,
+   "seen_from": 58,
+   "ahead_from": 30
+  },
+  {
+   "name": "haul 14",
+   "kind": "haul",
+   "at": [
+    -66.04,
+    23.96
+   ],
+   "height": 4,
+   "seen_from": 32,
+   "ahead_from": 11
+  },
+  {
+   "name": "solar 15",
+   "kind": "solar",
+   "at": [
+    -68.96,
+    15.62
+   ],
+   "height": 4,
+   "seen_from": 33,
+   "ahead_from": 21
+  },
+  {
+   "name": "outcrop 16",
+   "kind": "outcrop",
+   "at": [
+    -68.13,
+    4.38
+   ],
+   "height": 5,
+   "seen_from": 50,
+   "ahead_from": 30
+  },
+  {
+   "name": "camp 17",
+   "kind": "camp",
+   "at": [
+    -65.63,
+    -4.38
+   ],
+   "height": 3,
+   "seen_from": 20,
+   "ahead_from": 14
+  },
+  {
+   "name": "beacon 18",
+   "kind": "beacon",
+   "at": [
+    -60.21,
+    -12.29
+   ],
+   "height": 10,
+   "seen_from": 63,
+   "ahead_from": 29
+  },
+  {
+   "name": "outcrop 19",
+   "kind": "outcrop",
+   "at": [
+    170.62,
+    9.37
+   ],
+   "height": 25,
+   "seen_from": 104,
+   "ahead_from": 63
+  },
+  {
+   "name": "watcher 20",
+   "kind": "watcher",
+   "at": [
+    149.37,
+    -19.79
+   ],
+   "height": 9.6,
+   "seen_from": 44,
+   "ahead_from": 20
+  },
+  {
+   "name": "shard 21",
+   "kind": "shard",
+   "at": [
+    158.96,
+    -15.62
+   ],
+   "height": 7,
+   "seen_from": 44,
+   "ahead_from": 33
+  },
+  {
+   "name": "shard 22",
+   "kind": "shard",
+   "at": [
+    166.04,
+    -8.54
+   ],
+   "height": 11.200000000000001,
+   "seen_from": 61,
+   "ahead_from": 38
+  },
+  {
+   "name": "arch 23",
+   "kind": "arch",
+   "at": [
+    171.04,
+    -1.46
+   ],
+   "height": 9,
+   "seen_from": 62,
+   "ahead_from": 35
+  },
+  {
+   "name": "haul 24",
+   "kind": "haul",
+   "at": [
+    -53.54,
+    -16.88
+   ],
+   "height": 4,
+   "seen_from": 26,
+   "ahead_from": 11
+  },
+  {
+   "name": "outcrop 25",
+   "kind": "outcrop",
+   "at": [
+    100.21,
+    61.88
+   ],
+   "height": 5,
+   "seen_from": 54,
+   "ahead_from": 35
+  },
+  {
+   "name": "camp 26",
+   "kind": "camp",
+   "at": [
+    91.04,
+    70.62
+   ],
+   "height": 3,
+   "seen_from": 29,
+   "ahead_from": 21
+  },
+  {
+   "name": "beacon 27",
+   "kind": "beacon",
+   "at": [
+    111.04,
+    79.37
+   ],
+   "height": 10,
+   "seen_from": 70,
+   "ahead_from": 44
+  },
+  {
+   "name": "plant 28",
+   "kind": "plant",
+   "at": [
+    -10.21,
+    -13.96
+   ],
+   "height": 21.599999999999998,
+   "seen_from": 49,
+   "ahead_from": 29
+  },
+  {
+   "name": "camp 29",
+   "kind": "camp",
+   "at": [
+    -34.79,
+    -37.29
+   ],
+   "height": 3,
+   "seen_from": 32,
+   "ahead_from": 12
+  },
+  {
+   "name": "beacon 30",
+   "kind": "beacon",
+   "at": [
+    -23.96,
+    -33.12
+   ],
+   "height": 10,
+   "seen_from": 81,
+   "ahead_from": 33
+  },
+  {
+   "name": "fuel 31",
+   "kind": "fuel",
+   "at": [
+    -14.79,
+    -27.71
+   ],
+   "height": 6,
+   "seen_from": 29,
+   "ahead_from": 15
+  },
+  {
+   "name": "weather 32",
+   "kind": "weather",
+   "at": [
+    -14.38,
+    -17.71
+   ],
+   "height": 6,
+   "seen_from": 25,
+   "ahead_from": 16
+  },
+  {
+   "name": "plant 33",
+   "kind": "plant",
+   "at": [
+    89.37,
+    -13.54
+   ],
+   "height": 21.599999999999998,
+   "seen_from": 38,
+   "ahead_from": 0
+  },
+  {
+   "name": "weather 34",
+   "kind": "weather",
+   "at": [
+    63.13,
+    -19.38
+   ],
+   "height": 6,
+   "seen_from": 32,
+   "ahead_from": 8
+  },
+  {
+   "name": "haul 35",
+   "kind": "haul",
+   "at": [
+    68.96,
+    -27.71
+   ],
+   "height": 4,
+   "seen_from": 35,
+   "ahead_from": 30
+  },
+  {
+   "name": "solar 36",
+   "kind": "solar",
+   "at": [
+    79.38,
+    -23.96
+   ],
+   "height": 4,
+   "seen_from": 23,
+   "ahead_from": 8
+  },
+  {
+   "name": "signal 37",
+   "kind": "signal",
+   "at": [
+    119.38,
+    36.87
+   ],
+   "height": 23.8,
+   "seen_from": 72,
+   "ahead_from": 53
+  },
+  {
+   "name": "haul 38",
+   "kind": "haul",
+   "at": [
+    114.37,
+    5.21
+   ],
+   "height": 4,
+   "seen_from": 32,
+   "ahead_from": 23
+  },
+  {
+   "name": "solar 39",
+   "kind": "solar",
+   "at": [
+    115.63,
+    11.87
+   ],
+   "height": 4,
+   "seen_from": 34,
+   "ahead_from": 12
+  },
+  {
+   "name": "outcrop 40",
+   "kind": "outcrop",
+   "at": [
+    118.54,
+    22.29
+   ],
+   "height": 5,
+   "seen_from": 37,
+   "ahead_from": 30
+  },
+  {
+   "name": "weather 41",
+   "kind": "weather",
+   "at": [
+    110.21,
+    -1.46
+   ],
+   "height": 6,
+   "seen_from": 41,
+   "ahead_from": 31
+  },
+  {
+   "name": "haul 42",
+   "kind": "haul",
+   "at": [
+    106.46,
+    -10.21
+   ],
+   "height": 4,
+   "seen_from": 27,
+   "ahead_from": 23
+  },
+  {
+   "name": "solar 43",
+   "kind": "solar",
+   "at": [
+    97.29,
+    -13.96
+   ],
+   "height": 4,
+   "seen_from": 25,
+   "ahead_from": 18
+  },
+  {
+   "name": "outcrop 44",
+   "kind": "outcrop",
+   "at": [
+    -93.96,
+    4.37
+   ],
+   "height": 25,
+   "seen_from": 101,
+   "ahead_from": 52
+  },
+  {
+   "name": "watcher 45",
+   "kind": "watcher",
+   "at": [
+    -100.62,
+    -23.54
+   ],
+   "height": 9.6,
+   "seen_from": 43,
+   "ahead_from": 24
+  },
+  {
+   "name": "shard 46",
+   "kind": "shard",
+   "at": [
+    -98.54,
+    -16.04
+   ],
+   "height": 7,
+   "seen_from": 73,
+   "ahead_from": 23
+  },
+  {
+   "name": "shard 47",
+   "kind": "shard",
+   "at": [
+    -100.21,
+    -8.54
+   ],
+   "height": 11.200000000000001,
+   "seen_from": 80,
+   "ahead_from": 43
+  },
+  {
+   "name": "plant 48",
+   "kind": "plant",
+   "at": [
+    -56.04,
+    -4.38
+   ],
+   "height": 21.599999999999998,
+   "seen_from": 80,
+   "ahead_from": 24
+  },
+  {
+   "name": "solar 49",
+   "kind": "solar",
+   "at": [
+    -50.62,
+    21.46
+   ],
+   "height": 4,
+   "seen_from": 28,
+   "ahead_from": 0
+  },
+  {
+   "name": "outcrop 50",
+   "kind": "outcrop",
+   "at": [
+    -58.54,
+    16.04
+   ],
+   "height": 5,
+   "seen_from": 37,
+   "ahead_from": 18
+  },
+  {
+   "name": "camp 51",
+   "kind": "camp",
+   "at": [
+    -58.54,
+    5.21
+   ],
+   "height": 3,
+   "seen_from": 16,
+   "ahead_from": 13
+  },
+  {
+   "name": "weather 52",
+   "kind": "weather",
+   "at": [
+    -40.63,
+    -19.38
+   ],
+   "height": 6,
+   "seen_from": 49,
+   "ahead_from": 14
+  },
+  {
+   "name": "haul 53",
+   "kind": "haul",
+   "at": [
+    -32.71,
+    -15.21
+   ],
+   "height": 4,
+   "seen_from": 45,
+   "ahead_from": 8
+  },
+  {
+   "name": "outcrop 54",
+   "kind": "outcrop",
+   "at": [
+    152.29,
+    -27.29
+   ],
+   "height": 25,
+   "seen_from": 64,
+   "ahead_from": 25
+  },
+  {
+   "name": "watcher 55",
+   "kind": "watcher",
+   "at": [
+    -113.96,
+    -4.38
+   ],
+   "height": 32,
+   "seen_from": 67,
+   "ahead_from": 29
+  },
+  {
+   "name": "outcrop 56",
+   "kind": "outcrop",
+   "at": [
+    -114.79,
+    22.29
+   ],
+   "height": 6.0,
+   "seen_from": 28,
+   "ahead_from": 8
+  },
+  {
+   "name": "watcher 57",
+   "kind": "watcher",
+   "at": [
+    -118.13,
+    13.54
+   ],
+   "height": 9.6,
+   "seen_from": 35,
+   "ahead_from": 13
+  },
+  {
+   "name": "shard 58",
+   "kind": "shard",
+   "at": [
+    -116.46,
+    5.62
+   ],
+   "height": 7,
+   "seen_from": 36,
+   "ahead_from": 7
+  },
+  {
+   "name": "shard 59",
+   "kind": "shard",
+   "at": [
+    -91.87,
+    31.87
+   ],
+   "height": 7,
+   "seen_from": 50,
+   "ahead_from": 26
+  },
+  {
+   "name": "shard 60",
+   "kind": "shard",
+   "at": [
+    -86.04,
+    23.54
+   ],
+   "height": 11.200000000000001,
+   "seen_from": 49,
+   "ahead_from": 20
+  },
+  {
+   "name": "comms 61",
+   "kind": "comms",
+   "at": [
+    -28.96,
+    -20.62
+   ],
+   "height": 23.8,
+   "seen_from": 111,
+   "ahead_from": 61
+  },
+  {
+   "name": "weather 62",
+   "kind": "weather",
+   "at": [
+    -26.87,
+    5.21
+   ],
+   "height": 6,
+   "seen_from": 50,
+   "ahead_from": 30
+  },
+  {
+   "name": "haul 63",
+   "kind": "haul",
+   "at": [
+    -28.54,
+    -3.96
+   ],
+   "height": 4,
+   "seen_from": 38,
+   "ahead_from": 4
+  },
+  {
+   "name": "shard 64",
+   "kind": "shard",
+   "at": [
+    -108.96,
+    -27.29
+   ],
+   "height": 7,
+   "seen_from": 70,
+   "ahead_from": 20
+  },
+  {
+   "name": "shard 65",
+   "kind": "shard",
+   "at": [
+    -106.88,
+    -21.87
+   ],
+   "height": 11.200000000000001,
+   "seen_from": 66,
+   "ahead_from": 24
+  },
+  {
+   "name": "arch 67",
+   "kind": "arch",
+   "at": [
+    123.96,
+    -2.71
+   ],
+   "height": 9,
+   "seen_from": 85,
+   "ahead_from": 35
+  },
+  {
+   "name": "outcrop 68",
+   "kind": "outcrop",
+   "at": [
+    128.54,
+    6.46
+   ],
+   "height": 6.0,
+   "seen_from": 59,
+   "ahead_from": 30
+  },
+  {
+   "name": "watcher 69",
+   "kind": "watcher",
+   "at": [
+    135.21,
+    13.12
+   ],
+   "height": 9.6,
+   "seen_from": 97,
+   "ahead_from": 61
+  },
+  {
+   "name": "watcher 70",
+   "kind": "watcher",
+   "at": [
+    -81.87,
+    -53.54
+   ],
+   "height": 32,
+   "seen_from": 116,
+   "ahead_from": 43
+  },
+  {
+   "name": "outcrop 71",
+   "kind": "outcrop",
+   "at": [
+    -94.38,
+    -30.63
+   ],
+   "height": 6.0,
+   "seen_from": 51,
+   "ahead_from": 18
+  },
+  {
+   "name": "watcher 72",
+   "kind": "watcher",
+   "at": [
+    -85.62,
+    -37.29
+   ],
+   "height": 9.6,
+   "seen_from": 62,
+   "ahead_from": 36
+  },
+  {
+   "name": "shard 73",
+   "kind": "shard",
+   "at": [
+    -91.88,
+    -46.46
+   ],
+   "height": 7,
+   "seen_from": 63,
+   "ahead_from": 24
+  },
+  {
+   "name": "outcrop 74",
+   "kind": "outcrop",
+   "at": [
+    -172.29,
+    19.79
+   ],
+   "height": 25,
+   "seen_from": 100,
+   "ahead_from": 52
+  },
+  {
+   "name": "watcher 75",
+   "kind": "watcher",
+   "at": [
+    154.38,
+    10.62
+   ],
+   "height": 9.6,
+   "seen_from": 84,
+   "ahead_from": 40
+  },
+  {
+   "name": "shard 76",
+   "kind": "shard",
+   "at": [
+    163.96,
+    13.96
+   ],
+   "height": 7,
+   "seen_from": 68,
+   "ahead_from": 45
+  },
+  {
+   "name": "shard 77",
+   "kind": "shard",
+   "at": [
+    169.79,
+    21.87
+   ],
+   "height": 11.200000000000001,
+   "seen_from": 57,
+   "ahead_from": 34
+  },
+  {
+   "name": "plant 78",
+   "kind": "plant",
+   "at": [
+    -50.21,
+    52.29
+   ],
+   "height": 21.599999999999998,
+   "seen_from": 104,
+   "ahead_from": 33
+  },
+  {
+   "name": "fuel 79",
+   "kind": "fuel",
+   "at": [
+    -5.62,
+    61.46
+   ],
+   "height": 6,
+   "seen_from": 57,
+   "ahead_from": 26
+  },
+  {
+   "name": "weather 80",
+   "kind": "weather",
+   "at": [
+    -28.54,
+    63.96
+   ],
+   "height": 6,
+   "seen_from": 57,
+   "ahead_from": 27
+  },
+  {
+   "name": "haul 81",
+   "kind": "haul",
+   "at": [
+    -48.12,
+    63.54
+   ],
+   "height": 4,
+   "seen_from": 24,
+   "ahead_from": 8
+  },
+  {
+   "name": "signal 82",
+   "kind": "signal",
+   "at": [
+    94.79,
+    53.13
+   ],
+   "height": 23.8,
+   "seen_from": 109,
+   "ahead_from": 59
+  },
+  {
+   "name": "fuel 83",
+   "kind": "fuel",
+   "at": [
+    107.29,
+    45.21
+   ],
+   "height": 6,
+   "seen_from": 36,
+   "ahead_from": 26
+  },
+  {
+   "name": "solar 84",
+   "kind": "solar",
+   "at": [
+    122.29,
+    40.21
+   ],
+   "height": 4,
+   "seen_from": 20,
+   "ahead_from": 13
+  },
+  {
+   "name": "watcher 85",
+   "kind": "watcher",
+   "at": [
+    -113.12,
+    13.54
+   ],
+   "height": 32,
+   "seen_from": 98,
+   "ahead_from": 42
+  },
+  {
+   "name": "outcrop 86",
+   "kind": "outcrop",
+   "at": [
+    -101.04,
+    35.63
+   ],
+   "height": 6.0,
+   "seen_from": 72,
+   "ahead_from": 31
+  },
+  {
+   "name": "watcher 87",
+   "kind": "watcher",
+   "at": [
+    -100.21,
+    26.04
+   ],
+   "height": 9.6,
+   "seen_from": 76,
+   "ahead_from": 38
+  },
+  {
+   "name": "outcrop 88",
+   "kind": "outcrop",
+   "at": [
+    -45.62,
+    -3.13
+   ],
+   "height": 5,
+   "seen_from": 35,
+   "ahead_from": 19
+  },
+  {
+   "name": "shard 89",
+   "kind": "shard",
+   "at": [
+    -169.37,
+    27.71
+   ],
+   "height": 7,
+   "seen_from": 81,
+   "ahead_from": 40
+  },
+  {
+   "name": "weather 90",
+   "kind": "weather",
+   "at": [
+    32.71,
+    72.71
+   ],
+   "height": 6,
+   "seen_from": 51,
+   "ahead_from": 17
+  },
+  {
+   "name": "haul 91",
+   "kind": "haul",
+   "at": [
+    19.37,
+    80.63
+   ],
+   "height": 4,
+   "seen_from": 16,
+   "ahead_from": 3
+  },
+  {
+   "name": "arch 92",
+   "kind": "arch",
+   "at": [
+    -89.79,
+    -25.21
+   ],
+   "height": 9,
+   "seen_from": 85,
+   "ahead_from": 28
+  },
+  {
+   "name": "plant 93",
+   "kind": "plant",
+   "at": [
+    66.88,
+    2.29
+   ],
+   "height": 21.599999999999998,
+   "seen_from": 46,
+   "ahead_from": 23
+  },
+  {
+   "name": "haul 94",
+   "kind": "haul",
+   "at": [
+    84.37,
+    13.96
+   ],
+   "height": 4,
+   "seen_from": 37,
+   "ahead_from": 22
+  },
+  {
+   "name": "solar 95",
+   "kind": "solar",
+   "at": [
+    76.46,
+    8.12
+   ],
+   "height": 4,
+   "seen_from": 23,
+   "ahead_from": 16
+  },
+  {
+   "name": "outcrop 96",
+   "kind": "outcrop",
+   "at": [
+    148.13,
+    -1.87
+   ],
+   "height": 6.0,
+   "seen_from": 47,
+   "ahead_from": 16
+  },
+  {
+   "name": "watcher 97",
+   "kind": "watcher",
+   "at": [
+    142.29,
+    6.04
+   ],
+   "height": 9.6,
+   "seen_from": 58,
+   "ahead_from": 33
+  },
+  {
+   "name": "shard 98",
+   "kind": "shard",
+   "at": [
+    -132.71,
+    30.21
+   ],
+   "height": 28,
+   "seen_from": 134,
+   "ahead_from": 71
+  },
+  {
+   "name": "shard 99",
+   "kind": "shard",
+   "at": [
+    -142.29,
+    51.46
+   ],
+   "height": 7,
+   "seen_from": 50,
+   "ahead_from": 30
+  },
+  {
+   "name": "shard 100",
+   "kind": "shard",
+   "at": [
+    -140.21,
+    41.46
+   ],
+   "height": 11.200000000000001,
+   "seen_from": 106,
+   "ahead_from": 61
+  },
+  {
+   "name": "arch 102",
+   "kind": "arch",
+   "at": [
+    -122.71,
+    42.71
+   ],
+   "height": 9,
+   "seen_from": 83,
+   "ahead_from": 46
+  },
+  {
+   "name": "plant 103",
+   "kind": "plant",
+   "at": [
+    113.12,
+    23.12
+   ],
+   "height": 21.599999999999998,
+   "seen_from": 84,
+   "ahead_from": 22
+  },
+  {
+   "name": "weather 104",
+   "kind": "weather",
+   "at": [
+    76.04,
+    65.63
+   ],
+   "height": 6,
+   "seen_from": 66,
+   "ahead_from": 26
+  },
+  {
+   "name": "solar 105",
+   "kind": "solar",
+   "at": [
+    4.37,
+    70.63
+   ],
+   "height": 4,
+   "seen_from": 41,
+   "ahead_from": 13
+  },
+  {
+   "name": "comms 106",
+   "kind": "comms",
+   "at": [
+    -51.04,
+    -26.88
+   ],
+   "height": 23.8,
+   "seen_from": 101,
+   "ahead_from": 57
+  },
+  {
+   "name": "signal 107",
+   "kind": "signal",
+   "at": [
+    -37.29,
+    -8.12
+   ],
+   "height": 23.8,
+   "seen_from": 64,
+   "ahead_from": 28
+  },
+  {
+   "name": "haul 108",
+   "kind": "haul",
+   "at": [
+    -32.29,
+    -27.29
+   ],
+   "height": 4,
+   "seen_from": 29,
+   "ahead_from": 7
+  },
+  {
+   "name": "outcrop 109",
+   "kind": "outcrop",
+   "at": [
+    -7.29,
+    16.46
+   ],
+   "height": 22.5,
+   "seen_from": 35,
+   "ahead_from": 8
+  },
+  {
+   "name": "beacon 110",
+   "kind": "beacon",
+   "at": [
+    14.79,
+    28.54
+   ],
+   "height": 10,
+   "seen_from": 70,
+   "ahead_from": 33
+  },
+  {
+   "name": "watcher 112",
+   "kind": "watcher",
+   "at": [
+    -124.38,
+    54.79
+   ],
+   "height": 9.6,
+   "seen_from": 57,
+   "ahead_from": 20
+  },
+  {
+   "name": "outcrop 113",
+   "kind": "outcrop",
+   "at": [
+    -82.29,
+    -47.71
+   ],
+   "height": 6.0,
+   "seen_from": 67,
+   "ahead_from": 27
+  },
+  {
+   "name": "outcrop 114",
+   "kind": "outcrop",
+   "at": [
+    -131.04,
+    14.37
+   ],
+   "height": 25,
+   "seen_from": 56,
+   "ahead_from": 20
+  },
+  {
+   "name": "watcher 115",
+   "kind": "watcher",
+   "at": [
+    -150.21,
+    19.79
+   ],
+   "height": 9.6,
+   "seen_from": 23,
+   "ahead_from": 11
+  },
+  {
+   "name": "shard 116",
+   "kind": "shard",
+   "at": [
+    -142.71,
+    19.38
+   ],
+   "height": 7,
+   "seen_from": 15,
+   "ahead_from": 2
+  },
+  {
+   "name": "moose 118",
+   "kind": "moose",
+   "at": [
+    130.21,
+    -49.37
+   ],
+   "height": 2.2,
+   "seen_from": 16,
+   "ahead_from": 5
+  },
+  {
+   "name": "shard 119",
+   "kind": "shard",
+   "at": [
+    118.12,
+    -46.87
+   ],
+   "height": 8.4,
+   "seen_from": 52,
+   "ahead_from": 27
+  },
+  {
+   "name": "tower 120",
+   "kind": "tower",
+   "at": [
+    82.71,
+    73.13
+   ],
+   "height": 30,
+   "seen_from": 159,
+   "ahead_from": 68
+  },
+  {
+   "name": "fuel 121",
+   "kind": "fuel",
+   "at": [
+    80.62,
+    53.13
+   ],
+   "height": 6,
+   "seen_from": 44,
+   "ahead_from": 25
+  },
+  {
+   "name": "arch 122",
+   "kind": "arch",
+   "at": [
+    -96.46,
+    48.54
+   ],
+   "height": 9,
+   "seen_from": 80,
+   "ahead_from": 33
+  },
+  {
+   "name": "outcrop 123",
+   "kind": "outcrop",
+   "at": [
+    -103.54,
+    59.38
+   ],
+   "height": 6.0,
+   "seen_from": 32,
+   "ahead_from": 15
+  },
+  {
+   "name": "shard 124",
+   "kind": "shard",
+   "at": [
+    -109.79,
+    3.96
+   ],
+   "height": 7,
+   "seen_from": 34,
+   "ahead_from": 22
+  },
+  {
+   "name": "shard 125",
+   "kind": "shard",
+   "at": [
+    -101.46,
+    7.29
+   ],
+   "height": 11.200000000000001,
+   "seen_from": 61,
+   "ahead_from": 25
+  },
+  {
+   "name": "outcrop 126",
+   "kind": "outcrop",
+   "at": [
+    131.04,
+    0.62
+   ],
+   "height": 6.0,
+   "seen_from": 40,
+   "ahead_from": 15
+  },
+  {
+   "name": "signal 127",
+   "kind": "signal",
+   "at": [
+    -57.71,
+    -42.71
+   ],
+   "height": 23.8,
+   "seen_from": 197,
+   "ahead_from": 94
+  },
+  {
+   "name": "fuel 128",
+   "kind": "fuel",
+   "at": [
+    -31.46,
+    -39.38
+   ],
+   "height": 6,
+   "seen_from": 66,
+   "ahead_from": 35
+  },
+  {
+   "name": "shard 129",
+   "kind": "shard",
+   "at": [
+    146.04,
+    14.37
+   ],
+   "height": 7,
+   "seen_from": 67,
+   "ahead_from": 35
+  },
+  {
+   "name": "watcher 130",
+   "kind": "watcher",
+   "at": [
+    125.63,
+    -13.12
+   ],
+   "height": 9.6,
+   "seen_from": 80,
+   "ahead_from": 40
+  },
+  {
+   "name": "shard 131",
+   "kind": "shard",
+   "at": [
+    70.63,
+    -44.38
+   ],
+   "height": 8.4,
+   "seen_from": 23,
+   "ahead_from": 17
+  },
+  {
+   "name": "watcher 132",
+   "kind": "watcher",
+   "at": [
+    84.37,
+    -42.71
+   ],
+   "height": 35.2,
+   "seen_from": 137,
+   "ahead_from": 57
+  },
+  {
+   "name": "watcher 133",
+   "kind": "watcher",
+   "at": [
+    -111.88,
+    -46.87
+   ],
+   "height": 32,
+   "seen_from": 81,
+   "ahead_from": 34
+  },
+  {
+   "name": "comms 141",
+   "kind": "comms",
+   "at": [
+    -21.88,
+    20.62
+   ],
+   "height": 23.8,
+   "seen_from": 102,
+   "ahead_from": 48
+  },
+  {
+   "name": "signal 142",
+   "kind": "signal",
+   "at": [
+    -53.13,
+    -55.63
+   ],
+   "height": 23.8,
+   "seen_from": 103,
+   "ahead_from": 56
+  },
+  {
+   "name": "shard 145",
+   "kind": "shard",
+   "at": [
+    103.13,
+    -55.62
+   ],
+   "height": 31.5,
+   "seen_from": 56,
+   "ahead_from": 26
+  },
+  {
+   "name": "shard 146",
+   "kind": "shard",
+   "at": [
+    161.04,
+    -54.38
+   ],
+   "height": 31.5,
+   "seen_from": 120,
+   "ahead_from": 67
+  },
+  {
+   "name": "signal 147",
+   "kind": "signal",
+   "at": [
+    106.46,
+    -1.46
+   ],
+   "height": 23.8,
+   "seen_from": 92,
+   "ahead_from": 29
+  },
+  {
+   "name": "tower 150",
+   "kind": "tower",
+   "at": [
+    17.71,
+    36.87
+   ],
+   "height": 30,
+   "seen_from": 129,
+   "ahead_from": 50
+  },
+  {
+   "name": "comms 151",
+   "kind": "comms",
+   "at": [
+    -41.87,
+    10.21
+   ],
+   "height": 23.8,
+   "seen_from": 12,
+   "ahead_from": 5
+  },
+  {
+   "name": "signal 152",
+   "kind": "signal",
+   "at": [
+    37.29,
+    36.04
+   ],
+   "height": 23.8,
+   "seen_from": 29,
+   "ahead_from": 14
+  },
+  {
+   "name": "watcher 153",
+   "kind": "watcher",
+   "at": [
+    171.04,
+    -9.79
+   ],
+   "height": 32,
+   "seen_from": 88,
+   "ahead_from": 46
+  },
+  {
+   "name": "outcrop 154",
+   "kind": "outcrop",
+   "at": [
+    26.46,
+    51.46
+   ],
+   "height": 22.5,
+   "seen_from": 91,
+   "ahead_from": 40
+  },
+  {
+   "name": "tower 155",
+   "kind": "tower",
+   "at": [
+    0.63,
+    43.54
+   ],
+   "height": 30,
+   "seen_from": 90,
+   "ahead_from": 34
+  },
+  {
+   "name": "comms 156",
+   "kind": "comms",
+   "at": [
+    71.46,
+    37.29
+   ],
+   "height": 23.8,
+   "seen_from": 68,
+   "ahead_from": 36
+  },
+  {
+   "name": "shard 157",
+   "kind": "shard",
+   "at": [
+    -133.13,
+    48.54
+   ],
+   "height": 28,
+   "seen_from": 111,
+   "ahead_from": 35
+  },
+  {
+   "name": "shard 158",
+   "kind": "shard",
+   "at": [
+    -151.46,
+    6.88
+   ],
+   "height": 28,
+   "seen_from": 75,
+   "ahead_from": 29
+  },
+  {
+   "name": "outcrop 159",
+   "kind": "outcrop",
+   "at": [
+    -176.87,
+    -76.46
+   ],
+   "height": 25,
+   "seen_from": 91,
+   "ahead_from": 34
+  },
+  {
+   "name": "watcher 160",
+   "kind": "watcher",
+   "at": [
+    151.87,
+    -83.54
+   ],
+   "height": 35.2,
+   "seen_from": 97,
+   "ahead_from": 42
+  },
+  {
+   "name": "tower 165",
+   "kind": "tower",
+   "at": [
+    82.29,
+    4.79
+   ],
+   "height": 30,
+   "seen_from": 67,
+   "ahead_from": 29
   },
   {
    "name": "Terminal 1",

@@ -22,4 +22,7 @@ python3 draw_underground.py ../../planets/v2-underground.png ../../planets/v2-wo
 | `build_world.js` | Digs the mine with the planet's ramp, tunnel and chamber tools; writes and checks the layout |
 | `dump_lines.js` | Writes the trails as the game lays them, and the bridge decks, for the audit |
 | `audit_views.py` | Rides every trail both ways and reports what is on screen: `planets/v2-view-audit.md`, `.json`, `.png` |
+| `scenery.json` | The scenery wish list: landmarks and trailside props `build_surface.py` places where there is room |
+| `fill_views.py` | Adds wishes to `scenery.json` from the audit's bare stretches and empty crests |
+| `round.sh` | Build and audit in one step |
 | `find_bridge_span.py` | Searches every zone for a light-bridge span up to the highlands |

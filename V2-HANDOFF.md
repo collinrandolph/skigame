@@ -1,6 +1,6 @@
 # v2 handoff guide
 
-For whoever picks this up next, person or model. Read this first, then `V2-MIGRATION.md` (the port map) and `planets/V2-WORLD.md` (the world as built).
+For whoever picks this up next, person or model. Read this first, then `V2-MIGRATION.md` (the port map) and `planets/V2-WORLD.md` (the world as built). Problems that v2 cannot fix (terrain, planet size, trail layout, look) are logged in `V3-IDEAS.md`: add to it when you hit one.
 
 Everything is on branch `v2`. Nothing here needs a build step.
 
@@ -32,6 +32,14 @@ python3 draw_world.py ../../planets/v2-world-map.png
 python3 draw_underground.py ../../planets/v2-underground.png ../../planets/v2-world.json
 node dump_lines.js ../../planets/v2-world.json $WORLD_WORK/v2lines.json
 python3 audit_views.py ../../planets/v2-world.json ../../planets/v2-view-audit
+
+# or, in one step: build and audit (prints the audit's summary)
+./round.sh
+# add scenery wishes for whatever the audit still calls bare, then build again
+python3 fill_views.py && ./round.sh
+
+# look at a spot in the real page: lon,lat,compass bearing (writes view-1.png ...)
+cd ../test/browser && node views.js "-77.73,-16.51,2"
 ```
 
 ## 2. Rules that do not change
@@ -52,7 +60,8 @@ python3 audit_views.py ../../planets/v2-world.json ../../planets/v2-view-audit
 | Chapters 1 to 6 playable in the page, with save and checkpoints | Done, tested |
 | Controls port (base game scheme on keyboard, controller, touch) | Done, tested |
 | Chapters 7 to 9 (moose puzzle, crown crystals, ceremony, Starway) | **On hold.** Rules are in `game-core.js` and the props are in the world, but the page draws none of it and there are no tests for it. The owner wants this redesigned using the audit (section 6, task F) before more is built. |
-| View audit | Tool written, first run done (section 4) |
+| View audit | Tool written (section 4) |
+| Scenery pass | Done: 147 landmarks and trailside props placed from the audit. Bare ride 38% to 3% |
 | Minimap, sound, tutorial, set dressing, drawbridge animation, tilt, pinch | Not started |
 | New visual look | Not started (section 6, task H) |
 
@@ -60,20 +69,22 @@ python3 audit_views.py ../../planets/v2-world.json ../../planets/v2-view-audit
 
 Full numbers: `planets/v2-view-audit.md`. Map: `planets/v2-view-audit.png`.
 
-The owner's playtest complaint is long stretches of monotony. The audit agrees and shows where.
+The owner's playtest complaint was long stretches of monotony. The first audit agreed, and the scenery pass was built from it.
 
-| Zone | Trail | Bare (nothing on screen) |
-|---|---|---|
-| 1, the Bowl | 0.9 km | 1% |
-| 2 | 12.0 km | 42% |
-| 3 | 9.0 km | 50% |
-| 4 | 2.2 km | 15% |
-| Highlands | 2.5 km | 12% |
+| Zone | Trail | Bare before | Bare now |
+|---|---|---|---|
+| 1, the Bowl | 0.9 km | 1% | 1% |
+| 2 | 12.0 km | 42% | 2% |
+| 3 | 9.0 km | 50% | 2% |
+| 4 | 2.2 km | 15% | 4% |
+| Highlands | 2.5 km | 12% | 11% |
 
-- 38% of the whole ride is bare. Zone 1 is the only zone that plays the way the owner wants.
-- There are 63 bare stretches of 120 m or more. The longest is 610 m (about 94 seconds) on Riverside south.
-- 115 crests and openings were found where the view suddenly runs further. 94 of them have nothing in line to look at.
-- The summit, the goal of the whole story, is on screen for 5% of the ride.
+- Before: 38% of the ride bare, 63 bare stretches of 120 m or more, the longest 610 m.
+- Now: 3% bare, no bare stretch of 120 m or more.
+- Crests and openings with a landmark in line: 21 of 115 before, 60 now. The other 55 have no room where the landmark would need to stand.
+- The summit is still on screen for only 5% of the ride. Props cannot change that (see `V3-IDEAS.md`).
+
+The scores say something is on screen. They do not say it looks good: the owner has not playtested the scenery pass yet.
 
 **Why.** The planet is small. The camera sits 9.3 m up and the page draws the planet as if it were 917 m in radius. Level ground drops out of sight 131 m away. How far off a thing can be seen depends on its height:
 
@@ -119,18 +130,21 @@ Recommended redesign (not built): replace the spiral with a staircase of light b
 
 Each task is self-contained. "Model" is the suggested minimum; a stronger model is always fine.
 
-### A. Fill the bare stretches (Opus; Sonnet with care)
+### A. Scenery pass (done once; repeat after any trail or terrain change) (Sonnet)
 
-Goal: no zone more than 15% bare, no bare stretch over 150 m, at least 60 of the crests with a landmark in line.
+The scenery is a wish list, `tools/world/scenery.json`. `build_surface.py` places each entry near its point if there is room, after all story props. `fill_views.py` writes wishes from the audit: a tall landmark on the heading of each bare stretch and each empty crest, and a small prop beside the trail every 90 m. Each zone has its own kit (`KIT` in `fill_views.py`).
 
-1. Open `planets/v2-view-audit.md`. Work down "Longest bare stretches". Each row gives an `Aim` point: a tall landmark there is dead ahead for the whole stretch.
-2. In `tools/world/build_surface.py`, section "the world", add props with `place(id, lon, lat, zone, ...)`. It finds level ground near the point, clear of trails, cliffs and other props.
-3. Use the height table in section 4. A landmark meant to be seen from 250 m or more must be 15 m or taller. Tall ids today: `tower` (30 m), `plant` (18 m), `watcher` and `observatory` (16 m), `comms` and `signal` (14 m), `crystalgate` (21 m).
-4. Keep a rhythm: small trailside props every 60 to 80 m, a set piece every 200 to 400 m, a tall landmark at each crest.
-5. Do not repeat one model along a trail. Vary by zone so each zone has its own kit.
-6. Rebuild, run `verify_zones.py`, re-run the audit, compare the zone table. Run the browser tests: a prop on a trail fails them.
+To repeat: `./round.sh`, then `python3 fill_views.py && ./round.sh` until the summary stops changing (two or three rounds).
 
-One bare stretch often has two rows (forwards and backwards). One landmark rarely fixes both; check both rows after each change.
+To tune by hand:
+
+- Edit `scenery.json` directly. An entry is `{id, lon, lat, zone, scale, reach, off, far, kind}`. `reach` is how far from the point it may stand; `off` and `far` are the least and most it may stand from a trail.
+- To change what a zone gets, edit `KIT`, delete that zone's entries from `scenery.json`, and run the rounds again.
+- Use the height table in section 4. A landmark meant to be seen from 250 m or more must be 15 m or taller.
+- Look at the result with `tools/test/browser/views.js` before trusting a score. The fossil (`ribs`) was dropped from the kit because it looked wrong scaled up.
+- Run both browser tests afterwards.
+
+Still open: the highlands are 11% bare, and 55 crests have nothing in line.
 
 ### B. Tall landmark models (Fable or Opus for the first three; Sonnet for the rest)
 

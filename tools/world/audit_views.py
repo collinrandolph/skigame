@@ -144,7 +144,7 @@ for t in TR:
                 tgt = ahead_point(POS[mid], HEAD[mid], 160)
                 runs_bare.append(dict(trail=t["name"], dir=dr, zone=t["zone"], frm=round(float(VP[a][2])), metres=L, seconds=round(L/SPEED), start=ll(POS[a]), mid=ll(POS[mid]),
                                       heading=round(float(np.degrees(np.arctan2(np.dot(HEAD[mid], np.cross([0, 1, 0], POS[mid])/np.linalg.norm(np.cross([0, 1, 0], POS[mid]))), np.dot(HEAD[mid], np.cross(POS[mid], np.cross([0, 1, 0], POS[mid]))/np.linalg.norm(np.cross([0, 1, 0], POS[mid])))))) % 360),
-                                      aim=ll(tgt), aim_slope=round(float(slope(tgt)), 2), skyline=round(float(SKY[mid]), 1)))
+                                      aim=ll(tgt), aim_slope=round(float(slope(tgt)), 2), skyline=round(float(SKY[mid]), 1), pts=[ll(POS[v]) for v in idx[k:j:3]]))
             k = j
         # nothing-new runs: metres since something came on screen that was not there a moment ago
         seen_prev = set(); since = 0.0; start = 0; worst = 0

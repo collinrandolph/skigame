@@ -680,12 +680,12 @@
  "counts": {
   "trails": 53,
   "newTrails": 36,
-  "models": 87,
+  "models": 234,
   "landmarks": 10,
   "bridges": 5,
   "tunnels": 5,
   "caveStamps": 19,
-  "bytes": 4066014
+  "bytes": 4083646
  },
  "roundTrip": true
 }

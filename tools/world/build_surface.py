@@ -232,12 +232,14 @@ SIZE = dict(dome=22, plant=26, pad=20, greenhouse=20, biolab=20, giant=26, ribs=
             arch=9, watcher=8, shard=5, camp=12, harvester=7, signal=6, shacks=12, kiosk=1.5, gate=14, post=1.2, outcrop=6, plateau=5, crystalgate=12, mineportal=8, altar=3, moose=3, diamond=1.5, elder=3)
 def put(mid, d, rot=0, v=0, seed=1, name=None, scale=1, solid=True):
     MODELS.append(dict(name=name or mid, id=mid, v=v, seed=seed, d=r6(d), rot=round(float(rot), 1), scale=scale, solid=solid)); PLACED.append((d, SIZE.get(mid, 6)*scale)); return d
-def place(mid, lo, la, zone, name=None, reach=170, v=0, seed=1, scale=1, flat=0.14, face_trail=True):
+def place(mid, lo, la, zone, name=None, reach=170, v=0, seed=1, scale=1, flat=0.14, face_trail=True, far=60, quiet=False, off=7):
     """Stand a model on level ground near (lon, lat): off the trails by its own size, clear of cliffs and other models."""
     r = SIZE.get(mid, 6)*scale; c = d_of(lo, la); dd = angd(c)
-    ok = PASS & (zl == Z[zone]) & (dd <= reach) & (td >= r + 7) & (td <= r + 60) & (clf >= r + 4) & (sgf <= flat)
+    ok = PASS & (zl == Z[zone]) & (dd <= reach) & (td >= r + off) & (td <= r + far) & (clf >= r + 4) & (sgf <= flat)
     for q, rq in PLACED: ok &= angd(q) >= r + rq + 6
-    if not ok.any(): warn("no room for", mid, "near", lo, la); return None
+    if not ok.any():
+        if not quiet: warn("no room for", mid, "near", lo, la)
+        return None
     k = int(np.argmin(np.where(ok, dd + 0.6*td, 1e9))); d = V[k]
     rot = bearing(d, nearest_any(d)[3]) if face_trail else (seed*67) % 360
     return put(mid, d, rot=rot, v=v, seed=seed, name=name, scale=scale)
@@ -382,6 +384,20 @@ if ALTAR is not None:
         SW = dict(foot=r6(w["foot"]), top=r6(w["top"]), length=round(w["L"]), rise=round(w["rise"]))
         print("starway: %d m (%.2f turns over the plain, then the span), rising %d m at %d%%, at least %.0f m over the ground and up to %d m; foot %.0f m from the altar; %d ways tried fit" % (w["L"], w["turns"], w["rise"], K*100, w["clear"], w["high"], dist(w["foot"], ALTAR), len(cands)))
     else: warn("no Starway found")
+
+# ---------------- scenery: the view audit's landmarks and trailside props (scenery.json; fill_views.py adds to it) ----------------
+# each entry: id, lon, lat, zone, and optionally scale, reach (how far from the point it may stand), off and far (the
+# least and most it may stand from a trail, beyond its own radius), seed, name. story props above were placed first, so scenery never takes their ground. an entry with no room is
+# skipped and counted, not an error: the list is a wish list
+SCN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scenery.json"); scn_put = scn_skip = 0
+if os.path.exists(SCN):
+    for k_, e in enumerate(json.load(open(SCN))):
+        if str(e["zone"]) not in {str(k) for k in Z}: scn_skip += 1; continue
+        zk = next(k for k in Z if str(k) == str(e["zone"]))
+        got = place(e["id"], e["lon"], e["lat"], zk, name=e.get("name") or "%s %d" % (e["id"], k_), reach=e.get("reach", 60), far=e.get("far", 60), off=e.get("off", 7), seed=e.get("seed", k_ + 1), scale=e.get("scale", 1), flat=e.get("flat", 0.2), quiet=True)
+        if got is None: scn_skip += 1
+        else: scn_put += 1
+    print("scenery: %d placed, %d had no room" % (scn_put, scn_skip))
 
 # ---------------- write it out ----------------
 new = [t for t in TR if t["new"]]

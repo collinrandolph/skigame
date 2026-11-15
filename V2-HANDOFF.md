@@ -146,6 +146,8 @@ To tune by hand:
 
 Still open: the highlands are 11% bare, and 55 crests have nothing in line.
 
+The owner's verdict on the first pass: it looks random. That is fair: models were picked in rotation to fill gaps. What should replace it, zone by zone, is in `V3-IDEAS.md` under "Replacing the v2 scenery pass". Any further v2 scenery work should follow those rules (sites, one motif per trail, named landmarks, lines that lead somewhere).
+
 ### B. Tall landmark models (Fable or Opus for the first three; Sonnet for the rest)
 
 `models.js` has few tall things. Add new ids in the existing style (flat-shaded, low-poly, built from `bx`, `cy`, `tube`). Wanted, each 15 to 40 m tall:

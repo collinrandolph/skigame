@@ -32,6 +32,42 @@ The measurable goal for v3, if it is built, is in section "Goal" at the end.
 | Nothing moves in the distance. | Turning, blinking and drifting things: turbines, beacons, herds crossing, birds. |
 | The sky is empty of landmarks. | Sky bodies fixed over regions (ringed planet, moon, station, black hole). On a small planet the sky turns as you travel, so they work as geography. |
 
+## Replacing the v2 scenery pass
+
+**What v2 did, and why it reads as random.** `fill_views.py` found each gap and filled it with the next model from a per-zone list, scaled up if it had to be tall. Nothing was chosen for a reason: a fuel tank is beside a trail because the trail was bare there, not because anything needs fuel. The pass fixes "nothing on screen" and nothing else. Treat it as a placeholder that marks where things are needed.
+
+**The rule for v3: every prop answers "why is this here?"** Scenery is placed by what it means, then checked by the audit, not the other way round.
+
+### How to place
+
+| Instead of (v2) | Do (v3) |
+|---|---|
+| Single props, evenly spaced | Sites: 3 to 7 props that belong together (a relay station, a depot, a camp), with empty snow between sites. |
+| A different model every 90 m | One motif per trail, repeated: snow poles, lantern posts, a fence line, a pipeline. Repetition along a line reads as designed. |
+| Tall models picked in rotation | Named landmarks, each used once on the planet, each on high ground, each on the heading of the trails that approach it. |
+| Props that point nowhere | Lines that lead somewhere: power lines, haul roads and standing-stone rows that run toward the next objective, so scenery is also wayfinding. |
+| Scaled-up small models | Models built at landmark size. |
+| Scenery that never changes | Scenery that answers the story: lights come on down a power line when its terminal is powered; a dormant pylon pair stands at every future light bridge. |
+
+### What each zone should have
+
+| Zone | v2 placed | v3 replacement |
+|---|---|---|
+| 1, the Bowl | Almost nothing added; it already works | Keep as the model. Add one lookout that shows the summit, so the goal is seen in the first ten minutes. |
+| 2, the home plain (the outpost) | Towers, masts, plants, fuel tanks, haulers, solar panels, weather stations, scattered | A working outpost that is switched off. A power line of pylons from each terminal to the gate or bridge it opens. A chain of relay masts on the high points, each in sight of the next. Depots only at junctions. Greenhouses and camps only around terminals, as small settlements. |
+| 3, the far plain (mine country) | Spires, arches, crystal shards, outcrops, scattered | One haul road with a conveyor line running to the pit, and the headframe tall enough to see across the zone. Spoil heaps and abandoned diggers along that line only. Ruins that get denser toward the crystal gate. |
+| 4, the south plain (the moose) | Large shards and outcrops | No machinery. Rows of standing stones aligned on the Broken Circle. Antler arches over the trail. Herds that move. |
+| Highlands | A few shards and outcrops | Crystal growths that get denser near each of the 20 crystals, so the scenery is the clue. |
+| The river | Nothing | Drawbridge towers, jetties, boathouses, marker buoys frozen into the ice. |
+| Every trail | Mixed small props | Trail furniture a real ski trail has: snow poles, distance markers, a named sign at every junction. |
+
+### Changes to the tools
+
+- `scenery.json` entries get a `site` (which group it belongs to) and a `reason` (one line: why it is here). An entry without a reason is not placed.
+- The audit reports any model that repeats within sight of itself, and any landmark used more than once.
+- The audit reports, for each site line (power line, haul road, stone row), whether following it leads to the objective it points at.
+- `fill_views.py` stops choosing models. It only reports where a site or landmark is needed; a person or a model with the story in hand chooses what goes there.
+
 ## Look
 
 | Seen in v2 | v3 idea |

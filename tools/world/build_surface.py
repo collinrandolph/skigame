@@ -229,7 +229,7 @@ BRIDGES = [dict(name="West drawbridge", pts=REF["bridges"][1]["pts"], kind="draw
 # ---------------- props ----------------
 MODELS = []; PLACED = []
 SIZE = dict(dome=22, plant=26, pad=20, greenhouse=20, biolab=20, giant=26, ribs=26, circle=18, observatory=20, tower=12, excavator=14, haul=7, comms=9, weather=5, fuel=12, solar=10, beacon=5,
-            arch=9, watcher=8, shard=5, camp=12, harvester=7, signal=6, shacks=12, kiosk=1.5, gate=14, post=1.2, outcrop=6, plateau=5, crystalgate=12, mineportal=8, altar=3)
+            arch=9, watcher=8, shard=5, camp=12, harvester=7, signal=6, shacks=12, kiosk=1.5, gate=14, post=1.2, outcrop=6, plateau=5, crystalgate=12, mineportal=8, altar=3, moose=3, diamond=1.5, elder=3)
 def put(mid, d, rot=0, v=0, seed=1, name=None, scale=1, solid=True):
     MODELS.append(dict(name=name or mid, id=mid, v=v, seed=seed, d=r6(d), rot=round(float(rot), 1), scale=scale, solid=solid)); PLACED.append((d, SIZE.get(mid, 6)*scale)); return d
 def place(mid, lo, la, zone, name=None, reach=170, v=0, seed=1, scale=1, flat=0.14, face_trail=True):
@@ -305,11 +305,30 @@ if MINE: lo, la = ll_of(pit_at(MINE["deg"], MINE["r"] + 70)); place("excavator",
 place("watcher", 10, -4, "E", name="The watcher", face_trail=False); place("ribs", 18, -30, "E", name="The sleeping ribs", face_trail=False); place("watcher", 16, -60, "E", seed=2, face_trail=False)
 for k, (lo, la) in enumerate([(10, -16), (14, -36), (20, -46), (8, -62), (30, -34), (-2, -68), (10, 2)]): place("shard", lo, la, "E", seed=k + 1, face_trail=False)
 i = int(0.5*(len(T("Trail 2")["line"]) - 1)); a_ = T("Trail 2")["line"]; put("arch", a_[i], rot=bearing(a_[i], a_[min(len(a_) - 1, i + 3)]), name="Spine arch", solid=False)
+# the Broken Circle: the court's ground. the giant sleeps right across it (so nothing there can be reached until a calf
+# wakes it); under it the altar, three diamonds for the calves, and the elders waiting on the peak's side
+SIZE["giant"] = 3                                      # (the model is life size: the layout stands it eleven times over)
 ALTAR = place("circle", -172, -60, 4, name="The Broken Circle", face_trail=False)
-if ALTAR is not None: put("altar", ALTAR, name="Altar")
-GIANT = place("giant", 128, -68, 4, name="The sleeping giant", face_trail=False)
+pk = int(np.argmax(hgf)); PEAK = V[pk]; GIANT = None; DIAMONDS = []
+if ALTAR is not None:
+    toPeak = bearing(ALTAR, PEAK)
+    put("altar", ALTAR, name="Altar")
+    GIANT = put("giant", ALTAR, rot=(toPeak + 90) % 360, name="The sleeping giant", scale=11)
+    for k in range(3): DIAMONDS.append(put("diamond", offset(ALTAR, 10, toPeak + 60 + 120*k), name="Court diamond %d" % (k + 1), solid=False))
+    for k, (b_, r_) in enumerate([(toPeak - 62, 24), (toPeak - 90, 26), (toPeak - 118, 24)]): put("elder", offset(ALTAR, r_, b_), rot=(b_ + 180) % 360, name="Elder %d" % (k + 1))
+# the herds, on the Herd round's side of the plain: grown moose standing about, and calves between them and the trail
+CALVES = []
+for k, (lo, la) in enumerate([(118, -64), (143, -68), (126, -77)]):
+    c = place("moose", lo, la, 4, name="Herd bull", seed=k + 1, scale=1.6, face_trail=False)
+    if c is None: continue
+    for j, (b_, r_) in enumerate([(30 + 50*k, 8), (170 + 40*k, 9)]): put("moose", offset(c, r_, b_), rot=(b_*3 + 40) % 360, seed=10*k + j, name="Herd moose")
+    q = nearest_any(c)[3]; t_ = norm(c - q*np.dot(q, c)); t_ = norm(t_ - q*np.dot(t_, q)); s_ = np.cross(q, t_)
+    for j in (-1, 1):
+        d = norm(q + (t_*5.5 + s_*j*3.5)/R)
+        if PASS[node(d)] and zone_of(d) == 4: CALVES.append(d)
+print("herd calves:", len(CALVES))
 for k, (lo, la) in enumerate([(118, -62), (140, -64), (132, -76), (110, -70), (160, -70), (-178, -64), (150, -58), (105, -50)]): place("outcrop", lo, la, 4, seed=k + 1, face_trail=False)
-pk = int(np.argmax(hgf)); put("observatory", V[pk], rot=0, name="The observatory")
+put("observatory", PEAK, rot=0, name="The observatory")
 
 # crystals: twenty through the highlands, beside the trails, a good walk apart
 hl = [t for t in TR if zone_of(t["line"][len(t["line"])//2]) == "E"]; total = sum(line_len(t["line"], t["closed"]) for t in hl)
@@ -323,11 +342,46 @@ while len(CRYSTALS) < 20:                               # each next one as far f
 print("crystals placed: %d over %d m of highland trail, nearest pair %.0f m apart" % (len(CRYSTALS), total, min(dist(a, b) for i, a in enumerate(CRYSTALS) for b in CRYSTALS[i + 1:])))
 if len(CRYSTALS) < 20: warn("only", len(CRYSTALS), "crystals fitted")
 
-# the Starway: from the altar's ground up to the peak
+# the Starway: a bridge of light from the Broken Circle to the observatory on the peak, 190 m up and 385 m away. the
+# mountain is too steep to climb and joins the ranges round it, so the bridge can't wind round it either: it gains its
+# height over the open plain first, in a widening-to-tightening spiral beside the court (each turn 12 m inside the
+# last, so no part of it hangs over another), then crosses to the summit in one straight span
 SW = None
 if ALTAR is not None:
-    dd = angd(V[pk]); ok = PASS & (zl == Z[4]); k = int(np.argmin(np.where(ok, dd, 1e9))); SW = dict(foot=r6(V[k]), top=r6(V[pk]), length=round(float(dd[k])), rise=round(float(hgf[pk] - hgf[k])))
-    print("starway: %d m long, rising %d m" % (SW["length"], SW["rise"]))
+    K, R_A, PITCH, R_TOP = 0.2, 82.0, 12.0, 31.0          # the deck's grade; the spiral's first radius and what it closes by each turn
+    def starway(C, turn):
+        ce, cn = basis(C); va = ALTAR - C*np.dot(ALTAR, C); th0 = math.atan2(np.dot(va, cn), np.dot(va, ce))
+        at = lambda r, th: norm(C + (ce*math.cos(th) + cn*math.sin(th))*r/R)
+        pts = []; best = None
+        for i in range(0, int(3.4*72) + 1):
+            f = i/72; q = at(R_A - PITCH*f, th0 + turn*2*math.pi*f); pts.append(q)
+            if f >= 1.9 and len(pts) > 2:                  # leave the spiral where it's pointing at the peak
+                t_ = norm(pts[-1] - pts[-2]); tp = PEAK - q*np.dot(PEAK, q); tp = norm(tp)
+                if np.dot(t_, tp) > math.cos(math.radians(2.5)): best = len(pts); break
+        if best is None: return None
+        out = norm(pts[-1] - PEAK*np.dot(pts[-1], PEAK)); land = lambda r: norm(PEAK + out*r/R)
+        # the span must set the skier down on the summit plateau itself, not its rim: the first spot, coming in, with
+        # level skiable ground under it and for 8 m further on (the rim is steeper than a skier can stand on)
+        r_top = next((r for r in np.arange(R_TOP + 12, 4, -1.0) if all(slope(land(r - e)) <= 0.3 for e in (0, 4, 8))), None)
+        if r_top is None: return None
+        top = land(r_top)
+        n = max(2, int(dist(pts[-1], top)/20)); pts += [norm(pts[-1]*(1 - j/n) + top*(j/n)) for j in range(1, n + 1)]
+        line = resample(np.array(pts), 4.0); sd = np.concatenate([[0], np.cumsum([dist(line[i], line[i + 1]) for i in range(len(line) - 1)])]); L_ = sd[-1]
+        g = np.array([height(q) for q in line]); deck = np.minimum(g[0] + K*sd, g[-1] + K*(L_ - sd)); mid = (sd > 45) & (sd < L_ - 45)
+        return dict(pts=pts, L=L_, clear=float((deck - g)[mid].min()), rise=float(g[-1] - g[0]), foot=pts[0], top=top, high=float((deck - g).max()), turns=(best - 1)/72)
+    cands = []
+    for cb in range(0, 360, 15):
+        for cd in (R_A + 30, R_A + 42, R_A + 56):
+            C = offset(ALTAR, cd, cb)
+            for turn in (1, -1):
+                w = starway(C, turn)
+                if w and w["clear"] >= 8 and PASS[node(w["foot"])] and zone_of(w["foot"]) == 4 and all(dist(w["foot"], q) > rq + 6 for q, rq in PLACED if rq < 30): cands.append(w)
+    if cands:
+        w = min(cands, key=lambda c: c["L"])
+        BRIDGES.append(dict(name="Starway", pts=[r6(q) for q in w["pts"]], kind="light", clearance=400, ramp=round(400/K), width=3.5, maxGrade=0.25))
+        SW = dict(foot=r6(w["foot"]), top=r6(w["top"]), length=round(w["L"]), rise=round(w["rise"]))
+        print("starway: %d m (%.2f turns over the plain, then the span), rising %d m at %d%%, at least %.0f m over the ground and up to %d m; foot %.0f m from the altar; %d ways tried fit" % (w["L"], w["turns"], w["rise"], K*100, w["clear"], w["high"], dist(w["foot"], ALTAR), len(cands)))
+    else: warn("no Starway found")
 
 # ---------------- write it out ----------------
 new = [t for t in TR if t["new"]]
@@ -346,11 +400,14 @@ out = dict(
                dict(name="Crystal gate", d=r6(cgd), between=["highlands", 4], opens="20 crystals offered; lights the Crystal bridge", when=dict(flag="offered")),
                dict(name="South pass gate", d=r6(GATES["south"]["d"]), between=[3, 4], opens="from the zone 4 side, once reached", when=dict(flag="southGate"))],
         bridges=[dict(name="West drawbridge", kind="draw", opens="zone 2 terminals powered", when=dict(zone=2), post=BRIDGES[0]["home"]), dict(name="East drawbridge", kind="draw", opens="zone 2 terminals powered", when=dict(zone=2), post=BRIDGES[1]["home"]),
-                 dict(name="Highland bridge", kind="light", opens="the crystal altar woken", when=dict(flag="altar")), dict(name="Crystal bridge", kind="light", opens="20 crystals offered at the Crystal gate", when=dict(flag="offered"))],
+                 dict(name="Highland bridge", kind="light", opens="the crystal altar woken", when=dict(flag="altar")), dict(name="Crystal bridge", kind="light", opens="20 crystals offered at the Crystal gate", when=dict(flag="offered")),
+                 dict(name="Starway", kind="light", opens="30 crown crystals offered at the Broken Circle", when=dict(flag="ceremony"), foot=SW["foot"] if SW else None)],
         crystals=[r6(c) for c in CRYSTALS], altar=r6(ALTAR) if ALTAR is not None else None, giant=r6(GIANT) if GIANT is not None else None, starway=SW,
+        calves=[r6(c) for c in CALVES], court=dict(d=r6(ALTAR), diamonds=[r6(d) for d in DIAMONDS], calvesNeeded=3) if ALTAR is not None else None,
         chapters=["Zone 1: power 2 terminals; the East and North gates open", "Zone 2: power 3 terminals; the two drawbridges over the river lower", "Zone 3: power 3 terminals; the mine portal opens",
                   "The mine: reach the teleporter (dead) and wake the crystal altar; the Highland bridge lights, back in the Bowl", "Crystal search: find 20 crystals in the highlands", "Crystal gate: offer them; the Crystal bridge lights down into zone 4",
-                  "Zone 4: the moose puzzle and the altar at the Broken Circle; the South pass gate opens as a shortcut", "The crown door in the mine: the deep layer and the crown room", "The Starway: from the Broken Circle to the observatory on the peak"]),
+                  "Zone 4: a calf from the herds wakes the giant asleep on the Broken Circle; three calves crowned there and the court dresses you in purple; the South pass gate opens as a shortcut",
+                  "The crown door in the mine knows the purple: 30 crown crystals in the crown room", "Offer them at the Broken Circle and the Starway lights, winding up the peak to the observatory: the end"]),
     report=dict(warnings=WARN, newTrailMetres=round(sum(line_len(t["line"], t["closed"]) for t in new)), oldTrailMetres=round(sum(line_len(t["line"], t["closed"]) for t in TR if not t["new"])),
         zoneAreasHa={str(k): round(float(CELL_AREA.ravel()[zl == v].sum()/1e4), 1) for k, v in Z.items()},
         zoneTrailMetres={str(z): round(sum(line_len(t["line"], t["closed"]) for t in TR if tz[t["name"]] == z)) for z in (1, 2, 3, 4, "E")}))

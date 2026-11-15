@@ -1,0 +1,6773 @@
+{
+ "settings": {
+  "eye": 9.3,
+  "drawn_radius": 916.6666666666667,
+  "far": 900.0,
+  "step": 10.0,
+  "ahead": 20.0,
+  "frame": 42.0,
+  "seen_deg": 1.5,
+  "near": 45.0,
+  "vista_deg": 4.0,
+  "speed": 6.5
+ },
+ "summit": {
+  "height": 186,
+  "visible_any": 0.278,
+  "on_screen": 0.047
+ },
+ "classes": [
+  "landmark dead ahead",
+  "landmark on screen",
+  "trailside prop only",
+  "mountain view only",
+  "bare"
+ ],
+ "overall": [
+  0.303,
+  0.202,
+  0.04,
+  0.075,
+  0.381
+ ],
+ "zones": {
+  "E": {
+   "metres": 2512,
+   "share": [
+    0.522,
+    0.27,
+    0.057,
+    0.026,
+    0.125
+   ]
+  },
+  "2": {
+   "metres": 12034,
+   "share": [
+    0.289,
+    0.182,
+    0.035,
+    0.078,
+    0.416
+   ]
+  },
+  "1": {
+   "metres": 893,
+   "share": [
+    0.433,
+    0.383,
+    0.027,
+    0.145,
+    0.011
+   ]
+  },
+  "3": {
+   "metres": 9043,
+   "share": [
+    0.222,
+    0.186,
+    0.038,
+    0.054,
+    0.5
+   ]
+  },
+  "4": {
+   "metres": 2240,
+   "share": [
+    0.396,
+    0.225,
+    0.055,
+    0.175,
+    0.149
+   ]
+  }
+ },
+ "trails": [
+  {
+   "trail": "Trail 2",
+   "dir": 1,
+   "zone": "E",
+   "metres": 662,
+   "share": [
+    0.612,
+    0.239,
+    0.045,
+    0.0,
+    0.104
+   ],
+   "longest_bare": 50.0,
+   "longest_nothing_new": 150.0
+  },
+  {
+   "trail": "Trail 2",
+   "dir": -1,
+   "zone": "E",
+   "metres": 662,
+   "share": [
+    0.522,
+    0.373,
+    0.045,
+    0.0,
+    0.06
+   ],
+   "longest_bare": 30.0,
+   "longest_nothing_new": 180.0
+  },
+  {
+   "trail": "Trail 3",
+   "dir": 1,
+   "zone": "E",
+   "metres": 330,
+   "share": [
+    0.5,
+    0.294,
+    0.118,
+    0.0,
+    0.088
+   ],
+   "longest_bare": 30.0,
+   "longest_nothing_new": 140.0
+  },
+  {
+   "trail": "Trail 3",
+   "dir": -1,
+   "zone": "E",
+   "metres": 330,
+   "share": [
+    0.324,
+    0.412,
+    0.059,
+    0.0,
+    0.206
+   ],
+   "longest_bare": 60.0,
+   "longest_nothing_new": 100.0
+  },
+  {
+   "trail": "Trail 4",
+   "dir": 1,
+   "zone": "E",
+   "metres": 300,
+   "share": [
+    0.387,
+    0.194,
+    0.161,
+    0.0,
+    0.258
+   ],
+   "longest_bare": 60.0,
+   "longest_nothing_new": 170.0
+  },
+  {
+   "trail": "Trail 4",
+   "dir": -1,
+   "zone": "E",
+   "metres": 300,
+   "share": [
+    0.29,
+    0.323,
+    0.065,
+    0.0,
+    0.323
+   ],
+   "longest_bare": 60.0,
+   "longest_nothing_new": 110.0
+  },
+  {
+   "trail": "Trail 5",
+   "dir": 1,
+   "zone": "E",
+   "metres": 179,
+   "share": [
+    0.889,
+    0.111,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 100.0
+  },
+  {
+   "trail": "Trail 5",
+   "dir": -1,
+   "zone": "E",
+   "metres": 179,
+   "share": [
+    0.889,
+    0.111,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 110.0
+  },
+  {
+   "trail": "Trail 6",
+   "dir": 1,
+   "zone": "E",
+   "metres": 190,
+   "share": [
+    0.368,
+    0.158,
+    0.0,
+    0.263,
+    0.211
+   ],
+   "longest_bare": 30.0,
+   "longest_nothing_new": 90.0
+  },
+  {
+   "trail": "Trail 6",
+   "dir": -1,
+   "zone": "E",
+   "metres": 190,
+   "share": [
+    0.211,
+    0.263,
+    0.053,
+    0.158,
+    0.316
+   ],
+   "longest_bare": 40.0,
+   "longest_nothing_new": 90.0
+  },
+  {
+   "trail": "Trail 9",
+   "dir": 1,
+   "zone": 2,
+   "metres": 821,
+   "share": [
+    0.458,
+    0.181,
+    0.048,
+    0.0,
+    0.313
+   ],
+   "longest_bare": 190.0,
+   "longest_nothing_new": 190.0
+  },
+  {
+   "trail": "Trail 9",
+   "dir": -1,
+   "zone": 2,
+   "metres": 821,
+   "share": [
+    0.41,
+    0.217,
+    0.036,
+    0.0,
+    0.337
+   ],
+   "longest_bare": 280.0,
+   "longest_nothing_new": 380.0
+  },
+  {
+   "trail": "Trail 11",
+   "dir": 1,
+   "zone": 1,
+   "metres": 577,
+   "share": [
+    0.362,
+    0.431,
+    0.017,
+    0.19,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 150.0
+  },
+  {
+   "trail": "Trail 11",
+   "dir": -1,
+   "zone": 1,
+   "metres": 577,
+   "share": [
+    0.362,
+    0.379,
+    0.034,
+    0.207,
+    0.017
+   ],
+   "longest_bare": 10.0,
+   "longest_nothing_new": 130.0
+  },
+  {
+   "trail": "Trail 12",
+   "dir": 1,
+   "zone": 1,
+   "metres": 316,
+   "share": [
+    0.625,
+    0.281,
+    0.031,
+    0.062,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 80.0
+  },
+  {
+   "trail": "Trail 12",
+   "dir": -1,
+   "zone": 1,
+   "metres": 316,
+   "share": [
+    0.5,
+    0.406,
+    0.031,
+    0.031,
+    0.031
+   ],
+   "longest_bare": 10.0,
+   "longest_nothing_new": 90.0
+  },
+  {
+   "trail": "Trail 13",
+   "dir": 1,
+   "zone": 2,
+   "metres": 1089,
+   "share": [
+    0.211,
+    0.055,
+    0.0,
+    0.0,
+    0.734
+   ],
+   "longest_bare": 520.0,
+   "longest_nothing_new": 540.0
+  },
+  {
+   "trail": "Trail 13",
+   "dir": -1,
+   "zone": 2,
+   "metres": 1089,
+   "share": [
+    0.128,
+    0.156,
+    0.018,
+    0.0,
+    0.697
+   ],
+   "longest_bare": 410.0,
+   "longest_nothing_new": 470.0
+  },
+  {
+   "trail": "Trail 14",
+   "dir": 1,
+   "zone": 2,
+   "metres": 1776,
+   "share": [
+    0.225,
+    0.135,
+    0.062,
+    0.225,
+    0.354
+   ],
+   "longest_bare": 150.0,
+   "longest_nothing_new": 400.0
+  },
+  {
+   "trail": "Trail 14",
+   "dir": -1,
+   "zone": 2,
+   "metres": 1776,
+   "share": [
+    0.112,
+    0.157,
+    0.045,
+    0.146,
+    0.539
+   ],
+   "longest_bare": 370.0,
+   "longest_nothing_new": 440.0
+  },
+  {
+   "trail": "Trail 16",
+   "dir": 1,
+   "zone": 3,
+   "metres": 1719,
+   "share": [
+    0.366,
+    0.122,
+    0.058,
+    0.0,
+    0.453
+   ],
+   "longest_bare": 240.0,
+   "longest_nothing_new": 370.0
+  },
+  {
+   "trail": "Trail 16",
+   "dir": -1,
+   "zone": 3,
+   "metres": 1719,
+   "share": [
+    0.32,
+    0.221,
+    0.087,
+    0.017,
+    0.355
+   ],
+   "longest_bare": 190.0,
+   "longest_nothing_new": 280.0
+  },
+  {
+   "trail": "Trail 17",
+   "dir": 1,
+   "zone": 3,
+   "metres": 68,
+   "share": [
+    0.286,
+    0.571,
+    0.143,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 60.0
+  },
+  {
+   "trail": "Trail 17",
+   "dir": -1,
+   "zone": 3,
+   "metres": 68,
+   "share": [
+    0.571,
+    0.143,
+    0.286,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 60.0
+  },
+  {
+   "trail": "Trail 8",
+   "dir": 1,
+   "zone": 4,
+   "metres": 661,
+   "share": [
+    0.313,
+    0.239,
+    0.015,
+    0.134,
+    0.299
+   ],
+   "longest_bare": 120.0,
+   "longest_nothing_new": 190.0
+  },
+  {
+   "trail": "Trail 8",
+   "dir": -1,
+   "zone": 4,
+   "metres": 661,
+   "share": [
+    0.343,
+    0.06,
+    0.0,
+    0.09,
+    0.507
+   ],
+   "longest_bare": 130.0,
+   "longest_nothing_new": 440.0
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "metres": 4218,
+   "share": [
+    0.232,
+    0.164,
+    0.021,
+    0.161,
+    0.422
+   ],
+   "longest_bare": 530.0,
+   "longest_nothing_new": 580.0
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "metres": 4218,
+   "share": [
+    0.306,
+    0.182,
+    0.007,
+    0.107,
+    0.398
+   ],
+   "longest_bare": 380.0,
+   "longest_nothing_new": 610.0
+  },
+  {
+   "trail": "Trail 18",
+   "dir": 1,
+   "zone": "E",
+   "metres": 477,
+   "share": [
+    0.646,
+    0.167,
+    0.042,
+    0.0,
+    0.146
+   ],
+   "longest_bare": 70.0,
+   "longest_nothing_new": 150.0
+  },
+  {
+   "trail": "Trail 18",
+   "dir": -1,
+   "zone": "E",
+   "metres": 477,
+   "share": [
+    0.542,
+    0.292,
+    0.104,
+    0.0,
+    0.062
+   ],
+   "longest_bare": 30.0,
+   "longest_nothing_new": 180.0
+  },
+  {
+   "trail": "Trail 19",
+   "dir": 1,
+   "zone": 3,
+   "metres": 73,
+   "share": [
+    0.75,
+    0.25,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 70.0
+  },
+  {
+   "trail": "Trail 19",
+   "dir": -1,
+   "zone": 3,
+   "metres": 73,
+   "share": [
+    0.125,
+    0.25,
+    0.0,
+    0.0,
+    0.625
+   ],
+   "longest_bare": 50.0,
+   "longest_nothing_new": 50.0
+  },
+  {
+   "trail": "Trail 20",
+   "dir": 1,
+   "zone": 3,
+   "metres": 883,
+   "share": [
+    0.045,
+    0.225,
+    0.034,
+    0.101,
+    0.596
+   ],
+   "longest_bare": 280.0,
+   "longest_nothing_new": 440.0
+  },
+  {
+   "trail": "Trail 20",
+   "dir": -1,
+   "zone": 3,
+   "metres": 883,
+   "share": [
+    0.247,
+    0.18,
+    0.022,
+    0.034,
+    0.517
+   ],
+   "longest_bare": 460.0,
+   "longest_nothing_new": 550.0
+  },
+  {
+   "trail": "Northfield loop",
+   "dir": 1,
+   "zone": 2,
+   "metres": 546,
+   "share": [
+    0.345,
+    0.309,
+    0.164,
+    0.0,
+    0.182
+   ],
+   "longest_bare": 100.0,
+   "longest_nothing_new": 190.0
+  },
+  {
+   "trail": "Northfield loop",
+   "dir": -1,
+   "zone": 2,
+   "metres": 546,
+   "share": [
+    0.164,
+    0.273,
+    0.255,
+    0.0,
+    0.309
+   ],
+   "longest_bare": 120.0,
+   "longest_nothing_new": 120.0
+  },
+  {
+   "trail": "Longlight loop",
+   "dir": 1,
+   "zone": 2,
+   "metres": 631,
+   "share": [
+    0.328,
+    0.219,
+    0.0,
+    0.031,
+    0.422
+   ],
+   "longest_bare": 90.0,
+   "longest_nothing_new": 120.0
+  },
+  {
+   "trail": "Longlight loop",
+   "dir": -1,
+   "zone": 2,
+   "metres": 631,
+   "share": [
+    0.438,
+    0.188,
+    0.031,
+    0.047,
+    0.297
+   ],
+   "longest_bare": 130.0,
+   "longest_nothing_new": 160.0
+  },
+  {
+   "trail": "Eastbank loop",
+   "dir": 1,
+   "zone": 2,
+   "metres": 538,
+   "share": [
+    0.074,
+    0.278,
+    0.148,
+    0.0,
+    0.5
+   ],
+   "longest_bare": 100.0,
+   "longest_nothing_new": 150.0
+  },
+  {
+   "trail": "Eastbank loop",
+   "dir": -1,
+   "zone": 2,
+   "metres": 538,
+   "share": [
+    0.13,
+    0.13,
+    0.185,
+    0.0,
+    0.556
+   ],
+   "longest_bare": 80.0,
+   "longest_nothing_new": 120.0
+  },
+  {
+   "trail": "Northfield road",
+   "dir": 1,
+   "zone": 2,
+   "metres": 578,
+   "share": [
+    0.552,
+    0.259,
+    0.0,
+    0.0,
+    0.19
+   ],
+   "longest_bare": 90.0,
+   "longest_nothing_new": 130.0
+  },
+  {
+   "trail": "Northfield road",
+   "dir": -1,
+   "zone": 2,
+   "metres": 578,
+   "share": [
+    0.603,
+    0.259,
+    0.017,
+    0.0,
+    0.121
+   ],
+   "longest_bare": 50.0,
+   "longest_nothing_new": 150.0
+  },
+  {
+   "trail": "High traverse",
+   "dir": 1,
+   "zone": 2,
+   "metres": 148,
+   "share": [
+    0.6,
+    0.2,
+    0.0,
+    0.2,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 90.0
+  },
+  {
+   "trail": "High traverse",
+   "dir": -1,
+   "zone": 2,
+   "metres": 148,
+   "share": [
+    0.6,
+    0.4,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 80.0
+  },
+  {
+   "trail": "Longlight road",
+   "dir": 1,
+   "zone": 2,
+   "metres": 221,
+   "share": [
+    0.348,
+    0.348,
+    0.0,
+    0.0,
+    0.304
+   ],
+   "longest_bare": 70.0,
+   "longest_nothing_new": 160.0
+  },
+  {
+   "trail": "Longlight road",
+   "dir": -1,
+   "zone": 2,
+   "metres": 221,
+   "share": [
+    0.261,
+    0.217,
+    0.0,
+    0.0,
+    0.522
+   ],
+   "longest_bare": 90.0,
+   "longest_nothing_new": 90.0
+  },
+  {
+   "trail": "Trenchside",
+   "dir": 1,
+   "zone": 2,
+   "metres": 144,
+   "share": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "longest_bare": 150.0,
+   "longest_nothing_new": 150.0
+  },
+  {
+   "trail": "Trenchside",
+   "dir": -1,
+   "zone": 2,
+   "metres": 144,
+   "share": [
+    0.4,
+    0.4,
+    0.0,
+    0.0,
+    0.2
+   ],
+   "longest_bare": 30.0,
+   "longest_nothing_new": 40.0
+  },
+  {
+   "trail": "Bridge road east",
+   "dir": 1,
+   "zone": 2,
+   "metres": 238,
+   "share": [
+    0.167,
+    0.25,
+    0.0,
+    0.0,
+    0.583
+   ],
+   "longest_bare": 90.0,
+   "longest_nothing_new": 110.0
+  },
+  {
+   "trail": "Bridge road east",
+   "dir": -1,
+   "zone": 2,
+   "metres": 238,
+   "share": [
+    0.792,
+    0.042,
+    0.0,
+    0.0,
+    0.167
+   ],
+   "longest_bare": 40.0,
+   "longest_nothing_new": 80.0
+  },
+  {
+   "trail": "Mouth road",
+   "dir": 1,
+   "zone": 2,
+   "metres": 461,
+   "share": [
+    0.553,
+    0.383,
+    0.021,
+    0.0,
+    0.043
+   ],
+   "longest_bare": 20.0,
+   "longest_nothing_new": 250.0
+  },
+  {
+   "trail": "Mouth road",
+   "dir": -1,
+   "zone": 2,
+   "metres": 461,
+   "share": [
+    0.383,
+    0.085,
+    0.021,
+    0.0,
+    0.511
+   ],
+   "longest_bare": 170.0,
+   "longest_nothing_new": 290.0
+  },
+  {
+   "trail": "Far north trail",
+   "dir": 1,
+   "zone": 2,
+   "metres": 317,
+   "share": [
+    0.219,
+    0.094,
+    0.0,
+    0.0,
+    0.688
+   ],
+   "longest_bare": 220.0,
+   "longest_nothing_new": 220.0
+  },
+  {
+   "trail": "Far north trail",
+   "dir": -1,
+   "zone": 2,
+   "metres": 317,
+   "share": [
+    0.875,
+    0.031,
+    0.0,
+    0.0,
+    0.094
+   ],
+   "longest_bare": 30.0,
+   "longest_nothing_new": 90.0
+  },
+  {
+   "trail": "Northcap loop",
+   "dir": 1,
+   "zone": 2,
+   "metres": 308,
+   "share": [
+    0.194,
+    0.258,
+    0.0,
+    0.0,
+    0.548
+   ],
+   "longest_bare": 150.0,
+   "longest_nothing_new": 150.0
+  },
+  {
+   "trail": "Northcap loop",
+   "dir": -1,
+   "zone": 2,
+   "metres": 308,
+   "share": [
+    0.129,
+    0.258,
+    0.0,
+    0.0,
+    0.613
+   ],
+   "longest_bare": 190.0,
+   "longest_nothing_new": 220.0
+  },
+  {
+   "trail": "Westreach loop",
+   "dir": 1,
+   "zone": 3,
+   "metres": 526,
+   "share": [
+    0.075,
+    0.453,
+    0.113,
+    0.0,
+    0.358
+   ],
+   "longest_bare": 140.0,
+   "longest_nothing_new": 260.0
+  },
+  {
+   "trail": "Westreach loop",
+   "dir": -1,
+   "zone": 3,
+   "metres": 526,
+   "share": [
+    0.321,
+    0.151,
+    0.038,
+    0.0,
+    0.491
+   ],
+   "longest_bare": 130.0,
+   "longest_nothing_new": 150.0
+  },
+  {
+   "trail": "Basin loop",
+   "dir": 1,
+   "zone": 3,
+   "metres": 1146,
+   "share": [
+    0.157,
+    0.174,
+    0.009,
+    0.104,
+    0.557
+   ],
+   "longest_bare": 240.0,
+   "longest_nothing_new": 470.0
+  },
+  {
+   "trail": "Basin loop",
+   "dir": -1,
+   "zone": 3,
+   "metres": 1146,
+   "share": [
+    0.157,
+    0.226,
+    0.043,
+    0.157,
+    0.417
+   ],
+   "longest_bare": 250.0,
+   "longest_nothing_new": 380.0
+  },
+  {
+   "trail": "Farside loop",
+   "dir": 1,
+   "zone": 3,
+   "metres": 539,
+   "share": [
+    0.278,
+    0.111,
+    0.056,
+    0.0,
+    0.556
+   ],
+   "longest_bare": 170.0,
+   "longest_nothing_new": 230.0
+  },
+  {
+   "trail": "Farside loop",
+   "dir": -1,
+   "zone": 3,
+   "metres": 539,
+   "share": [
+    0.222,
+    0.093,
+    0.167,
+    0.0,
+    0.519
+   ],
+   "longest_bare": 160.0,
+   "longest_nothing_new": 210.0
+  },
+  {
+   "trail": "Peakfoot loop",
+   "dir": 1,
+   "zone": 3,
+   "metres": 607,
+   "share": [
+    0.23,
+    0.098,
+    0.0,
+    0.18,
+    0.492
+   ],
+   "longest_bare": 140.0,
+   "longest_nothing_new": 320.0
+  },
+  {
+   "trail": "Peakfoot loop",
+   "dir": -1,
+   "zone": 3,
+   "metres": 607,
+   "share": [
+    0.131,
+    0.098,
+    0.0,
+    0.0,
+    0.77
+   ],
+   "longest_bare": 280.0,
+   "longest_nothing_new": 330.0
+  },
+  {
+   "trail": "Westreach road",
+   "dir": 1,
+   "zone": 3,
+   "metres": 71,
+   "share": [
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 30.0
+  },
+  {
+   "trail": "Westreach road",
+   "dir": -1,
+   "zone": 3,
+   "metres": 71,
+   "share": [
+    0.0,
+    0.0,
+    0.625,
+    0.0,
+    0.375
+   ],
+   "longest_bare": 30.0,
+   "longest_nothing_new": 40.0
+  },
+  {
+   "trail": "Peakfoot road",
+   "dir": 1,
+   "zone": 3,
+   "metres": 242,
+   "share": [
+    0.08,
+    0.12,
+    0.0,
+    0.0,
+    0.8
+   ],
+   "longest_bare": 200.0,
+   "longest_nothing_new": 200.0
+  },
+  {
+   "trail": "Peakfoot road",
+   "dir": -1,
+   "zone": 3,
+   "metres": 242,
+   "share": [
+    0.44,
+    0.4,
+    0.0,
+    0.0,
+    0.16
+   ],
+   "longest_bare": 40.0,
+   "longest_nothing_new": 60.0
+  },
+  {
+   "trail": "Basin road",
+   "dir": 1,
+   "zone": 3,
+   "metres": 358,
+   "share": [
+    0.583,
+    0.25,
+    0.0,
+    0.0,
+    0.167
+   ],
+   "longest_bare": 60.0,
+   "longest_nothing_new": 260.0
+  },
+  {
+   "trail": "Basin road",
+   "dir": -1,
+   "zone": 3,
+   "metres": 358,
+   "share": [
+    0.167,
+    0.0,
+    0.0,
+    0.0,
+    0.833
+   ],
+   "longest_bare": 300.0,
+   "longest_nothing_new": 300.0
+  },
+  {
+   "trail": "Riverside south",
+   "dir": 1,
+   "zone": 3,
+   "metres": 958,
+   "share": [
+    0.25,
+    0.115,
+    0.0,
+    0.0,
+    0.635
+   ],
+   "longest_bare": 610.0,
+   "longest_nothing_new": 690.0
+  },
+  {
+   "trail": "Riverside south",
+   "dir": -1,
+   "zone": 3,
+   "metres": 958,
+   "share": [
+    0.146,
+    0.302,
+    0.042,
+    0.0,
+    0.51
+   ],
+   "longest_bare": 260.0,
+   "longest_nothing_new": 290.0
+  },
+  {
+   "trail": "Farside road",
+   "dir": 1,
+   "zone": 3,
+   "metres": 288,
+   "share": [
+    0.069,
+    0.103,
+    0.034,
+    0.103,
+    0.69
+   ],
+   "longest_bare": 100.0,
+   "longest_nothing_new": 150.0
+  },
+  {
+   "trail": "Farside road",
+   "dir": -1,
+   "zone": 3,
+   "metres": 288,
+   "share": [
+    0.414,
+    0.345,
+    0.0,
+    0.0,
+    0.241
+   ],
+   "longest_bare": 70.0,
+   "longest_nothing_new": 140.0
+  },
+  {
+   "trail": "Bridge road west",
+   "dir": 1,
+   "zone": 3,
+   "metres": 258,
+   "share": [
+    0.346,
+    0.423,
+    0.0,
+    0.0,
+    0.231
+   ],
+   "longest_bare": 60.0,
+   "longest_nothing_new": 80.0
+  },
+  {
+   "trail": "Bridge road west",
+   "dir": -1,
+   "zone": 3,
+   "metres": 258,
+   "share": [
+    0.231,
+    0.269,
+    0.0,
+    0.0,
+    0.5
+   ],
+   "longest_bare": 130.0,
+   "longest_nothing_new": 170.0
+  },
+  {
+   "trail": "Deepsouth loop",
+   "dir": 1,
+   "zone": 3,
+   "metres": 169,
+   "share": [
+    0.176,
+    0.294,
+    0.0,
+    0.412,
+    0.118
+   ],
+   "longest_bare": 20.0,
+   "longest_nothing_new": 80.0
+  },
+  {
+   "trail": "Deepsouth loop",
+   "dir": -1,
+   "zone": 3,
+   "metres": 169,
+   "share": [
+    0.0,
+    0.235,
+    0.0,
+    0.529,
+    0.235
+   ],
+   "longest_bare": 30.0,
+   "longest_nothing_new": 130.0
+  },
+  {
+   "trail": "Deepsouth road",
+   "dir": 1,
+   "zone": 3,
+   "metres": 128,
+   "share": [
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 130.0
+  },
+  {
+   "trail": "Deepsouth road",
+   "dir": -1,
+   "zone": 3,
+   "metres": 128,
+   "share": [
+    0.462,
+    0.385,
+    0.0,
+    0.0,
+    0.154
+   ],
+   "longest_bare": 20.0,
+   "longest_nothing_new": 50.0
+  },
+  {
+   "trail": "Pitside loop",
+   "dir": 1,
+   "zone": 3,
+   "metres": 380,
+   "share": [
+    0.158,
+    0.211,
+    0.0,
+    0.053,
+    0.579
+   ],
+   "longest_bare": 80.0,
+   "longest_nothing_new": 170.0
+  },
+  {
+   "trail": "Pitside loop",
+   "dir": -1,
+   "zone": 3,
+   "metres": 380,
+   "share": [
+    0.105,
+    0.158,
+    0.0,
+    0.079,
+    0.658
+   ],
+   "longest_bare": 140.0,
+   "longest_nothing_new": 260.0
+  },
+  {
+   "trail": "Pitside road",
+   "dir": 1,
+   "zone": 3,
+   "metres": 66,
+   "share": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "longest_bare": 70.0,
+   "longest_nothing_new": 70.0
+  },
+  {
+   "trail": "Pitside road",
+   "dir": -1,
+   "zone": 3,
+   "metres": 66,
+   "share": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "longest_bare": 70.0,
+   "longest_nothing_new": 70.0
+  },
+  {
+   "trail": "Northreach loop",
+   "dir": 1,
+   "zone": 3,
+   "metres": 340,
+   "share": [
+    0.229,
+    0.0,
+    0.0,
+    0.114,
+    0.657
+   ],
+   "longest_bare": 120.0,
+   "longest_nothing_new": 280.0
+  },
+  {
+   "trail": "Northreach loop",
+   "dir": -1,
+   "zone": 3,
+   "metres": 340,
+   "share": [
+    0.057,
+    0.143,
+    0.0,
+    0.029,
+    0.771
+   ],
+   "longest_bare": 110.0,
+   "longest_nothing_new": 110.0
+  },
+  {
+   "trail": "Northreach road",
+   "dir": 1,
+   "zone": 3,
+   "metres": 164,
+   "share": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "longest_bare": 170.0,
+   "longest_nothing_new": 170.0
+  },
+  {
+   "trail": "Northreach road",
+   "dir": -1,
+   "zone": 3,
+   "metres": 164,
+   "share": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "longest_bare": 170.0,
+   "longest_nothing_new": 170.0
+  },
+  {
+   "trail": "Rimway",
+   "dir": 1,
+   "zone": 3,
+   "metres": 60,
+   "share": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 30.0
+  },
+  {
+   "trail": "Rimway",
+   "dir": -1,
+   "zone": 3,
+   "metres": 60,
+   "share": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0
+   ],
+   "longest_bare": 70.0,
+   "longest_nothing_new": 70.0
+  },
+  {
+   "trail": "Herd round",
+   "dir": 1,
+   "zone": 4,
+   "metres": 842,
+   "share": [
+    0.447,
+    0.447,
+    0.024,
+    0.071,
+    0.012
+   ],
+   "longest_bare": 10.0,
+   "longest_nothing_new": 130.0
+  },
+  {
+   "trail": "Herd round",
+   "dir": -1,
+   "zone": 4,
+   "metres": 842,
+   "share": [
+    0.494,
+    0.353,
+    0.071,
+    0.047,
+    0.035
+   ],
+   "longest_bare": 10.0,
+   "longest_nothing_new": 170.0
+  },
+  {
+   "trail": "Altar loop",
+   "dir": 1,
+   "zone": 4,
+   "metres": 511,
+   "share": [
+    0.231,
+    0.096,
+    0.212,
+    0.404,
+    0.058
+   ],
+   "longest_bare": 20.0,
+   "longest_nothing_new": 230.0
+  },
+  {
+   "trail": "Altar loop",
+   "dir": -1,
+   "zone": 4,
+   "metres": 511,
+   "share": [
+    0.173,
+    0.135,
+    0.096,
+    0.577,
+    0.019
+   ],
+   "longest_bare": 10.0,
+   "longest_nothing_new": 310.0
+  },
+  {
+   "trail": "South pass road",
+   "dir": 1,
+   "zone": 4,
+   "metres": 92,
+   "share": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 40.0
+  },
+  {
+   "trail": "South pass road",
+   "dir": -1,
+   "zone": 4,
+   "metres": 92,
+   "share": [
+    0.0,
+    0.0,
+    0.0,
+    0.4,
+    0.6
+   ],
+   "longest_bare": 60.0,
+   "longest_nothing_new": 100.0
+  },
+  {
+   "trail": "Altar road",
+   "dir": 1,
+   "zone": 4,
+   "metres": 134,
+   "share": [
+    0.857,
+    0.143,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 30.0
+  },
+  {
+   "trail": "Altar road",
+   "dir": -1,
+   "zone": 4,
+   "metres": 134,
+   "share": [
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "longest_bare": 0,
+   "longest_nothing_new": 40.0
+  },
+  {
+   "trail": "Southcrown loop",
+   "dir": 1,
+   "zone": "E",
+   "metres": 374,
+   "share": [
+    0.553,
+    0.289,
+    0.026,
+    0.053,
+    0.079
+   ],
+   "longest_bare": 30.0,
+   "longest_nothing_new": 120.0
+  },
+  {
+   "trail": "Southcrown loop",
+   "dir": -1,
+   "zone": "E",
+   "metres": 374,
+   "share": [
+    0.526,
+    0.316,
+    0.026,
+    0.079,
+    0.053
+   ],
+   "longest_bare": 20.0,
+   "longest_nothing_new": 100.0
+  }
+ ],
+ "bare": [
+  {
+   "trail": "Riverside south",
+   "dir": 1,
+   "zone": 3,
+   "frm": 90,
+   "metres": 610.0,
+   "seconds": 94,
+   "start": [
+    -79.14,
+    -45.97
+   ],
+   "mid": [
+    -77.73,
+    -16.51
+   ],
+   "heading": 2,
+   "aim": [
+    -77.21,
+    0.15
+   ],
+   "aim_slope": 0.08,
+   "skyline": -9.2
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "frm": 470,
+   "metres": 530.0,
+   "seconds": 82,
+   "start": [
+    -69.8,
+    44.73
+   ],
+   "mid": [
+    -81.79,
+    70.09
+   ],
+   "heading": 323,
+   "aim": [
+    -139.11,
+    78.24
+   ],
+   "aim_slope": 0.02,
+   "skyline": -5.0
+  },
+  {
+   "trail": "Trail 13",
+   "dir": 1,
+   "zone": 2,
+   "frm": 30,
+   "metres": 520.0,
+   "seconds": 80,
+   "start": [
+    -64.52,
+    35.69
+   ],
+   "mid": [
+    -67.89,
+    9.33
+   ],
+   "heading": 178,
+   "aim": [
+    -67.26,
+    -7.33
+   ],
+   "aim_slope": 0.97,
+   "skyline": -8.6
+  },
+  {
+   "trail": "Trail 20",
+   "dir": -1,
+   "zone": 3,
+   "frm": 780,
+   "metres": 460.0,
+   "seconds": 71,
+   "start": [
+    147.61,
+    -22.58
+   ],
+   "mid": [
+    165.38,
+    -6.17
+   ],
+   "heading": 26,
+   "aim": [
+    172.76,
+    8.78
+   ],
+   "aim_slope": 0.02,
+   "skyline": -7.8
+  },
+  {
+   "trail": "Trail 13",
+   "dir": -1,
+   "zone": 2,
+   "frm": 610,
+   "metres": 410.0,
+   "seconds": 63,
+   "start": [
+    -52.18,
+    -19.39
+   ],
+   "mid": [
+    -64.16,
+    -2.55
+   ],
+   "heading": 338,
+   "aim": [
+    -70.39,
+    12.93
+   ],
+   "aim_slope": 0.08,
+   "skyline": -7.4
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "frm": 1240,
+   "metres": 380.0,
+   "seconds": 58,
+   "start": [
+    99.06,
+    58.42
+   ],
+   "mid": [
+    101.51,
+    77.98
+   ],
+   "heading": 14,
+   "aim": [
+    -121.22,
+    84.29
+   ],
+   "aim_slope": 0.06,
+   "skyline": -11.3
+  },
+  {
+   "trail": "Trail 14",
+   "dir": -1,
+   "zone": 2,
+   "frm": 670,
+   "metres": 370.0,
+   "seconds": 57,
+   "start": [
+    -37.64,
+    -34.11
+   ],
+   "mid": [
+    -18.54,
+    -29.65
+   ],
+   "heading": 35,
+   "aim": [
+    -8.71,
+    -15.65
+   ],
+   "aim_slope": 0.14,
+   "skyline": 3.3
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "frm": 2510,
+   "metres": 370.0,
+   "seconds": 57,
+   "start": [
+    63.68,
+    -16.43
+   ],
+   "mid": [
+    76.89,
+    -26.88
+   ],
+   "heading": 77,
+   "aim": [
+    94.45,
+    -22.11
+   ],
+   "aim_slope": 0.55,
+   "skyline": -9.5
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "frm": 1890,
+   "metres": 360.0,
+   "seconds": 55,
+   "start": [
+    113.86,
+    1.35
+   ],
+   "mid": [
+    119.36,
+    19.13
+   ],
+   "heading": 12,
+   "aim": [
+    123.61,
+    35.37
+   ],
+   "aim_slope": 0.06,
+   "skyline": -6.5
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "frm": 1900,
+   "metres": 310.0,
+   "seconds": 48,
+   "start": [
+    113.25,
+    0.51
+   ],
+   "mid": [
+    103.05,
+    -11.35
+   ],
+   "heading": 227,
+   "aim": [
+    90.03,
+    -22.45
+   ],
+   "aim_slope": 0.08,
+   "skyline": -6.2
+  },
+  {
+   "trail": "Basin road",
+   "dir": -1,
+   "zone": 3,
+   "frm": 350,
+   "metres": 300.0,
+   "seconds": 46,
+   "start": [
+    -100.0,
+    -27.37
+   ],
+   "mid": [
+    -95.59,
+    -12.39
+   ],
+   "heading": 6,
+   "aim": [
+    -93.82,
+    4.18
+   ],
+   "aim_slope": 0.09,
+   "skyline": -4.8
+  },
+  {
+   "trail": "Trail 9",
+   "dir": -1,
+   "zone": 2,
+   "frm": 380,
+   "metres": 280.0,
+   "seconds": 43,
+   "start": [
+    -48.56,
+    24.16
+   ],
+   "mid": [
+    -57.62,
+    13.45
+   ],
+   "heading": 189,
+   "aim": [
+    -60.16,
+    -3.03
+   ],
+   "aim_slope": 0.11,
+   "skyline": -9.9
+  },
+  {
+   "trail": "Trail 13",
+   "dir": 1,
+   "zone": 2,
+   "frm": 600,
+   "metres": 280.0,
+   "seconds": 43,
+   "start": [
+    -53.18,
+    -18.95
+   ],
+   "mid": [
+    -37.95,
+    -20.14
+   ],
+   "heading": 76,
+   "aim": [
+    -21.22,
+    -15.25
+   ],
+   "aim_slope": 0.02,
+   "skyline": -1.9
+  },
+  {
+   "trail": "Trail 20",
+   "dir": 1,
+   "zone": 3,
+   "frm": 480,
+   "metres": 280.0,
+   "seconds": 43,
+   "start": [
+    169.69,
+    -0.44
+   ],
+   "mid": [
+    161.15,
+    -12.03
+   ],
+   "heading": 229,
+   "aim": [
+    147.68,
+    -22.67
+   ],
+   "aim_slope": 0.03,
+   "skyline": -3.9
+  },
+  {
+   "trail": "Peakfoot loop",
+   "dir": -1,
+   "zone": 3,
+   "frm": 530,
+   "metres": 280.0,
+   "seconds": 43,
+   "start": [
+    -112.85,
+    24.28
+   ],
+   "mid": [
+    -119.46,
+    12.74
+   ],
+   "heading": 183,
+   "aim": [
+    -120.45,
+    -3.9
+   ],
+   "aim_slope": 0.54,
+   "skyline": -0.8
+  },
+  {
+   "trail": "Riverside south",
+   "dir": -1,
+   "zone": 3,
+   "frm": 910,
+   "metres": 260.0,
+   "seconds": 40,
+   "start": [
+    -89.35,
+    34.26
+   ],
+   "mid": [
+    -86.74,
+    21.79
+   ],
+   "heading": 142,
+   "aim": [
+    -76.54,
+    8.33
+   ],
+   "aim_slope": 1.21,
+   "skyline": -8.4
+  },
+  {
+   "trail": "Trail 13",
+   "dir": -1,
+   "zone": 2,
+   "frm": 1060,
+   "metres": 250.0,
+   "seconds": 38,
+   "start": [
+    -30.36,
+    7.25
+   ],
+   "mid": [
+    -27.05,
+    -4.1
+   ],
+   "heading": 180,
+   "aim": [
+    -27.05,
+    -20.77
+   ],
+   "aim_slope": 0.06,
+   "skyline": -5.0
+  },
+  {
+   "trail": "Basin loop",
+   "dir": -1,
+   "zone": 3,
+   "frm": 1000,
+   "metres": 250.0,
+   "seconds": 38,
+   "start": [
+    -113.57,
+    -32.13
+   ],
+   "mid": [
+    -108.1,
+    -20.64
+   ],
+   "heading": 33,
+   "aim": [
+    -99.1,
+    -6.44
+   ],
+   "aim_slope": 0.03,
+   "skyline": -6.7
+  },
+  {
+   "trail": "Trail 16",
+   "dir": 1,
+   "zone": 3,
+   "frm": 280,
+   "metres": 240.0,
+   "seconds": 37,
+   "start": [
+    125.04,
+    -6.22
+   ],
+   "mid": [
+    129.55,
+    5.29
+   ],
+   "heading": 34,
+   "aim": [
+    139.37,
+    18.94
+   ],
+   "aim_slope": 0.07,
+   "skyline": -6.0
+  },
+  {
+   "trail": "Basin loop",
+   "dir": 1,
+   "zone": 3,
+   "frm": 20,
+   "metres": 240.0,
+   "seconds": 37,
+   "start": [
+    -98.36,
+    -29.43
+   ],
+   "mid": [
+    -87.21,
+    -37.59
+   ],
+   "heading": 168,
+   "aim": [
+    -81.24,
+    -53.74
+   ],
+   "aim_slope": 0.07,
+   "skyline": -4.2
+  },
+  {
+   "trail": "Trail 16",
+   "dir": 1,
+   "zone": 3,
+   "frm": 640,
+   "metres": 230.0,
+   "seconds": 35,
+   "start": [
+    151.45,
+    12.14
+   ],
+   "mid": [
+    162.49,
+    14.58
+   ],
+   "heading": 59,
+   "aim": [
+    177.87,
+    22.72
+   ],
+   "aim_slope": 0.05,
+   "skyline": -9.9
+  },
+  {
+   "trail": "Far north trail",
+   "dir": 1,
+   "zone": 2,
+   "frm": 0,
+   "metres": 220.0,
+   "seconds": 34,
+   "start": [
+    -2.4,
+    64.71
+   ],
+   "mid": [
+    -26.24,
+    63.13
+   ],
+   "heading": 240,
+   "aim": [
+    -50.26,
+    52.23
+   ],
+   "aim_slope": 0.08,
+   "skyline": -7.5
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "frm": 1030,
+   "metres": 210.0,
+   "seconds": 32,
+   "start": [
+    104.75,
+    79.97
+   ],
+   "mid": [
+    96.86,
+    69.74
+   ],
+   "heading": 184,
+   "aim": [
+    95.01,
+    53.09
+   ],
+   "aim_slope": 0.07,
+   "skyline": -7.4
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "frm": 1250,
+   "metres": 210.0,
+   "seconds": 32,
+   "start": [
+    99.71,
+    57.44
+   ],
+   "mid": [
+    107.21,
+    48.14
+   ],
+   "heading": 139,
+   "aim": [
+    120.58,
+    34.76
+   ],
+   "aim_slope": 0.16,
+   "skyline": -8.9
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "frm": 1520,
+   "metres": 200.0,
+   "seconds": 31,
+   "start": [
+    125.29,
+    38.12
+   ],
+   "mid": [
+    115.66,
+    44.1
+   ],
+   "heading": 287,
+   "aim": [
+    92.12,
+    46.7
+   ],
+   "aim_slope": 0.03,
+   "skyline": -9.0
+  },
+  {
+   "trail": "Peakfoot road",
+   "dir": 1,
+   "zone": 3,
+   "frm": 0,
+   "metres": 200.0,
+   "seconds": 31,
+   "start": [
+    -99.44,
+    38.62
+   ],
+   "mid": [
+    -100.08,
+    28.49
+   ],
+   "heading": 215,
+   "aim": [
+    -109.79,
+    14.46
+   ],
+   "aim_slope": 0.01,
+   "skyline": -8.7
+  },
+  {
+   "trail": "Trail 9",
+   "dir": 1,
+   "zone": 2,
+   "frm": 0,
+   "metres": 190.0,
+   "seconds": 29,
+   "start": [
+    -42.42,
+    -2.06
+   ],
+   "mid": [
+    -51.42,
+    0.19
+   ],
+   "heading": 304,
+   "aim": [
+    -65.37,
+    9.41
+   ],
+   "aim_slope": 0.07,
+   "skyline": -10.6
+  },
+  {
+   "trail": "Trail 16",
+   "dir": -1,
+   "zone": 3,
+   "frm": 1060,
+   "metres": 190.0,
+   "seconds": 29,
+   "start": [
+    -168.22,
+    30.94
+   ],
+   "mid": [
+    -176.29,
+    25.19
+   ],
+   "heading": 244,
+   "aim": [
+    168.1,
+    17.04
+   ],
+   "aim_slope": 0.12,
+   "skyline": -8.2
+  },
+  {
+   "trail": "Northcap loop",
+   "dir": -1,
+   "zone": 2,
+   "frm": 260,
+   "metres": 190.0,
+   "seconds": 29,
+   "start": [
+    29.34,
+    69.89
+   ],
+   "mid": [
+    36.19,
+    78.09
+   ],
+   "heading": 348,
+   "aim": [
+    -106.97,
+    84.46
+   ],
+   "aim_slope": 0.02,
+   "skyline": -9.5
+  },
+  {
+   "trail": "Basin loop",
+   "dir": 1,
+   "zone": 3,
+   "frm": 600,
+   "metres": 180.0,
+   "seconds": 28,
+   "start": [
+    -89.62,
+    -28.62
+   ],
+   "mid": [
+    -92.14,
+    -19.84
+   ],
+   "heading": 345,
+   "aim": [
+    -96.4,
+    -3.69
+   ],
+   "aim_slope": 0.08,
+   "skyline": -7.6
+  },
+  {
+   "trail": "Mouth road",
+   "dir": -1,
+   "zone": 2,
+   "frm": 460,
+   "metres": 170.0,
+   "seconds": 26,
+   "start": [
+    87.59,
+    15.31
+   ],
+   "mid": [
+    81.36,
+    9.68
+   ],
+   "heading": 230,
+   "aim": [
+    68.61,
+    -1.12
+   ],
+   "aim_slope": 0.05,
+   "skyline": 0.1
+  },
+  {
+   "trail": "Farside loop",
+   "dir": 1,
+   "zone": 3,
+   "frm": 210,
+   "metres": 170.0,
+   "seconds": 26,
+   "start": [
+    150.83,
+    0.87
+   ],
+   "mid": [
+    144.09,
+    1.76
+   ],
+   "heading": 346,
+   "aim": [
+    140.02,
+    17.94
+   ],
+   "aim_slope": 0.07,
+   "skyline": -4.6
+  },
+  {
+   "trail": "Northreach road",
+   "dir": 1,
+   "zone": 3,
+   "frm": 0,
+   "metres": 170.0,
+   "seconds": 26,
+   "start": [
+    -137.61,
+    53.38
+   ],
+   "mid": [
+    -140.28,
+    45.82
+   ],
+   "heading": 157,
+   "aim": [
+    -132.79,
+    30.22
+   ],
+   "aim_slope": 0.02,
+   "skyline": -9.5
+  },
+  {
+   "trail": "Northreach road",
+   "dir": -1,
+   "zone": 3,
+   "frm": 160,
+   "metres": 170.0,
+   "seconds": 26,
+   "start": [
+    -135.3,
+    38.49
+   ],
+   "mid": [
+    -140.28,
+    45.82
+   ],
+   "heading": 337,
+   "aim": [
+    -153.53,
+    60.56
+   ],
+   "aim_slope": 0.2,
+   "skyline": -0.6
+  },
+  {
+   "trail": "Trail 16",
+   "dir": -1,
+   "zone": 3,
+   "frm": 1470,
+   "metres": 160.0,
+   "seconds": 25,
+   "start": [
+    -118.68,
+    40.38
+   ],
+   "mid": [
+    -129.5,
+    40.4
+   ],
+   "heading": 250,
+   "aim": [
+    -148.18,
+    32.98
+   ],
+   "aim_slope": 0.03,
+   "skyline": -5.7
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "frm": 1480,
+   "metres": 160.0,
+   "seconds": 25,
+   "start": [
+    123.67,
+    42.02
+   ],
+   "mid": [
+    123.69,
+    34.19
+   ],
+   "heading": 204,
+   "aim": [
+    116.68,
+    18.73
+   ],
+   "aim_slope": 0.01,
+   "skyline": -6.1
+  },
+  {
+   "trail": "Farside loop",
+   "dir": -1,
+   "zone": 3,
+   "frm": 420,
+   "metres": 160.0,
+   "seconds": 25,
+   "start": [
+    147.83,
+    8.41
+   ],
+   "mid": [
+    143.55,
+    6.93
+   ],
+   "heading": 180,
+   "aim": [
+    143.43,
+    -9.74
+   ],
+   "aim_slope": 0.11,
+   "skyline": -6.0
+  },
+  {
+   "trail": "Trail 14",
+   "dir": 1,
+   "zone": 2,
+   "frm": 150,
+   "metres": 150.0,
+   "seconds": 23,
+   "start": [
+    -28.85,
+    -31.48
+   ],
+   "mid": [
+    -24.8,
+    -25.86
+   ],
+   "heading": 7,
+   "aim": [
+    -22.76,
+    -9.31
+   ],
+   "aim_slope": 0.1,
+   "skyline": -8.1
+  },
+  {
+   "trail": "Trenchside",
+   "dir": 1,
+   "zone": 2,
+   "frm": 0,
+   "metres": 150.0,
+   "seconds": 23,
+   "start": [
+    70.19,
+    64.39
+   ],
+   "mid": [
+    84.85,
+    66.8
+   ],
+   "heading": 119,
+   "aim": [
+    111.44,
+    55.74
+   ],
+   "aim_slope": 0.99,
+   "skyline": -6.8
+  },
+  {
+   "trail": "Northcap loop",
+   "dir": 1,
+   "zone": 2,
+   "frm": 0,
+   "metres": 150.0,
+   "seconds": 23,
+   "start": [
+    15.27,
+    69.65
+   ],
+   "mid": [
+    -0.85,
+    74.98
+   ],
+   "heading": 350,
+   "aim": [
+    -116.09,
+    86.74
+   ],
+   "aim_slope": 0.07,
+   "skyline": -7.5
+  },
+  {
+   "trail": "Basin loop",
+   "dir": -1,
+   "zone": 3,
+   "frm": 480,
+   "metres": 150.0,
+   "seconds": 23,
+   "start": [
+    -80.17,
+    -37.88
+   ],
+   "mid": [
+    -83.04,
+    -44.81
+   ],
+   "heading": 201,
+   "aim": [
+    -94.87,
+    -59.89
+   ],
+   "aim_slope": 0.04,
+   "skyline": -1.2
+  },
+  {
+   "trail": "Trail 14",
+   "dir": 1,
+   "zone": 2,
+   "frm": 570,
+   "metres": 140.0,
+   "seconds": 22,
+   "start": [
+    -25.43,
+    -35.54
+   ],
+   "mid": [
+    -34.14,
+    -35.32
+   ],
+   "heading": 296,
+   "aim": [
+    -50.95,
+    -26.84
+   ],
+   "aim_slope": 0.08,
+   "skyline": -7.3
+  },
+  {
+   "trail": "Trail 14",
+   "dir": -1,
+   "zone": 2,
+   "frm": 130,
+   "metres": 140.0,
+   "seconds": 22,
+   "start": [
+    -31.13,
+    -30.84
+   ],
+   "mid": [
+    -35.74,
+    -24.96
+   ],
+   "heading": 354,
+   "aim": [
+    -37.38,
+    -8.36
+   ],
+   "aim_slope": 0.1,
+   "skyline": -8.8
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "frm": 3690,
+   "metres": 140.0,
+   "seconds": 22,
+   "start": [
+    19.59,
+    29.93
+   ],
+   "mid": [
+    13.19,
+    25.35
+   ],
+   "heading": 228,
+   "aim": [
+    0.48,
+    13.73
+   ],
+   "aim_slope": 0.8,
+   "skyline": -10.1
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "frm": 800,
+   "metres": 140.0,
+   "seconds": 22,
+   "start": [
+    -94.41,
+    76.35
+   ],
+   "mid": [
+    -81.79,
+    70.09
+   ],
+   "heading": 143,
+   "aim": [
+    -64.24,
+    55.33
+   ],
+   "aim_slope": 0.01,
+   "skyline": -7.7
+  },
+  {
+   "trail": "Westreach loop",
+   "dir": 1,
+   "zone": 3,
+   "frm": 250,
+   "metres": 140.0,
+   "seconds": 22,
+   "start": [
+    -117.93,
+    44.1
+   ],
+   "mid": [
+    -123.48,
+    49.89
+   ],
+   "heading": 329,
+   "aim": [
+    -142.54,
+    62.98
+   ],
+   "aim_slope": 0.18,
+   "skyline": -2.1
+  },
+  {
+   "trail": "Peakfoot loop",
+   "dir": 1,
+   "zone": 3,
+   "frm": 270,
+   "metres": 140.0,
+   "seconds": 22,
+   "start": [
+    -116.01,
+    0.88
+   ],
+   "mid": [
+    -118.37,
+    7.7
+   ],
+   "heading": 340,
+   "aim": [
+    -124.41,
+    23.33
+   ],
+   "aim_slope": 0.03,
+   "skyline": -6.9
+  },
+  {
+   "trail": "Riverside south",
+   "dir": -1,
+   "zone": 3,
+   "frm": 180,
+   "metres": 140.0,
+   "seconds": 22,
+   "start": [
+    -74.0,
+    -37.89
+   ],
+   "mid": [
+    -76.76,
+    -44.79
+   ],
+   "heading": 214,
+   "aim": [
+    -94.24,
+    -57.48
+   ],
+   "aim_slope": 0.03,
+   "skyline": -3.9
+  },
+  {
+   "trail": "Pitside loop",
+   "dir": -1,
+   "zone": 3,
+   "frm": 240,
+   "metres": 140.0,
+   "seconds": 22,
+   "start": [
+    -153.22,
+    20.61
+   ],
+   "mid": [
+    -146.93,
+    16.66
+   ],
+   "heading": 99,
+   "aim": [
+    -129.98,
+    13.47
+   ],
+   "aim_slope": 0.22,
+   "skyline": -6.5
+  },
+  {
+   "trail": "Trail 8",
+   "dir": -1,
+   "zone": 4,
+   "frm": 490,
+   "metres": 130.0,
+   "seconds": 20,
+   "start": [
+    134.75,
+    -51.23
+   ],
+   "mid": [
+    125.8,
+    -48.94
+   ],
+   "heading": 304,
+   "aim": [
+    108.19,
+    -38.11
+   ],
+   "aim_slope": 0.49,
+   "skyline": 1.7
+  },
+  {
+   "trail": "Trail 20",
+   "dir": 1,
+   "zone": 3,
+   "frm": 100,
+   "metres": 130.0,
+   "seconds": 20,
+   "start": [
+    -168.43,
+    30.46
+   ],
+   "mid": [
+    -173.98,
+    26.72
+   ],
+   "heading": 229,
+   "aim": [
+    173.12,
+    15.17
+   ],
+   "aim_slope": 0.09,
+   "skyline": -8.8
+  },
+  {
+   "trail": "Longlight loop",
+   "dir": -1,
+   "zone": 2,
+   "frm": 140,
+   "metres": 130.0,
+   "seconds": 20,
+   "start": [
+    73.38,
+    52.43
+   ],
+   "mid": [
+    79.94,
+    56.95
+   ],
+   "heading": 13,
+   "aim": [
+    92.15,
+    72.87
+   ],
+   "aim_slope": 0.09,
+   "skyline": -7.7
+  },
+  {
+   "trail": "Westreach loop",
+   "dir": -1,
+   "zone": 3,
+   "frm": 120,
+   "metres": 130.0,
+   "seconds": 20,
+   "start": [
+    -99.87,
+    46.36
+   ],
+   "mid": [
+    -99.39,
+    52.49
+   ],
+   "heading": 354,
+   "aim": [
+    -103.87,
+    69.03
+   ],
+   "aim_slope": 0.18,
+   "skyline": -9.5
+  },
+  {
+   "trail": "Peakfoot loop",
+   "dir": -1,
+   "zone": 3,
+   "frm": 230,
+   "metres": 130.0,
+   "seconds": 20,
+   "start": [
+    -112.79,
+    2.1
+   ],
+   "mid": [
+    -106.91,
+    3.94
+   ],
+   "heading": 63,
+   "aim": [
+    -91.77,
+    11.22
+   ],
+   "aim_slope": 0.07,
+   "skyline": -5.0
+  },
+  {
+   "trail": "Bridge road west",
+   "dir": -1,
+   "zone": 3,
+   "frm": 200,
+   "metres": 130.0,
+   "seconds": 20,
+   "start": [
+    130.71,
+    -2.62
+   ],
+   "mid": [
+    134.21,
+    2.56
+   ],
+   "heading": 36,
+   "aim": [
+    144.22,
+    16.0
+   ],
+   "aim_slope": 0.06,
+   "skyline": -6.6
+  },
+  {
+   "trail": "Trail 14",
+   "dir": -1,
+   "zone": 2,
+   "frm": 980,
+   "metres": 120.0,
+   "seconds": 18,
+   "start": [
+    -28.03,
+    -40.93
+   ],
+   "mid": [
+    -36.26,
+    -41.94
+   ],
+   "heading": 260,
+   "aim": [
+    -58.84,
+    -42.69
+   ],
+   "aim_slope": 0.12,
+   "skyline": -6.4
+  },
+  {
+   "trail": "Trail 16",
+   "dir": -1,
+   "zone": 3,
+   "frm": 620,
+   "metres": 120.0,
+   "seconds": 18,
+   "start": [
+    149.34,
+    12.44
+   ],
+   "mid": [
+    143.02,
+    13.5
+   ],
+   "heading": 281,
+   "aim": [
+    126.0,
+    16.15
+   ],
+   "aim_slope": 0.17,
+   "skyline": -515.7
+  },
+  {
+   "trail": "Trail 16",
+   "dir": -1,
+   "zone": 3,
+   "frm": 240,
+   "metres": 120.0,
+   "seconds": 18,
+   "start": [
+    125.29,
+    -10.11
+   ],
+   "mid": [
+    129.19,
+    -15.01
+   ],
+   "heading": 133,
+   "aim": [
+    142.6,
+    -26.01
+   ],
+   "aim_slope": 0.06,
+   "skyline": -3.1
+  },
+  {
+   "trail": "Trail 8",
+   "dir": 1,
+   "zone": 4,
+   "frm": 0,
+   "metres": 120.0,
+   "seconds": 18,
+   "start": [
+    65.93,
+    -44.57
+   ],
+   "mid": [
+    74.37,
+    -46.62
+   ],
+   "heading": 106,
+   "aim": [
+    99.02,
+    -48.54
+   ],
+   "aim_slope": 0.7,
+   "skyline": -12.7
+  },
+  {
+   "trail": "Trail 8",
+   "dir": -1,
+   "zone": 4,
+   "frm": 350,
+   "metres": 120.0,
+   "seconds": 18,
+   "start": [
+    116.03,
+    -44.02
+   ],
+   "mid": [
+    107.78,
+    -43.35
+   ],
+   "heading": 257,
+   "aim": [
+    84.58,
+    -44.85
+   ],
+   "aim_slope": 0.21,
+   "skyline": -2.4
+  },
+  {
+   "trail": "Northfield loop",
+   "dir": -1,
+   "zone": 2,
+   "frm": 530,
+   "metres": 120.0,
+   "seconds": 18,
+   "start": [
+    5.9,
+    66.57
+   ],
+   "mid": [
+    -6.92,
+    63.43
+   ],
+   "heading": 236,
+   "aim": [
+    -29.53,
+    51.74
+   ],
+   "aim_slope": 0.04,
+   "skyline": -8.6
+  },
+  {
+   "trail": "Basin loop",
+   "dir": 1,
+   "zone": 3,
+   "frm": 890,
+   "metres": 120.0,
+   "seconds": 18,
+   "start": [
+    -108.67,
+    -21.54
+   ],
+   "mid": [
+    -111.13,
+    -27.37
+   ],
+   "heading": 202,
+   "aim": [
+    -119.45,
+    -42.6
+   ],
+   "aim_slope": 0.56,
+   "skyline": 0.3
+  },
+  {
+   "trail": "Northreach loop",
+   "dir": 1,
+   "zone": 3,
+   "frm": 230,
+   "metres": 120.0,
+   "seconds": 18,
+   "start": [
+    -141.94,
+    56.6
+   ],
+   "mid": [
+    -138.73,
+    61.84
+   ],
+   "heading": 39,
+   "aim": [
+    -103.44,
+    71.71
+   ],
+   "aim_slope": 0.28,
+   "skyline": -10.7
+  }
+ ],
+ "nothing_new": [
+  {
+   "trail": "Riverside south",
+   "dir": 1,
+   "zone": 3,
+   "frm": 0,
+   "metres": 690.0,
+   "seconds": 106,
+   "start": [
+    -91.95,
+    -43.97
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "frm": 1940,
+   "metres": 610.0,
+   "seconds": 94,
+   "start": [
+    110.74,
+    -2.82
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "frm": 410,
+   "metres": 580.0,
+   "seconds": 89,
+   "start": [
+    -66.08,
+    39.22
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "frm": 2730,
+   "metres": 570.0,
+   "seconds": 88,
+   "start": [
+    48.99,
+    -2.28
+   ]
+  },
+  {
+   "trail": "Trail 20",
+   "dir": -1,
+   "zone": 3,
+   "frm": 880,
+   "metres": 550.0,
+   "seconds": 85,
+   "start": [
+    139.68,
+    -29.66
+   ]
+  },
+  {
+   "trail": "Trail 13",
+   "dir": 1,
+   "zone": 2,
+   "frm": 0,
+   "metres": 540.0,
+   "seconds": 83,
+   "start": [
+    -65.63,
+    38.69
+   ]
+  },
+  {
+   "trail": "Trail 13",
+   "dir": -1,
+   "zone": 2,
+   "frm": 680,
+   "metres": 470.0,
+   "seconds": 72,
+   "start": [
+    -44.56,
+    -20.73
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "frm": 2620,
+   "metres": 470.0,
+   "seconds": 72,
+   "start": [
+    54.12,
+    -11.15
+   ]
+  },
+  {
+   "trail": "Basin loop",
+   "dir": 1,
+   "zone": 3,
+   "frm": 530,
+   "metres": 470.0,
+   "seconds": 72,
+   "start": [
+    -83.38,
+    -33.59
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "frm": 1320,
+   "metres": 450.0,
+   "seconds": 69,
+   "start": [
+    104.54,
+    50.73
+   ]
+  },
+  {
+   "trail": "Trail 14",
+   "dir": -1,
+   "zone": 2,
+   "frm": 750,
+   "metres": 440.0,
+   "seconds": 68,
+   "start": [
+    -46.98,
+    -35.52
+   ]
+  },
+  {
+   "trail": "Trail 8",
+   "dir": -1,
+   "zone": 4,
+   "frm": 540,
+   "metres": 440.0,
+   "seconds": 68,
+   "start": [
+    141.98,
+    -49.07
+   ]
+  },
+  {
+   "trail": "Trail 20",
+   "dir": 1,
+   "zone": 3,
+   "frm": 400,
+   "metres": 440.0,
+   "seconds": 68,
+   "start": [
+    175.65,
+    5.39
+   ]
+  },
+  {
+   "trail": "Trail 14",
+   "dir": 1,
+   "zone": 2,
+   "frm": 1250,
+   "metres": 400.0,
+   "seconds": 62,
+   "start": [
+    -35.98,
+    -47.17
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "frm": 1240,
+   "metres": 390.0,
+   "seconds": 60,
+   "start": [
+    99.06,
+    58.42
+   ]
+  },
+  {
+   "trail": "Trail 9",
+   "dir": -1,
+   "zone": 2,
+   "frm": 490,
+   "metres": 380.0,
+   "seconds": 58,
+   "start": [
+    -36.22,
+    23.15
+   ]
+  },
+  {
+   "trail": "Basin loop",
+   "dir": -1,
+   "zone": 3,
+   "frm": 1140,
+   "metres": 380.0,
+   "seconds": 58,
+   "start": [
+    -101.07,
+    -27.82
+   ]
+  },
+  {
+   "trail": "Trail 16",
+   "dir": 1,
+   "zone": 3,
+   "frm": 140,
+   "metres": 370.0,
+   "seconds": 57,
+   "start": [
+    131.5,
+    -18.51
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "frm": 1840,
+   "metres": 360.0,
+   "seconds": 55,
+   "start": [
+    116.16,
+    5.96
+   ]
+  },
+  {
+   "trail": "Trail 16",
+   "dir": 1,
+   "zone": 3,
+   "frm": 1250,
+   "metres": 340.0,
+   "seconds": 52,
+   "start": [
+    -146.37,
+    34.7
+   ]
+  },
+  {
+   "trail": "Trail 16",
+   "dir": 1,
+   "zone": 3,
+   "frm": 530,
+   "metres": 330.0,
+   "seconds": 51,
+   "start": [
+    139.83,
+    13.8
+   ]
+  },
+  {
+   "trail": "Peakfoot loop",
+   "dir": -1,
+   "zone": 3,
+   "frm": 590,
+   "metres": 330.0,
+   "seconds": 51,
+   "start": [
+    -110.33,
+    18.81
+   ]
+  },
+  {
+   "trail": "Trail 13",
+   "dir": 1,
+   "zone": 2,
+   "frm": 550,
+   "metres": 320.0,
+   "seconds": 49,
+   "start": [
+    -56.92,
+    -15.24
+   ]
+  },
+  {
+   "trail": "Trail 14",
+   "dir": 1,
+   "zone": 2,
+   "frm": 380,
+   "metres": 320.0,
+   "seconds": 49,
+   "start": [
+    -15.38,
+    -18.93
+   ]
+  },
+  {
+   "trail": "Peakfoot loop",
+   "dir": 1,
+   "zone": 3,
+   "frm": 80,
+   "metres": 320.0,
+   "seconds": 49,
+   "start": [
+    -103.32,
+    11.41
+   ]
+  },
+  {
+   "trail": "Trail 14",
+   "dir": 1,
+   "zone": 2,
+   "frm": 60,
+   "metres": 310.0,
+   "seconds": 48,
+   "start": [
+    -35.74,
+    -24.96
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "frm": 4160,
+   "metres": 310.0,
+   "seconds": 48,
+   "start": [
+    -28.33,
+    25.23
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "frm": 3840,
+   "metres": 310.0,
+   "seconds": 48,
+   "start": [
+    5.94,
+    20.51
+   ]
+  },
+  {
+   "trail": "Altar loop",
+   "dir": -1,
+   "zone": 4,
+   "frm": 370,
+   "metres": 310.0,
+   "seconds": 48,
+   "start": [
+    -178.23,
+    -62.61
+   ]
+  },
+  {
+   "trail": "Basin road",
+   "dir": -1,
+   "zone": 3,
+   "frm": 350,
+   "metres": 300.0,
+   "seconds": 46,
+   "start": [
+    -100.0,
+    -27.37
+   ]
+  }
+ ],
+ "crests": [
+  {
+   "trail": "Trail 2",
+   "dir": 1,
+   "zone": "E",
+   "at": 450,
+   "where": [
+    25.38,
+    -32.9
+   ],
+   "opens_to": 455,
+   "skyline": -12.1,
+   "sees": [],
+   "hidden_in_line": [
+    "Terminal 1",
+    "Terminal 1"
+   ],
+   "aim": [
+    30.56,
+    -14.75
+   ]
+  },
+  {
+   "trail": "Trail 2",
+   "dir": 1,
+   "zone": "E",
+   "at": 610,
+   "where": [
+    42.26,
+    -31.89
+   ],
+   "opens_to": 290,
+   "skyline": -10.3,
+   "sees": [],
+   "hidden_in_line": [
+    "outcrop"
+   ],
+   "aim": [
+    62.3,
+    -41.72
+   ]
+  },
+  {
+   "trail": "Trail 2",
+   "dir": -1,
+   "zone": "E",
+   "at": 320,
+   "where": [
+    16.24,
+    -42.62
+   ],
+   "opens_to": 245,
+   "skyline": -10.2,
+   "sees": [],
+   "hidden_in_line": [
+    "shard",
+    "shard"
+   ],
+   "aim": [
+    7.1,
+    -60.53
+   ]
+  },
+  {
+   "trail": "Trail 2",
+   "dir": -1,
+   "zone": "E",
+   "at": 0,
+   "where": [
+    -9.95,
+    -71.91
+   ],
+   "opens_to": 245,
+   "skyline": -16.1,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -84.08,
+    -77.73
+   ]
+  },
+  {
+   "trail": "Trail 3",
+   "dir": 1,
+   "zone": "E",
+   "at": 210,
+   "where": [
+    11.32,
+    -28.84
+   ],
+   "opens_to": 305,
+   "skyline": -11.8,
+   "sees": [],
+   "hidden_in_line": [
+    "shard",
+    "shard"
+   ],
+   "aim": [
+    8.81,
+    -47.49
+   ]
+  },
+  {
+   "trail": "Trail 3",
+   "dir": 1,
+   "zone": "E",
+   "at": 330,
+   "where": [
+    18.39,
+    -39.3
+   ],
+   "opens_to": 365,
+   "skyline": -13.3,
+   "sees": [],
+   "hidden_in_line": [
+    "outcrop"
+   ],
+   "aim": [
+    41.18,
+    -48.59
+   ]
+  },
+  {
+   "trail": "Trail 3",
+   "dir": -1,
+   "zone": "E",
+   "at": 190,
+   "where": [
+    12.01,
+    -26.86
+   ],
+   "opens_to": 410,
+   "skyline": -11.5,
+   "sees": [],
+   "hidden_in_line": [
+    "North gate",
+    "beacon"
+   ],
+   "aim": [
+    19.02,
+    -9.31
+   ]
+  },
+  {
+   "trail": "Trail 3",
+   "dir": -1,
+   "zone": "E",
+   "at": 50,
+   "where": [
+    23.9,
+    -27.27
+   ],
+   "opens_to": 440,
+   "skyline": -9.6,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    33.02,
+    -44.54
+   ]
+  },
+  {
+   "trail": "Trail 4",
+   "dir": 1,
+   "zone": "E",
+   "at": 230,
+   "where": [
+    6.58,
+    -5.77
+   ],
+   "opens_to": 245,
+   "skyline": -14.0,
+   "sees": [],
+   "hidden_in_line": [
+    "shard"
+   ],
+   "aim": [
+    14.41,
+    -22.94
+   ]
+  },
+  {
+   "trail": "Trail 4",
+   "dir": -1,
+   "zone": "E",
+   "at": 110,
+   "where": [
+    9.0,
+    1.8
+   ],
+   "opens_to": 455,
+   "skyline": -22.3,
+   "sees": [],
+   "hidden_in_line": [
+    "Terminal 2",
+    "Research dome",
+    "weather"
+   ],
+   "aim": [
+    23.75,
+    -9.86
+   ]
+  },
+  {
+   "trail": "Trail 6",
+   "dir": 1,
+   "zone": "E",
+   "at": 90,
+   "where": [
+    28.16,
+    -64.1
+   ],
+   "opens_to": 290,
+   "skyline": -14.3,
+   "sees": [
+    "The sleeping ribs"
+   ],
+   "hidden_in_line": [
+    "Terminal 1",
+    "Terminal 2",
+    "Landing pad",
+    "Command tower",
+    "weather",
+    "Terminal 1",
+    "Terminal 2",
+    "Beacon 3"
+   ],
+   "aim": [
+    32.6,
+    -45.51
+   ]
+  },
+  {
+   "trail": "Trail 6",
+   "dir": -1,
+   "zone": "E",
+   "at": 0,
+   "where": [
+    15.67,
+    -58.43
+   ],
+   "opens_to": 395,
+   "skyline": -23.5,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -5.65,
+    -44.91
+   ]
+  },
+  {
+   "trail": "Trail 9",
+   "dir": 1,
+   "zone": 2,
+   "at": 440,
+   "where": [
+    -41.76,
+    24.31
+   ],
+   "opens_to": 440,
+   "skyline": -5.5,
+   "sees": [],
+   "hidden_in_line": [
+    "shard"
+   ],
+   "aim": [
+    -21.86,
+    20.58
+   ]
+  },
+  {
+   "trail": "Trail 9",
+   "dir": -1,
+   "zone": 2,
+   "at": 80,
+   "where": [
+    -50.52,
+    -0.33
+   ],
+   "opens_to": 230,
+   "skyline": -10.6,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -33.92,
+    -9.19
+   ]
+  },
+  {
+   "trail": "Trail 13",
+   "dir": 1,
+   "zone": 2,
+   "at": 670,
+   "where": [
+    -45.67,
+    -20.6
+   ],
+   "opens_to": 485,
+   "skyline": -6.0,
+   "sees": [],
+   "hidden_in_line": [
+    "shard"
+   ],
+   "aim": [
+    -25.58,
+    -21.66
+   ]
+  },
+  {
+   "trail": "Trail 14",
+   "dir": 1,
+   "zone": 2,
+   "at": 60,
+   "where": [
+    -35.74,
+    -24.96
+   ],
+   "opens_to": 425,
+   "skyline": -5.0,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -33.22,
+    -43.6
+   ]
+  },
+  {
+   "trail": "Trail 14",
+   "dir": 1,
+   "zone": 2,
+   "at": 790,
+   "where": [
+    -50.15,
+    -38.64
+   ],
+   "opens_to": 365,
+   "skyline": -3.3,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -51.24,
+    -57.38
+   ]
+  },
+  {
+   "trail": "Trail 14",
+   "dir": 1,
+   "zone": 2,
+   "at": 1300,
+   "where": [
+    -43.12,
+    -48.17
+   ],
+   "opens_to": 365,
+   "skyline": -8.2,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -65.5,
+    -62.15
+   ]
+  },
+  {
+   "trail": "Trail 14",
+   "dir": -1,
+   "zone": 2,
+   "at": 1280,
+   "where": [
+    -40.57,
+    -47.14
+   ],
+   "opens_to": 365,
+   "skyline": -1.9,
+   "sees": [],
+   "hidden_in_line": [
+    "shard"
+   ],
+   "aim": [
+    -16.47,
+    -40.04
+   ]
+  },
+  {
+   "trail": "Trail 14",
+   "dir": -1,
+   "zone": 2,
+   "at": 710,
+   "where": [
+    -42.56,
+    -33.68
+   ],
+   "opens_to": 380,
+   "skyline": -4.2,
+   "sees": [
+    "haul"
+   ],
+   "hidden_in_line": [],
+   "aim": [
+    -21.49,
+    -28.45
+   ]
+  },
+  {
+   "trail": "Trail 16",
+   "dir": 1,
+   "zone": 3,
+   "at": 370,
+   "where": [
+    127.93,
+    2.62
+   ],
+   "opens_to": 275,
+   "skyline": -5.8,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    137.64,
+    18.78
+   ]
+  },
+  {
+   "trail": "Trail 16",
+   "dir": 1,
+   "zone": 3,
+   "at": 470,
+   "where": [
+    134.43,
+    10.74
+   ],
+   "opens_to": 230,
+   "skyline": -10.6,
+   "sees": [],
+   "hidden_in_line": [
+    "Mine portal",
+    "shacks"
+   ],
+   "aim": [
+    149.05,
+    23.29
+   ]
+  },
+  {
+   "trail": "Trail 16",
+   "dir": -1,
+   "zone": 3,
+   "at": 400,
+   "where": [
+    129.55,
+    5.29
+   ],
+   "opens_to": 365,
+   "skyline": -8.4,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    118.97,
+    -10.22
+   ]
+  },
+  {
+   "trail": "Trail 17",
+   "dir": -1,
+   "zone": 3,
+   "at": 30,
+   "where": [
+    -167.52,
+    36.54
+   ],
+   "opens_to": 380,
+   "skyline": -8.8,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    174.13,
+    49.82
+   ]
+  },
+  {
+   "trail": "Trail 8",
+   "dir": 1,
+   "zone": 4,
+   "at": 50,
+   "where": [
+    72.92,
+    -46.32
+   ],
+   "opens_to": 230,
+   "skyline": -13.0,
+   "sees": [],
+   "hidden_in_line": [
+    "South pass gate"
+   ],
+   "aim": [
+    100.6,
+    -48.56
+   ]
+  },
+  {
+   "trail": "Trail 8",
+   "dir": 1,
+   "zone": 4,
+   "at": 460,
+   "where": [
+    129.97,
+    -50.52
+   ],
+   "opens_to": 575,
+   "skyline": -10.5,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    160.34,
+    -54.5
+   ]
+  },
+  {
+   "trail": "Trail 8",
+   "dir": -1,
+   "zone": 4,
+   "at": 90,
+   "where": [
+    78.82,
+    -47.35
+   ],
+   "opens_to": 245,
+   "skyline": -10.0,
+   "sees": [
+    "Crystal gate"
+   ],
+   "hidden_in_line": [
+    "The sleeping ribs",
+    "shard",
+    "Terminal 2"
+   ],
+   "aim": [
+    54.11,
+    -40.96
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "at": 640,
+   "where": [
+    -71.26,
+    61.77
+   ],
+   "opens_to": 335,
+   "skyline": -8.5,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -109.03,
+    75.37
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "at": 1380,
+   "where": [
+    110.45,
+    45.94
+   ],
+   "opens_to": 245,
+   "skyline": -10.0,
+   "sees": [],
+   "hidden_in_line": [
+    "Terminal 8",
+    "camp",
+    "signal",
+    "Terminal 8"
+   ],
+   "aim": [
+    127.91,
+    32.81
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "at": 1780,
+   "where": [
+    117.73,
+    12.01
+   ],
+   "opens_to": 395,
+   "skyline": -7.2,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    113.47,
+    -6.25
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "at": 2170,
+   "where": [
+    92.85,
+    -19.03
+   ],
+   "opens_to": 305,
+   "skyline": -5.6,
+   "sees": [],
+   "hidden_in_line": [
+    "Crystal gate",
+    "The sleeping ribs"
+   ],
+   "aim": [
+    74.9,
+    -28.1
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "at": 2540,
+   "where": [
+    62.15,
+    -13.9
+   ],
+   "opens_to": 470,
+   "skyline": -4.9,
+   "sees": [
+    "Terminal 1"
+   ],
+   "hidden_in_line": [
+    "Terminal 1",
+    "solar",
+    "shard"
+   ],
+   "aim": [
+    43.74,
+    -8.81
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "at": 2720,
+   "where": [
+    50.03,
+    -2.32
+   ],
+   "opens_to": 365,
+   "skyline": 0.9,
+   "sees": [],
+   "hidden_in_line": [
+    "shard"
+   ],
+   "aim": [
+    31.41,
+    -0.06
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "at": 3410,
+   "where": [
+    20.27,
+    16.07
+   ],
+   "opens_to": 170,
+   "skyline": -18.5,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    22.78,
+    34.69
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "at": 3470,
+   "where": [
+    20.93,
+    22.21
+   ],
+   "opens_to": 335,
+   "skyline": -22.2,
+   "sees": [
+    "Terminal 4"
+   ],
+   "hidden_in_line": [
+    "Terminal 4",
+    "biolab"
+   ],
+   "aim": [
+    17.2,
+    40.7
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "at": 3640,
+   "where": [
+    25.08,
+    31.88
+   ],
+   "opens_to": 245,
+   "skyline": -16.8,
+   "sees": [
+    "beacon"
+   ],
+   "hidden_in_line": [
+    "Processing plant",
+    "Terminal 3"
+   ],
+   "aim": [
+    3.21,
+    30.36
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": 1,
+   "zone": 2,
+   "at": 4170,
+   "where": [
+    -29.14,
+    24.49
+   ],
+   "opens_to": 305,
+   "skyline": -11.4,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -42.21,
+    10.44
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "at": 4100,
+   "where": [
+    -22.37,
+    28.32
+   ],
+   "opens_to": 350,
+   "skyline": -6.9,
+   "sees": [
+    "beacon"
+   ],
+   "hidden_in_line": [],
+   "aim": [
+    -0.95,
+    30.15
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "at": 3650,
+   "where": [
+    23.86,
+    31.84
+   ],
+   "opens_to": 200,
+   "skyline": -6.3,
+   "sees": [],
+   "hidden_in_line": [
+    "Terminal 5",
+    "fuel",
+    "weather",
+    "Terminal 5"
+   ],
+   "aim": [
+    46.09,
+    33.71
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "at": 3390,
+   "where": [
+    20.86,
+    14.11
+   ],
+   "opens_to": 470,
+   "skyline": -19.5,
+   "sees": [
+    "Command tower",
+    "Terminal 1",
+    "Beacon 3"
+   ],
+   "hidden_in_line": [
+    "Crystal gate",
+    "Terminal 1",
+    "Landing pad",
+    "Research dome",
+    "weather"
+   ],
+   "aim": [
+    30.14,
+    -2.23
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "at": 3100,
+   "where": [
+    19.52,
+    -13.6
+   ],
+   "opens_to": 260,
+   "skyline": -7.0,
+   "sees": [
+    "Terminal 2"
+   ],
+   "hidden_in_line": [
+    "Crystal gate",
+    "Terminal 2"
+   ],
+   "aim": [
+    35.74,
+    -24.45
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "at": 2530,
+   "where": [
+    62.95,
+    -14.47
+   ],
+   "opens_to": 290,
+   "skyline": -4.6,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    77.34,
+    -27.61
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "at": 1730,
+   "where": [
+    118.9,
+    17.1
+   ],
+   "opens_to": 335,
+   "skyline": -7.1,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    123.69,
+    35.36
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "at": 1420,
+   "where": [
+    115.66,
+    44.1
+   ],
+   "opens_to": 365,
+   "skyline": -9.0,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    89.08,
+    46.68
+   ]
+  },
+  {
+   "trail": "Trail 10",
+   "dir": -1,
+   "zone": 2,
+   "at": 50,
+   "where": [
+    -27.24,
+    31.81
+   ],
+   "opens_to": 380,
+   "skyline": -1.1,
+   "sees": [
+    "beacon"
+   ],
+   "hidden_in_line": [
+    "North gate"
+   ],
+   "aim": [
+    -6.87,
+    25.92
+   ]
+  },
+  {
+   "trail": "Trail 18",
+   "dir": -1,
+   "zone": "E",
+   "at": 360,
+   "where": [
+    17.75,
+    -38.92
+   ],
+   "opens_to": 380,
+   "skyline": -10.2,
+   "sees": [],
+   "hidden_in_line": [
+    "outcrop"
+   ],
+   "aim": [
+    39.73,
+    -49.22
+   ]
+  },
+  {
+   "trail": "Trail 18",
+   "dir": -1,
+   "zone": "E",
+   "at": 300,
+   "where": [
+    15.79,
+    -44.67
+   ],
+   "opens_to": 305,
+   "skyline": -9.8,
+   "sees": [
+    "shard"
+   ],
+   "hidden_in_line": [],
+   "aim": [
+    10.83,
+    -63.21
+   ]
+  },
+  {
+   "trail": "Trail 18",
+   "dir": -1,
+   "zone": "E",
+   "at": 0,
+   "where": [
+    -9.95,
+    -71.91
+   ],
+   "opens_to": 245,
+   "skyline": -16.1,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -84.08,
+    -77.73
+   ]
+  },
+  {
+   "trail": "Trail 20",
+   "dir": 1,
+   "zone": 3,
+   "at": 240,
+   "where": [
+    -179.27,
+    20.64
+   ],
+   "opens_to": 425,
+   "skyline": -8.4,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    179.83,
+    1.91
+   ]
+  },
+  {
+   "trail": "Trail 20",
+   "dir": 1,
+   "zone": 3,
+   "at": 370,
+   "where": [
+    177.05,
+    8.12
+   ],
+   "opens_to": 275,
+   "skyline": -5.2,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    171.1,
+    -9.67
+   ]
+  },
+  {
+   "trail": "Trail 20",
+   "dir": 1,
+   "zone": 3,
+   "at": 520,
+   "where": [
+    166.7,
+    -3.35
+   ],
+   "opens_to": 395,
+   "skyline": -7.9,
+   "sees": [],
+   "hidden_in_line": [
+    "South pass gate"
+   ],
+   "aim": [
+    156.32,
+    -19.11
+   ]
+  },
+  {
+   "trail": "Trail 20",
+   "dir": -1,
+   "zone": 3,
+   "at": 40,
+   "where": [
+    -166.71,
+    35.73
+   ],
+   "opens_to": 380,
+   "skyline": -9.3,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    175.64,
+    49.37
+   ]
+  },
+  {
+   "trail": "Northfield loop",
+   "dir": 1,
+   "zone": 2,
+   "at": 30,
+   "where": [
+    16.01,
+    64.8
+   ],
+   "opens_to": 470,
+   "skyline": -3.3,
+   "sees": [],
+   "hidden_in_line": [
+    "beacon"
+   ],
+   "aim": [
+    24.81,
+    46.67
+   ]
+  },
+  {
+   "trail": "Northfield loop",
+   "dir": 1,
+   "zone": 2,
+   "at": 90,
+   "where": [
+    17.27,
+    58.61
+   ],
+   "opens_to": 425,
+   "skyline": -0.7,
+   "sees": [],
+   "hidden_in_line": [
+    "North gate"
+   ],
+   "aim": [
+    17.63,
+    39.86
+   ]
+  },
+  {
+   "trail": "Northfield loop",
+   "dir": -1,
+   "zone": 2,
+   "at": 410,
+   "where": [
+    -14.73,
+    59.49
+   ],
+   "opens_to": 500,
+   "skyline": -6.2,
+   "sees": [],
+   "hidden_in_line": [
+    "shard"
+   ],
+   "aim": [
+    0.43,
+    43.19
+   ]
+  },
+  {
+   "trail": "Longlight loop",
+   "dir": 1,
+   "zone": 2,
+   "at": 320,
+   "where": [
+    46.05,
+    59.01
+   ],
+   "opens_to": 275,
+   "skyline": -1.3,
+   "sees": [],
+   "hidden_in_line": [
+    "North gate",
+    "beacon"
+   ],
+   "aim": [
+    31.83,
+    42.45
+   ]
+  },
+  {
+   "trail": "Longlight loop",
+   "dir": 1,
+   "zone": 2,
+   "at": 500,
+   "where": [
+    42.88,
+    65.95
+   ],
+   "opens_to": 350,
+   "skyline": -7.6,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    93.36,
+    70.09
+   ]
+  },
+  {
+   "trail": "Longlight loop",
+   "dir": -1,
+   "zone": 2,
+   "at": 490,
+   "where": [
+    41.29,
+    65.15
+   ],
+   "opens_to": 290,
+   "skyline": -5.3,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    24.85,
+    48.54
+   ]
+  },
+  {
+   "trail": "Longlight loop",
+   "dir": -1,
+   "zone": 2,
+   "at": 130,
+   "where": [
+    74.93,
+    52.86
+   ],
+   "opens_to": 305,
+   "skyline": -5.8,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    107.1,
+    57.4
+   ]
+  },
+  {
+   "trail": "Eastbank loop",
+   "dir": 1,
+   "zone": 2,
+   "at": 180,
+   "where": [
+    95.39,
+    18.27
+   ],
+   "opens_to": 395,
+   "skyline": -7.4,
+   "sees": [],
+   "hidden_in_line": [
+    "East gate",
+    "Research dome"
+   ],
+   "aim": [
+    80.2,
+    6.75
+   ]
+  },
+  {
+   "trail": "Eastbank loop",
+   "dir": 1,
+   "zone": 2,
+   "at": 330,
+   "where": [
+    83.42,
+    21.51
+   ],
+   "opens_to": 320,
+   "skyline": -5.8,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    71.38,
+    37.09
+   ]
+  },
+  {
+   "trail": "Northfield road",
+   "dir": 1,
+   "zone": 2,
+   "at": 130,
+   "where": [
+    -28.69,
+    23.79
+   ],
+   "opens_to": 230,
+   "skyline": -10.4,
+   "sees": [
+    "Terminal 3"
+   ],
+   "hidden_in_line": [
+    "Terminal 3"
+   ],
+   "aim": [
+    -48.75,
+    20.93
+   ]
+  },
+  {
+   "trail": "Northfield road",
+   "dir": -1,
+   "zone": 2,
+   "at": 180,
+   "where": [
+    -34.01,
+    25.36
+   ],
+   "opens_to": 290,
+   "skyline": -2.8,
+   "sees": [
+    "Processing plant"
+   ],
+   "hidden_in_line": [],
+   "aim": [
+    -19.25,
+    12.78
+   ]
+  },
+  {
+   "trail": "Northfield road",
+   "dir": -1,
+   "zone": 2,
+   "at": 50,
+   "where": [
+    -21.62,
+    28.4
+   ],
+   "opens_to": 335,
+   "skyline": -7.4,
+   "sees": [],
+   "hidden_in_line": [
+    "beacon"
+   ],
+   "aim": [
+    -0.31,
+    32.18
+   ]
+  },
+  {
+   "trail": "Bridge road east",
+   "dir": 1,
+   "zone": 2,
+   "at": 220,
+   "where": [
+    117.7,
+    11.87
+   ],
+   "opens_to": 395,
+   "skyline": -7.2,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    113.42,
+    -6.39
+   ]
+  },
+  {
+   "trail": "Bridge road east",
+   "dir": -1,
+   "zone": 2,
+   "at": 60,
+   "where": [
+    103.82,
+    18.49
+   ],
+   "opens_to": 515,
+   "skyline": -8.4,
+   "sees": [
+    "fuel"
+   ],
+   "hidden_in_line": [],
+   "aim": [
+    84.27,
+    16.45
+   ]
+  },
+  {
+   "trail": "Mouth road",
+   "dir": -1,
+   "zone": 2,
+   "at": 430,
+   "where": [
+    85.51,
+    12.93
+   ],
+   "opens_to": 290,
+   "skyline": -5.4,
+   "sees": [],
+   "hidden_in_line": [
+    "East gate",
+    "Crystal gate"
+   ],
+   "aim": [
+    72.23,
+    -0.43
+   ]
+  },
+  {
+   "trail": "Mouth road",
+   "dir": -1,
+   "zone": 2,
+   "at": 200,
+   "where": [
+    72.29,
+    -5.68
+   ],
+   "opens_to": 350,
+   "skyline": -5.4,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    72.37,
+    -24.44
+   ]
+  },
+  {
+   "trail": "Far north trail",
+   "dir": -1,
+   "zone": 2,
+   "at": 50,
+   "where": [
+    -12.98,
+    64.54
+   ],
+   "opens_to": 365,
+   "skyline": -6.1,
+   "sees": [
+    "Terminal 4"
+   ],
+   "hidden_in_line": [
+    "Terminal 4",
+    "beacon"
+   ],
+   "aim": [
+    15.65,
+    52.71
+   ]
+  },
+  {
+   "trail": "Northcap loop",
+   "dir": 1,
+   "zone": 2,
+   "at": 70,
+   "where": [
+    -0.85,
+    74.98
+   ],
+   "opens_to": 320,
+   "skyline": -7.5,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -137.01,
+    85.23
+   ]
+  },
+  {
+   "trail": "Northcap loop",
+   "dir": 1,
+   "zone": 2,
+   "at": 160,
+   "where": [
+    34.16,
+    79.05
+   ],
+   "opens_to": 260,
+   "skyline": -5.4,
+   "sees": [
+    "Comms dish"
+   ],
+   "hidden_in_line": [],
+   "aim": [
+    54.41,
+    61.33
+   ]
+  },
+  {
+   "trail": "Northcap loop",
+   "dir": -1,
+   "zone": 2,
+   "at": 40,
+   "where": [
+    6.38,
+    72.62
+   ],
+   "opens_to": 380,
+   "skyline": -5.5,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    30.22,
+    56.56
+   ]
+  },
+  {
+   "trail": "Westreach loop",
+   "dir": -1,
+   "zone": 3,
+   "at": 490,
+   "where": [
+    -106.19,
+    56.27
+   ],
+   "opens_to": 320,
+   "skyline": -7.5,
+   "sees": [],
+   "hidden_in_line": [
+    "excavator",
+    "haul",
+    "shacks"
+   ],
+   "aim": [
+    -135.42,
+    49.43
+   ]
+  },
+  {
+   "trail": "Basin loop",
+   "dir": 1,
+   "zone": 3,
+   "at": 140,
+   "where": [
+    -87.21,
+    -37.59
+   ],
+   "opens_to": 440,
+   "skyline": -4.2,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -80.18,
+    -55.73
+   ]
+  },
+  {
+   "trail": "Basin loop",
+   "dir": 1,
+   "zone": 3,
+   "at": 740,
+   "where": [
+    -95.26,
+    -15.73
+   ],
+   "opens_to": 290,
+   "skyline": -7.2,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -111.23,
+    -5.45
+   ]
+  },
+  {
+   "trail": "Basin loop",
+   "dir": -1,
+   "zone": 3,
+   "at": 660,
+   "where": [
+    -91.87,
+    -22.94
+   ],
+   "opens_to": 215,
+   "skyline": -9.8,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -91.58,
+    -41.69
+   ]
+  },
+  {
+   "trail": "Basin loop",
+   "dir": -1,
+   "zone": 3,
+   "at": 490,
+   "where": [
+    -80.35,
+    -36.85
+   ],
+   "opens_to": 440,
+   "skyline": -4.4,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -70.23,
+    -54.26
+   ]
+  },
+  {
+   "trail": "Basin loop",
+   "dir": -1,
+   "zone": 3,
+   "at": 300,
+   "where": [
+    -96.11,
+    -50.59
+   ],
+   "opens_to": 410,
+   "skyline": 8.8,
+   "sees": [],
+   "hidden_in_line": [
+    "The observatory"
+   ],
+   "aim": [
+    -121.35,
+    -43.01
+   ]
+  },
+  {
+   "trail": "Basin loop",
+   "dir": -1,
+   "zone": 3,
+   "at": 110,
+   "where": [
+    -89.68,
+    -35.25
+   ],
+   "opens_to": 290,
+   "skyline": -7.4,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -105.41,
+    -22.46
+   ]
+  },
+  {
+   "trail": "Farside loop",
+   "dir": 1,
+   "zone": 3,
+   "at": 90,
+   "where": [
+    156.15,
+    5.19
+   ],
+   "opens_to": 440,
+   "skyline": -7.4,
+   "sees": [],
+   "hidden_in_line": [
+    "South pass gate"
+   ],
+   "aim": [
+    154.2,
+    -13.46
+   ]
+  },
+  {
+   "trail": "Farside loop",
+   "dir": 1,
+   "zone": 3,
+   "at": 300,
+   "where": [
+    143.87,
+    2.77
+   ],
+   "opens_to": 275,
+   "skyline": -4.4,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    141.08,
+    21.33
+   ]
+  },
+  {
+   "trail": "Farside loop",
+   "dir": 1,
+   "zone": 3,
+   "at": 430,
+   "where": [
+    148.79,
+    7.98
+   ],
+   "opens_to": 590,
+   "skyline": -5.0,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    166.46,
+    1.53
+   ]
+  },
+  {
+   "trail": "Farside loop",
+   "dir": 1,
+   "zone": 3,
+   "at": 490,
+   "where": [
+    154.62,
+    9.16
+   ],
+   "opens_to": 290,
+   "skyline": -7.5,
+   "sees": [],
+   "hidden_in_line": [
+    "Mine portal"
+   ],
+   "aim": [
+    166.57,
+    24.04
+   ]
+  },
+  {
+   "trail": "Farside loop",
+   "dir": -1,
+   "zone": 3,
+   "at": 290,
+   "where": [
+    144.09,
+    1.76
+   ],
+   "opens_to": 425,
+   "skyline": -5.0,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    148.62,
+    -16.45
+   ]
+  },
+  {
+   "trail": "Farside loop",
+   "dir": -1,
+   "zone": 3,
+   "at": 180,
+   "where": [
+    153.93,
+    1.04
+   ],
+   "opens_to": 485,
+   "skyline": -8.6,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    172.62,
+    -0.53
+   ]
+  },
+  {
+   "trail": "Farside loop",
+   "dir": -1,
+   "zone": 3,
+   "at": 40,
+   "where": [
+    159.4,
+    9.19
+   ],
+   "opens_to": 260,
+   "skyline": -6.4,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    169.18,
+    25.48
+   ]
+  },
+  {
+   "trail": "Peakfoot loop",
+   "dir": 1,
+   "zone": 3,
+   "at": 140,
+   "where": [
+    -104.27,
+    5.61
+   ],
+   "opens_to": 440,
+   "skyline": 3.2,
+   "sees": [],
+   "hidden_in_line": [
+    "The observatory"
+   ],
+   "aim": [
+    -118.42,
+    -6.73
+   ]
+  },
+  {
+   "trail": "Peakfoot loop",
+   "dir": -1,
+   "zone": 3,
+   "at": 510,
+   "where": [
+    -115.05,
+    24.07
+   ],
+   "opens_to": 440,
+   "skyline": -7.3,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -132.61,
+    15.18
+   ]
+  },
+  {
+   "trail": "Westreach road",
+   "dir": 1,
+   "zone": 3,
+   "at": 30,
+   "where": [
+    -109.75,
+    41.92
+   ],
+   "opens_to": 305,
+   "skyline": -6.4,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -128.58,
+    56.21
+   ]
+  },
+  {
+   "trail": "Peakfoot road",
+   "dir": 1,
+   "zone": 3,
+   "at": 110,
+   "where": [
+    -100.77,
+    27.64
+   ],
+   "opens_to": 590,
+   "skyline": -8.3,
+   "sees": [],
+   "hidden_in_line": [
+    "shacks"
+   ],
+   "aim": [
+    -112.33,
+    12.32
+   ]
+  },
+  {
+   "trail": "Peakfoot road",
+   "dir": 1,
+   "zone": 3,
+   "at": 190,
+   "where": [
+    -105.14,
+    20.39
+   ],
+   "opens_to": 425,
+   "skyline": -6.1,
+   "sees": [],
+   "hidden_in_line": [
+    "shacks"
+   ],
+   "aim": [
+    -114.95,
+    4.25
+   ]
+  },
+  {
+   "trail": "Basin road",
+   "dir": 1,
+   "zone": 3,
+   "at": 220,
+   "where": [
+    -96.1,
+    -14.41
+   ],
+   "opens_to": 380,
+   "skyline": -9.4,
+   "sees": [],
+   "hidden_in_line": [
+    "camp"
+   ],
+   "aim": [
+    -104.31,
+    -31.59
+   ]
+  },
+  {
+   "trail": "Riverside south",
+   "dir": -1,
+   "zone": 3,
+   "at": 260,
+   "where": [
+    -76.26,
+    -29.81
+   ],
+   "opens_to": 500,
+   "skyline": -8.0,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -75.04,
+    -48.54
+   ]
+  },
+  {
+   "trail": "Riverside south",
+   "dir": -1,
+   "zone": 3,
+   "at": 80,
+   "where": [
+    -80.62,
+    -46.14
+   ],
+   "opens_to": 500,
+   "skyline": 0.4,
+   "sees": [],
+   "hidden_in_line": [
+    "The observatory"
+   ],
+   "aim": [
+    -107.4,
+    -44.74
+   ]
+  },
+  {
+   "trail": "Farside road",
+   "dir": -1,
+   "zone": 3,
+   "at": 20,
+   "where": [
+    150.02,
+    -1.59
+   ],
+   "opens_to": 320,
+   "skyline": -7.8,
+   "sees": [
+    "camp"
+   ],
+   "hidden_in_line": [],
+   "aim": [
+    148.96,
+    17.13
+   ]
+  },
+  {
+   "trail": "Bridge road west",
+   "dir": 1,
+   "zone": 3,
+   "at": 90,
+   "where": [
+    137.16,
+    6.85
+   ],
+   "opens_to": 410,
+   "skyline": -9.7,
+   "sees": [],
+   "hidden_in_line": [
+    "camp"
+   ],
+   "aim": [
+    125.87,
+    -8.15
+   ]
+  },
+  {
+   "trail": "Bridge road west",
+   "dir": -1,
+   "zone": 3,
+   "at": 90,
+   "where": [
+    137.16,
+    6.85
+   ],
+   "opens_to": 260,
+   "skyline": -9.8,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    149.18,
+    21.57
+   ]
+  },
+  {
+   "trail": "Deepsouth road",
+   "dir": -1,
+   "zone": 3,
+   "at": 80,
+   "where": [
+    -100.13,
+    -57.39
+   ],
+   "opens_to": 350,
+   "skyline": -8.4,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -109.36,
+    -39.62
+   ]
+  },
+  {
+   "trail": "Pitside loop",
+   "dir": 1,
+   "zone": 3,
+   "at": 190,
+   "where": [
+    -148.98,
+    17.33
+   ],
+   "opens_to": 275,
+   "skyline": -6.9,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -166.74,
+    26.31
+   ]
+  },
+  {
+   "trail": "Pitside loop",
+   "dir": -1,
+   "zone": 3,
+   "at": 260,
+   "where": [
+    -154.24,
+    22.45
+   ],
+   "opens_to": 320,
+   "skyline": 9.7,
+   "sees": [],
+   "hidden_in_line": [
+    "The observatory"
+   ],
+   "aim": [
+    -151.44,
+    3.89
+   ]
+  },
+  {
+   "trail": "Northreach loop",
+   "dir": 1,
+   "zone": 3,
+   "at": 270,
+   "where": [
+    -141.69,
+    60.32
+   ],
+   "opens_to": 260,
+   "skyline": -11.2,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -102.68,
+    70.88
+   ]
+  },
+  {
+   "trail": "Herd round",
+   "dir": 1,
+   "zone": 4,
+   "at": 410,
+   "where": [
+    138.19,
+    -55.65
+   ],
+   "opens_to": 545,
+   "skyline": 0.6,
+   "sees": [],
+   "hidden_in_line": [
+    "The observatory"
+   ],
+   "aim": [
+    167.12,
+    -48.94
+   ]
+  },
+  {
+   "trail": "Herd round",
+   "dir": -1,
+   "zone": 4,
+   "at": 790,
+   "where": [
+    120.47,
+    -73.16
+   ],
+   "opens_to": 500,
+   "skyline": -8.0,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    -176.32,
+    -70.83
+   ]
+  },
+  {
+   "trail": "Herd round",
+   "dir": -1,
+   "zone": 4,
+   "at": 710,
+   "where": [
+    145.97,
+    -78.38
+   ],
+   "opens_to": 545,
+   "skyline": -4.4,
+   "sees": [],
+   "hidden_in_line": [
+    "The observatory"
+   ],
+   "aim": [
+    -166.82,
+    -65.27
+   ]
+  },
+  {
+   "trail": "Herd round",
+   "dir": -1,
+   "zone": 4,
+   "at": 240,
+   "where": [
+    115.24,
+    -59.96
+   ],
+   "opens_to": 425,
+   "skyline": -6.8,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    153.8,
+    -60.99
+   ]
+  },
+  {
+   "trail": "Altar loop",
+   "dir": 1,
+   "zone": 4,
+   "at": 220,
+   "where": [
+    -151.08,
+    -69.24
+   ],
+   "opens_to": 350,
+   "skyline": 7.3,
+   "sees": [],
+   "hidden_in_line": [],
+   "aim": [
+    164.76,
+    -87.06
+   ]
+  },
+  {
+   "trail": "Altar loop",
+   "dir": 1,
+   "zone": 4,
+   "at": 280,
+   "where": [
+    -165.49,
+    -70.3
+   ],
+   "opens_to": 320,
+   "skyline": 2.8,
+   "sees": [
+    "outcrop"
+   ],
+   "hidden_in_line": [],
+   "aim": [
+    168.6,
+    -55.36
+   ]
+  },
+  {
+   "trail": "Altar loop",
+   "dir": 1,
+   "zone": 4,
+   "at": 440,
+   "where": [
+    175.63,
+    -57.06
+   ],
+   "opens_to": 350,
+   "skyline": 11.8,
+   "sees": [],
+   "hidden_in_line": [
+    "The observatory"
+   ],
+   "aim": [
+    -168.24,
+    -41.42
+   ]
+  },
+  {
+   "trail": "Altar loop",
+   "dir": -1,
+   "zone": 4,
+   "at": 450,
+   "where": [
+    176.92,
+    -56.3
+   ],
+   "opens_to": 425,
+   "skyline": -5.0,
+   "sees": [],
+   "hidden_in_line": [
+    "Herd bull",
+    "Herd moose",
+    "Herd moose",
+    "Herd moose",
+    "outcrop",
+    "outcrop"
+   ],
+   "aim": [
+    142.48,
+    -65.41
+   ]
+  },
+  {
+   "trail": "Altar loop",
+   "dir": -1,
+   "zone": 4,
+   "at": 220,
+   "where": [
+    -151.08,
+    -69.24
+   ],
+   "opens_to": 380,
+   "skyline": 10.5,
+   "sees": [],
+   "hidden_in_line": [
+    "The observatory"
+   ],
+   "aim": [
+    -147.85,
+    -50.56
+   ]
+  },
+  {
+   "trail": "Southcrown loop",
+   "dir": 1,
+   "zone": "E",
+   "at": 50,
+   "where": [
+    15.02,
+    -59.36
+   ],
+   "opens_to": 305,
+   "skyline": -16.5,
+   "sees": [
+    "Crystal gate"
+   ],
+   "hidden_in_line": [
+    "Research dome",
+    "solar",
+    "The sleeping ribs"
+   ],
+   "aim": [
+    33.34,
+    -44.25
+   ]
+  },
+  {
+   "trail": "Southcrown loop",
+   "dir": 1,
+   "zone": "E",
+   "at": 310,
+   "where": [
+    -0.43,
+    -67.13
+   ],
+   "opens_to": 215,
+   "skyline": -8.7,
+   "sees": [
+    "watcher"
+   ],
+   "hidden_in_line": [
+    "shard",
+    "shard",
+    "shard",
+    "shard",
+    "Spine arch"
+   ],
+   "aim": [
+    12.89,
+    -49.62
+   ]
+  },
+  {
+   "trail": "Southcrown loop",
+   "dir": -1,
+   "zone": "E",
+   "at": 290,
+   "where": [
+    -1.84,
+    -67.94
+   ],
+   "opens_to": 230,
+   "skyline": -9.4,
+   "sees": [
+    "watcher"
+   ],
+   "hidden_in_line": [
+    "shard",
+    "shard",
+    "shard",
+    "Spine arch"
+   ],
+   "aim": [
+    11.91,
+    -50.45
+   ]
+  },
+  {
+   "trail": "Southcrown loop",
+   "dir": -1,
+   "zone": "E",
+   "at": 160,
+   "where": [
+    17.74,
+    -59.35
+   ],
+   "opens_to": 260,
+   "skyline": -1.4,
+   "sees": [],
+   "hidden_in_line": [
+    "outcrop"
+   ],
+   "aim": [
+    56.44,
+    -62.64
+   ]
+  },
+  {
+   "trail": "Southcrown loop",
+   "dir": -1,
+   "zone": "E",
+   "at": 60,
+   "where": [
+    16.18,
+    -58.94
+   ],
+   "opens_to": 395,
+   "skyline": -23.9,
+   "sees": [],
+   "hidden_in_line": [
+    "haul"
+   ],
+   "aim": [
+    -10.41,
+    -48.41
+   ]
+  }
+ ],
+ "features": [
+  {
+   "name": "East gate",
+   "kind": "gate",
+   "at": [
+    59.3,
+    -13.12
+   ],
+   "height": 12,
+   "seen_from": 82,
+   "ahead_from": 36
+  },
+  {
+   "name": "North gate",
+   "kind": "gate",
+   "at": [
+    22.1,
+    12.64
+   ],
+   "height": 12,
+   "seen_from": 11,
+   "ahead_from": 6
+  },
+  {
+   "name": "South pass gate",
+   "kind": "gate",
+   "at": [
+    143.32,
+    -43.23
+   ],
+   "height": 12,
+   "seen_from": 68,
+   "ahead_from": 32
+  },
+  {
+   "name": "Crystal gate",
+   "kind": "crystalgate",
+   "at": [
+    42.44,
+    -32.0
+   ],
+   "height": 21,
+   "seen_from": 85,
+   "ahead_from": 42
+  },
+  {
+   "name": "Mine portal",
+   "kind": "mineportal",
+   "at": [
+    -170.83,
+    38.24
+   ],
+   "height": 6,
+   "seen_from": 19,
+   "ahead_from": 13
+  },
+  {
+   "name": "Terminal 1",
+   "kind": "kiosk",
+   "at": [
+    34.02,
+    -7.18
+   ],
+   "height": 1.6,
+   "seen_from": 21,
+   "ahead_from": 7
+  },
+  {
+   "name": "Terminal 2",
+   "kind": "kiosk",
+   "at": [
+    32.1,
+    -20.17
+   ],
+   "height": 1.6,
+   "seen_from": 12,
+   "ahead_from": 9
+  },
+  {
+   "name": "Terminal 3",
+   "kind": "kiosk",
+   "at": [
+    -40.79,
+    23.5
+   ],
+   "height": 1.6,
+   "seen_from": 12,
+   "ahead_from": 7
+  },
+  {
+   "name": "Terminal 4",
+   "kind": "kiosk",
+   "at": [
+    13.47,
+    52.28
+   ],
+   "height": 1.6,
+   "seen_from": 11,
+   "ahead_from": 4
+  },
+  {
+   "name": "Terminal 5",
+   "kind": "kiosk",
+   "at": [
+    84.38,
+    21.24
+   ],
+   "height": 1.6,
+   "seen_from": 10,
+   "ahead_from": 8
+  },
+  {
+   "name": "Terminal 6",
+   "kind": "kiosk",
+   "at": [
+    -105.02,
+    45.15
+   ],
+   "height": 1.6,
+   "seen_from": 9,
+   "ahead_from": 3
+  },
+  {
+   "name": "Terminal 7",
+   "kind": "kiosk",
+   "at": [
+    -88.2,
+    -28.83
+   ],
+   "height": 1.6,
+   "seen_from": 12,
+   "ahead_from": 5
+  },
+  {
+   "name": "Terminal 8",
+   "kind": "kiosk",
+   "at": [
+    151.74,
+    0.36
+   ],
+   "height": 1.6,
+   "seen_from": 14,
+   "ahead_from": 7
+  },
+  {
+   "name": "West drawbridge post",
+   "kind": "post",
+   "at": [
+    -68.83,
+    44.49
+   ],
+   "height": 1.5,
+   "seen_from": 10,
+   "ahead_from": 5
+  },
+  {
+   "name": "East drawbridge post",
+   "kind": "post",
+   "at": [
+    113.39,
+    1.42
+   ],
+   "height": 1.5,
+   "seen_from": 10,
+   "ahead_from": 9
+  },
+  {
+   "name": "Landing pad",
+   "kind": "pad",
+   "at": [
+    40.21,
+    -14.37
+   ],
+   "height": 4,
+   "seen_from": 13,
+   "ahead_from": 6
+  },
+  {
+   "name": "Command tower",
+   "kind": "tower",
+   "at": [
+    37.29,
+    -11.46
+   ],
+   "height": 30,
+   "seen_from": 44,
+   "ahead_from": 17
+  },
+  {
+   "name": "Research dome",
+   "kind": "dome",
+   "at": [
+    43.96,
+    -18.12
+   ],
+   "height": 12,
+   "seen_from": 31,
+   "ahead_from": 16
+  },
+  {
+   "name": "weather",
+   "kind": "weather",
+   "at": [
+    36.04,
+    -16.04
+   ],
+   "height": 6,
+   "seen_from": 14,
+   "ahead_from": 9
+  },
+  {
+   "name": "solar",
+   "kind": "solar",
+   "at": [
+    45.62,
+    -8.96
+   ],
+   "height": 4,
+   "seen_from": 14,
+   "ahead_from": 8
+  },
+  {
+   "name": "Processing plant",
+   "kind": "plant",
+   "at": [
+    -27.29,
+    19.79
+   ],
+   "height": 18,
+   "seen_from": 122,
+   "ahead_from": 58
+  },
+  {
+   "name": "excavator",
+   "kind": "excavator",
+   "at": [
+    -48.54,
+    26.46
+   ],
+   "height": 10,
+   "seen_from": 110,
+   "ahead_from": 60
+  },
+  {
+   "name": "haul",
+   "kind": "haul",
+   "at": [
+    -38.12,
+    -2.29
+   ],
+   "height": 4,
+   "seen_from": 28,
+   "ahead_from": 23
+  },
+  {
+   "name": "fuel",
+   "kind": "fuel",
+   "at": [
+    -27.29,
+    13.96
+   ],
+   "height": 6,
+   "seen_from": 46,
+   "ahead_from": 25
+  },
+  {
+   "name": "greenhouse",
+   "kind": "greenhouse",
+   "at": [
+    1.87,
+    51.87
+   ],
+   "height": 6,
+   "seen_from": 25,
+   "ahead_from": 11
+  },
+  {
+   "name": "biolab",
+   "kind": "biolab",
+   "at": [
+    9.37,
+    63.96
+   ],
+   "height": 8,
+   "seen_from": 83,
+   "ahead_from": 42
+  },
+  {
+   "name": "Comms dish",
+   "kind": "comms",
+   "at": [
+    56.46,
+    61.87
+   ],
+   "height": 14,
+   "seen_from": 90,
+   "ahead_from": 37
+  },
+  {
+   "name": "solar",
+   "kind": "solar",
+   "at": [
+    69.37,
+    58.54
+   ],
+   "height": 4,
+   "seen_from": 34,
+   "ahead_from": 13
+  },
+  {
+   "name": "fuel",
+   "kind": "fuel",
+   "at": [
+    91.88,
+    18.54
+   ],
+   "height": 6,
+   "seen_from": 43,
+   "ahead_from": 25
+  },
+  {
+   "name": "weather",
+   "kind": "weather",
+   "at": [
+    86.04,
+    30.21
+   ],
+   "height": 6,
+   "seen_from": 30,
+   "ahead_from": 9
+  },
+  {
+   "name": "beacon",
+   "kind": "beacon",
+   "at": [
+    27.71,
+    33.12
+   ],
+   "height": 10,
+   "seen_from": 45,
+   "ahead_from": 32
+  },
+  {
+   "name": "beacon",
+   "kind": "beacon",
+   "at": [
+    69.79,
+    -19.38
+   ],
+   "height": 10,
+   "seen_from": 45,
+   "ahead_from": 27
+  },
+  {
+   "name": "beacon",
+   "kind": "beacon",
+   "at": [
+    -14.38,
+    28.96
+   ],
+   "height": 10,
+   "seen_from": 100,
+   "ahead_from": 60
+  },
+  {
+   "name": "beacon",
+   "kind": "beacon",
+   "at": [
+    110.21,
+    8.12
+   ],
+   "height": 10,
+   "seen_from": 27,
+   "ahead_from": 1
+  },
+  {
+   "name": "beacon",
+   "kind": "beacon",
+   "at": [
+    -62.29,
+    39.79
+   ],
+   "height": 10,
+   "seen_from": 66,
+   "ahead_from": 34
+  },
+  {
+   "name": "haul",
+   "kind": "haul",
+   "at": [
+    -29.79,
+    -29.79
+   ],
+   "height": 4,
+   "seen_from": 31,
+   "ahead_from": 10
+  },
+  {
+   "name": "camp",
+   "kind": "camp",
+   "at": [
+    -109.79,
+    54.37
+   ],
+   "height": 3,
+   "seen_from": 26,
+   "ahead_from": 3
+  },
+  {
+   "name": "shacks",
+   "kind": "shacks",
+   "at": [
+    -103.54,
+    47.71
+   ],
+   "height": 4,
+   "seen_from": 31,
+   "ahead_from": 15
+  },
+  {
+   "name": "Signal tower",
+   "kind": "signal",
+   "at": [
+    -116.04,
+    43.12
+   ],
+   "height": 14,
+   "seen_from": 94,
+   "ahead_from": 52
+  },
+  {
+   "name": "camp",
+   "kind": "camp",
+   "at": [
+    -101.87,
+    -29.79
+   ],
+   "height": 3,
+   "seen_from": 23,
+   "ahead_from": 15
+  },
+  {
+   "name": "harvester",
+   "kind": "harvester",
+   "at": [
+    -101.87,
+    -36.46
+   ],
+   "height": 5,
+   "seen_from": 12,
+   "ahead_from": 9
+  },
+  {
+   "name": "camp",
+   "kind": "camp",
+   "at": [
+    149.79,
+    9.79
+   ],
+   "height": 3,
+   "seen_from": 37,
+   "ahead_from": 18
+  },
+  {
+   "name": "signal",
+   "kind": "signal",
+   "at": [
+    155.21,
+    2.29
+   ],
+   "height": 14,
+   "seen_from": 61,
+   "ahead_from": 29
+  },
+  {
+   "name": "shacks",
+   "kind": "shacks",
+   "at": [
+    -112.29,
+    9.79
+   ],
+   "height": 4,
+   "seen_from": 19,
+   "ahead_from": 11
+  },
+  {
+   "name": "camp",
+   "kind": "camp",
+   "at": [
+    -83.96,
+    33.96
+   ],
+   "height": 3,
+   "seen_from": 6,
+   "ahead_from": 1
+  },
+  {
+   "name": "camp",
+   "kind": "camp",
+   "at": [
+    127.71,
+    -8.12
+   ],
+   "height": 3,
+   "seen_from": 23,
+   "ahead_from": 9
+  },
+  {
+   "name": "excavator",
+   "kind": "excavator",
+   "at": [
+    -165.62,
+    30.21
+   ],
+   "height": 10,
+   "seen_from": 86,
+   "ahead_from": 50
+  },
+  {
+   "name": "haul",
+   "kind": "haul",
+   "at": [
+    -167.71,
+    33.96
+   ],
+   "height": 4,
+   "seen_from": 44,
+   "ahead_from": 19
+  },
+  {
+   "name": "shacks",
+   "kind": "shacks",
+   "at": [
+    -163.96,
+    36.46
+   ],
+   "height": 4,
+   "seen_from": 44,
+   "ahead_from": 23
+  },
+  {
+   "name": "The watcher",
+   "kind": "watcher",
+   "at": [
+    8.96,
+    -3.96
+   ],
+   "height": 16,
+   "seen_from": 49,
+   "ahead_from": 26
+  },
+  {
+   "name": "The sleeping ribs",
+   "kind": "ribs",
+   "at": [
+    37.71,
+    -35.21
+   ],
+   "height": 9,
+   "seen_from": 15,
+   "ahead_from": 5
+  },
+  {
+   "name": "watcher",
+   "kind": "watcher",
+   "at": [
+    18.12,
+    -46.04
+   ],
+   "height": 16,
+   "seen_from": 172,
+   "ahead_from": 100
+  },
+  {
+   "name": "shard",
+   "kind": "shard",
+   "at": [
+    16.46,
+    -20.63
+   ],
+   "height": 7,
+   "seen_from": 53,
+   "ahead_from": 34
+  },
+  {
+   "name": "shard",
+   "kind": "shard",
+   "at": [
+    15.62,
+    -35.63
+   ],
+   "height": 7,
+   "seen_from": 64,
+   "ahead_from": 33
+  },
+  {
+   "name": "shard",
+   "kind": "shard",
+   "at": [
+    18.12,
+    -43.96
+   ],
+   "height": 7,
+   "seen_from": 77,
+   "ahead_from": 46
+  },
+  {
+   "name": "shard",
+   "kind": "shard",
+   "at": [
+    11.46,
+    -58.96
+   ],
+   "height": 7,
+   "seen_from": 90,
+   "ahead_from": 57
+  },
+  {
+   "name": "shard",
+   "kind": "shard",
+   "at": [
+    23.54,
+    -34.79
+   ],
+   "height": 7,
+   "seen_from": 43,
+   "ahead_from": 9
+  },
+  {
+   "name": "shard",
+   "kind": "shard",
+   "at": [
+    -8.12,
+    -68.13
+   ],
+   "height": 7,
+   "seen_from": 82,
+   "ahead_from": 41
+  },
+  {
+   "name": "shard",
+   "kind": "shard",
+   "at": [
+    9.37,
+    3.54
+   ],
+   "height": 7,
+   "seen_from": 27,
+   "ahead_from": 15
+  },
+  {
+   "name": "Spine arch",
+   "kind": "arch",
+   "at": [
+    16.61,
+    -41.62
+   ],
+   "height": 9,
+   "seen_from": 90,
+   "ahead_from": 64
+  },
+  {
+   "name": "The Broken Circle",
+   "kind": "circle",
+   "at": [
+    -172.29,
+    -60.21
+   ],
+   "height": 6,
+   "seen_from": 20,
+   "ahead_from": 13
+  },
+  {
+   "name": "Altar",
+   "kind": "altar",
+   "at": [
+    -172.29,
+    -60.21
+   ],
+   "height": 10,
+   "seen_from": 32,
+   "ahead_from": 17
+  },
+  {
+   "name": "The sleeping giant",
+   "kind": "giant",
+   "at": [
+    -172.29,
+    -60.21
+   ],
+   "height": 66,
+   "seen_from": 95,
+   "ahead_from": 41
+  },
+  {
+   "name": "Court diamond 1",
+   "kind": "diamond",
+   "at": [
+    -170.2,
+    -60.19
+   ],
+   "height": 1.5,
+   "seen_from": 3,
+   "ahead_from": 0
+  },
+  {
+   "name": "Court diamond 2",
+   "kind": "diamond",
+   "at": [
+    -173.37,
+    -61.11
+   ],
+   "height": 1.5,
+   "seen_from": 8,
+   "ahead_from": 5
+  },
+  {
+   "name": "Court diamond 3",
+   "kind": "diamond",
+   "at": [
+    -173.31,
+    -59.3
+   ],
+   "height": 1.5,
+   "seen_from": 3,
+   "ahead_from": 2
+  },
+  {
+   "name": "Elder 1",
+   "kind": "elder",
+   "at": [
+    -174.8,
+    -58.07
+   ],
+   "height": 2.5,
+   "seen_from": 11,
+   "ahead_from": 7
+  },
+  {
+   "name": "Elder 2",
+   "kind": "elder",
+   "at": [
+    -176.82,
+    -58.78
+   ],
+   "height": 2.5,
+   "seen_from": 12,
+   "ahead_from": 8
+  },
+  {
+   "name": "Elder 3",
+   "kind": "elder",
+   "at": [
+    -177.3,
+    -60.03
+   ],
+   "height": 2.5,
+   "seen_from": 15,
+   "ahead_from": 10
+  },
+  {
+   "name": "Herd bull",
+   "kind": "moose",
+   "at": [
+    118.54,
+    -63.54
+   ],
+   "height": 3.5200000000000005,
+   "seen_from": 24,
+   "ahead_from": 6
+  },
+  {
+   "name": "Herd moose",
+   "kind": "moose",
+   "at": [
+    119.45,
+    -62.82
+   ],
+   "height": 2.2,
+   "seen_from": 12,
+   "ahead_from": 6
+  },
+  {
+   "name": "Herd moose",
+   "kind": "moose",
+   "at": [
+    118.92,
+    -64.46
+   ],
+   "height": 2.2,
+   "seen_from": 8,
+   "ahead_from": 0
+  },
+  {
+   "name": "Herd bull",
+   "kind": "moose",
+   "at": [
+    142.71,
+    -68.12
+   ],
+   "height": 3.5200000000000005,
+   "seen_from": 24,
+   "ahead_from": 10
+  },
+  {
+   "name": "Herd moose",
+   "kind": "moose",
+   "at": [
+    140.79,
+    -67.71
+   ],
+   "height": 2.2,
+   "seen_from": 8,
+   "ahead_from": 2
+  },
+  {
+   "name": "Herd moose",
+   "kind": "moose",
+   "at": [
+    145.03,
+    -67.78
+   ],
+   "height": 2.2,
+   "seen_from": 3,
+   "ahead_from": 0
+  },
+  {
+   "name": "Herd bull",
+   "kind": "moose",
+   "at": [
+    127.71,
+    -78.13
+   ],
+   "height": 3.5200000000000005,
+   "seen_from": 36,
+   "ahead_from": 12
+  },
+  {
+   "name": "Herd moose",
+   "kind": "moose",
+   "at": [
+    127.9,
+    -77.29
+   ],
+   "height": 2.2,
+   "seen_from": 21,
+   "ahead_from": 7
+  },
+  {
+   "name": "Herd moose",
+   "kind": "moose",
+   "at": [
+    131.7,
+    -78.61
+   ],
+   "height": 2.2,
+   "seen_from": 22,
+   "ahead_from": 8
+  },
+  {
+   "name": "outcrop",
+   "kind": "outcrop",
+   "at": [
+    116.46,
+    -61.88
+   ],
+   "height": 5,
+   "seen_from": 42,
+   "ahead_from": 15
+  },
+  {
+   "name": "outcrop",
+   "kind": "outcrop",
+   "at": [
+    139.79,
+    -63.96
+   ],
+   "height": 5,
+   "seen_from": 32,
+   "ahead_from": 19
+  },
+  {
+   "name": "outcrop",
+   "kind": "outcrop",
+   "at": [
+    135.63,
+    -75.63
+   ],
+   "height": 5,
+   "seen_from": 48,
+   "ahead_from": 25
+  },
+  {
+   "name": "outcrop",
+   "kind": "outcrop",
+   "at": [
+    124.79,
+    -72.29
+   ],
+   "height": 5,
+   "seen_from": 35,
+   "ahead_from": 12
+  },
+  {
+   "name": "outcrop",
+   "kind": "outcrop",
+   "at": [
+    162.29,
+    -70.21
+   ],
+   "height": 5,
+   "seen_from": 47,
+   "ahead_from": 25
+  },
+  {
+   "name": "outcrop",
+   "kind": "outcrop",
+   "at": [
+    -176.46,
+    -65.62
+   ],
+   "height": 5,
+   "seen_from": 28,
+   "ahead_from": 13
+  },
+  {
+   "name": "outcrop",
+   "kind": "outcrop",
+   "at": [
+    150.21,
+    -58.13
+   ],
+   "height": 5,
+   "seen_from": 68,
+   "ahead_from": 20
+  },
+  {
+   "name": "outcrop",
+   "kind": "outcrop",
+   "at": [
+    102.71,
+    -51.88
+   ],
+   "height": 5,
+   "seen_from": 21,
+   "ahead_from": 8
+  },
+  {
+   "name": "The observatory",
+   "kind": "observatory",
+   "at": [
+    -151.87,
+    -22.71
+   ],
+   "height": 16,
+   "seen_from": 0,
+   "ahead_from": 0
+  },
+  {
+   "name": "Terminal 1",
+   "kind": "terminal",
+   "at": [
+    33.57,
+    -6.36
+   ],
+   "height": 40.0,
+   "seen_from": 83,
+   "ahead_from": 38
+  },
+  {
+   "name": "Terminal 2",
+   "kind": "terminal",
+   "at": [
+    31.34,
+    -20.78
+   ],
+   "height": 40.0,
+   "seen_from": 78,
+   "ahead_from": 34
+  },
+  {
+   "name": "Terminal 3",
+   "kind": "terminal",
+   "at": [
+    -40.94,
+    22.57
+   ],
+   "height": 40.0,
+   "seen_from": 142,
+   "ahead_from": 65
+  },
+  {
+   "name": "Terminal 4",
+   "kind": "terminal",
+   "at": [
+    12.67,
+    53.09
+   ],
+   "height": 40.0,
+   "seen_from": 145,
+   "ahead_from": 73
+  },
+  {
+   "name": "Terminal 5",
+   "kind": "terminal",
+   "at": [
+    85.28,
+    21.67
+   ],
+   "height": 40.0,
+   "seen_from": 85,
+   "ahead_from": 40
+  },
+  {
+   "name": "Terminal 6",
+   "kind": "terminal",
+   "at": [
+    -105.51,
+    44.28
+   ],
+   "height": 40.0,
+   "seen_from": 162,
+   "ahead_from": 86
+  },
+  {
+   "name": "Terminal 7",
+   "kind": "terminal",
+   "at": [
+    -87.51,
+    -28.11
+   ],
+   "height": 40.0,
+   "seen_from": 140,
+   "ahead_from": 55
+  },
+  {
+   "name": "Terminal 8",
+   "kind": "terminal",
+   "at": [
+    151.87,
+    -0.57
+   ],
+   "height": 40.0,
+   "seen_from": 99,
+   "ahead_from": 43
+  },
+  {
+   "name": "Beacon 3",
+   "kind": "beacon",
+   "at": [
+    37.2,
+    -12.6
+   ],
+   "height": 40.0,
+   "seen_from": 50,
+   "ahead_from": 18
+  },
+  {
+   "name": "Beacon 4",
+   "kind": "beacon",
+   "at": [
+    -38.98,
+    -51.42
+   ],
+   "height": 40.0,
+   "seen_from": 132,
+   "ahead_from": 67
+  },
+  {
+   "name": "West drawbridge",
+   "kind": "drawbridge",
+   "at": [
+    -77.53,
+    42.23
+   ],
+   "height": 24.652259987655803,
+   "seen_from": 79,
+   "ahead_from": 18
+  },
+  {
+   "name": "East drawbridge",
+   "kind": "drawbridge",
+   "at": [
+    118.96,
+    -1.81
+   ],
+   "height": 25.709443710097187,
+   "seen_from": 86,
+   "ahead_from": 51
+  }
+ ]
+}

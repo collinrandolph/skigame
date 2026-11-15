@@ -63,6 +63,9 @@ if (A.mine){
     const g = walk(d.end, t, [[44, -26], [52, 40], [48, -22]], Rk); tunnel('Crown passage', k, g.pts, 9, 8);
     const [room, tr] = step(g.p, g.t, 34, Rk); chamber(k, room, 46, 28); pillars(k, room, tr, 30, [30, 90, 150, 210, 270, 330], 3.4, Rk);
     UG.crownDoor = { layer: 1, d: r6(d.d), opens: 'crowned at the Broken Circle' }; UG.crownRoom = { layer: 1, d: r6(room), name: 'Crown room' };
+    // the 30 crown crystals: two rings round the room, clear of the pillars (at 30 m)
+    const cc = []; for (let i = 0; i < 12; i++) cc.push(r6(step(room, turn(room, tr, 15 + 30*i), 17, Rk)[0])); for (let i = 0; i < 18; i++) cc.push(r6(step(room, turn(room, tr, 10 + 20*i), 39, Rk)[0]));
+    UG.crownCrystals = { layer: 1, d: cc };
   }
   o.game.underground = Object.assign({ layers: o.layers.map((l, i) => ({ index: i, name: l.name, depth: l.depth })), ramp: 'Mine spiral' }, UG);
 }
@@ -91,6 +94,8 @@ report.caves = [];
   const doorOpen = T.ramps.flatMap(B => B.doors.filter(d => d.link === k)).map(d => { const e = norm(d.mouth.map((v, i) => v + d.out[i]*10/R)); return F.at(e[0], e[1], e[2]).open; });
   report.caves.push({ layer: ly.name, depth: ly.depth, tunnelMetres: n*2, closedPoints: shut, lowestHeadroom: Math.round(low*10)/10, skylightPoints: sky, intoThePit: pitHit, rooms, doorsOpen: doorOpen });
 });
+if (o.game.underground && o.game.underground.crownCrystals){ const cc = o.game.underground.crownCrystals, F = PT.caveField(L, cc.layer, R, T.under, T.ramps); report.crownCrystalsOpen = cc.d.filter(p => { const a = F.at(p[0], p[1], p[2]); return a.open && a.ceil - a.floor > 3; }).length + ' of ' + cc.d.length; console.log('crown crystals standing in open cave:', report.crownCrystalsOpen); }
+{ const b = L.bridges.find(x => x.name === 'Starway'); if (b){ const D = PT.bridgeDeck(b, T.height, R); let lo = Infinity; for (let i = 0; i < D.g.length; i++) if (D.s[i] > 30 && D.L - D.s[i] > 30) lo = Math.min(lo, D.h[i] - D.g[i]); console.log('starway: ' + Math.round(D.L) + ' m, climbs at most ' + Math.round(D.climb*100) + '%, drops at most ' + Math.round(D.desc*100) + '%, never less than ' + lo.toFixed(1) + ' m over the ground, up to ' + Math.round(D.highest) + ' m; top at ' + Math.round(D.h[D.h.length - 1]) + ' m'); } }
 report.counts = { trails: L.trails.length, newTrails: A.trails.length, models: L.models.length, landmarks: L.landmarks.length, bridges: L.bridges.length, tunnels: L.tunnels.length, caveStamps: L.caveStamps.length, bytes: fs.statSync(OUT).size };
 { const L2 = PT.parse(PT.serialize(L)); report.roundTrip = !!L2.game && L2.game.terminals.length === 8 && L2.bridges[0].kind === 'draw'; if (!report.roundTrip) console.log('round trip:', !!L.game, !!L2.game, L.bridges[0].kind, L2.bridges[0].kind); }
 fs.writeFileSync(path.join(WORK, 'report.json'), JSON.stringify(report, null, 1));

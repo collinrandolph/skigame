@@ -608,6 +608,18 @@
     45,
     46
    ]
+  },
+  {
+   "name": "Starway",
+   "kind": "light",
+   "metres": 1198,
+   "climb": 24,
+   "descent": 20,
+   "highest": 196,
+   "ends": [
+    -6,
+    186
+   ]
   }
  ],
  "caves": [
@@ -664,15 +676,16 @@
    ]
   }
  ],
+ "crownCrystalsOpen": "30 of 30",
  "counts": {
   "trails": 53,
   "newTrails": 36,
-  "models": 72,
+  "models": 87,
   "landmarks": 10,
-  "bridges": 4,
+  "bridges": 5,
   "tunnels": 5,
   "caveStamps": 19,
-  "bytes": 4057274
+  "bytes": 4066014
  },
  "roundTrip": true
 }

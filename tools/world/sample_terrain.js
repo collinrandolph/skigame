@@ -1,5 +1,5 @@
 globalThis.window = globalThis;
-require('/home/claude/collinrandolph/skigame/prototypes/planet-terrain.js');
+require(require('path').join(__dirname, '../../prototypes/planet-terrain.js'));
 const fs = require('fs'), PT = globalThis.PlanetTerrain;
 const L = PT.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const t0 = Date.now(), T = PT.terrain(L, L.radius);

@@ -34,13 +34,19 @@ const fbm = (x, y, z, o = 4) => { let s = 0, a = 0.5, f = 1; for (let i = 0; i <
 function rng(seed){ let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0)/4294967296; }; }
 
 // ================================================================ the layout, by hand
-// four loops, each with a relay to relight; links between them; a road north to the Spire
 const SPIRE = ll(0, 58);
+// every zone is a small network: a main loop, one or two more loops beside or inside it, and lanes between them, so there
+// is more than one way round and each terminal sends you somewhere new. z: the zone (1 Frostline, 2 Frostveil, 3 the Cut, 4 the Court)
 const LOOPS = [
-  { name: 'Frostline Loop',    c: ll(0, -8),    r: 185, wob: [0.10, 3, 0.4],  relay: 'Frostline Beacon',  relayAt: 200, zone: 'outpost' },
-  { name: 'Frostveil',    c: ll(72, 6),    r: 245, wob: [0.13, 4, 1.7],  relay: 'Veil Beacon',    relayAt: 60,  zone: 'ruins' },
-  { name: 'Court Round', c: ll(-76, 2),   r: 225, wob: [0.12, 3, 2.6],  relay: 'Court Beacon',   relayAt: 300, zone: 'court' },
-  { name: 'The Cut',     c: ll(178, -6),  r: 265, wob: [0.11, 5, 0.9],  relay: 'Cut Beacon',     relayAt: 150, zone: 'mine' },
+  { name: 'Frostline Loop', z: 1, c: ll(0, -8),   r: 185, wob: [0.10, 3, 0.4] },
+  { name: 'Frostveil',      z: 2, c: ll(72, 6),   r: 245, wob: [0.13, 4, 1.7] },
+  { name: 'Court Round',    z: 4, c: ll(-76, 2),  r: 225, wob: [0.12, 3, 2.6] },
+  { name: 'The Cut',        z: 3, c: ll(178, -6), r: 265, wob: [0.11, 5, 0.9] },
+  { name: 'Dome Ring',      z: 1, c: ll(0, -8),   r: 82,  wob: [0.06, 2, 1.0] },      // 4: round the outpost, inside the Frostline Loop
+  { name: 'Ribs Rise',      z: 2, c: ll(90, 46),  r: 110, wob: [0.10, 3, 0.2] },      // 5: north of Frostveil, under the Sleeping Ribs
+  { name: 'South Veil',     z: 2, c: ll(66, -38), r: 125, wob: [0.10, 3, 2.2] },      // 6: south of it, round the Low Watcher
+  { name: 'Pit Ring',       z: 3, c: ll(178, -6), r: 105, wob: [0.07, 3, 0.5] },      // 7: inside the Cut, round the mine's pit
+  { name: 'Circle Walk',    z: 4, c: ll(-76, 2),  r: 96,  wob: [0.06, 2, 2.0] },      // 8: inside the Court Round
 ];
 // a link leaves loop `a` at compass bearing `ab` from its centre and joins loop `b` at bearing `bb` (or ends at `to`)
 const LINKS = [
@@ -48,6 +54,17 @@ const LINKS = [
   { name: 'Antler Way',   a: 0, ab: 276, b: 2, bb: 98,  bend: -26, power: 2 },
   { name: 'Haul Road', far: 'Haul Road, far bank', draw: 'East drawbridge',   a: 1, ab: 96,  b: 3, bb: 280, bend: -55, power: 3 },
   { name: 'Shard Way', far: 'Shard Way, far bank', draw: 'West drawbridge',   a: 2, ab: 264, b: 3, bb: 84,  bend: 50,  power: 3 },
+  // lanes inside the zones. `spoke`: from an inner ring out to the loop round it, at one bearing from their shared centre
+  { name: 'Pad Lane',    a: 4, ab: 165, b: 0, bb: 165, bend: 8, spoke: true },
+  { name: 'Tower Lane',  a: 4, ab: 45,  b: 0, bb: 45,  bend: -8, spoke: true },
+  { name: 'Dish Lane',   a: 4, ab: 285, b: 0, bb: 285, bend: 8, spoke: true },
+  { name: 'Ribs Climb',  a: 1, ab: 24,  b: 5, bb: 204, bend: 14 },
+  { name: 'Low Road',    a: 1, ab: 188, b: 6, bb: 8,   bend: -14 },
+  { name: 'Pit Lane',    a: 7, ab: 100, b: 3, bb: 100, bend: 10, spoke: true },
+  { name: 'Ore Lane',    a: 7, ab: 220, b: 3, bb: 220, bend: -10, spoke: true },
+  { name: 'Shaft Lane',  a: 7, ab: 340, b: 3, bb: 340, bend: 10, spoke: true },
+  { name: 'Temple Lane', a: 8, ab: 60,  b: 2, bb: 60,  bend: 8, spoke: true },
+  { name: 'Herd Lane',   a: 8, ab: 230, b: 2, bb: 230, bend: -8, spoke: true },
   { name: 'Crystal Road',  a: 0, ab: 2,   to: offset(SPIRE, 150, 184), arrive: 276, bend: 34, power: 'all' },      // arrives heading west, the way the Ascent sets off
 ];
 // ridges: lines of high ground between the loops. [points], height, half-width
@@ -100,7 +117,7 @@ for (const K of LINKS){
   // leave square to the loop, swing out by `bend` metres on the way, arrive square
   const L = dist(pa, pb), side = norm(cross(pa, pb)), c = [pa, offset(pa, Math.min(40, L*0.2), K.ab)];
   for (const t of [0.35, 0.65]){ const m = mix(pa, pb, t), s = Math.sin(t*Math.PI)*K.bend/R; c.push(norm([m[0] + side[0]*s, m[1] + side[1]*s, m[2] + side[2]*s])); }
-  if (!K.to) c.push(offset(pb, Math.min(40, L*0.2), K.bb));
+  if (!K.to) c.push(offset(pb, Math.min(40, L*0.2), K.spoke ? (K.bb + 180) % 360 : K.bb));
   if (K.to && K.arrive !== undefined) c.push(offset(pb, 46, (K.arrive + 180) % 360));
   c.push(pb);
   const pts = densify(c, false), wet = []; pts.forEach((p, i) => { if (riverDist(p[0], p[1], p[2]) < RIVER.bank) wet.push(i); });
@@ -226,7 +243,7 @@ const beside = (t, i, off) => { const M = t.pts.length, a = t.pts[Math.max(0, i 
 const tanBearing = (t, i) => { const M = t.pts.length; return bearing(t.pts[i], t.pts[Math.min(M - 1, i + 1)] === t.pts[i] ? t.pts[i - 1] : t.pts[Math.min(M - 1, i + 1)]); };
 // ---- the story's furniture (the rules that use it are game-core.js; GAME below is the block they read)
 // zones: 1 the Frostline bowl and its corridor north, 2 Frostveil, 3 the Cut across the canyon, 4 the Court
-const ZONE_OF_LOOP = [1, 2, 4, 3], ZONES = [{ id: 1, name: 'Frostline' }, { id: 2, name: 'Frostveil' }, { id: 3, name: 'The Cut' }, { id: 4, name: 'The Court' }];
+const ZONE_OF_LOOP = LOOPS.map(L => L.z), ZONES = [{ id: 1, name: 'Frostline' }, { id: 2, name: 'Frostveil' }, { id: 3, name: 'The Cut' }, { id: 4, name: 'The Court' }];
 const trailNamed = n => TRAILS.find(t => t.name === n);
 const zoneOfTrail = t => t.link ? (t.part === 'b' ? ZONE_OF_LOOP[t.link.b] : ZONE_OF_LOOP[t.link.a]) : ZONE_OF_LOOP[t.loop];
 // gates: where a road goes through a ridge, at the ridge's crest
@@ -247,16 +264,16 @@ const orbsAlong = (t, i0, i1, n) => { const out = [], M = t.pts.length; for (let
 const TERMINALS = [];
 const terminal = (zone, t, f, side, orbs, loopName) => { const M = t.pts.length, i = Math.round(f*(M - 1)), name = 'Terminal ' + (TERMINALS.length + 1), d = beside(t, i, side*5.2);
   TERMINALS.push({ name, zone, d, at: t.pts[i], loop: [loopName || t.name], orbs: orbs(i, M), loopLength: 0 }); put('terminal', d, { rot: tanBearing(t, i) + (side > 0 ? -90 : 90), name, r: 0.9 }); };
-{ const L0 = TRAILS[0], L1 = TRAILS[1], L3 = TRAILS[3], cr = trailNamed('Crystal Road'), hr = trailNamed('Haul Road'), sw = trailNamed('Shard Way, far bank');
-  const crownGate = GATES.find(g => g.name === 'Crown gate');
-  terminal(1, L0, 0.56, -1, (i, M) => orbsAlong(L0, i, i + M, 8).slice(0, 7));                                          // 1: once round the bowl
-  terminal(1, cr, 0.06, 1, () => orbsAlong(cr, 8, crownGate.i - 6, 6), 'Crystal Road');                                 // 2: up the corridor to the Crown gate and back
-  terminal(2, L1, 0.10, 1, (i, M) => orbsAlong(L1, i, i + M*0.55, 7));                                                  // 3: the Ribs side of Frostveil
-  terminal(2, L1, 0.62, -1, (i, M) => orbsAlong(L1, i, i + M*0.55, 7));                                                 // 4: the Watcher side
-  terminal(2, hr, 0.08, 1, () => orbsAlong(hr, 8, hr.pts.length - 6, 6), 'Haul Road');                                  // 5: out to the canyon and the raised bridge
-  terminal(3, L3, 0.05, 1, (i, M) => orbsAlong(L3, i, i + M*0.55, 8));                                                  // 6, 7: the two halves of the Cut
-  terminal(3, L3, 0.55, -1, (i, M) => orbsAlong(L3, i, i + M*0.55, 8));
-  terminal(3, sw, 0.9, 1, () => orbsAlong(sw, sw.pts.length - 8, 5, 5), 'Shard Way');                                   // 8: back to the west bridge
+{ const L0 = TRAILS[0], L1 = TRAILS[1], L3 = TRAILS[3], dome = trailNamed('Dome Ring'), pad = trailNamed('Pad Lane'), ribs = trailNamed('Ribs Rise'), sv = trailNamed('South Veil'), pit = trailNamed('Pit Ring'), sw = trailNamed('Shard Way, far bank');
+  const round = (t, n) => (i, M) => orbsAlong(t, i, i + M, n + 1).slice(0, n);
+  terminal(1, L0, 0.56, -1, round(L0, 7));                                                                              // 1: once round the bowl
+  terminal(1, dome, 0.30, 1, (i, M) => round(dome, 4)(i, M).concat(orbsAlong(pad, 2, pad.pts.length - 3, 2)), 'Dome Ring');     // 2: round the outpost and down Pad Lane
+  terminal(2, L1, 0.10, 1, (i, M) => orbsAlong(L1, i, i + M*0.55, 6));                                                  // 3: half of Frostveil
+  terminal(2, ribs, 0.75, -1, round(ribs, 6), 'Ribs Rise');                                                             // 4: up the Ribs Climb and round the Rise
+  terminal(2, sv, 0.25, 1, round(sv, 6), 'South Veil');                                                                 // 5: down the Low Road and round South Veil
+  terminal(3, L3, 0.05, 1, (i, M) => orbsAlong(L3, i, i + M*0.55, 7));                                                  // 6: half of the Cut
+  terminal(3, pit, 0.6, -1, round(pit, 5), 'Pit Ring');                                                                 // 7: in to the Pit Ring
+  terminal(3, sw, 0.9, 1, () => orbsAlong(sw, sw.pts.length - 8, 5, 5), 'Shard Way');                                   // 8: out to the west bridge
 }
 // drawbridge posts: on the side you first reach each from
 const DRAW_POSTS = {};
@@ -280,7 +297,11 @@ const landmark = (kind, name, d, o) => { LANDMARKS.push({ kind, name, d }); retu
 { const s = along('Frostline Loop', 0.80); landmark('tower', 'Research Tower', beside(s.t, s.i, 18), { rot: tanBearing(s.t, s.i), r: 5 }); }
 { const s = along('Frostline Loop', 0.05); landmark('dish', 'The Ear', beside(s.t, s.i, 24), { rot: tanBearing(s.t, s.i) + 90, r: 6 }); }
 { const s = along('Veil Road', 0.5); landmark('arch', 'Spine Arch', s.t.pts[s.i], { rot: tanBearing(s.t, s.i) }); }
-{ const s = along('Frostveil', 0.2); landmark('ribs', 'The Sleeping Ribs', beside(s.t, s.i, 42), { rot: tanBearing(s.t, s.i) + 90, r: 12 }); }
+{ const s = along('Ribs Rise', 0.3); landmark('ribs', 'The Sleeping Ribs', beside(s.t, s.i, -44), { rot: tanBearing(s.t, s.i) + 90, r: 12 }); }
+{ const s = along('Ribs Climb', 0.5); landmark('arch', 'Rise Arch', s.t.pts[s.i], { rot: tanBearing(s.t, s.i), scale: 0.7 }); }
+landmark('watcher', 'The Low Watcher', LOOPS[6].c, { rot: 0, r: 6, scale: 1.1 });
+landmark('mast', 'Frostline Mast', offset(LOOPS[0].c, 6, 90), { rot: 0, r: 1.5 });
+{ const s = along('South Veil', 0.6); for (let k = 0; k < 4; k++) landmark('ore', 'Veil ore ' + (k + 1), beside(s.t, (s.i + k*9) % s.t.pts.length, k % 2 ? 11 : -11), { rot: k*80, scale: 1.2, r: 1 }); }
 landmark('watcher', 'The Watcher', offset(LOOPS[1].c, 30, 200), { rot: 0, r: 13, scale: 2.4 });
 { const s = along('Frostveil', 0.85); landmark('mast', 'Signal Tower', beside(s.t, s.i, 14), { rot: 0, r: 1.5 }); }
 { const s = along('Court Round', 0.45); for (let k = 0; k < 11; k++){ const i = (s.i + k*10) % s.t.pts.length; landmark('crystal', 'Glass ' + (k + 1), beside(s.t, i, (k % 2 ? 1 : -1)*(12 + (k*7) % 13)), { scale: 1.4 + ((k*5) % 4)*1.1, rot: k*77, r: 2 }); } }
@@ -293,7 +314,7 @@ landmark('watcher', 'The Watcher', offset(LOOPS[1].c, 30, 200), { rot: 0, r: 13,
 { const s = along('Haul Road', 0.5); landmark('watcher', 'The Far Watcher', beside(s.t, s.i, -30), { rot: 0, r: 5, scale: 0.8 }); }
 { const s = along('Shard Way', 0.5); landmark('arch', 'Shard Arch', s.t.pts[s.i], { rot: tanBearing(s.t, s.i) }); }
 // a camp at every junction: people settle where roads meet
-JUNCTIONS.forEach((j, k) => put('camp', offset(j, 13, 200 + k*70), { rot: k*70, r: 3.5 }));
+JUNCTIONS.forEach((j, k) => { if (k % 3) return; for (let q = 0; q < 12; q++){ const d = offset(j, 15, 200 + k*70 + q*30); if (nearestTrail(d[0], d[1], d[2]).d > 9.5){ put('camp', d, { rot: k*70, r: 3.5 }); break; } } });
 // a herd on the open snow west of the garden
 { const s = along('Court Round', 0.7); for (let k = 0; k < 5; k++) put('moose', offset(beside(s.t, s.i, 30), 4 + k*3, k*75), { rot: k*50, r: 1 }); }
 landmark('heart', 'The Heartcrystal', SPIRE, { r: CRYSTAL_R }); put('portal', BRIDGE.foot, { rot: bearing(BRIDGE.pts[0], BRIDGE.pts[4]), name: 'Ascent foot' });

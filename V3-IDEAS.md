@@ -1,5 +1,7 @@
 # v3 ideas log
 
+**A first v3 prototype now exists: `v3/` on branch `v3` (see `v3/README.md`).** It acts on the terrain, trail, landmark and look ideas below, on a new world built from the concept art. This log stays as the list of what v2 taught; add v3's own findings to `v3/README.md`.
+
 Things found while working on v2 that are out of v2's scope: they need the terrain, the planet size, the trail network or the look to change. Add to this as they come up. Each entry says what was seen and what v3 could do about it.
 
 The measurable goal for v3, if it is built, is in section "Goal" at the end.

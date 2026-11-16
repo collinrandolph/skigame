@@ -200,7 +200,7 @@ function buildTrails(){
 // ================================================================ scenery
 const frameAt = (d, rotDeg, out = new THREE.Matrix4()) => { const [e, n] = W.basis(d), b = (rotDeg || 0)*Math.PI/180, f = [n[0]*Math.cos(b) + e[0]*Math.sin(b), n[1]*Math.cos(b) + e[1]*Math.sin(b), n[2]*Math.cos(b) + e[2]*Math.sin(b)];
   const z = new V3(-f[0], -f[1], -f[2]), y = v3(d), x = new V3().crossVectors(y, z).normalize(); z.crossVectors(x, y); return out.makeBasis(x, y, z); };
-const groups = {}, relayObj = [], buckets = [];        // groups: what lights up together (a loop's lamps, a road's pylons)
+const groups = {}, termObj = {}, gateObj = {}, postObj = {}, buckets = [];        // groups: what lights up together (a loop's lamps, a road's pylons)
 const addToGroup = (g, fn) => { (groups[g] = groups[g] || []).push(fn); };
 let heart = null, portalObj = null;
 function bucketOf(d){ const ax = Math.abs(d[0]), ay = Math.abs(d[1]), az = Math.abs(d[2]); let f, u, v; if (ax >= ay && ax >= az){ f = d[0] > 0 ? 0 : 1; u = d[1]/ax; v = d[2]/ax; } else if (ay >= az){ f = d[1] > 0 ? 2 : 3; u = d[0]/ay; v = d[2]/ay; } else { f = d[2] > 0 ? 4 : 5; u = d[0]/az; v = d[1]/az; } return f*9 + Math.min(2, Math.floor((u + 1)*1.5))*3 + Math.min(2, Math.floor((v + 1)*1.5)); }
@@ -225,7 +225,7 @@ function buildScenery(){
     g.applyMatrix4(frameAt(s.d, s.rot)); g.scale.setScalar(s.scale || 1); g.position.set(s.d[0]*r, s.d[1]*r, s.d[2]*r);
     g.traverse(o => { if (o.isMesh && !(o.material && o.material.isMeshBasicMaterial)){ o.castShadow = SHADOWS && !big[s.kind]; } });
     g.userData.site = s; g.userData.dir = v3(s.d); scene.add(g);
-    if (s.kind === 'relay'){ relayObj[s.group] = g; }
+    if (s.kind === 'terminal') termObj[s.name] = g; else if (s.kind === 'gate' || s.kind === 'crystalgate') gateObj[s.name] = g; else if (s.kind === 'post') postObj[s.name.slice(0, -5)] = g;
     else if (s.kind === 'pylon') addToGroup(s.group, on => g.userData.lit(on));
     else if (s.kind === 'heart') heart = g; else if (s.kind === 'portal') portalObj = g;
   }
@@ -259,63 +259,86 @@ function buildCosmic(){
   cosmic.mat = mat;
 }
 
-// ================================================================ the game: ore cells round each loop light its beacon; four beacons light the Ascent
-const SAVE = 'hale-v3-save';
-const game = { cells: W.RELAYS.map(r => r.cells.map(() => false)), lit: W.RELAYS.map(() => false), ended: false, awake: 0 };
-try { const s = JSON.parse(localStorage.getItem(SAVE) || 'null'); if (s && s.cells && s.cells.length === game.cells.length){ game.cells = s.cells; game.lit = s.lit; game.ended = !!s.ended; } } catch (e) {}
-const saveGame = () => { try { localStorage.setItem(SAVE, JSON.stringify({ cells: game.cells, lit: game.lit, ended: game.ended })); } catch (e) {} };
-const cellObj = [];
-function buildCells(){
-  const geo = new THREE.OctahedronGeometry(0.42, 0), mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 2.3, 3.0), fog: false });
-  W.RELAYS.forEach((r, li) => r.cells.forEach((d, ci) => { const m = new THREE.Mesh(geo, mat), rr = R + W.height(d[0], d[1], d[2]) + 1.25; m.position.set(d[0]*rr, d[1]*rr, d[2]*rr); m.quaternion.setFromRotationMatrix(frameAt(d, 0)); m.userData = { li, ci, d: v3(d) }; m.visible = !game.cells[li][ci]; scene.add(m); cellObj.push(m); }));
+// ---- the drawbridges: two leaves, up until the post lowers them
+const draws = [];
+function buildDraws(){
+  const M = PROPS.MAT;
+  for (const D of W.DRAWS){
+    const n = D.pts.length, L = D.s[n - 1], half = L/2 + 0.2, leaves = [], lamp = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 0.3, 0.3), fog: false });
+    for (const end of [0, 1]){
+      const p = D.pts[end ? n - 1 : 0], q = D.pts[end ? n - 4 : 3], brg = W.bearing(p, q), r = R + D.h[end ? n - 1 : 0], g = new THREE.Group(), leaf = new THREE.Group();
+      const deck = new THREE.Mesh(new THREE.BoxGeometry(D.halfW*2, 0.5, half), M.dark); deck.position.set(0, -0.27, -half/2); leaf.add(deck);
+      const top = new THREE.Mesh(new THREE.BoxGeometry(D.halfW*2 - 1, 0.06, half), M.panel); top.position.set(0, 0.0, -half/2); leaf.add(top);
+      for (const sd of [-1, 1]){ const rail = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.9, half), M.orange); rail.position.set(sd*(D.halfW - 0.1), 0.45, -half/2); leaf.add(rail);
+        const tower = new THREE.Mesh(new THREE.BoxGeometry(1.3, 9, 1.6), M.steel); tower.position.set(sd*(D.halfW + 1.2), 3.5, 0.6); g.add(tower);
+        const lit = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.2, 0.5), lamp); lit.position.set(sd*(D.halfW + 1.2), 8.6, 0.6); g.add(lit); }
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(D.halfW*2 + 4, 0.8, 1.2), M.orange); beam.position.set(0, 7.6, 0.6); g.add(beam);
+      g.add(leaf); g.applyMatrix4(frameAt(p, brg)); g.position.set(p[0]*r, p[1]*r, p[2]*r); g.traverse(o => { if (o.isMesh) o.castShadow = SHADOWS; }); scene.add(g); leaves.push(leaf);
+    }
+    draws.push({ name: D.name, leaves, lamp, up: 1, want: 1 });
+  }
 }
-let toastUntil = 0; const toastQ = [];
-const toast = t => toastQ.push(t);
-function setLit(li, on, quiet){
-  game.lit[li] = on; relayObj[li].userData.lit(on); (groups[li] || []).forEach(f => f(on));
-  const all = game.lit.every(Boolean); (groups.all || []).forEach(f => f(all));
-  sk.bridges[0].locked = !all; portalObj.userData.lit(all);
-  bridgeMats.deck.opacity = all ? 0.55 : 0; bridgeMats.rail.color.setRGB(all ? 1.6 : 0.2, all ? 0.9 : 0.2, all ? 3.2 : 0.26);
-  if (!quiet && on) toast(all ? 'The Heartcrystal wakes. Take Crystal Road north to the Ascent.' : W.RELAYS[li].name + ' lit');
+
+// ================================================================ the game: the rules are game-core.js (the same module v2 uses), reading W.GAME
+const SAVE = 'hale-v3-story', G = SkiGame.create(W.GAME, R);
+try { const s = localStorage.getItem(SAVE); if (s) G.restore(s); } catch (e) {}
+for (const c of (Q.get('cheat') || '').split(',')) if (c) G.cheat(c);        // ?cheat=zone1,zone2,bridges ... for testing
+let ended = false, lastRev = -1, solidObjs = [];
+const orbGeo = new THREE.SphereGeometry(0.38, 12, 8), orbMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.0, 1.9, 0.5), fog: false }), orbPool = [];
+function syncOrbs(){
+  const list = G.orbs(); while (orbPool.length < list.length){ const o = new THREE.Mesh(orbGeo, orbMat); scene.add(o); orbPool.push(o); }
+  orbPool.forEach((o, i) => { const it = list[i]; o.visible = !!it && !it.got; if (o.visible){ const d = it.d, r = R + W.height(d[0], d[1], d[2]) + 1.25; o.position.set(d[0]*r, d[1]*r, d[2]*r); } });
 }
-function checkpoint(){ let best = null; W.RELAYS.forEach((r, i) => { if (game.lit[i]) best = r; }); return best ? v3(best.at) : null; }
-function gameStep(){
-  const n = sk.n;
-  for (const m of cellObj){ if (!m.visible) continue; if (m.userData.d.dot(n) > Math.cos(4.2/R)){ const { li, ci } = m.userData; m.visible = false; game.cells[li][ci] = true;
-      const left = game.cells[li].filter(x => !x).length; if (!left && !game.lit[li]) setLit(li, true); else toast(left + ' to go on ' + W.RELAYS[li].loop); saveGame(); } }
-  const B = sk.onBridge; if (B && B.i >= B.b.V.length - 6){ sk.S.vx = sk.S.vy = 0; if (!game.ended){ game.ended = true; saveGame(); showEnd(); } }
+const toastQ = []; let toastUntil = 0; const toast = t => toastQ.push(t);
+function syncGame(){
+  if (G.rev === lastRev) return; lastRev = G.rev; const st = G.state();
+  for (const t of W.TERMINALS) termObj[t.name].userData.set(G.modelVariant(t.name, 'kiosk'));
+  for (const g of W.GATES){ const on = G.gateOpen(g.name); gateObj[g.name].userData.open(on); for (const s of solidObjs) if (s.gate === g.name) s.off = on; }
+  W.BRIDGES.forEach((b, i) => { sk.bridges[i].locked = !G.bridgeOpen(b.name); });
+  for (const D of draws){ const open = G.bridgeOpen(D.name), w = W.DRAWS.find(q => q.name === D.name).when; D.want = open ? 0 : 1; D.lamp.color.setRGB(open ? 0.4 : 2.4, open ? 2.4 : 0.3, open ? 1.2 : 0.3); postObj[D.name].userData.set(open ? 2 : G.zoneDone(w.zone) ? 1 : 0); }
+  const asc = G.bridgeOpen('The Ascent'); portalObj.userData.lit(asc); bridgeMats.deck.opacity = asc ? 0.55 : 0; bridgeMats.rail.color.setRGB(asc ? 1.6 : 0.2, asc ? 0.9 : 0.2, asc ? 3.2 : 0.26);
+  for (const z of [1, 2, 3, 4]) (groups[z] || []).forEach(f => f(z === 4 ? !!st.offered : G.zoneDone(z)));
+  syncOrbs();
+  try { localStorage.setItem(SAVE, G.serialize()); } catch (e) {}
 }
-function showEnd(){ $('endTxt').textContent = 'You stand on the Heartcrystal, 215 metres over the snow. Below, four beacons burn, and the herd has come to watch.'; $('end').style.display = 'flex'; }
+const checkpoint = () => { const c = G.checkpoint(); return c ? v3(c) : null; };
+function gameStep(dt){
+  const n = sk.n; G.update({ n: [n.x, n.y, n.z], ug: -1 }); syncGame();
+  while (G.toasts.length) toast(G.toasts.shift());
+  for (const D of draws){ D.up += (D.want - D.up)*Math.min(1, dt*1.4); for (const l of D.leaves) l.rotation.x = D.up*1.08; }
+  const B = sk.onBridge; if (B && B.b.src.src === W.BRIDGE && B.i >= B.b.V.length - 6){ sk.S.vx = sk.S.vy = 0; if (!ended){ ended = true; showEnd(); } }
+}
+function showEnd(){ $('endTxt').textContent = 'You stand on the Heartcrystal, 215 metres over the snow, and the herd has come to watch.'; $('end').style.display = 'flex'; }
 $('keepBtn').onclick = () => { $('end').style.display = 'none'; };
-$('newBtn').onclick = () => { try { localStorage.removeItem(SAVE); } catch (e) {} location.reload(); };
+$('newBtn').onclick = () => { G.reset(); try { localStorage.removeItem(SAVE); } catch (e) {} location.href = location.pathname; };
+$('offer').onclick = () => { G.confirm(); };
 
 // ================================================================ build, then go
 let sk = null;
 function boot(){
-  buildGround(); buildTrails(); buildScenery(); buildBridge(); buildCells(); buildCosmic();
-  const B = W.BRIDGE;
+  buildGround(); buildTrails(); buildScenery(); buildBridge(); buildDraws(); buildCosmic();
+  solidObjs = W.SOLIDS.map(s => ({ d: v3(s.d), r: s.r, gate: s.gate }));
   sk = createSkier({ THREE, scene, camera, R, stop: W.STOP, height: W.height,
     trails: W.TRAILS.map(t => ({ name: t.name, closed: t.closed, pts: t.pts.map(v3) })), junctions: W.JUNCTIONS.map(v3),
-    bridges: [{ pts: B.pts.map(v3), s: B.s, h: B.h, halfW: B.halfW }], solids: W.SOLIDS.map(s => ({ d: v3(s.d), r: s.r })),
+    bridges: W.BRIDGES.map(B => ({ pts: B.pts.map(v3), s: B.s, h: B.h, halfW: B.halfW, src: B })), solids: solidObjs, confirm: () => G.confirm(),
     start: v3(W.START.d), buildSkier: () => buildSkierV3(THREE), checkpoint, camdInput: { min: 6, max: 40, step: 0.5, get value(){ return sk ? sk.P.camd : 15; }, set value(v){ if (sk) sk.P.camd = +v; }, dispatchEvent(){} } });
   sk.fig.traverse(o => { if (o.isMesh && o.geometry.type !== 'CircleGeometry') o.castShadow = SHADOWS; });
-  game.lit.forEach((on, i) => setLit(i, on, true));
-  W.RELAYS.forEach((r, i) => { const p = document.createElement('span'); p.className = 'pip'; p.innerHTML = '<i></i>' + r.loop; p.id = 'pip' + i; $('pips').appendChild(p); });
+  syncGame();
+  for (const z of W.ZONES.slice(0, 3)){ const p = document.createElement('span'); p.className = 'pip'; p.innerHTML = '<i></i><span></span>'; p.id = 'pip' + z.id; $('pips').appendChild(p); }
   $('viewBtn').onclick = e => { sk.toggleView(); e.currentTarget.blur(); }; $('resetBtn').onclick = e => { sk.reset(); e.currentTarget.blur(); };
   addEventListener('keydown', e => { if (e.key.toLowerCase() === 'h' && !e.repeat) document.body.classList.toggle('clean'); });
   $('load').style.display = 'none';
-  window.__hale = { W, sk, game, scene, camera, renderer, setLit, set dayPhase(v){ dayPhase = v; }, get dayPhase(){ return dayPhase; }, place(lon, lat, brg){ const d = v3(W.ll(lon, lat)); sk.TEST.place(d); if (brg !== undefined){ const b = W.basis(W.ll(lon, lat)), r = brg*Math.PI/180, f = new V3(b[1][0]*Math.cos(r) + b[0][0]*Math.sin(r), b[1][1]*Math.cos(r) + b[0][1]*Math.sin(r), b[1][2]*Math.cos(r) + b[0][2]*Math.sin(r)); sk.S.th = sk.S.tgt = Math.atan2(f.dot(sk.ex), -f.dot(sk.ey)); } } };
-  if (game.ended) toast('The Ascent is open. Ski where you like.');
+  window.__hale = { W, sk, G, scene, camera, renderer, get ended(){ return ended; }, set dayPhase(v){ dayPhase = v; }, get dayPhase(){ return dayPhase; }, place(lon, lat, brg){ const d = v3(W.ll(lon, lat)); sk.TEST.place(d); if (brg !== undefined){ const b = W.basis(W.ll(lon, lat)), r = brg*Math.PI/180, f = new V3(b[1][0]*Math.cos(r) + b[0][0]*Math.sin(r), b[1][1]*Math.cos(r) + b[0][1]*Math.sin(r), b[1][2]*Math.cos(r) + b[0][2]*Math.sin(r)); sk.S.th = sk.S.tgt = Math.atan2(f.dot(sk.ex), -f.dot(sk.ey)); } } };
   requestAnimationFrame(frame);
 }
 // ---- the frame
-let last = performance.now(), hudT = 0, t0 = last; const _c = new V3(), _m = new THREE.Color(), _n = new THREE.Color();
+let last = performance.now(), hudT = 0, t0 = last, awake = 0; const _c = new V3(), _m = new THREE.Color(), _n = new THREE.Color();
 function frame(now){
   requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - last)/1000); last = now; const t = (now - t0)/1000;
   sk.pollPad();
   const nsub = Math.max(1, Math.ceil(dt*60 - 1e-6)); for (let i = 0; i < nsub; i++){ sk.bridgeAssist(dt/nsub); sk.step(dt/nsub); }
-  gameStep(); sk.poseFigure(dt); const viewK = sk.placeCamera(dt); sk.updateMarks();
+  gameStep(dt); sk.poseFigure(dt); const viewK = sk.placeCamera(dt); sk.updateMarks();
   const n = sk.n;
   // the sun goes round the planet's axis once a "day"; where you stand decides day or night
   dayPhase = (dayPhase + dt/(DAY_MIN*60)) % 1; const a = dayPhase*Math.PI*2; sunDir.set(Math.cos(a), 0.33, Math.sin(a)).normalize();
@@ -335,29 +358,34 @@ function frame(now){
   finalMat.uniforms.expo.value = 1.1 + 0.3*(1 - dayK);
   // skip what is round the back of the planet
   const lim = viewK > 0.02 ? -2 : 0.42; for (const c of chunks) c.visible = c.userData.dir.dot(n) > lim - 0.12; for (const b of buckets) b.visible = b.userData.dir.dot(n) > lim;
-  for (const m of cellObj) if (m.visible) m.rotateY(dt*1.6);
-  if (heart){ game.awake += ((game.lit.every(Boolean) ? 1 : game.lit.filter(Boolean).length*0.12) - game.awake)*Math.min(1, dt); heart.userData.wake(game.awake*(0.85 + 0.15*Math.sin(t*1.1))); }
-  { const want = game.lit.every(Boolean) ? (0.10 + 0.16*(1 - dayK))*(1 + 0.15*Math.sin(t*0.7)) : 0; cosmic.mat.opacity += (want - cosmic.mat.opacity)*Math.min(1, dt*0.5); for (const g of cosmic) g.visible = cosmic.mat.opacity > 0.004; }
+  const st = G.state(), powered = Object.keys(st.powered).length;
+  if (heart){ awake += ((st.ceremony ? 1 : powered*0.05) - awake)*Math.min(1, dt); heart.userData.wake(awake*(0.85 + 0.15*Math.sin(t*1.1))); }
+  { const k = 0.75 + 0.25*Math.sin(t*3); orbMat.color.setRGB(3.0*k, 1.9*k, 0.5*k); }
+  { const want = st.ceremony ? (0.10 + 0.16*(1 - dayK))*(1 + 0.15*Math.sin(t*0.7)) : 0; cosmic.mat.opacity += (want - cosmic.mat.opacity)*Math.min(1, dt*0.5); for (const g of cosmic) g.visible = cosmic.mat.opacity > 0.004; }
   renderFrame();
   hudT -= dt; if (hudT <= 0){ hudT = 0.12; hud(now); }
 }
 function hud(now){
-  const n = sk.n, kmh = sk.speed()*3.6; $('kmh').firstChild.nodeValue = Math.round(kmh);
-  const st = sk.steep > 0 ? 'Too steep' : sk.onBridge ? 'The Ascent' : sk.trailName || 'Ungroomed'; if (sk.steep > 0) sk.steep = Math.max(0, sk.steep - 0.12);
-  $('where').textContent = st + (sk.mode ? ' · ' + sk.mode : '');
-  // the goal: finish the loop you are on if it is unlit; otherwise the nearest unlit loop; then the Ascent
-  let target = null, label = '', goal = '';
-  const all = game.lit.every(Boolean);
-  if (all){ target = v3(game.ended ? W.SPIRE : W.BRIDGE.foot); label = 'The Ascent'; goal = game.ended ? 'The Ascent is open' : 'Climb the Ascent'; }
-  else { let li = -1, bd = 1e9; W.RELAYS.forEach((r, i) => { if (game.lit[i]) return; const d = v3(W.LOOPS[i].c).angleTo(n)*R - W.LOOPS[i].r; if (d < bd){ bd = d; li = i; } });
-    const r = W.RELAYS[li], left = game.cells[li].filter(x => !x).length; let cd = 1e9;
-    r.cells.forEach((c, ci) => { if (game.cells[li][ci]) return; const d = v3(c).angleTo(n)*R; if (d < cd){ cd = d; target = v3(c); } });
-    label = bd < 60 ? 'Ore cell' : r.loop; goal = 'Light the ' + r.name + ': ' + (6 - left) + ' of 6 ore cells';
-    W.RELAYS.forEach((q, i) => { const p = $('pip' + i); p.classList.toggle('on', game.lit[i]); p.classList.toggle('here', i === li && !game.lit[i]); }); }
-  if (all) W.RELAYS.forEach((q, i) => $('pip' + i).classList.add('on'));
-  $('goal').textContent = goal;
-  if (target){ const d = target.angleTo(n)*R, rel = target.clone().addScaledVector(n, -target.dot(n)), brg = Math.atan2(rel.dot(sk.ex), -rel.dot(sk.ey)) - sk.heading();
+  const n = sk.n, kmh = sk.speed()*3.6, st = G.state(); $('kmh').firstChild.nodeValue = Math.round(kmh);
+  const where = sk.steep > 0 ? 'Too steep' : sk.onBridge ? sk.onBridge.b.src.src.name : sk.trailName || 'Ungroomed'; if (sk.steep > 0) sk.steep = Math.max(0, sk.steep - 0.12);
+  $('where').textContent = where + (sk.mode ? ' · ' + sk.mode : '');
+  const goal = G.goal(); $('goal').textContent = goal.title; $('detail').textContent = goal.detail || '';
+  for (const z of W.ZONES.slice(0, 3)){ const [a, b] = G.zoneCount(z.id), p = $('pip' + z.id); p.lastChild.textContent = z.name + ' ' + a + '/' + b; p.classList.toggle('on', a === b); p.classList.toggle('here', a < b && (z.id === 1 || G.zoneDone(z.id - 1))); }
+  // what the arrow points at: the next orb of the terminal that is running, or that terminal once they are all in;
+  // otherwise the nearest terminal still dark in the zone you are working on, or the post that lowers the bridge to it
+  let target = null, label = '';
+  const nearest = list => { let best = null, bd = 1e9; for (const it of list){ const d = v3(it.d).angleTo(n); if (d < bd){ bd = d; best = it; } } return best; };
+  if (st.active){ const left = G.orbs().filter(o => !o.got); if (left.length){ target = nearest(left).d; label = 'Orb'; } else { target = W.TERMINALS.find(t => t.name === st.active).d; label = st.active; } }
+  else { const z = [1, 2, 3].find(q => !G.zoneDone(q));
+    if (z === 3 && !G.bridgeOpen('East drawbridge')){ target = W.GAME.bridges.find(b => b.name === 'East drawbridge').post; label = 'Bridge post'; }
+    else if (z){ const t = nearest(W.TERMINALS.filter(q => q.zone === z && !st.powered[q.name])); target = t.d; label = t.name; } }
+  $('way').style.visibility = target ? 'visible' : 'hidden';
+  if (target){ const tv = v3(target), d = tv.angleTo(n)*R, rel = tv.addScaledVector(n, -tv.dot(n)), brg = Math.atan2(rel.dot(sk.ex), -rel.dot(sk.ey)) - sk.heading();
     $('arrow').style.transform = 'rotate(' + (brg*180/Math.PI).toFixed(0) + 'deg)'; $('wayTxt').textContent = label + ' · ' + (d >= 1000 ? (d/1000).toFixed(1) + ' km' : Math.round(d) + ' m'); }
+  // an offer to agree to (Enter, E, the A button, or a tap), or the reason something will not open
+  const pr = G.prompt, off = $('offer');
+  if (pr){ off.style.display = 'block'; $('offerT').textContent = pr.text; $('offerD').textContent = pr.detail || ''; } else off.style.display = 'none';
+  $('hint').textContent = !pr && G.hint ? G.hint : ''; $('hint').style.display = !pr && G.hint ? 'block' : 'none';
   if (toastQ.length && now > toastUntil - 400){ $('toast').textContent = toastQ.shift(); $('toast').classList.add('on'); toastUntil = now + 3200; }
   else if (now > toastUntil) $('toast').classList.remove('on');
 }

@@ -46,21 +46,27 @@ const LOOPS = [
 const LINKS = [
   { name: 'Veil Road',   a: 0, ab: 82,  b: 1, bb: 262, bend: 30,  power: 1 },
   { name: 'Antler Way',   a: 0, ab: 276, b: 2, bb: 98,  bend: -26, power: 2 },
-  { name: 'Haul Road',   a: 1, ab: 96,  b: 3, bb: 280, bend: -55, power: 3 },
-  { name: 'Shard Way',   a: 2, ab: 264, b: 3, bb: 84,  bend: 50,  power: 3 },
+  { name: 'Haul Road', far: 'Haul Road, far bank', draw: 'East drawbridge',   a: 1, ab: 96,  b: 3, bb: 280, bend: -55, power: 3 },
+  { name: 'Shard Way', far: 'Shard Way, far bank', draw: 'West drawbridge',   a: 2, ab: 264, b: 3, bb: 84,  bend: 50,  power: 3 },
   { name: 'Crystal Road',  a: 0, ab: 2,   to: offset(SPIRE, 150, 184), arrive: 276, bend: 34, power: 'all' },      // arrives heading west, the way the Ascent sets off
 ];
 // ridges: lines of high ground between the loops. [points], height, half-width
 const ring = (c, r, n, wob = 0) => { const p = []; for (let i = 0; i <= n; i++) p.push(offset(c, r*(1 + wob*Math.sin(i*2.1)), i*360/n)); return p; };
+// the walls of the world. every zone is shut in by ridges too steep to ski (and, for the far side, the river canyon);
+// a road gets through a ridge by a narrow cut, which is where the gates stand
+const RIM = 345, CROWN = 300;
 const RIDGES = [
-  { pts: ring(LOOPS[0].c, 345, 40, 0.06), H: 62, w: 62 },                          // the rim round the landing bowl
-  { pts: [ll(127, 62), ll(124, 30), ll(128, 0), ll(123, -30), ll(127, -62)], H: 135, w: 78 },     // the Wall, between the Reach and the far side
-  { pts: [ll(-130, 62), ll(-126, 30), ll(-131, 0), ll(-126, -30), ll(-129, -62)], H: 135, w: 78 },  // the Teeth, west
-  { pts: ring(SPIRE, 300, 30, 0.08), H: 48, w: 55 },                               // the crown round the Spire
-  { pts: [ll(40, -52), ll(10, -60), ll(-25, -56), ll(-55, -48)], H: 95, w: 90 },   // the south shelf
-  { pts: [ll(150, 44), ll(180, 52), ll(-150, 46)], H: 80, w: 80 },                 // far north
+  { pts: ring(LOOPS[0].c, RIM, 40, 0.06), H: 62, w: 42 },                                            // 0 the rim round the Frostline bowl
+  { pts: [ll(127, 62), ll(124, 30), ll(128, 0), ll(123, -30), ll(127, -62)], H: 135, w: 78 },        // 1 the Wall, east: the last range before the canyon
+  { pts: [ll(-130, 62), ll(-126, 30), ll(-131, 0), ll(-126, -30), ll(-129, -62)], H: 135, w: 78 },   // 2 the Teeth, west
+  { pts: ring(SPIRE, CROWN, 30, 0.08), H: 64, w: 45 },                                               // 3 the crown round the Heartcrystal
+  { pts: [offset(LOOPS[0].c, RIM, 38), offset(SPIRE, CROWN, 146)], H: 80, w: 50 },                   // 4, 5 the corridor: Crystal Road runs between these, from the bowl to the crown
+  { pts: [offset(LOOPS[0].c, RIM, 322), offset(SPIRE, CROWN, 214)], H: 80, w: 50 },
+  { pts: [offset(SPIRE, CROWN, 0), ll(180, 76), ll(180, 58), ll(180, 41)], H: 95, w: 55 },           // 6 the north spine: over the pole to the canyon, parting east from west
+  { pts: [offset(LOOPS[0].c, RIM, 180), ll(0, -66), ll(0, -89), ll(180, -72), ll(180, -53)], H: 95, w: 55 },   // 7 the south spine, the same
 ];
-const RIVER = { n: norm(ll(118, 62)), off: Math.sin(-20*D2R), half: 11, level: -8 };     // a ring of ice round the planet
+// the river: a canyon cut 16 m down round the whole far side, ice at the bottom, ore in the walls. only the drawbridges cross it
+const RIVER = { n: norm(LOOPS[3].c), off: Math.cos(44*D2R), half: 11, level: -16, bank: 24 };
 
 // ================================================================ trails
 function densify(ctrl, closed, step = 3){
@@ -86,7 +92,8 @@ const loopPoint = (L, brg) => offset(L.c, L.r*(1 + L.wob[0]*Math.sin(L.wob[1]*br
 const TRAILS = [];
 for (const L of LOOPS){ const c = []; for (let b = 0; b < 360; b += 15) c.push(loopPoint(L, b)); TRAILS.push({ name: L.name, closed: true, loop: TRAILS.length, pts: densify(c, true) }); }
 function nearestIndex(pts, d){ let bi = 0, bd = -2; for (let i = 0; i < pts.length; i++){ const q = dot(pts[i], d); if (q > bd){ bd = q; bi = i; } } return bi; }
-const JUNCTIONS = [];
+const JUNCTIONS = [], DRAWS = [];
+const riverDist = (x, y, z) => Math.abs(Math.asin(Math.max(-1, Math.min(1, x*RIVER.n[0] + y*RIVER.n[1] + z*RIVER.n[2]))) - Math.asin(RIVER.off))*R;
 for (const K of LINKS){
   const A = LOOPS[K.a], pa = TRAILS[K.a].pts[nearestIndex(TRAILS[K.a].pts, loopPoint(A, K.ab))];
   const pb = K.to || TRAILS[K.b].pts[nearestIndex(TRAILS[K.b].pts, loopPoint(LOOPS[K.b], K.bb))];
@@ -96,56 +103,65 @@ for (const K of LINKS){
   if (!K.to) c.push(offset(pb, Math.min(40, L*0.2), K.bb));
   if (K.to && K.arrive !== undefined) c.push(offset(pb, 46, (K.arrive + 180) % 360));
   c.push(pb);
-  TRAILS.push({ name: K.name, closed: false, link: K, pts: densify(c, false) });
+  const pts = densify(c, false), wet = []; pts.forEach((p, i) => { if (riverDist(p[0], p[1], p[2]) < RIVER.bank) wet.push(i); });
+  if (wet.length && K.draw){     // the road stops at each bank; a drawbridge carries it over
+    const a = wet[0], b = wet[wet.length - 1];
+    TRAILS.push({ name: K.name, closed: false, link: K, part: 'a', pts: pts.slice(0, a + 1) });
+    DRAWS.push({ name: K.draw, link: K, pts: pts.slice(a, b + 1) });
+    TRAILS.push({ name: K.far, closed: false, link: K, part: 'b', pts: pts.slice(b) });
+  } else TRAILS.push({ name: K.name, closed: false, link: K, pts });
   JUNCTIONS.push(pa); if (!K.to) JUNCTIONS.push(pb);
 }
 // every trail sample in one flat list, and a coarse list (every 4th) for the first pass of "how far is the nearest trail"
 const TS = []; const COARSE = [];
 TRAILS.forEach((t, ti) => { t.first = TS.length; t.pts.forEach((p, i) => { TS.push({ p, ti, i }); if (i % 4 === 0) COARSE.push(TS.length - 1); }); });
-const CX = new Float64Array(COARSE.length), CY = new Float64Array(COARSE.length), CZ = new Float64Array(COARSE.length);
+const CX = new Float64Array(COARSE.length), CY = new Float64Array(COARSE.length), CZ = new Float64Array(COARSE.length), CLOOP = Uint8Array.from(COARSE, k => TRAILS[TS[k].ti].closed ? 1 : 0);
 COARSE.forEach((k, j) => { CX[j] = TS[k].p[0]; CY[j] = TS[k].p[1]; CZ[j] = TS[k].p[2]; });
 // the nearest trail to a direction: { d metres from its centre line, ti trail, i sample, u how far to the next sample }
 function nearestTrail(x, y, z){
-  let bj = 0, bd = -2;
-  for (let j = 0; j < CX.length; j++){ const q = CX[j]*x + CY[j]*y + CZ[j]*z; if (q > bd){ bd = q; bj = j; } }
-  const k0 = COARSE[bj], s0 = TS[k0], t = TRAILS[s0.ti], M = t.pts.length; let best = null;
-  if (bd < Math.cos(260/R)) return { d: R*Math.acos(Math.max(-1, bd)), ti: s0.ti, i: s0.i, u: 0 };
+  let bj = 0, bd = -2, bl = -2;
+  for (let j = 0; j < CX.length; j++){ const q = CX[j]*x + CY[j]*y + CZ[j]*z; if (q > bd){ bd = q; bj = j; } if (CLOOP[j] && q > bl) bl = q; }
+  const k0 = COARSE[bj], s0 = TS[k0], t = TRAILS[s0.ti], M = t.pts.length, dLoop = R*Math.acos(Math.max(-1, Math.min(1, bl))); let best = null;
+  if (bd < Math.cos(260/R)) return { d: R*Math.acos(Math.max(-1, bd)), dLoop, ti: s0.ti, i: s0.i, u: 0 };
   for (let o = -4; o <= 4; o++){
     let i = s0.i + o; if (t.closed) i = ((i % M) + M) % M; else if (i < 0 || i >= M - 1) continue;
     const a = t.pts[i], b = t.pts[(i + 1) % M], bx = b[0] - a[0], by = b[1] - a[1], bz = b[2] - a[2], L2 = bx*bx + by*by + bz*bz || 1e-12;
     const u = Math.max(0, Math.min(1, ((x - a[0])*bx + (y - a[1])*by + (z - a[2])*bz)/L2));
     const d = Math.hypot(x - a[0] - u*bx, y - a[1] - u*by, z - a[2] - u*bz)*R;
-    if (!best || d < best.d) best = { d, ti: s0.ti, i, u };
+    if (!best || d < best.d) best = { d, dLoop, ti: s0.ti, i, u };
   }
-  return best || { d: R*Math.acos(Math.max(-1, bd)), ti: s0.ti, i: s0.i, u: 0 };
+  return best || { d: R*Math.acos(Math.max(-1, bd)), dLoop, ti: s0.ti, i: s0.i, u: 0 };
 }
 
 // ================================================================ the ground
 const RP = RIDGES.map(r => { const p = densify(r.pts, false, 14); return { H: r.H, w: r.w, x: Float64Array.from(p, q => q[0]), y: Float64Array.from(p, q => q[1]), z: Float64Array.from(p, q => q[2]) }; });
-const riverDist = (x, y, z) => Math.abs(Math.asin(Math.max(-1, Math.min(1, x*RIVER.n[0] + y*RIVER.n[1] + z*RIVER.n[2]))) - Math.asin(RIVER.off))*R;
 // the Heartcrystal stands on a mound: the ground rises 70 m to a flat top 40 m across, and the crystal itself (drawn, not
 // ground) goes up another 190 m from there. SPIRE_H is the height the Ascent ends at
 const MOUND_H = 70, MOUND_TOP = 40, SPIRE_H = 215, CRYSTAL_R = 36;
 function spireAt(r){ const rr = Math.max(0, r - MOUND_TOP); return MOUND_H*Math.exp(-(rr/62)*(rr/62)) + 14*Math.exp(-(r/235)*(r/235)); }
 // the ground with no trail cut into it. dT: how far the nearest trail is (the land is gentle beside a trail)
-function rawHeight(x, y, z, dT){
-  const tf = sstep(28, 125, dT), k = R/170;
+// dLoop: how far the nearest loop is. beside a loop the ridges stand well back; a road is let through by a narrow cut
+// dry: leave the river out (for laying a road's own profile up to the bank)
+function rawHeight(x, y, z, dT, dLoop, dry){
+  const tf = sstep(28, 125, dT), k = R/170, tr = Math.min(sstep(9, 26, dT), sstep(40, 125, dLoop === undefined ? dT : dLoop));
   let h = 11*fbm(x*k + 3.1, y*k - 7.7, z*k + 1.3, 4)*(0.3 + 0.7*tf) + 0.9*noise(x*R/22, y*R/22, z*R/22);
   for (let q = 0; q < RP.length; q++){
     const r = RP[q]; let bd = -2; for (let j = 0; j < r.x.length; j++){ const c = r.x[j]*x + r.y[j]*y + r.z[j]*z; if (c > bd) bd = c; }
     const d = R*Math.acos(Math.min(1, bd)), g = Math.exp(-(d/r.w)*(d/r.w));
-    if (g > 0.004) h += r.H*g*(0.55 + 0.9*Math.abs(noise(x*R/95 + q*9.1, y*R/95, z*R/95 - q*4.7)))*tf;
+    if (g > 0.004) h += r.H*g*(0.8 + 0.5*Math.abs(noise(x*R/95 + q*9.1, y*R/95, z*R/95 - q*4.7)))*tr;
   }
   const rs = R*Math.acos(Math.max(-1, Math.min(1, x*SPIRE[0] + y*SPIRE[1] + z*SPIRE[2])));
   if (rs < 700) h += spireAt(rs);
-  const dr = riverDist(x, y, z), trench = Math.exp(-(dr/30)*(dr/30));
-  h = h*(1 - 0.9*trench) + (RIVER.level - 1.5)*trench;
-  const ice = 1 - sstep(RIVER.half - 2, RIVER.half + 3, dr);
-  return h*(1 - ice) + RIVER.level*ice;
+  if (dry) return h;
+  const dr = riverDist(x, y, z); if (dr > 200) return h;
+  h *= 1 - 0.5*Math.exp(-(dr/70)*(dr/70));                           // the land sinks toward the canyon
+  const c = 1 - sstep(RIVER.half, RIVER.half + 8, dr);               // and then drops into it
+  return h*(1 - c) + RIVER.level*c;
 }
+function ridgeAt(q, d){ const r = RP[q]; let bd = -2; for (let j = 0; j < r.x.length; j++){ const c = r.x[j]*d[0] + r.y[j]*d[1] + r.z[j]*d[2]; if (c > bd) bd = c; } return R*Math.acos(Math.min(1, bd)); }
 // each trail's own height profile: the raw ground along it, smoothed and held to a grade a skier can climb
 for (const t of TRAILS){
-  const M = t.pts.length, raw = t.pts.map(p => rawHeight(p[0], p[1], p[2], 0)), win = 14; let h = raw.slice();
+  const M = t.pts.length, raw = t.pts.map(p => rawHeight(p[0], p[1], p[2], 0, 0, true)), win = 14; let h = raw.slice();
   for (let pass = 0; pass < 3; pass++){ const o = h.slice();
     for (let i = 0; i < M; i++){ let s = 0, c = 0; for (let k = -win; k <= win; k++){ let j = i + k; if (t.closed) j = ((j % M) + M) % M; else j = Math.max(0, Math.min(M - 1, j)); s += o[j]; c++; } h[i] = s/c; } }
   const maxStep = 0.09*3;
@@ -159,23 +175,26 @@ for (const t of TRAILS){
 TRAILS.forEach(t => { if (!t.link) return; const K = t.link, M = t.pts.length;
   const join = (end, loopT) => { const j = nearestIndex(loopT.pts, t.pts[end]), target = loopT.h[j], n = Math.min(40, M - 1);
     for (let k = 0; k <= n; k++){ const i = end === 0 ? k : M - 1 - k, w = 1 - sstep(0, n, k); t.h[i] = t.h[i]*(1 - w) + target*w; } };
-  join(0, TRAILS[K.a]); if (!K.to) join(M - 1, TRAILS[K.b]); });
+  if (t.part !== 'b') join(0, TRAILS[K.a]); if (!K.to && t.part !== 'a') join(M - 1, TRAILS[K.b]); });
+// a drawbridge's deck runs level from bank to bank
+for (const D of DRAWS){ const A = TRAILS.find(t => t.link === D.link && t.part === 'a'), B = TRAILS.find(t => t.link === D.link && t.part === 'b'), h0 = A.h[A.h.length - 1], h1 = B.h[0], n = D.pts.length;
+  D.s = [0]; for (let i = 1; i < n; i++) D.s.push(D.s[i - 1] + dist(D.pts[i - 1], D.pts[i])); D.h = D.s.map(v => h0 + (h1 - h0)*v/D.s[n - 1]); D.halfW = 3; D.kind = 'draw'; }
 const BED = 3.6, SHOULDER = 16;
-function trailBlend(nt){ return nt.d >= SHOULDER ? 0 : 1 - sstep(BED, SHOULDER, nt.d); }
+function trailBlend(nt, x, y, z){ if (nt.d >= SHOULDER) return 0; const dr = riverDist(x, y, z); return (1 - sstep(BED, SHOULDER, nt.d))*(dr > RIVER.bank ? 1 : sstep(RIVER.half + 7, RIVER.bank, dr)); }      // no road bed in the canyon: the bridge is the road there
 function trailHeightAt(nt){ const t = TRAILS[nt.ti], M = t.pts.length, j = t.closed ? (nt.i + 1) % M : Math.min(M - 1, nt.i + 1); return t.h[nt.i] + (t.h[j] - t.h[nt.i])*nt.u; }
 function height(x, y, z){
-  const nt = nearestTrail(x, y, z), h = rawHeight(x, y, z, nt.d), w = trailBlend(nt);
+  const nt = nearestTrail(x, y, z), h = rawHeight(x, y, z, nt.d, nt.dLoop), w = trailBlend(nt, x, y, z);
   return w > 0 ? h + (trailHeightAt(nt) - h)*w : h;
 }
 // what the ground is, for the shader and for sound: trail 0..1, ice 0..1, how far along the trail
 function surface(x, y, z){
-  const nt = nearestTrail(x, y, z), w = trailBlend(nt), dr = riverDist(x, y, z);
+  const nt = nearestTrail(x, y, z), w = trailBlend(nt, x, y, z), dr = riverDist(x, y, z);
   return { trail: nt.d < 2.5 ? 1 : nt.d > 3.4 ? 0 : 1 - (nt.d - 2.5)/0.9, dTrail: nt.d, ti: nt.ti, i: nt.i, ice: (1 - sstep(RIVER.half - 2, RIVER.half + 3, dr))*(1 - w), carve: w };
 }
 // everything the ground mesh needs at a point, in one pass: height, how far the nearest trail is, ice, how deep in the cut
 function sample(x, y, z){
-  const nt = nearestTrail(x, y, z), h0 = rawHeight(x, y, z, nt.d), w = trailBlend(nt), dr = riverDist(x, y, z);
-  return { h: w > 0 ? h0 + (trailHeightAt(nt) - h0)*w : h0, dT: nt.d, ice: (1 - sstep(RIVER.half - 2, RIVER.half + 3, dr))*(1 - w), cut: Math.exp(-(dr/30)*(dr/30)) };
+  const nt = nearestTrail(x, y, z), h0 = rawHeight(x, y, z, nt.d, nt.dLoop), w = trailBlend(nt, x, y, z), dr = riverDist(x, y, z);
+  return { h: w > 0 ? h0 + (trailHeightAt(nt) - h0)*w : h0, dT: nt.d, ice: 1 - sstep(RIVER.half - 1, RIVER.half + 2, dr), cut: Math.exp(-(dr/34)*(dr/34)) };
 }
 function slopeAt(d){ const [e, n] = basis(d), s = 1.5/R, f = (v, k) => norm([d[0] + v[0]*k, d[1] + v[1]*k, d[2] + v[2]*k]);
   const a = f(e, s), b = f(e, -s), c = f(n, s), g = f(n, -s);
@@ -205,15 +224,47 @@ const SITES = []; const SOLIDS = [];
 const put = (kind, d, o = {}) => { const s = Object.assign({ kind, d, rot: 0, scale: 1 }, o); SITES.push(s); if (o.r) SOLIDS.push({ d, r: o.r }); return s; };
 const beside = (t, i, off) => { const M = t.pts.length, a = t.pts[Math.max(0, i - 1)], b = t.pts[Math.min(M - 1, i + 1)], p = t.pts[i], tan = norm([b[0] - a[0], b[1] - a[1], b[2] - a[2]]), s = cross(p, tan); return norm([p[0] + s[0]*off/R, p[1] + s[1]*off/R, p[2] + s[2]*off/R]); };
 const tanBearing = (t, i) => { const M = t.pts.length; return bearing(t.pts[i], t.pts[Math.min(M - 1, i + 1)] === t.pts[i] ? t.pts[i - 1] : t.pts[Math.min(M - 1, i + 1)]); };
-const RELAYS = [];
-LOOPS.forEach((L, li) => {
-  const t = TRAILS[li], M = t.pts.length, ri = nearestIndex(t.pts, loopPoint(L, L.relayAt)), d = beside(t, ri, li % 2 ? 9 : -9);
-  const cells = []; for (let k = 1; k <= 6; k++){ const i = (ri + Math.round(k*M/7)) % M; cells.push(t.pts[i]); }
-  RELAYS.push({ name: L.relay, loop: L.name, zone: L.zone, d, cells, at: t.pts[ri] });
-  put('relay', d, { rot: tanBearing(t, ri), group: li, r: 2.2, name: L.relay });
-});
+// ---- the story's furniture (the rules that use it are game-core.js; GAME below is the block they read)
+// zones: 1 the Frostline bowl and its corridor north, 2 Frostveil, 3 the Cut across the canyon, 4 the Court
+const ZONE_OF_LOOP = [1, 2, 4, 3], ZONES = [{ id: 1, name: 'Frostline' }, { id: 2, name: 'Frostveil' }, { id: 3, name: 'The Cut' }, { id: 4, name: 'The Court' }];
+const trailNamed = n => TRAILS.find(t => t.name === n);
+const zoneOfTrail = t => t.link ? (t.part === 'b' ? ZONE_OF_LOOP[t.link.b] : ZONE_OF_LOOP[t.link.a]) : ZONE_OF_LOOP[t.loop];
+// gates: where a road goes through a ridge, at the ridge's crest
+const GATES = [
+  { name: 'East gate', trail: 'Veil Road', ridge: 0, when: { zone: 1 }, opens: 'Frostline terminals powered' },
+  { name: 'Crystal gate', trail: 'Antler Way', ridge: 0, when: { flag: 'offered' }, opens: 'the crystals offered', kind: 'crystalgate' },
+  { name: 'South pass gate', trail: 'Shard Way', ridge: 2, when: { flag: 'southGate' }, opens: 'after the Crystal gate' },
+  { name: 'Crown gate', trail: 'Crystal Road', ridge: 3, when: { flag: 'ceremony' }, opens: 'the ceremony' },
+];
+for (const g of GATES){ const t = trailNamed(g.trail); let bi = 0, bd = 1e9; t.pts.forEach((p, i) => { const d = ridgeAt(g.ridge, p); if (d < bd){ bd = d; bi = i; } });
+  g.d = t.pts[bi]; g.rot = tanBearing(t, bi); g.i = bi;
+  put(g.kind || 'gate', g.d, { rot: g.rot, name: g.name, gate: g.name });
+  // what actually stops you while it is shut: a row of posts across the cut (main.js switches them off when the gate opens)
+  for (let k = -5; k <= 5; k++) SOLIDS.push({ d: beside(t, bi, k*2.6), r: 1.5, gate: g.name }); }
+// terminals: each has a console by the trail and orbs along a stretch of trail to fetch. the out-and-back ones lead to a
+// shut gate or a raised bridge, so you see what comes next before you can reach it
+const orbsAlong = (t, i0, i1, n) => { const out = [], M = t.pts.length; for (let k = 1; k <= n; k++){ let i = Math.round(i0 + (i1 - i0)*k/n); if (t.closed) i = ((i % M) + M) % M; out.push(t.pts[Math.max(0, Math.min(M - 1, i))]); } return out; };
+const TERMINALS = [];
+const terminal = (zone, t, f, side, orbs, loopName) => { const M = t.pts.length, i = Math.round(f*(M - 1)), name = 'Terminal ' + (TERMINALS.length + 1), d = beside(t, i, side*5.2);
+  TERMINALS.push({ name, zone, d, at: t.pts[i], loop: [loopName || t.name], orbs: orbs(i, M), loopLength: 0 }); put('terminal', d, { rot: tanBearing(t, i) + (side > 0 ? -90 : 90), name, r: 0.9 }); };
+{ const L0 = TRAILS[0], L1 = TRAILS[1], L3 = TRAILS[3], cr = trailNamed('Crystal Road'), hr = trailNamed('Haul Road'), sw = trailNamed('Shard Way, far bank');
+  const crownGate = GATES.find(g => g.name === 'Crown gate');
+  terminal(1, L0, 0.56, -1, (i, M) => orbsAlong(L0, i, i + M, 8).slice(0, 7));                                          // 1: once round the bowl
+  terminal(1, cr, 0.06, 1, () => orbsAlong(cr, 8, crownGate.i - 6, 6), 'Crystal Road');                                 // 2: up the corridor to the Crown gate and back
+  terminal(2, L1, 0.10, 1, (i, M) => orbsAlong(L1, i, i + M*0.55, 7));                                                  // 3: the Ribs side of Frostveil
+  terminal(2, L1, 0.62, -1, (i, M) => orbsAlong(L1, i, i + M*0.55, 7));                                                 // 4: the Watcher side
+  terminal(2, hr, 0.08, 1, () => orbsAlong(hr, 8, hr.pts.length - 6, 6), 'Haul Road');                                  // 5: out to the canyon and the raised bridge
+  terminal(3, L3, 0.05, 1, (i, M) => orbsAlong(L3, i, i + M*0.55, 8));                                                  // 6, 7: the two halves of the Cut
+  terminal(3, L3, 0.55, -1, (i, M) => orbsAlong(L3, i, i + M*0.55, 8));
+  terminal(3, sw, 0.9, 1, () => orbsAlong(sw, sw.pts.length - 8, 5, 5), 'Shard Way');                                   // 8: back to the west bridge
+}
+// drawbridge posts: on the side you first reach each from
+const DRAW_POSTS = {};
+for (const D of DRAWS){ const east = D.name === 'East drawbridge', t = TRAILS.find(q => q.link === D.link && q.part === (east ? 'a' : 'b')), i = east ? t.pts.length - 6 : 5, d = beside(t, i, 4.6);
+  DRAW_POSTS[D.name] = d; D.when = { zone: east ? 2 : 3 }; put('post', d, { rot: tanBearing(t, i), name: D.name + ' post', r: 0.5 }); }
+// lamps and power lines switch on with their zone
 TRAILS.forEach((t, ti) => {
-  const M = t.pts.length, group = t.link ? t.link.power : ti;
+  const M = t.pts.length, group = zoneOfTrail(t);
   for (let i = 4, k = 0; i < M - 3; i += 9, k++) put('pole', beside(t, i, k % 2 ? 3.5 : -3.5), { group, r: 0.12 });
   if (t.link) for (let i = 10, k = 0; i < M - 8; i += 20, k++) put('pylon', beside(t, i, 10), { rot: tanBearing(t, i), group, r: 0.8 });
 });
@@ -264,10 +315,18 @@ const TREES = (() => {
 })();
 for (const t of TREES) SOLIDS.push({ d: t.d, r: 0.22*t.s });
 
+const GAME = { version: 1, note: 'Hale (v3): the same block game-core.js reads from a v2 layout.',
+  zones: ZONES.map(z => ({ id: z.id, name: z.name })), trailZones: Object.fromEntries(TRAILS.map(t => [t.name, zoneOfTrail(t)])),
+  terminals: TERMINALS.map(t => ({ name: t.name, zone: t.zone, d: t.d, loop: t.loop, orbs: t.orbs })),
+  gates: GATES.map(g => ({ name: g.name, d: g.d, opens: g.opens, when: g.when })),
+  bridges: DRAWS.map(D => ({ name: D.name, kind: 'draw', when: D.when, post: DRAW_POSTS[D.name], opens: 'zone ' + D.when.zone + ' terminals powered' }))
+    .concat([{ name: 'The Ascent', kind: 'light', when: { flag: 'ceremony' }, foot: BRIDGE.foot, opens: 'the ceremony' }]),
+  crystals: [], chapters: ['Frostline: power 2 terminals; the East gate opens', 'Frostveil: power 3 terminals; the East drawbridge answers at its post', 'The Cut: power 3 terminals'] };
+const BRIDGES = [BRIDGE].concat(DRAWS);
 const START = (() => { const t = TRAILS[0], i = nearestIndex(t.pts, loopPoint(LOOPS[0], 180)); return { d: t.pts[i], heading: tanBearing(t, i) }; })();
 
 const W = { R, ll, toLL, dot, norm, cross, mix, dist, offset, bearing, basis, sstep, noise, fbm, rng,
-  SPIRE, SPIRE_H, MOUND_H, CRYSTAL_R, LOOPS, LINKS, RIDGES, RIVER, TRAILS, JUNCTIONS, BRIDGE, RELAYS, SITES, SOLIDS, LANDMARKS, TREES, START,
+  SPIRE, SPIRE_H, MOUND_H, CRYSTAL_R, LOOPS, LINKS, RIDGES, RIVER, TRAILS, JUNCTIONS, BRIDGE, BRIDGES, DRAWS, GATES, TERMINALS, ZONES, GAME, zoneOfTrail, SITES, SOLIDS, LANDMARKS, TREES, START,
   TRAIL_W: 5, STOP: 0.55, height, rawHeight, sample, surface, slopeAt, nearestTrail, riverDist };
 if (typeof module !== 'undefined' && module.exports) module.exports = W; else root.Hale = W;
 })(typeof window !== 'undefined' ? window : globalThis);

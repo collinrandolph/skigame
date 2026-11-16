@@ -13,6 +13,11 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 #hud{top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;padding:10px 14px;max-width:min(330px,calc(100vw - 110px))}
 #hud h1{margin:0;font-size:12px;letter-spacing:.32em;font-weight:700;color:var(--muted)}
 #goal{margin:4px 0 6px;font-size:15px;font-weight:600}
+#detail{font-size:12px;color:var(--muted);margin:-3px 0 7px;min-height:16px}
+#offer,#hint{left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 92px);transform:translateX(-50%);padding:10px 18px;text-align:center;display:none;max-width:86vw}
+#offer{cursor:pointer;border-color:var(--accent)} #offer b{display:block;font-size:17px} #offer span{display:block;font-size:12px;color:var(--muted)} #offer em{display:block;font-style:normal;font-size:10.5px;color:var(--accent);margin-top:3px;letter-spacing:.06em}
+#hint{font-size:13px;color:var(--muted)}
+@media (pointer:coarse){ #offer,#hint{bottom:calc(env(safe-area-inset-bottom,0px) + 210px)} }
 #pips{display:flex;gap:6px;flex-wrap:wrap}
 .pip{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);padding:2px 7px;border:1px solid var(--line);border-radius:99px}
 .pip i{width:7px;height:7px;border-radius:50%;background:#3a4558}
@@ -42,17 +47,20 @@ body.clean .card,body.clean #btns{display:none!important}
 </head>
 <body>
 <canvas id="c"></canvas>
-<div id="hud" class="card"><h1>HALE</h1><div id="goal">&nbsp;</div><div id="pips"></div></div>
+<div id="hud" class="card"><h1>HALE</h1><div id="goal">&nbsp;</div><div id="detail"></div><div id="pips"></div></div>
 <div id="way" class="card"><svg id="arrow" viewBox="0 0 20 20"><path d="M10 1l6 16-6-4-6 4z"/></svg><span id="wayTxt"></span></div>
-<div id="btns"><button id="viewBtn" title="Planet view (V)">Planet</button><button id="resetBtn" title="Back to the last beacon (R)">Reset</button></div>
+<div id="btns"><button id="viewBtn" title="Planet view (V)">Planet</button><button id="resetBtn" title="Back to the last terminal you powered (R)">Reset</button></div>
 <div id="speed" class="card"><div id="kmh">0<small>km/h</small></div><div id="where"></div></div>
-<div id="help" class="card"><b>←/→</b> or <b>A/D</b> kick · hold to glide · <b>Space</b> + kick: loaded stroke · <b>↑</b> tuck (←/→ lean) · <b>↓</b> snow plow · <b>V</b> planet · <b>R</b> reset · <b>H</b> hide UI. Controller and touch as in the game.</div>
+<div id="help" class="card"><b>←/→</b> or <b>A/D</b> kick · hold to glide · <b>Space</b> + kick: loaded stroke · <b>↑</b> tuck (←/→ lean) · <b>↓</b> snow plow · <b>Enter</b> agree · <b>V</b> planet · <b>R</b> reset · <b>H</b> hide UI. Controller and touch as in the game.</div>
 <div id="toast" class="card"></div>
+<div id="offer" class="card"><b id="offerT"></b><span id="offerD"></span><em>Enter · E · Ⓐ · tap</em></div>
+<div id="hint" class="card"></div>
 <div class="pads" aria-hidden="true"><div class="pad" id="padL">Left kick</div><div class="pad" id="padR">Right kick</div></div>
 <div id="end"><h2>HALE</h2><p id="endTxt"></p><div><button id="keepBtn">Keep skiing</button> <button id="newBtn">New game</button></div></div>
 <div id="load"><h2>HALE</h2><p id="loadTxt">Shaping the planet…</p></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="js/world.js"></script>
+<script src="js/game-core.js"></script>
 <script src="js/skier-anim.js"></script>
 <script src="js/figure.js"></script>
 <script src="js/skier.js"></script>

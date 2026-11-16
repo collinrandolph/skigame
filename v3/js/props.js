@@ -44,6 +44,23 @@ function createProps(THREE){
     for (const x of [-4.6, 4.6]) g.add(shard(0.55, 2.0, MAT.crystal, 0, 0, x, 0).translateY(5.4));
     g.userData = { lit(on){ lamp.color.setRGB(on ? 1.9 : 0.05, on ? 0.8 : 0.06, on ? 3.2 : 0.08); } }; return g; };
 
+  // ---------------- the story's furniture: terminals, gates, bridge posts (main.js sets their state from the rules)
+  // a terminal: a console by the trail and a beacon mast behind it. 0 asleep, 1 running (amber), 2 powered (cyan, and a column of light)
+  B.terminal = () => { const scr = lampMat(), lamp = lampMat(), g = G(box(1.5, 1.0, 0.8, MAT.dark, 0, 0.5, 0), box(1.3, 0.75, 0.1, scr, 0, 1.35, -0.18), box(1.5, 0.12, 0.9, MAT.orange, 0, 1.05, 0), cyl(0.5, 0.36, 8.5, MAT.panel, 0, 0, 1.6, 10), cyl(0.5, 0.46, 0.8, MAT.orange, 0, 3.4, 1.6, 10),
+      cyl(0.55, 0.55, 1.1, lamp, 0, 8.5, 1.6, 10), cyl(0.7, 0.1, 0.7, MAT.orange, 0, 9.6, 1.6, 10)); g.children[1].rotation.x = -0.45;
+    const beam = mesh(new THREE.CylinderGeometry(0.35, 0.8, 320, 10, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.45, 1.4, 1.9), transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }), 0, 170, 1.6); g.add(beam);
+    g.userData = { set(v){ scr.color.setRGB(v === 2 ? 0.5 : v === 1 ? 2.6 : 0.06, v === 2 ? 2.1 : v === 1 ? 1.5 : 0.07, v === 2 ? 2.7 : v === 1 ? 0.3 : 0.09); lamp.color.copy(scr.color); beam.visible = v === 2; } }; g.userData.set(0); return g; };
+  // a gate across a cut in the ridge: two towers, a lintel, and a wall of light while it is shut
+  const gateOf = (span, high, bar, crystal) => () => { const lamp = lampMat(), wall = mesh(new THREE.PlaneGeometry(span*2 - 1.5, high), new THREE.MeshBasicMaterial({ color: new THREE.Color(...bar), transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }), 0, high/2 + 0.2, 0);
+    const g = G(wall, box(span*2 + 3, 1.2, 2.4, crystal ? MAT.white : MAT.steel, 0, high + 0.9, 0), box(span*2 - 2, 0.3, 0.3, lamp, 0, high + 0.1, -1.25));
+    for (const sd of [-1, 1]){ g.add(cyl(1.7, 1.25, high + 0.4, crystal ? MAT.white : MAT.dark, sd*span, 0, 0, crystal ? 12 : 6), box(0.5, 1.6, 0.5, lamp, sd*(span - 1.5), high - 1.4, -1.0));
+      if (crystal) g.add(shard(0.9, 4.2, MAT.crystal, 0, 0, sd*span, 0).translateY(high + 1.4)); else g.add(box(3.2, 1.0, 3.2, MAT.orange, sd*span, high + 2.0, 0)); }
+    g.userData = { open(on){ wall.visible = !on; lamp.color.setRGB(on ? 0.4 : 2.8, on ? 2.4 : 0.35, on ? 1.2 : 0.2); } }; g.userData.open(false); return g; };
+  B.gate = gateOf(13.5, 9, [2.4, 0.5, 0.25], false);
+  B.crystalgate = gateOf(13.5, 12, [1.5, 0.6, 2.8], true);
+  // the post that lowers a drawbridge
+  B.post = () => { const lamp = lampMat(), g = G(cyl(0.3, 0.24, 1.5, MAT.dark, 0, 0, 0, 8), box(0.7, 0.5, 0.5, MAT.orange, 0, 1.6, 0), box(0.5, 0.3, 0.08, lamp, 0, 1.62, -0.27), cyl(0.05, 0.05, 1.3, MAT.steel, 0, 1.8, 0, 5), mesh(new THREE.SphereGeometry(0.16, 8, 6), lamp, 0, 3.15, 0));
+    g.userData = { set(v){ lamp.color.setRGB(v === 2 ? 0.4 : v === 1 ? 2.6 : 2.4, v === 2 ? 2.4 : v === 1 ? 1.5 : 0.3, v === 2 ? 1.2 : 0.3); } }; g.userData.set(0); return g; };
   // ---------------- Frostline-3
   B.dome = () => { const r = 12, g = G(cyl(r + 0.6, r + 0.2, 1.4, MAT.panel, 0, 0, 0, 24), mesh(new THREE.IcosahedronGeometry(r, 2), MAT.glass, 0, 1.2, 0));
     const frame = mesh(new THREE.IcosahedronGeometry(r*1.005, 2), new THREE.MeshBasicMaterial({ color: C(0x5b6978), wireframe: true }), 0, 1.2, 0); g.add(frame);

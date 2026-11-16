@@ -114,7 +114,7 @@ const station = (() => { const g = new THREE.Group(), M = PROPS.MAT, lit = new T
     const ship = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 3, 16, 8), hull); ship.rotation.z = Math.PI/2; ship.rotation.y = a + Math.PI/2; ship.position.set(Math.sin(a)*50, 0, Math.cos(a)*50); if (k % 3 !== 2) g.add(ship); }
   const portal = new THREE.Mesh(new THREE.TorusGeometry(14, 1.6, 8, 32), hull), disc = new THREE.Mesh(new THREE.CircleGeometry(13, 32), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 1.2, 3.0), side: THREE.DoubleSide, fog: false }));
   portal.position.set(66, 0, 0); portal.rotation.y = Math.PI/2; disc.position.copy(portal.position); disc.rotation.y = Math.PI/2; g.add(portal, disc);
-  g.traverse(o => { o.frustumCulled = false; }); g.scale.setScalar(1.6); scene.add(g); return g; })();
+  g.traverse(o => { o.frustumCulled = false; }); g.scale.setScalar(1.6); g.visible = false; return g; })();      // (the first sketch of the station; the real one is a realm now: see buildRealms)
 
 // ================================================================ the ground: a cube-sphere in chunks, one material that knows snow, rock, ice and ore
 const groundU = { uSun: { value: sunDir }, uT: { value: 0 } };
@@ -181,26 +181,26 @@ trailMat.onBeforeCompile = sh => {
       { float dist = length(cameraPosition - vWP2), cord = 0.5 + 0.5*sin(vT.x*52.), near = 1. - smoothstep(18., 60., dist);
         diffuseColor.rgb = vec3(0.90, 0.93, 0.975)*(1. - 0.085*cord*near) ; diffuseColor.a = vT.z; }`);
 };
-function buildTrails(){
-  for (const t of W.TRAILS){
+function buildTrails(list = W.TRAILS, Rk = R, hf = W.height, parent = scene){
+  for (const t of list){
     const M = t.pts.length, n = t.closed ? M + 1 : M, across = [-3.1, -2.5, 0, 2.5, 3.1], al = [0, 1, 1, 1, 0], K = across.length;
     const pos = new Float32Array(n*K*3), nor = new Float32Array(n*K*3), aT = new Float32Array(n*K*3), idx = []; let s = 0;
     for (let i = 0; i < n; i++){
       const p = t.pts[i % M], a = t.pts[(i - 1 + M) % M], b = t.pts[(i + 1) % M], tan = W.norm(t.closed || (i > 0 && i < M - 1) ? [b[0] - a[0], b[1] - a[1], b[2] - a[2]] : i === 0 ? [b[0] - p[0], b[1] - p[1], b[2] - p[2]] : [p[0] - a[0], p[1] - a[1], p[2] - a[2]]), side = W.cross(p, tan);
       if (i > 0) s += W.dist(t.pts[(i - 1) % M], p);
-      for (let k = 0; k < K; k++){ const d = W.norm([p[0] + side[0]*across[k]/R, p[1] + side[1]*across[k]/R, p[2] + side[2]*across[k]/R]), r = R + W.height(d[0], d[1], d[2]) + 0.07, o = (i*K + k)*3;
+      for (let k = 0; k < K; k++){ const d = W.norm([p[0] + side[0]*across[k]/Rk, p[1] + side[1]*across[k]/Rk, p[2] + side[2]*across[k]/Rk]), r = Rk + hf(d[0], d[1], d[2]) + 0.07, o = (i*K + k)*3;
         pos[o] = d[0]*r; pos[o + 1] = d[1]*r; pos[o + 2] = d[2]*r; nor[o] = d[0]; nor[o + 1] = d[1]; nor[o + 2] = d[2]; aT[o] = across[k]; aT[o + 1] = s; aT[o + 2] = al[k]; }
       if (i < n - 1) for (let k = 0; k < K - 1; k++){ const q = i*K + k; idx.push(q, q + K, q + 1, q + 1, q + K, q + K + 1); }
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.setAttribute('aT', new THREE.BufferAttribute(aT, 3)); g.setIndex(idx);
-    const m = new THREE.Mesh(g, trailMat); m.receiveShadow = true; m.renderOrder = 1; scene.add(m);
+    const m = new THREE.Mesh(g, trailMat); m.receiveShadow = true; m.renderOrder = 1; m.frustumCulled = parent === scene; parent.add(m);
   }
 }
 
 // ================================================================ scenery
 const frameAt = (d, rotDeg, out = new THREE.Matrix4()) => { const [e, n] = W.basis(d), b = (rotDeg || 0)*Math.PI/180, f = [n[0]*Math.cos(b) + e[0]*Math.sin(b), n[1]*Math.cos(b) + e[1]*Math.sin(b), n[2]*Math.cos(b) + e[2]*Math.sin(b)];
   const z = new V3(-f[0], -f[1], -f[2]), y = v3(d), x = new V3().crossVectors(y, z).normalize(); z.crossVectors(x, y); return out.makeBasis(x, y, z); };
-const groups = {}, termObj = {}, gateObj = {}, postObj = {}, buckets = [];        // groups: what lights up together (a loop's lamps, a road's pylons)
+const siteObjs = [], groups = {}, termObj = {}, gateObj = {}, postObj = {}, altarObj = {}, teleObj = [], buckets = [];        // groups: what lights up together (a loop's lamps, a road's pylons)
 const addToGroup = (g, fn) => { (groups[g] = groups[g] || []).push(fn); };
 let heart = null, portalObj = null;
 function bucketOf(d){ const ax = Math.abs(d[0]), ay = Math.abs(d[1]), az = Math.abs(d[2]); let f, u, v; if (ax >= ay && ax >= az){ f = d[0] > 0 ? 0 : 1; u = d[1]/ax; v = d[2]/ax; } else if (ay >= az){ f = d[1] > 0 ? 2 : 3; u = d[0]/ay; v = d[2]/ay; } else { f = d[2] > 0 ? 4 : 5; u = d[0]/az; v = d[1]/az; } return f*9 + Math.min(2, Math.floor((u + 1)*1.5))*3 + Math.min(2, Math.floor((v + 1)*1.5)); }
@@ -215,20 +215,21 @@ function instanced(geo, mat, items, cast){   // items: [{ d, rot, scale, h }], s
   }
   return out;
 }
-function buildScenery(){
+function buildScenery(sites = W.SITES, Rk = R, hf = W.height, parent = scene){
   const big = { ribs: 1, arch: 1, watcher: 1, heart: 1 };
   const poles = [], lamps = {};
-  for (const s of W.SITES){
+  for (const s of sites){
     if (s.kind === 'pole'){ poles.push(s); (lamps[s.group] = lamps[s.group] || []).push(s); continue; }
     const build = PROPS.build[s.kind]; if (!build) continue;
-    const g = build(s), h = W.height(s.d[0], s.d[1], s.d[2]), r = R + h - (big[s.kind] ? 1.2 : 0.05);
+    const g = build(s), h = hf(s.d[0], s.d[1], s.d[2]), r = Rk + h - (big[s.kind] ? 1.2 : 0.05);
     g.applyMatrix4(frameAt(s.d, s.rot)); g.scale.setScalar(s.scale || 1); g.position.set(s.d[0]*r, s.d[1]*r, s.d[2]*r);
     g.traverse(o => { if (o.isMesh && !(o.material && o.material.isMeshBasicMaterial)){ o.castShadow = SHADOWS && !big[s.kind]; } });
-    g.userData.site = s; g.userData.dir = v3(s.d); scene.add(g);
-    if (s.kind === 'terminal') termObj[s.name] = g; else if (s.kind === 'gate' || s.kind === 'crystalgate') gateObj[s.name] = g; else if (s.kind === 'post') postObj[s.name.slice(0, -5)] = g;
+    g.userData.site = s; g.userData.dir = v3(s.d); parent.add(g); siteObjs.push(g);
+    if (s.kind === 'terminal') termObj[s.name] = g; else if (s.kind === 'gate' || s.kind === 'crystalgate' || (s.kind === 'mineportal' && s.gate)) gateObj[s.name] = g; else if (s.kind === 'altar') altarObj[s.name] = g; else if (s.kind === 'telepad') teleObj.push(g); else if (s.kind === 'post') postObj[s.name.slice(0, -5)] = g;
     else if (s.kind === 'pylon') addToGroup(s.group, on => g.userData.lit(on));
     else if (s.kind === 'heart') heart = g; else if (s.kind === 'portal') portalObj = g;
   }
+  if (parent !== scene) return;
   instanced(PROPS.poleGeo(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 }), poles, false);
   for (const k of Object.keys(lamps)){ const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.25, 0.28, 0.32) }); instanced(PROPS.lampGeo(), mat, lamps[k], false);
     addToGroup(k, on => mat.color.setRGB(on ? 0.7 : 0.25, on ? 2.4 : 0.28, on ? 3.0 : 0.32)); }
@@ -257,6 +258,76 @@ function buildCosmic(){
   for (let k = 0; k < 4; k++){ const d = W.offset(W.SPIRE, 215, 45 + k*90), g = PROPS.build.moose({}), r = R + W.height(d[0], d[1], d[2]) - 2;
     g.traverse(o => { if (o.isMesh){ o.material = mat; o.castShadow = false; } }); g.applyMatrix4(frameAt(d, W.bearing(d, W.SPIRE))); g.scale.setScalar(34); g.position.set(d[0]*r, d[1]*r, d[2]*r); g.visible = false; scene.add(g); cosmic.push(g); }
   cosmic.mat = mat;
+}
+
+// ================================================================ the realms: the mine below and the station above (world.js REALMS)
+const realmGroup = {}; let realm = null;                 // realm: where the skier is now (null: on the surface)
+const caveMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0 });
+caveMat.onBeforeCompile = sh => {
+  Object.assign(sh.uniforms, groundU);
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP; varying vec3 vWN;').replace('#include <begin_vertex>', '#include <begin_vertex>\n vWP = position; vWN = normal;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>\nvarying vec3 vWP; varying vec3 vWN; uniform float uT; ${GLSL_NOISE}\n float gVein;`)
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      { vec3 up = normalize(vWP), wn = normalize(vWN); float flat_ = smoothstep(0.75, 0.97, dot(wn, up)), n1 = vnoise(vWP*0.09), n2 = vnoise(vWP*0.7);
+        float strata = 0.5 + 0.5*sin((length(vWP))*1.1 + n1*6.);
+        vec3 rock = mix(vec3(0.085, 0.07, 0.065), vec3(0.20, 0.165, 0.14), strata)*(0.8 + 0.4*n2), dust = vec3(0.36, 0.33, 0.31)*(0.85 + 0.3*n2);
+        diffuseColor.rgb = mix(rock, dust, flat_);
+        gVein = (1. - smoothstep(0.0, 0.05, abs(vnoise(vWP*0.13 + 7.) - 0.5)))*(1. - flat_)*smoothstep(0.35, 0.6, vnoise(vWP*0.021 + 2.)); }`)
+    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += vec3(0.08, 0.7, 1.6)*gVein*(1.6 + 0.5*sin(uT*1.3 + vWP.x*0.2));');
+};
+function buildRealms(){
+  for (const key of Object.keys(W.REALMS)){
+    const rl = W.REALMS[key], g = new THREE.Group(); realmGroup[key] = g; scene.add(g);
+    buildTrails(rl.trails, rl.R, rl.height, g); buildScenery(rl.sites, rl.R, rl.height, g);
+  }
+  // ---- the mine: a floor and a roof over the same grid, joined where the rock is solid
+  { const rl = W.REALMS.mine, g = realmGroup.mine, E = 192, st = 3, n = Math.floor(2*E/st) + 1, fl = new Float32Array(n*n*3), ce = new Float32Array(n*n*3), sd = new Float32Array(n*n), fi = [], ci = [];
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++){ const u = -E + i*st, v = -E + j*st, d = rl.F.to(u, v), k = j*n + i, hf = rl.floor(u, v), hc = Math.max(hf, rl.ceiling(u, v)); sd[k] = rl.sdf(u, v);
+      fl[k*3] = d[0]*(rl.R + hf); fl[k*3 + 1] = d[1]*(rl.R + hf); fl[k*3 + 2] = d[2]*(rl.R + hf); ce[k*3] = d[0]*(rl.R + hc); ce[k*3 + 1] = d[1]*(rl.R + hc); ce[k*3 + 2] = d[2]*(rl.R + hc); }
+    for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++){ const a = j*n + i, b = a + 1, c = a + n, d = c + 1; if (Math.min(sd[a], sd[b], sd[c], sd[d]) > 10) continue;
+      fi.push(a, b, c, b, d, c); ci.push(a, c, b, b, c, d); }
+    const mk = (pos, idx) => { const q = new THREE.BufferGeometry(); q.setAttribute('position', new THREE.BufferAttribute(pos, 3)); q.setIndex(idx); q.computeVertexNormals(); const me = new THREE.Mesh(q, caveMat); me.frustumCulled = false; g.add(me); return me; };
+    const f = mk(fl, fi); mk(ce, ci);
+    // which way is "up" for the winding: check one floor normal against the outward direction and flip both if needed
+    { const nrm = f.geometry.attributes.normal, p = f.geometry.attributes.position, k = fi[0]; if (nrm.getX(k)*p.getX(k) + nrm.getY(k)*p.getY(k) + nrm.getZ(k)*p.getZ(k) < 0) for (const me of g.children) if (me.isMesh && me.material === caveMat){ const ix = me.geometry.index.array; for (let q = 0; q < ix.length; q += 3){ const t = ix[q + 1]; ix[q + 1] = ix[q + 2]; ix[q + 2] = t; } me.geometry.computeVertexNormals(); } }
+    // light: warm along the street, blue at the terraces, violet at the altar
+    const lamp = (u, v, y, col, power, reach) => { const d = rl.F.to(u, v), L = new THREE.PointLight(col, power, reach, 1.6), r = rl.R + y; L.position.set(d[0]*r, d[1]*r, d[2]*r); g.add(L); };
+    lamp(0, -60, 9, 0xffb070, 1.5, 120); lamp(0, 5, 11, 0xffb070, 1.5, 130); lamp(0, 70, 9, 0xffb070, 1.4, 120); lamp(0, 132, 8, 0x58c8ff, 1.6, 110); lamp(-112, 44, 6, 0xb070ff, 1.2, 70); lamp(112, 52, 6, 0x70d0ff, 0.9, 60); lamp(0, -140, 5, 0xffc090, 0.8, 60);
+    g.visible = false; }
+  // ---- the station: decks laid on its shell (so the skier's ground and the drawn deck agree), and the structure round them
+  { const rl = W.REALMS.station, g = realmGroup.station, M = PROPS.MAT, C = rl.C;
+    const deckMat = new THREE.MeshStandardMaterial({ color: PROPS.C(0x56606c), roughness: 0.5, metalness: 0.5, side: THREE.DoubleSide }), edge = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 1.6, 2.4), fog: false });
+    const strip = (pts, half, mat, lift) => { const pos = [], idx = []; pts.forEach(([u, v, tu, tv], i) => { for (const sdn of [-1, 1]){ const d = rl.F.to(u + tv*half*sdn, v - tu*half*sdn), r = rl.R + lift; pos.push(d[0]*r, d[1]*r, d[2]*r); } if (i < pts.length - 1){ const q = i*2; idx.push(q, q + 1, q + 2, q + 1, q + 3, q + 2); } });
+      const q = new THREE.BufferGeometry(); q.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); q.setIndex(idx); q.computeVertexNormals(); const me = new THREE.Mesh(q, mat); me.frustumCulled = false; g.add(me); };
+    const circle = (r, n) => { const p = []; for (let i = 0; i <= n; i++){ const a = i/n*Math.PI*2; p.push([r*Math.sin(a), r*Math.cos(a), Math.cos(a), -Math.sin(a)]); } return p; };
+    strip(circle(90, 120), 5.5, deckMat, -0.02); strip(circle(95.4, 120), 0.12, edge, 0.5); strip(circle(84.6, 120), 0.12, edge, 0.5); strip(circle(12, 40), 12, deckMat, -0.02); strip(circle(24, 60), 0.12, edge, 0.5);
+    for (const [x, y] of [[0, 1], [1, 0], [0, -1], [-1, 0]]){ const p = []; for (let r = 22; r <= 86; r += 4) p.push([x*r, y*r, x, y]); strip(p, 4.5, deckMat, -0.02); for (const o of [-4.4, 4.4]) strip(p.map(([u, v, tu, tv]) => [u + tv*o, v - tu*o, tu, tv]), 0.1, edge, 0.5); }
+    // the structure, in a frame at the hub (x east, y up, z south), sunk a little toward the rim where the shell curves away
+    const S = new THREE.Group(), hull = new THREE.MeshStandardMaterial({ color: PROPS.C(0xb9c2cf), roughness: 0.5, metalness: 0.4, flatShading: true }), lit = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.9, 2.4), fog: false }), add = (geo, mat, x, y, z) => { const me = new THREE.Mesh(geo, mat); me.position.set(x, y, z); S.add(me); return me; };
+    const under = add(new THREE.TorusGeometry(90, 3.2, 8, 80), hull, 0, -7.5, 0); under.rotation.x = Math.PI/2; add(new THREE.CylinderGeometry(24, 30, 9, 24), hull, 0, -5.2, 0); add(new THREE.CylinderGeometry(10, 26, 30, 16), hull, 0, -24, 0); add(new THREE.CylinderGeometry(1.5, 6, 46, 8), hull, 0, -58, 0);
+    for (let k = 0; k < 4; k++){ const a = k*Math.PI/2 + Math.PI/4, x = Math.sin(a), z = Math.cos(a); const tw = add(new THREE.CylinderGeometry(2.2, 3, 26 + (k % 2)*12, 8), hull, x*17, 13 + (k % 2)*6, z*17); add(new THREE.CylinderGeometry(2.4, 2.4, 1.2, 8), lit, x*17, 8 + k*3, z*17); add(new THREE.ConeGeometry(2.2, 9, 8), hull, x*17, 30.5 + (k % 2)*12, z*17); }
+    for (let k = 0; k < 8; k++){ const a = k*Math.PI/4 + Math.PI/8, x = Math.sin(a), z = Math.cos(a), arm = add(new THREE.BoxGeometry(3, 3, 64), hull, x*126, -8, z*126); arm.rotation.y = a;
+      if (k % 4 !== 3){ const ship = add(new THREE.CylinderGeometry(4, 6, 34, 8), k % 3 ? hull : M.orange, x*176, -8, z*176); ship.rotation.z = Math.PI/2; ship.rotation.y = a + Math.PI/2; const nose = add(new THREE.ConeGeometry(4, 12, 8), hull, x*199, -8, z*199); nose.rotation.z = -Math.PI/2; nose.rotation.y = a + Math.PI/2; add(new THREE.BoxGeometry(2, 2, 2), lit, x*160, -5.5, z*160); } }
+    const hoop = add(new THREE.TorusGeometry(34, 3, 8, 40), hull, 150, 6, 0); hoop.rotation.y = Math.PI/2; const disc = add(new THREE.CircleGeometry(31, 40), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.35, 1.0, 2.6), side: THREE.DoubleSide, fog: false }), 150, 6, 0); disc.rotation.y = Math.PI/2; add(new THREE.BoxGeometry(60, 3, 3), hull, 120, -8, 0);
+    S.applyMatrix4(frameAt(C, 0)); S.position.set(C[0]*rl.R, C[1]*rl.R, C[2]*rl.R); S.traverse(o => { o.frustumCulled = false; }); g.add(S); }
+}
+// going from one realm to another: a short fade, then the skier is put down at the other end
+let fade = 0, pending = null, armed = true, camdOut = null;
+function go(key, at){ if (pending) return; pending = { key, at }; }
+function arrive(){
+  const { key, at } = pending; pending = null; realm = key ? W.REALMS[key] : null; sk.P.R = realm ? realm.R : R;
+  if (camdOut === null) camdOut = sk.P.camd; if (key === 'mine') sk.P.camd = Math.min(camdOut, 7.5); else { sk.P.camd = camdOut; camdOut = null; }      // a closer camera under a roof
+  const d = at.d, t = at.to; sk.TEST.place(v3(d)); const f = v3(t).sub(v3(d)); f.addScaledVector(sk.n, -f.dot(sk.n)).normalize(); sk.S.th = sk.S.tgt = Math.atan2(f.dot(sk.ex), -f.dot(sk.ey)); sk.S.vx = sk.S.vy = 0; sk.snapCamera();
+  realmGroup.mine.visible = key === 'mine'; armed = false; toast(realm ? realm.name : W.ZONES[2].name);
+}
+const nearDir = (d, m) => v3(d).angleTo(sk.n)*(realm ? realm.R : R) < m;
+function portals(){
+  const mine = W.REALMS.mine, stn = W.REALMS.station;
+  const spots = !realm ? [[W.PORTAL.d, 6, () => G.gateOpen('Mine portal') && go('mine', mine.entry)]]
+    : realm === mine ? [[mine.exit, 6, () => go(null, W.PORTAL.back)], [mine.tele, 4.5, () => G.doorOpen(0) && go('station', stn.teleArrive)]]
+    : [[stn.tele, 4, () => go('mine', mine.teleArrive)]];
+  let near = false; for (const [d, m, act] of spots) if (nearDir(d, m)){ near = true; if (armed) act(); }
+  if (!near && !pending) armed = true;         // (you have to leave a portal before it will take you again)
 }
 
 // ---- the drawbridges: two leaves, up until the post lowers them
@@ -289,6 +360,28 @@ function syncOrbs(){
   const list = G.orbs(); while (orbPool.length < list.length){ const o = new THREE.Mesh(orbGeo, orbMat); scene.add(o); orbPool.push(o); }
   orbPool.forEach((o, i) => { const it = list[i]; o.visible = !!it && !it.got; if (o.visible){ const d = it.d, r = R + W.height(d[0], d[1], d[2]) + 1.25; o.position.set(d[0]*r, d[1]*r, d[2]*r); } });
 }
+const crownGeo = new THREE.OctahedronGeometry(0.5, 0), crownMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 0.9, 3.2), fog: false }), crownPool = [];
+function syncCrown(){
+  const list = G.crownCrystals(), rl = W.REALMS.station; while (crownPool.length < list.length){ const o = new THREE.Mesh(crownGeo, crownMat); o.frustumCulled = false; scene.add(o); crownPool.push(o); }
+  crownPool.forEach((o, i) => { const it = list[i]; o.visible = !!it && !it.got; if (o.visible){ const d = it.d, r = rl.R + rl.height(d[0], d[1], d[2]) + 1.3; o.position.set(d[0]*r, d[1]*r, d[2]*r); } });
+}
+const xtalGeo = new THREE.OctahedronGeometry(0.55, 0), xtalMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.8, 0.7, 2.2), fog: false }), xtalPool = [];
+function syncCrystals(){
+  const list = G.crystals(); while (xtalPool.length < list.length){ const o = new THREE.Mesh(xtalGeo, xtalMat); o.scale.set(0.7, 1.5, 0.7); scene.add(o); xtalPool.push(o); }
+  xtalPool.forEach((o, i) => { const it = list[i]; o.visible = !!it && !it.got; if (o.visible){ const d = it.d, r = R + W.height(d[0], d[1], d[2]) + 1.4; o.position.set(d[0]*r, d[1]*r, d[2]*r); } });
+}
+// the calves: with their herd, trotting after you, or standing crowned on a diamond
+const calfObj = [];
+function buildCalves(){ for (let i = 0; i < W.COURT.calves.length; i++){ const g = PROPS.build.moose({}); g.scale.setScalar(0.52); g.userData.at = null; scene.add(g); calfObj.push(g); } }
+const _cp = new V3(), _cq = new V3();
+function calves(dt){
+  if (realm){ for (const g of calfObj) g.visible = false; return; }
+  G.calves().forEach((c, i) => { const g = calfObj[i]; g.visible = true; let want, face = null;
+    if (c.state === 'follow'){ const back = _cq.copy(sk.ex).multiplyScalar(-Math.sin(sk.S.th)).addScaledVector(sk.ey, Math.cos(sk.S.th)); want = _cp.copy(sk.n).addScaledVector(back, 5.5/R).normalize(); face = sk.n; }
+    else want = _cp.set(...(c.state === 'court' ? c.spot : c.d));
+    if (!g.userData.at) g.userData.at = want.clone(); const at = g.userData.at; at.lerp(want, c.state === 'follow' ? Math.min(1, dt*2.2) : 1).normalize();
+    const d = [at.x, at.y, at.z], r = R + W.height(d[0], d[1], d[2]); g.quaternion.setFromRotationMatrix(frameAt(d, face ? W.bearing(d, [face.x, face.y, face.z]) : i*60)); g.position.set(d[0]*r, d[1]*r, d[2]*r); });
+}
 const toastQ = []; let toastUntil = 0; const toast = t => toastQ.push(t);
 function syncGame(){
   if (G.rev === lastRev) return; lastRev = G.rev; const st = G.state();
@@ -297,14 +390,25 @@ function syncGame(){
   W.BRIDGES.forEach((b, i) => { sk.bridges[i].locked = !G.bridgeOpen(b.name); });
   for (const D of draws){ const open = G.bridgeOpen(D.name), w = W.DRAWS.find(q => q.name === D.name).when; D.want = open ? 0 : 1; D.lamp.color.setRGB(open ? 0.4 : 2.4, open ? 2.4 : 0.3, open ? 1.2 : 0.3); postObj[D.name].userData.set(open ? 2 : G.zoneDone(w.zone) ? 1 : 0); }
   const asc = G.bridgeOpen('The Ascent'); portalObj.userData.lit(asc); bridgeMats.deck.opacity = asc ? 0.55 : 0; bridgeMats.rail.color.setRGB(asc ? 1.6 : 0.2, asc ? 0.9 : 0.2, asc ? 3.2 : 0.26);
+  { const door = G.doorOpen(0); if (gateObj['Crown door']) gateObj['Crown door'].userData.open(door); for (const s of solidObjs) if (s.tag === 'crowndoor') s.off = door;
+    if (altarObj['Mine altar']) altarObj['Mine altar'].userData.set(!!st.altar); for (const t of teleObj) t.userData.set(door); }
+  // the Court: what the giant hides, the diamonds as calves take them, the altar while it is asking, your purple
+  for (const o of siteObjs){ const q = o.userData.site, k = q.kind;
+    if (k === 'giant') o.visible = !st.giantUp; else if (k === 'giantup') o.visible = !!st.giantUp;
+    else if (k === 'diamond'){ o.visible = !!st.giantUp; o.userData.set(G.modelVariant(q.name, 'diamond') === 1); }
+    else if (k === 'altar' && q.name === 'Altar'){ o.visible = !!st.giantUp && !st.ceremony; o.userData.set(G.modelVariant('Altar', 'altar') === 2); } }
+  sk.SKIER.setOutfit(!!st.crowned); syncCrystals();
+  syncCrown();
   for (const z of [1, 2, 3, 4]) (groups[z] || []).forEach(f => f(z === 4 ? !!st.offered : G.zoneDone(z)));
   syncOrbs();
   try { localStorage.setItem(SAVE, G.serialize()); } catch (e) {}
 }
-const checkpoint = () => { const c = G.checkpoint(); return c ? v3(c) : null; };
+const checkpoint = () => { if (realm) return v3(realm === W.REALMS.mine ? realm.entry.d : realm.teleArrive.d); const c = G.checkpoint(); return c ? v3(c) : null; };
 function gameStep(dt){
-  const n = sk.n; G.update({ n: [n.x, n.y, n.z], ug: -1 }); syncGame();
+  const n = sk.n; G.update({ n: [n.x, n.y, n.z], ug: realm ? realm.layer : -1 }); syncGame(); portals();
+  if (pending){ fade = Math.min(1, fade + dt*3.2); if (fade >= 1) arrive(); } else fade = Math.max(0, fade - dt*2.4); $('fade').style.opacity = fade;
   while (G.toasts.length) toast(G.toasts.shift());
+  calves(dt);
   for (const D of draws){ D.up += (D.want - D.up)*Math.min(1, dt*1.4); for (const l of D.leaves) l.rotation.x = D.up*1.08; }
   const B = sk.onBridge; if (B && B.b.src.src === W.BRIDGE && B.i >= B.b.V.length - 6){ sk.S.vx = sk.S.vy = 0; if (!ended){ ended = true; showEnd(); } }
 }
@@ -316,10 +420,11 @@ $('offer').onclick = () => { G.confirm(); };
 // ================================================================ build, then go
 let sk = null;
 function boot(){
-  buildGround(); buildTrails(); buildScenery(); buildBridge(); buildDraws(); buildCosmic();
-  solidObjs = W.SOLIDS.map(s => ({ d: v3(s.d), r: s.r, gate: s.gate }));
-  sk = createSkier({ THREE, scene, camera, R, stop: W.STOP, height: W.height,
-    trails: W.TRAILS.map(t => ({ name: t.name, closed: t.closed, pts: t.pts.map(v3) })), junctions: W.JUNCTIONS.map(v3),
+  buildGround(); buildTrails(); buildScenery(); buildBridge(); buildDraws(); buildCosmic(); buildRealms(); buildCalves();
+  const RL = Object.values(W.REALMS);
+  solidObjs = W.SOLIDS.map(s => ({ d: v3(s.d), r: s.r, gate: s.gate })).concat(RL.flatMap(rl => rl.solids.map(s => ({ d: v3(s.d), r: s.r, tag: s.tag }))));
+  sk = createSkier({ THREE, scene, camera, R, stop: W.STOP, height: (x, y, z) => realm ? realm.height(x, y, z) : W.height(x, y, z),
+    trails: W.TRAILS.concat(RL.flatMap(rl => rl.trails)).map(t => ({ name: t.name, closed: t.closed, pts: t.pts.map(v3) })), junctions: W.JUNCTIONS.concat(RL.flatMap(rl => rl.junctions)).map(v3),
     bridges: W.BRIDGES.map(B => ({ pts: B.pts.map(v3), s: B.s, h: B.h, halfW: B.halfW, src: B })), solids: solidObjs, confirm: () => G.confirm(),
     start: v3(W.START.d), buildSkier: () => buildSkierV3(THREE), checkpoint, camdInput: { min: 6, max: 40, step: 0.5, get value(){ return sk ? sk.P.camd : 15; }, set value(v){ if (sk) sk.P.camd = +v; }, dispatchEvent(){} } });
   sk.fig.traverse(o => { if (o.isMesh && o.geometry.type !== 'CircleGeometry') o.castShadow = SHADOWS; });
@@ -328,7 +433,7 @@ function boot(){
   $('viewBtn').onclick = e => { sk.toggleView(); e.currentTarget.blur(); }; $('resetBtn').onclick = e => { sk.reset(); e.currentTarget.blur(); };
   addEventListener('keydown', e => { if (e.key.toLowerCase() === 'h' && !e.repeat) document.body.classList.toggle('clean'); });
   $('load').style.display = 'none';
-  window.__hale = { W, sk, G, scene, camera, renderer, get ended(){ return ended; }, set dayPhase(v){ dayPhase = v; }, get dayPhase(){ return dayPhase; }, place(lon, lat, brg){ const d = v3(W.ll(lon, lat)); sk.TEST.place(d); if (brg !== undefined){ const b = W.basis(W.ll(lon, lat)), r = brg*Math.PI/180, f = new V3(b[1][0]*Math.cos(r) + b[0][0]*Math.sin(r), b[1][1]*Math.cos(r) + b[0][1]*Math.sin(r), b[1][2]*Math.cos(r) + b[0][2]*Math.sin(r)); sk.S.th = sk.S.tgt = Math.atan2(f.dot(sk.ex), -f.dot(sk.ey)); } } };
+  window.__hale = { W, sk, G, scene, camera, renderer, get ended(){ return ended; }, get realm(){ return realm ? realm.key : null; }, go: key => go(key || null, key === 'mine' ? W.REALMS.mine.entry : key === 'station' ? W.REALMS.station.teleArrive : W.PORTAL.back), set dayPhase(v){ dayPhase = v; }, get dayPhase(){ return dayPhase; }, place(lon, lat, brg){ const d = v3(W.ll(lon, lat)); sk.TEST.place(d); if (brg !== undefined){ const b = W.basis(W.ll(lon, lat)), r = brg*Math.PI/180, f = new V3(b[1][0]*Math.cos(r) + b[0][0]*Math.sin(r), b[1][1]*Math.cos(r) + b[0][1]*Math.sin(r), b[1][2]*Math.cos(r) + b[0][2]*Math.sin(r)); sk.S.th = sk.S.tgt = Math.atan2(f.dot(sk.ex), -f.dot(sk.ey)); } } };
   requestAnimationFrame(frame);
 }
 // ---- the frame
@@ -354,10 +459,14 @@ function frame(now){
   sky.position.copy(camera.position);
   mother.position.copy(camera.position).addScaledVector(MOTHER, MOTHER_D); ringM.position.copy(mother.position); motherU.uDay.value = dayK; motherU.uSky.value.setRGB(0.30, 0.50, 0.86);
   moon.position.copy(camera.position).addScaledVector(MOON, R*9);
-  { const o = t*2*Math.PI/200; station.position.set(Math.cos(o)*R*2.1, Math.sin(o)*R*1.2, Math.sin(o)*R*1.7); station.rotation.y = t*0.05; station.rotation.x = 0.5; }
   finalMat.uniforms.expo.value = 1.1 + 0.3*(1 - dayK);
+  // underground there is no sun or sky, only lamps and ore; in orbit there is no air
+  const inMine = realm === W.REALMS.mine, inStn = realm === W.REALMS.station;
+  if (inMine){ sun.intensity = 0.0001; shine.intensity = 0; hemi.color.setRGB(0.20, 0.17, 0.16); hemi.groundColor.setRGB(0.07, 0.055, 0.05); scene.fog.color.setRGB(0.014, 0.011, 0.016); scene.fog.near = 30; scene.fog.far = 330; finalMat.uniforms.expo.value = 1.55; }
+  if (inStn){ scene.fog.near = 5000; scene.fog.far = 60000; skyU.uDay.value = 0.12*dayK; skyU.uTw.value = 0; skyU.uFog.value.setRGB(0.004, 0.003, 0.016); motherU.uDay.value = 0; hemi.color.setRGB(0.22, 0.25, 0.34); hemi.groundColor.setRGB(0.10, 0.11, 0.16); sun.intensity = Math.max(sun.intensity, 0.9); }
+  sky.visible = mother.visible = ringM.visible = moon.visible = !inMine;
   // skip what is round the back of the planet
-  const lim = viewK > 0.02 ? -2 : 0.42; for (const c of chunks) c.visible = c.userData.dir.dot(n) > lim - 0.12; for (const b of buckets) b.visible = b.userData.dir.dot(n) > lim;
+  const lim = inMine ? 2 : viewK > 0.02 || inStn ? -2 : 0.42; for (const c of chunks) c.visible = c.userData.dir.dot(n) > lim - 0.12; for (const b of buckets) b.visible = b.userData.dir.dot(n) > lim;
   const st = G.state(), powered = Object.keys(st.powered).length;
   if (heart){ awake += ((st.ceremony ? 1 : powered*0.05) - awake)*Math.min(1, dt); heart.userData.wake(awake*(0.85 + 0.15*Math.sin(t*1.1))); }
   { const k = 0.75 + 0.25*Math.sin(t*3); orbMat.color.setRGB(3.0*k, 1.9*k, 0.5*k); }
@@ -367,7 +476,7 @@ function frame(now){
 }
 function hud(now){
   const n = sk.n, kmh = sk.speed()*3.6, st = G.state(); $('kmh').firstChild.nodeValue = Math.round(kmh);
-  const where = sk.steep > 0 ? 'Too steep' : sk.onBridge ? sk.onBridge.b.src.src.name : sk.trailName || 'Ungroomed'; if (sk.steep > 0) sk.steep = Math.max(0, sk.steep - 0.12);
+  const where = sk.steep > 0 ? 'Too steep' : sk.onBridge ? sk.onBridge.b.src.src.name : sk.trailName || (realm ? realm.name : 'Ungroomed'); if (sk.steep > 0) sk.steep = Math.max(0, sk.steep - 0.12);
   $('where').textContent = where + (sk.mode ? ' · ' + sk.mode : '');
   const goal = G.goal(); $('goal').textContent = goal.title; $('detail').textContent = goal.detail || '';
   for (const z of W.ZONES.slice(0, 3)){ const [a, b] = G.zoneCount(z.id), p = $('pip' + z.id); p.lastChild.textContent = z.name + ' ' + a + '/' + b; p.classList.toggle('on', a === b); p.classList.toggle('here', a < b && (z.id === 1 || G.zoneDone(z.id - 1))); }
@@ -378,7 +487,15 @@ function hud(now){
   if (st.active){ const left = G.orbs().filter(o => !o.got); if (left.length){ target = nearest(left).d; label = 'Orb'; } else { target = W.TERMINALS.find(t => t.name === st.active).d; label = st.active; } }
   else { const z = [1, 2, 3].find(q => !G.zoneDone(q));
     if (z === 3 && !G.bridgeOpen('East drawbridge')){ target = W.GAME.bridges.find(b => b.name === 'East drawbridge').post; label = 'Bridge post'; }
-    else if (z){ const t = nearest(W.TERMINALS.filter(q => q.zone === z && !st.powered[q.name])); target = t.d; label = t.name; } }
+    else if (z){ const t = nearest(W.TERMINALS.filter(q => q.zone === z && !st.powered[q.name])); target = t.d; label = t.name; }
+    else if (!st.altar){ target = W.PORTAL.d; label = 'Mine'; }
+    else if (st.crystals.length < W.CRYSTALS.length){ target = nearest(G.crystals().filter(c => !c.got)).d; label = 'Crystal'; }
+    else if (!st.offered){ target = W.GATES.find(g => g.name === 'Crystal gate').d; label = 'Crystal gate'; }
+    else if (!st.giantUp){ target = st.calf !== null ? W.COURT.giant : nearest(G.calves().filter(c => c.state === 'herd')).d; label = st.calf !== null ? 'The giant' : 'Calf'; }
+    else if (!st.crowned){ target = st.calf !== null ? W.COURT.d : nearest(G.calves().filter(c => c.state === 'herd')).d; label = st.calf !== null ? 'The court' : 'Calf'; }
+    else if (!st.ceremony){ const all = st.crown.length >= W.GAME.underground.crownCrystals.d.length; target = all ? W.COURT.d : W.PORTAL.d; label = all ? 'The altar' : 'Mine'; }
+    else if (!ended){ target = W.BRIDGE.foot; label = 'The Ascent'; } }
+  if (realm) target = null;
   $('way').style.visibility = target ? 'visible' : 'hidden';
   if (target){ const tv = v3(target), d = tv.angleTo(n)*R, rel = tv.addScaledVector(n, -tv.dot(n)), brg = Math.atan2(rel.dot(sk.ex), -rel.dot(sk.ey)) - sk.heading();
     $('arrow').style.transform = 'rotate(' + (brg*180/Math.PI).toFixed(0) + 'deg)'; $('wayTxt').textContent = label + ' · ' + (d >= 1000 ? (d/1000).toFixed(1) + ' km' : Math.round(d) + ' m'); }

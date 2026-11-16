@@ -10,6 +10,7 @@ function createProps(THREE){
     steel: std(0x8f9aa6, { roughness: 0.55, metalness: 0.3 }), dark: std(0x39414b, { roughness: 0.7 }), panel: std(0xe4e9ef, { roughness: 0.6 }), orange: std(0xe8732a, { roughness: 0.6 }),
     glass: new THREE.MeshStandardMaterial({ color: C(0x9fd4ee), roughness: 0.08, metalness: 0.2, transparent: true, opacity: 0.38, side: THREE.DoubleSide }),
     bone: std(0xc7d3e2, { roughness: 0.92 }), boneDark: std(0x55647a, { roughness: 0.95 }), stone: std(0xdfe5ee, { roughness: 0.9 }), white: std(0xf3f5f8, { roughness: 0.55, flatShading: false }),
+    adobe: std(0x8a6a4e, { roughness: 0.95 }), adobe2: std(0x5e4534, { roughness: 0.95 }),
     gold: std(0xe6bf4f, { roughness: 0.35, metalness: 0.7 }), hide: std(0x3b2b47, { roughness: 0.9 }), antler: std(0x2a2033, { roughness: 0.8 }), tarp: std(0xd9622b, { roughness: 0.9, side: THREE.DoubleSide }), tarp2: std(0x8e3b2a, { roughness: 0.9, side: THREE.DoubleSide }),
     crystal: new THREE.MeshStandardMaterial({ color: C(0x8a5ce6), emissive: new THREE.Color(0.30, 0.10, 0.80), emissiveIntensity: 0.42, roughness: 0.12, metalness: 0.25, flatShading: true }),
     ore: new THREE.MeshStandardMaterial({ color: C(0x2f9fd8), emissive: new THREE.Color(0.1, 0.75, 1.5), emissiveIntensity: 1.0, roughness: 0.2, flatShading: true }),
@@ -61,6 +62,27 @@ function createProps(THREE){
   // the post that lowers a drawbridge
   B.post = () => { const lamp = lampMat(), g = G(cyl(0.3, 0.24, 1.5, MAT.dark, 0, 0, 0, 8), box(0.7, 0.5, 0.5, MAT.orange, 0, 1.6, 0), box(0.5, 0.3, 0.08, lamp, 0, 1.62, -0.27), cyl(0.05, 0.05, 1.3, MAT.steel, 0, 1.8, 0, 5), mesh(new THREE.SphereGeometry(0.16, 8, 6), lamp, 0, 3.15, 0));
     g.userData = { set(v){ lamp.color.setRGB(v === 2 ? 0.4 : v === 1 ? 2.6 : 2.4, v === 2 ? 2.4 : v === 1 ? 1.5 : 0.3, v === 2 ? 1.2 : 0.3); } }; g.userData.set(0); return g; };
+  // ---------------- under the ground and over it
+  // a cave dwelling: earthen boxes stacked two to four high, each a little smaller, lit windows, a torn awning (after the painting)
+  B.dwelling = (site) => { const rnd = (() => { let s = (site && site.seed) || 7; return () => (s = (s*16807) % 2147483647)/2147483647; })(), g = G(), n = (site && site.storeys) || 2; let w = 8 + rnd()*3, d = 7 + rnd()*2, y = 0, ox = 0, oz = 0;
+    for (let k = 0; k < n; k++){ const h = 3.2 + rnd()*0.8; g.add(box(w, h, d, k % 2 ? MAT.adobe2 : MAT.adobe, ox, y + h/2, oz), box(w + 0.5, 0.25, d + 0.5, MAT.adobe2, ox, y + h + 0.1, oz));
+      for (let q = 0; q < 3; q++) if (rnd() < 0.7) g.add(box(0.8, 1.1, 0.12, rnd() < 0.75 ? MAT.warm : MAT.adobe2, ox + (q - 1)*w*0.3, y + h*0.55, oz - d/2 - 0.03));
+      if (k === 0){ g.add(box(1.3, 2.2, 0.14, MAT.warm, ox + w*0.18, 1.1, oz - d/2 - 0.04)); const aw = box(w*0.7, 0.08, 2.6, rnd() < 0.5 ? MAT.tarp : MAT.tarp2, ox - w*0.1, h - 0.3, oz - d/2 - 1.2); aw.rotation.x = 0.28; g.add(aw); }
+      y += h + 0.2; ox += (rnd() - 0.5)*1.6; oz += rnd()*1.2; w *= 0.72 + rnd()*0.15; d *= 0.75 + rnd()*0.15; }
+    for (let q = 0; q < 2; q++) g.add(cyl(0.07, 0.07, 2.6, MAT.adobe2, ox + (q - 0.5)*1.6, y, oz, 4)); return g; };
+  B.lamp = () => G(cyl(0.1, 0.07, 3.2, MAT.dark, 0, 0, 0, 5), mesh(new THREE.SphereGeometry(0.26, 8, 6), MAT.warm, 0, 3.4, 0));
+  // the altar in the mine: a plinth and a crystal that wakes
+  B.altar = () => { const mat = MAT.crystal.clone(), halo = mesh(new THREE.TorusGeometry(2.6, 0.08, 6, 40), lampMat(), 0, 0.5, 0); halo.rotation.x = Math.PI/2; mat.emissiveIntensity = 0.08;
+    const g = G(cyl(2.4, 2.0, 0.9, MAT.stone, 0, 0, 0, 8), cyl(1.4, 1.2, 0.7, MAT.stone, 0, 0.9, 0, 8), shard(0.75, 3.6, mat).translateY(1.5), halo);
+    g.userData = { set(on){ mat.emissiveIntensity = on ? 2.2 : 0.08; halo.material.color.setRGB(on ? 1.9 : 0.05, on ? 0.8 : 0.06, on ? 3.2 : 0.08); } }; return g; };
+  // a teleporter pad: a ring on the floor and a hoop over it
+  B.telepad = () => { const lamp = lampMat(), ring = mesh(new THREE.TorusGeometry(3.2, 0.14, 6, 40), lamp, 0, 0.15, 0), hoop = mesh(new THREE.TorusGeometry(3.0, 0.22, 8, 40), MAT.steel, 0, 3.0, 0); ring.rotation.x = Math.PI/2;
+    const g = G(cyl(3.6, 3.4, 0.2, MAT.dark, 0, 0, 0, 20), ring, hoop, mesh(new THREE.CircleGeometry(2.8, 28), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 1.3, 2.6), transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false, fog: false }), 0, 3.0, 0));
+    g.userData = { set(on){ lamp.color.setRGB(on ? 0.5 : 0.05, on ? 2.0 : 0.06, on ? 2.8 : 0.08); g.children[3].material.opacity = on ? 0.5 : 0; } }; g.userData.set(false); return g; };
+  // the mine's mouth: a timbered frame set into a mound, lamps on the lintel
+  B.mineportal = () => { const lamp = lampMat(), g = G(box(1.0, 5.2, 1.0, MAT.dark, -3.4, 2.6, 0), box(1.0, 5.2, 1.0, MAT.dark, 3.4, 2.6, 0), box(8.6, 1.0, 1.2, MAT.orange, 0, 5.6, 0), box(5.8, 4.8, 0.3, new THREE.MeshBasicMaterial({ color: 0x000000 }), 0, 2.4, 0.5), box(0.5, 0.5, 0.3, lamp, -2.4, 5.0, -0.7), box(0.5, 0.5, 0.3, lamp, 2.4, 5.0, -0.7));
+    const mound = mesh(new THREE.SphereGeometry(8.5, 10, 6, 0, Math.PI*2, 0, Math.PI/2), MAT.boneDark, 0, -1.2, 6.5); mound.scale.set(1.15, 0.8, 1); g.add(mound);
+    g.userData = { open(on){ lamp.color.setRGB(on ? 0.4 : 2.6, on ? 2.4 : 0.35, on ? 1.2 : 0.2); } }; g.userData.open(false); return g; };
   // ---------------- Frostline-3
   B.dome = () => { const r = 12, g = G(cyl(r + 0.6, r + 0.2, 1.4, MAT.panel, 0, 0, 0, 24), mesh(new THREE.IcosahedronGeometry(r, 2), MAT.glass, 0, 1.2, 0));
     const frame = mesh(new THREE.IcosahedronGeometry(r*1.005, 2), new THREE.MeshBasicMaterial({ color: C(0x5b6978), wireframe: true }), 0, 1.2, 0); g.add(frame);
@@ -122,6 +144,12 @@ function createProps(THREE){
     if (robed){ const robe = mesh(new THREE.BoxGeometry(1.16, 1.25, 1.9), MAT.robes[site.robe % 4], 0, 1.72, 0.05); robe.scale.y = 1.0; g.add(robe, box(1.2, 0.1, 1.94, MAT.gold, 0, 1.1, 0.05), box(1.2, 0.1, 1.94, MAT.gold, 0, 2.36, 0.05));
       const crown = mesh(new THREE.CylinderGeometry(0.3, 0.26, 0.2, 8, 1, true), MAT.gold, 0, 3.0, -2.0); g.add(crown); for (let k = 0; k < 5; k++) g.add(mesh(new THREE.ConeGeometry(0.06, 0.24, 4), MAT.gold, Math.cos(k*1.257)*0.27, 3.2, -2.0 + Math.sin(k*1.257)*0.27)); }
     return g; };
+  // the giant: a moose the size of a hall, asleep on its side across the Broken Circle, snow drifted over it; and the same, standing
+  B.giant = () => { const m = B.moose({}); m.scale.setScalar(9); m.rotation.z = 1.32; m.position.set(0, 4.5, 4); const g = G(m);
+    for (let k = 0; k < 7; k++){ const sn = mesh(new THREE.SphereGeometry(4 + (k % 3)*1.5, 8, 6), MAT.white, (k - 3)*1.0 - 6 + (k % 2)*5, 8.6 + (k % 2), -9 + k*3.6); sn.scale.y = 0.35; g.add(sn); } return g; };
+  B.giantup = () => { const m = B.moose({}); m.scale.setScalar(9); return G(m); };
+  B.diamond = () => { const lamp = lampMat(), top = mesh(new THREE.CylinderGeometry(1.3, 1.5, 0.3, 4), lamp, 0, 0.32, 0), g = G(mesh(new THREE.CylinderGeometry(1.7, 1.9, 0.25, 4), MAT.stone, 0, 0.12, 0), top);
+    g.userData = { set(on){ lamp.color.setRGB(on ? 2.6 : 0.10, on ? 1.9 : 0.09, on ? 0.5 : 0.14); } }; g.userData.set(false); return g; };
   // ---------------- the Heartcrystal: 190 m of it, on the mound
   B.heart = () => { const mat = MAT.crystal.clone(); mat.emissiveIntensity = 0.4; const g = G(shard(26, 196, mat));
     const side = [[13, 120, 0.16, 0.05, 22, 6], [10, 92, -0.2, 0.12, -20, 10], [15, 140, 0.05, -0.18, 6, -24], [9, 70, -0.1, 0.24, -8, 24], [8, 58, 0.28, -0.1, 26, -12], [11, 104, -0.24, -0.14, -24, -12], [6, 44, 0.3, 0.2, 14, 26]];

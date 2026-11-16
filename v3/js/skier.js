@@ -884,8 +884,10 @@ function bridgeAssist(dt){
   const r = off*Math.min(1, 3.2*dt);
   if (skating) camPending -= r; else S.tgt += r;
 }
+// (v3) after being put down somewhere else entirely: the camera goes straight behind the skier, and the ski marks start again
+function snapCamera(){ camTh = S.th; camVel = camPending = focusLat = focusV = 0; camR = null; mode = null; weightLeg = null; lastLeg = null; kickDrive = null; S.thv = 0; clearMarks(); }
 resetSkier();
-return { bridgeAssist, S, P, n, ex, ey, TEST, fig, SKIER, step, poseFigure, placeCamera, pollPad, updateMarks, reset: resetSkier, speed, press, release, setTuck, setPlow,
+return { snapCamera, bridgeAssist, S, P, n, ex, ey, TEST, fig, SKIER, step, poseFigure, placeCamera, pollPad, updateMarks, reset: resetSkier, speed, press, release, setTuck, setPlow,
   bridges: bridgesG, surfaceR, heading: () => camTh,
   get mode(){ return mode; }, get onBridge(){ return ONB; }, get steep(){ return steepT; }, set steep(v){ steepT = v; }, get view(){ return viewOn; }, toggleView,
   get assist(){ return assistW; }, get trailName(){ return S.trailNames && S.trailNames.length ? S.trailNames.join(' / ') : (S.trail ? S.trail.name : null); } };

@@ -41,10 +41,32 @@ let pass = 0, fail = 0; const ok = (c, m) => { if (c) pass++; else { fail++; con
   // a reload keeps it
   await page.reload(); await page.waitForFunction(() => window.__hale, null, { timeout: 240000 });
   s = await st(); const kept = s.powered.length;
-  // the Ascent: dark until the ceremony; then up it to the ending
+  { const toFoot0 = () => page.evaluate(() => { const H = window.__hale, W = H.W, t = W.TRAILS[W.TRAILS.length - 1], p = t.pts[t.pts.length - 8], ll = W.toLL(p); H.place(ll[0], ll[1], W.bearing(p, t.pts[t.pts.length - 5])); }); await toFoot0(); await skate(12); s = await st(); ok(!s.onB, 'the Ascent is dark: not on the bridge'); }
+  // ---- chapters 4 to 9, played through the rules (placing the skier, pressing Enter at the offers)
+  const flags = () => page.evaluate(() => { const H = window.__hale, g = H.G.state(); return { realm: H.realm, altar: g.altar, crystals: g.crystals.length, offered: g.offered, calf: g.calf, giantUp: g.giantUp, taken: g.taken.length, crowned: g.crowned, crown: g.crown.length, ceremony: g.ceremony, prompt: H.G.prompt ? H.G.prompt.text : null, goal: H.G.goal().title, purple: H.sk.SKIER.mats.jacket.color.getHex() === 0x7b3fe0,
+    door: H.G.doorOpen(0), crownGate: H.G.gateOpen('Crown gate'), crystalGate: H.G.gateOpen('Crystal gate'), R: H.sk.P.R }; });
+  const inRealm = async r => { await page.waitForFunction(r => window.__hale.realm === r && +document.getElementById('fade').style.opacity < 0.2, r, { timeout: 90000 }); await wait(300); };
+  const WD = await page.evaluate(() => { const W = window.__hale.W; return { altar: W.REALMS.mine.altar, tele: W.REALMS.mine.tele, crown: W.GAME.underground.crownCrystals.d, crystals: W.CRYSTALS, cgate: W.GATES.find(g => g.name === 'Crystal gate').d, calves: W.COURT.calves, court: W.COURT.d }; });
+  await page.evaluate(() => { const G = window.__hale.G; G.cheat('zone3'); G.cheat('bridges'); }); await wait(300);
+  let f = await flags(); ok(f.goal === 'Go down the mine', 'the Cut live: the goal is the mine (' + f.goal + ')');
+  await placeOn('Adit Lane', -7); await skate(40); await inRealm('mine'); f = await flags(); ok(f.realm === 'mine' && f.R === 480, 'skiing into the portal takes you down the mine (shell ' + f.R + ' m)');
+  s = await st(); ok(s.trail === 'The Adit', 'and sets you on the Adit: ' + s.trail);
+  await skate(16); s = await st(); ok(s.v > 1 && s.off < 0.6, 'you can ski down there: ' + s.v.toFixed(1) + ' m/s, on the trail');
+  await placeAt(WD.altar); await wait(500); f = await flags(); ok(f.prompt === 'Wake the altar', 'the altar offers: ' + f.prompt); await page.keyboard.press('Enter'); await wait(400); f = await flags(); ok(f.altar, 'and wakes');
+  await placeAt(WD.tele); await wait(600); f = await flags(); ok(f.realm === 'mine' && !f.door, 'the crown door is shut, and the teleporter beyond it does nothing yet');
+  await page.evaluate(() => window.__hale.go(null)); await inRealm(null);
+  for (const c of WD.crystals){ await placeAt(c); await wait(220); } f = await flags(); ok(f.crystals === 20, 'the 20 crystals it raised are all found: ' + f.crystals);
+  await placeAt(WD.cgate); await wait(500); f = await flags(); ok(f.prompt === 'Offer the crystals', 'the Crystal gate offers: ' + f.prompt); await page.keyboard.press('Enter'); await wait(400); f = await flags(); ok(f.offered && f.crystalGate, 'and opens on the Court');
+  await placeAt(WD.calves[0]); await wait(400); f = await flags(); ok(f.calf === 0, 'a calf follows'); await placeAt(WD.court); await wait(700); f = await flags(); ok(f.giantUp, 'the giant wakes for it'); ok(f.taken === 1, 'and the calf takes a diamond');
+  for (const i of [1, 2]){ await placeAt(WD.calves[i]); await wait(400); await placeAt(WD.court); await wait(500); } f = await flags(); ok(f.taken === 3 && f.crowned, 'three calves crowned: you are crowned'); ok(f.purple, 'and wear the purple'); ok(f.door, 'the crown door knows you');
+  await page.evaluate(() => window.__hale.go('mine')); await inRealm('mine'); await placeAt(WD.tele); await inRealm('station'); f = await flags(); ok(f.realm === 'station' && f.R === 1500, 'the teleporter lifts you to the Orbital Gateway (shell ' + f.R + ' m)');
+  await skate(20); s = await st(); ok(s.v > 1 && !!s.trail, 'you can ski up there: ' + s.v.toFixed(1) + ' m/s on ' + s.trail);
+  for (const c of WD.crown){ await placeAt(c); await wait(200); } f = await flags(); ok(f.crown === 30, 'all 30 crown crystals: ' + f.crown);
+  await page.evaluate(() => window.__hale.go(null)); await inRealm(null);
+  await placeAt(WD.court); await wait(600); f = await flags(); ok(f.prompt === 'Offer the crown crystals', 'the Court\'s altar offers: ' + f.prompt); await page.keyboard.press('Enter'); await wait(500); f = await flags(); ok(f.ceremony && f.crownGate, 'the ceremony: the Crown gate opens');
+  await page.reload(); await page.waitForFunction(() => window.__hale, null, { timeout: 240000 }); f = await flags(); ok(f.ceremony && f.crowned && f.purple, 'and a reload keeps all of it');
+  // the Ascent, lit by the ceremony: up it to the ending
   const toFoot = () => page.evaluate(() => { const H = window.__hale, W = H.W, t = W.TRAILS[W.TRAILS.length - 1], p = t.pts[t.pts.length - 8], ll = W.toLL(p); H.place(ll[0], ll[1], W.bearing(p, t.pts[t.pts.length - 5])); });
-  await toFoot(); await skate(12); s = await st(); ok(!s.onB, 'the Ascent is dark: not on the bridge');
-  await page.evaluate(() => window.__hale.G.cheat('ceremony')); await wait(300);
   await toFoot(); const r0 = (await st()).r; await skate(26); s = await st(); ok(s.onB === 'The Ascent', 'lit: onto the Ascent'); ok(s.r > r0 + 1.5, 'and climbing: ' + r0.toFixed(1) + ' > ' + s.r.toFixed(1));
   await skate(40); { const q = await st(); ok(q.onB && q.bi > s.bi + 6 && q.v > 1.5, 'the bridge assist carries you round the curve: sample ' + s.bi + ' > ' + q.bi + ' at ' + q.v.toFixed(1) + ' m/s'); }
   await page.evaluate(() => { const H = window.__hale, B = H.sk.onBridge; if (!B) return; const V = B.b.V, i = V.length - 14, s = H.sk; s.n.copy(V[i]); B.i = i; s.ex.addScaledVector(s.n, -s.ex.dot(s.n)).normalize(); s.ey.crossVectors(s.ex, s.n).normalize(); const tn = V[i + 1].clone().sub(V[i]).normalize(); s.S.th = s.S.tgt = Math.atan2(tn.dot(s.ex), -tn.dot(s.ey)); s.S.vx = s.S.vy = 0; });

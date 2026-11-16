@@ -1,5 +1,5 @@
 // ============================================================================================================
-// (v3 copy of prototypes/game-core.js: only G.goal's first lines differ, to use the zones' own names.)
+// (v3 copy of prototypes/game-core.js: the rules are the same; the words name Hale's places.)
 // Skate Ski v2: the game's rules, apart from drawing and input (window.SkiGame; also loads in Node for tests).
 //
 // It reads a layout's `game` block (planets/v2-world.json: zones, terminals with their orbs, gates, bridges, crystals,
@@ -108,7 +108,7 @@ SG.create = function(game, R){
       if (st.altar && !st.offered) crystals.forEach((d, i) => { if (!st.crystals.includes(i) && near(d, REACH.crystal)){ st.crystals.push(i); bump(); G.toasts.push(`Crystal ${st.crystals.length} of ${crystals.length}`); } });
       const cg = gates['Crystal gate'];
       if (cg && !st.offered && near(cg.d, REACH.gate)){
-        if (st.altar && st.crystals.length >= crystals.length) prompt = { key: 'offer', text: 'Offer the crystals', detail: 'The gate is waiting', act: () => { st.offered = true; bump(); G.toasts.push('The Crystal gate opens, and the Crystal bridge lights beyond it'); } };
+        if (st.altar && st.crystals.length >= crystals.length) prompt = { key: 'offer', text: 'Offer the crystals', detail: 'The gate is waiting', act: () => { st.offered = true; bump(); G.toasts.push('The Crystal gate opens on the Court'); } };
         else hint = st.altar ? `The Crystal gate wants all ${crystals.length} crystals: you have ${st.crystals.length}` : 'The Crystal gate: sealed';
       }
       const sg = gates['South pass gate'];
@@ -123,11 +123,11 @@ SG.create = function(game, R){
         } else if (st.giantUp && near(court.d, REACH.court)){
           if (st.calf !== null && st.taken.length < NEED){
             st.taken.push(st.calf); st.calf = null; bump(); G.toasts.push(`The calf takes its diamond and is crowned: ${st.taken.length} of ${NEED}`);
-            if (st.taken.length >= NEED){ st.crowned = true; G.toasts.push(`The court dresses you in its purple, and the altar rises. It asks for ${crownD.length} crown crystals: the crown door in the mine will know you now`); }
-          } else if (!st.crowned) hint = `The court waits: ${st.taken.length} of ${NEED} calves crowned. The herds are across the plain`;
+            if (st.taken.length >= NEED){ st.crowned = true; G.toasts.push(`The court dresses you in its purple, and the altar rises. It asks for ${crownD.length} crown crystals: the crown door in the mine will know you now, and the teleporter behind it`); }
+          } else if (!st.crowned) hint = `The court waits: ${st.taken.length} of ${NEED} calves crowned. The herds are by the Circle Walk and Herd Lane`;
           else if (!st.ceremony && near(court.d, REACH.courtAltar)){
-            if (st.crown.length >= crownD.length) prompt = { key: 'ceremony', text: 'Offer the crown crystals', detail: 'The court is watching', act: () => { st.ceremony = true; bump(); G.toasts.push('The altar takes them and sinks away. Beside the court the Starway wakes, turning up into the sky toward the peak'); } };
-            else hint = `The altar asks for ${crownD.length} crown crystals: you have ${st.crown.length}. They are in the mine, behind the crown door`;
+            if (st.crown.length >= crownD.length) prompt = { key: 'ceremony', text: 'Offer the crown crystals', detail: 'The court is watching', act: () => { st.ceremony = true; bump(); G.toasts.push('The altar takes them and sinks away. Far to the north the Heartcrystal blazes, the Crown gate opens, and the Ascent lights'); } };
+            else hint = `The altar asks for ${crownD.length} crown crystals: you have ${st.crown.length}. They are on the Orbital Gateway, by the teleporter in the mine`;
           }
         }
         if (st.ceremony && !st.ended && starway && near(starway.top, REACH.top)){ st.ended = true; bump(); }
@@ -137,11 +137,11 @@ SG.create = function(game, R){
     } else if (UGD){
       const al = UGD.crystalAltar, tp = UGD.teleporter;
       if (al && ug === al.layer && near(al.d, REACH.altar)){
-        if (!st.altar) prompt = { key: 'altar', text: 'Wake the altar', detail: 'Something old is sleeping here', act: () => { st.altar = true; bump(); G.toasts.push('The altar wakes. Far above, in the Bowl, a bridge of light reaches for the highlands'); } };
+        if (!st.altar) prompt = { key: 'altar', text: 'Wake the altar', detail: 'Something old is sleeping here', act: () => { st.altar = true; bump(); G.toasts.push('The altar wakes. Up on the surface, crystals rise out of the snow along the trails you have skied'); } };
         else hint = 'The altar: awake';
       }
       if (tp && ug === tp.layer && near(tp.d, REACH.room)) toast('The teleporter is dead. The old workings run on past it', 'teleporter');
-      if (st.crowned && !st.ceremony && ug === G.crownLayer) crownD.forEach((d, i) => { if (!st.crown.includes(i) && near(d, REACH.crystal)){ st.crown.push(i); bump(); G.toasts.push(st.crown.length >= crownD.length ? `All ${crownD.length} crown crystals: back to the Broken Circle` : `Crown crystal ${st.crown.length} of ${crownD.length}`); } });
+      if (st.crowned && !st.ceremony && ug === G.crownLayer) crownD.forEach((d, i) => { if (!st.crown.includes(i) && near(d, REACH.crystal)){ st.crown.push(i); bump(); G.toasts.push(st.crown.length >= crownD.length ? `All ${crownD.length} crown crystals: back down the teleporter, and to the Broken Circle` : `Crown crystal ${st.crown.length} of ${crownD.length}`); } });
       const cdr = UGD.crownDoor;
       if (cdr && !st.crowned && cdr.d && near(cdr.d, REACH.closed)) hint = 'The crown door: it opens for the court\'s purple';
     }
@@ -159,17 +159,16 @@ SG.create = function(game, R){
     if (!G.zoneDone(2)) return { title: 'Restore power in ' + zn(2), detail: zoneLine(2) };
     if (!Object.keys(st.lowered).length) return { title: 'Lower the drawbridge over the canyon', detail: 'Ski up to the control post at the end of Haul Road' };
     if (!G.zoneDone(3)) return { title: 'Restore power in ' + zn(3), detail: zoneLine(3) };
-    if (!UGD) return { title: zn(3) + ' is live', detail: 'The mine is the next chapter, and is not built yet' };
-    if (!st.altar) return { title: 'Go down the mine', detail: 'The portal at the deep pit is open' };
-    if (st.crystals.length < crystals.length) return { title: 'Find the crystals in the highlands', detail: `${st.crystals.length} of ${crystals.length} · the Highland bridge starts in the Bowl` };
-    if (!st.offered) return { title: 'Take the crystals to the Crystal gate', detail: 'At the far end of the highlands' };
+    if (!st.altar) return { title: 'Go down the mine', detail: 'Its mouth is at the middle of the Pit Ring, down Adit Lane' };
+    if (st.crystals.length < crystals.length) return { title: 'Find the crystals the altar raised', detail: `${st.crystals.length} of ${crystals.length} · on the trails of Frostline, Frostveil and the Cut` };
+    if (!st.offered) return { title: 'Take the crystals to the Crystal gate', detail: 'On Antler Way, west out of Frostline' };
     if (!court) return { title: 'Cross the Crystal bridge to the south plain', detail: '' };
-    if (st.ended) return { title: 'The end', detail: 'The observatory, at the top of the Starway' };
-    if (st.ceremony) return { title: 'Ride the Starway', detail: 'It starts beside the Broken Circle and ends at the observatory on the peak' };
+    if (st.ended) return { title: 'The end', detail: 'The top of the Heartcrystal' };
+    if (st.ceremony) return { title: 'Climb the Ascent', detail: 'North out of Frostline up Crystal Road, through the Crown gate, and round the Heartcrystal' };
     if (st.crowned) return st.crown.length >= crownD.length ? { title: 'Take the crown crystals to the Broken Circle', detail: 'The altar is waiting' }
-      : { title: 'Find the crown crystals', detail: `${st.crown.length} of ${crownD.length} · in the mine, behind the crown door on the deep landing` };
-    if (!st.giantUp) return st.calf !== null ? { title: 'Take the calf to the sleeping giant', detail: 'On the Broken Circle, across the south plain' } : { title: 'Cross to the south plain', detail: 'The herds are there, and something vast is asleep on the Broken Circle' };
-    return { title: 'Bring calves to the court', detail: `${st.taken.length} of ${NEED} crowned` + (st.calf !== null ? ' · one is following you' : ' · the herds are across the plain') };
+      : { title: 'Find the crown crystals', detail: `${st.crown.length} of ${crownD.length} · on the Orbital Gateway: its teleporter is behind the crown door in the mine` };
+    if (!st.giantUp) return st.calf !== null ? { title: 'Take the calf to the sleeping giant', detail: 'On the Broken Circle, on the north side of the Court Round' } : { title: 'Go into the Court', detail: 'The herds are there, and something vast is asleep on the Broken Circle' };
+    return { title: 'Bring calves to the court', detail: `${st.taken.length} of ${NEED} crowned` + (st.calf !== null ? ' · one is following you' : ' · the herds are by the Circle Walk and Herd Lane') };
   };
 
   // saving: plain JSON. restore takes what it can from an older or damaged save rather than failing

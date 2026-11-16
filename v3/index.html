@@ -31,6 +31,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 #btns{top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;display:flex;gap:8px;position:fixed}
 button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;cursor:pointer}
 button:hover{border-color:var(--cyan)}
+#fade{position:fixed;inset:0;background:#05060c;opacity:0;pointer-events:none;z-index:5}
 #toast{position:fixed;left:50%;top:22%;transform:translateX(-50%);padding:10px 18px;font-size:16px;font-weight:600;text-align:center;opacity:0;transition:opacity .4s;pointer-events:none;max-width:86vw}
 #toast.on{opacity:1}
 #help{bottom:14px;left:12px;padding:8px 12px;font-size:11.5px;color:var(--muted);max-width:300px}
@@ -57,6 +58,7 @@ body.clean .card,body.clean #btns{display:none!important}
 <div id="hint" class="card"></div>
 <div class="pads" aria-hidden="true"><div class="pad" id="padL">Left kick</div><div class="pad" id="padR">Right kick</div></div>
 <div id="end"><h2>HALE</h2><p id="endTxt"></p><div><button id="keepBtn">Keep skiing</button> <button id="newBtn">New game</button></div></div>
+<div id="fade"></div>
 <div id="load"><h2>HALE</h2><p id="loadTxt">Shaping the planet…</p></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="js/world.js"></script>

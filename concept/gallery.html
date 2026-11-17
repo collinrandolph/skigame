@@ -4,14 +4,15 @@
 #info{position:fixed;bottom:12px;left:12px;color:#9fb2cc;font-size:12px}</style></head><body><canvas id="c"></canvas>
 <div id="bar"><select id="pick"></select><button id="prev">Prev</button><button id="next">Next</button><button id="night">Night</button></div><div id="info"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="../v4/js/skier-anim.js"></script><script src="../v4/js/figure.js"></script><script src="../v4/js/props.js"></script><script src="models.js"></script>
+<script src="../v4/js/skier-anim.js"></script><script src="../v4/js/figure.js"></script><script src="../v4/js/props.js"></script><script src="models.js"></script><script src="models2.js"></script>
 <script>
 // Every model on a turntable: the game's props (v4/js/props.js), the skier, and the standalone concept models (models.js).
 const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping;
 const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(45, 1, 0.1, 5000), P = createProps(THREE), C = createConcept(THREE, P);
 const sun = new THREE.DirectionalLight(0xfff2dd, 1.1); sun.position.set(40, 70, 30); const hemi = new THREE.HemisphereLight(0x9cc4ff, 0x8a8fa0, 0.65); scene.add(sun, hemi);
 const ground = new THREE.Mesh(new THREE.CircleGeometry(600, 64), new THREE.MeshStandardMaterial({ color: 0xe8eef6, roughness: 0.95 })); ground.rotation.x = -Math.PI/2; scene.add(ground);
-const items = {}; for (const k of Object.keys(C)) items['Concept · ' + k] = () => C[k](); for (const k of Object.keys(P.build)) items['Game · ' + k] = () => P.build[k]({ seed: 9, storeys: 3, robe: 1 });
+const C2 = createConcept2(THREE, P);
+const items = {}; for (const k of Object.keys(C2)) items['New · ' + k] = () => C2[k](); for (const k of Object.keys(C)) items['Concept · ' + k] = () => C[k](); for (const k of Object.keys(P.build)) items['Game · ' + k] = () => P.build[k]({ seed: 9, storeys: 3, robe: 1 });
 items['Game · skier'] = () => { const s = buildSkierV3(THREE); try { s.pose({ lv: 0, rv: 0, speed: 0, t: 0 }); } catch (e) {} return s.rig; };
 const pick = document.getElementById('pick'), names = Object.keys(items); names.forEach(n => { const o = document.createElement('option'); o.textContent = n; pick.appendChild(o); });
 let cur = null, rad = 30, mid = 5, night = false;

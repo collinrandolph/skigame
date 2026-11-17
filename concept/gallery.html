@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hale · concept gallery</title>
+<style>html,body{margin:0;height:100%;background:#0b1020;color:#eaf2ff;font:14px ui-sans-serif,system-ui,sans-serif;overflow:hidden}canvas{position:fixed;inset:0;width:100%;height:100%}
+#bar{position:fixed;top:12px;left:12px;right:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}select,button{font:inherit;color:#eaf2ff;background:rgba(10,16,30,.7);border:1px solid rgba(160,190,255,.3);border-radius:8px;padding:7px 10px}
+#info{position:fixed;bottom:12px;left:12px;color:#9fb2cc;font-size:12px}</style></head><body><canvas id="c"></canvas>
+<div id="bar"><select id="pick"></select><button id="prev">Prev</button><button id="next">Next</button><button id="night">Night</button></div><div id="info"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="../v4/js/skier-anim.js"></script><script src="../v4/js/figure.js"></script><script src="../v4/js/props.js"></script><script src="models.js"></script><script src="models2.js"></script>
+<script>
+// Every model on a turntable: the game's props (v4/js/props.js), the skier, and the standalone concept models (models.js).
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(45, 1, 0.1, 5000), P = createProps(THREE), C = createConcept(THREE, P);
+const sun = new THREE.DirectionalLight(0xfff2dd, 1.1); sun.position.set(40, 70, 30); const hemi = new THREE.HemisphereLight(0x9cc4ff, 0x8a8fa0, 0.65); scene.add(sun, hemi);
+const ground = new THREE.Mesh(new THREE.CircleGeometry(600, 64), new THREE.MeshStandardMaterial({ color: 0xe8eef6, roughness: 0.95 })); ground.rotation.x = -Math.PI/2; scene.add(ground);
+const C2 = createConcept2(THREE, P);
+const items = {}; for (const k of Object.keys(C2)) items['New · ' + k] = () => C2[k](); for (const k of Object.keys(C)) items['Concept · ' + k] = () => C[k](); for (const k of Object.keys(P.build)) items['Game · ' + k] = () => P.build[k]({ seed: 9, storeys: 3, robe: 1 });
+items['Game · skier'] = () => { const s = buildSkierV3(THREE); try { s.pose({ lv: 0, rv: 0, speed: 0, t: 0 }); } catch (e) {} return s.rig; };
+const pick = document.getElementById('pick'), names = Object.keys(items); names.forEach(n => { const o = document.createElement('option'); o.textContent = n; pick.appendChild(o); });
+let cur = null, rad = 30, mid = 5, night = false;
+function show(n){ if (cur) scene.remove(cur); cur = items[n](); scene.add(cur); const b = new THREE.Box3().setFromObject(cur), s = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3()); rad = Math.max(4, Math.max(s.x, s.z)*0.9 + s.y*0.9); mid = c.y; cur.position.x -= c.x; cur.position.z -= c.z;
+  document.getElementById('info').textContent = n + ' · ' + s.x.toFixed(0) + ' × ' + s.y.toFixed(0) + ' × ' + s.z.toFixed(0) + ' m'; pick.value = n; location.hash = encodeURIComponent(n); }
+pick.onchange = () => show(pick.value); const step = d => show(names[(names.indexOf(pick.value) + d + names.length) % names.length]); document.getElementById('prev').onclick = () => step(-1); document.getElementById('next').onclick = () => step(1);
+document.getElementById('night').onclick = () => { night = !night; sun.intensity = night ? 0.12 : 1.1; hemi.intensity = night ? 0.22 : 0.65; hemi.color.set(night ? 0x6a4cc0 : 0x9cc4ff); scene.background = new THREE.Color(night ? 0x070512 : 0x9fc3ea); };
+scene.background = new THREE.Color(0x9fc3ea);
+function size(){ renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); } addEventListener('resize', size); size();
+const want = decodeURIComponent(location.hash.slice(1)); show(names.includes(want) ? want : names[0]); window.__gallery = { names, show };
+(function frame(t){ requestAnimationFrame(frame); const a = t*0.0003; camera.position.set(Math.cos(a)*rad, mid + rad*0.35, Math.sin(a)*rad); camera.lookAt(0, mid, 0); renderer.render(scene, camera); })(0);
+</script></body></html>

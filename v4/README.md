@@ -27,18 +27,21 @@ python3 -m http.server 8000        # from the repo root, on branch v4
 
 ## State
 
-Done and seen working in the automated playthrough (`tools/play.js`, headless Chromium, 48 of 52 on its one full run):
+Seen working in the automated playthrough (`tools/play.js`, headless Chromium, **51 of 52** on its last run):
 
 - Boot on the owner's terrain; skating, tuck, plow; trail assist.
-- A shut gate holds; a terminal from offer to powered; the drawbridge up, lowered, and carrying you.
-- Skiing off the end of the Pit Road through the door into the mine; the altar; the Highland bridge lighting.
+- A shut gate holds; a terminal from offer to powered; the gate opens; the drawbridge up, lowered, and carrying you.
+- Skiing off the end of the Pit Road through the door into the mine, and skiing on inside it (1.6 m/s after a few kicks); the altar; the Highland bridge lighting.
 - The three rings, and the surface ring waking.
 - 20 highland crystals; the Crystal gate; the calves, giant and crown; 30 crown crystals in the crown room; the ceremony; the steps lighting; the First Step carrying you; the last step ending the game at the summit; save across reloads.
 - `tools/zones.js`: the four zones, the highlands and the summit are six separate grounds at the stop slope (0.4) and at 1.2 times it; the pit floor is sealed while the mine portal is shut.
 
+The one failing check: in the mine's adit the skier is more than 0.7 m off the trail's centre line after 16 kicks. They are moving and not stuck; trail assist may be weak there, or the check too tight. Not looked into.
+
+For the later chapters the test puts the skier down at each place; it does not ski the distances between.
+
 **Not verified:**
 
-- **A fix made after that run has not been re-tested.** The mine was laid out a few degrees off the door's line, so you could not ski on from the door (the one real failure of the four). `world.js` now takes the mine's frame from the bearing back to the door. Run `node tools/play.js` and check "you can ski down there". The other three failures were test thresholds, since loosened.
 - No person has played v4. Nobody has skied the Pit Road, the steps or the networks end to end.
 - Frame rate on real hardware; controller and touch.
 
@@ -55,7 +58,7 @@ Done and seen working in the automated playthrough (`tools/play.js`, headless Ch
 
 | Step | Model |
 |---|---|
-| Run `tools/play.js`; fix what fails (start with the mine's alignment) | Sonnet |
+| Look into the one failing check (trail assist in the mine's adit) | Sonnet |
 | Playtest; tune loop sizes and counts in `tools/v4/build.py` (`PLAN`, `SPURS`) and rebuild `data/layout.js` | Owner, then Sonnet |
 | Port `tools/world/audit_views.py` to v4's world and fill what it finds, by the rules in `V3-IDEAS.md` (sites, one motif per trail, named landmarks) | Opus |
 | The river: an ice surface along the trench | Opus |
